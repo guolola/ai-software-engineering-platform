@@ -1,10 +1,17 @@
 // Resolves public OSS video URLs while allowing deploy-time Vite overrides.
+const DEFAULT_PUBLIC_VIDEO_BASE_URL =
+  "https://tuolola.oss-cn-chengdu.aliyuncs.com/video";
+
+function defaultPublicVideoUrl(fileName: string) {
+  return `${DEFAULT_PUBLIC_VIDEO_BASE_URL}/${encodeURIComponent(fileName)}`;
+}
+
 const DEFAULT_TUTORIAL_QUICK_START_VIDEO_URL =
-  "https://guolola.oss-cn-hangzhou.aliyuncs.com/video/%E9%A1%B9%E7%9B%AE%E6%BC%94%E7%A4%BA.mp4";
+  defaultPublicVideoUrl("项目演示.mp4");
 const DEFAULT_WORKFLOW_CHAIN_VIDEO_URL =
-  "https://guolola.oss-cn-hangzhou.aliyuncs.com/video/trusted-chain-demo.mp4";
+  defaultPublicVideoUrl("使用流程.mp4");
 const DEFAULT_MARKETING_PROMO_VIDEO_URL =
-  "https://guolola.oss-cn-hangzhou.aliyuncs.com/video/trusted-chain-evidence-film.mp4";
+  defaultPublicVideoUrl("平台介绍.mp4");
 
 function envVideoUrl(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim().length > 0

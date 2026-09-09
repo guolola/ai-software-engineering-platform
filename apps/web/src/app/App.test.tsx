@@ -1545,7 +1545,7 @@ describe("App shell routes", () => {
     expect(dialog.querySelector('[aria-label*="产品"]')).not.toBeInTheDocument();
     expect(promoVideo.querySelector("source")).toHaveAttribute(
       "src",
-      "https://guolola.oss-cn-hangzhou.aliyuncs.com/video/trusted-chain-evidence-film.mp4",
+      "https://tuolola.oss-cn-chengdu.aliyuncs.com/video/%E5%B9%B3%E5%8F%B0%E4%BB%8B%E7%BB%8D.mp4",
     );
     expect(promoVideo).toHaveAttribute("autoplay");
   });
@@ -1879,7 +1879,7 @@ describe("App shell routes", () => {
     const workflowVideo = screen.getByLabelText("可信链路功能演示视频");
     expect(workflowVideo.querySelector("source")).toHaveAttribute(
       "src",
-      "https://guolola.oss-cn-hangzhou.aliyuncs.com/video/trusted-chain-demo.mp4",
+      "https://tuolola.oss-cn-chengdu.aliyuncs.com/video/%E4%BD%BF%E7%94%A8%E6%B5%81%E7%A8%8B.mp4",
     );
     expect(screen.getAllByTestId("workflow-motion-card").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("marketing-fit-page")).not.toBeInTheDocument();

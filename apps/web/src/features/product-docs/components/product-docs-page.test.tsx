@@ -30,7 +30,7 @@ describe("ProductDocsPage", () => {
     expect(quickStartVideo).toBeInTheDocument();
     expect(quickStartVideo.querySelector("source")).toHaveAttribute(
       "src",
-      "https://guolola.oss-cn-hangzhou.aliyuncs.com/video/%E9%A1%B9%E7%9B%AE%E6%BC%94%E7%A4%BA.mp4",
+      "https://tuolola.oss-cn-chengdu.aliyuncs.com/video/%E9%A1%B9%E7%9B%AE%E6%BC%94%E7%A4%BA.mp4",
     );
     expect(screen.getAllByRole("table").length).toBeGreaterThan(0);
     for (const category of PRODUCT_DOC_CATEGORIES) {
@@ -265,7 +265,7 @@ describe("ProductDocsPage", () => {
 
     expect(quickStart?.video).toMatchObject({
       title: "快速开始项目演示视频",
-      src: "https://guolola.oss-cn-hangzhou.aliyuncs.com/video/%E9%A1%B9%E7%9B%AE%E6%BC%94%E7%A4%BA.mp4",
+      src: "https://tuolola.oss-cn-chengdu.aliyuncs.com/video/%E9%A1%B9%E7%9B%AE%E6%BC%94%E7%A4%BA.mp4",
     });
   });
 
