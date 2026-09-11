@@ -1,69 +1,47 @@
-# API Service
+<!-- 说明 API 服务的职责、边界、运行配置与验证入口。 -->
 
-默认监听 `http://127.0.0.1:4001`。
+# API 服务
 
-常用命令：
+## 职责
+
+提供账号、项目、需求、模型、设计、代码、测试、文档、支付和生成任务等 HTTP/SSE 接口，并编排生成流水线与持久化。
+
+## 边界
+
+- `src/routes/<domain>/` 负责注册端点、解析契约并调用流水线或适配器。
+- `src/runs/pipelines/` 负责业务阶段、事件与状态迁移。
+- `src/runs/records/` 负责运行记录和生命周期状态。
+- `src/adapters/` 负责模型、PlantUML、渲染与文件转换等外部系统。
+- `src/documents/` 负责文档上下文、章节和 DOCX 组装。
+
+入口文件 `src/index.ts` 只保留兼容导出和服务组装，不承载新的业务职责。
+
+## 使用或常用命令
 
 ```bash
-npm run dev:api
-npm run build:api
+npm run dev --workspace @uml-platform/api
+npm run build --workspace @uml-platform/api
+npm run test --workspace @uml-platform/api
+```
+
+根目录的 `npm run dev` 会以本地安全配置启动 API，并将端口设为 `4101`；工作区单独启动时默认端口为 `4001`。
+
+## 配置
+
+生产配置从部署目录外的 `production.env` 加载，至少需要数据库、跨域、模型供应商加密、邮件、渲染和文档存储相关变量。不要在仓库内保存真实凭据。
+
+## 验证
+
+```bash
+npm run build:contracts
+npm run build:prompts
 npm run test:api
 ```
 
-根目录的 `npm run dev` 会为本地 API 自动注入说明书编辑器所需变量，并检查/启动
-`onlyoffice-documentserver` Docker 容器。直接单独运行 `npm run dev:api` 时不会自动
-注入这些变量；如果需要单独调 API 并打开 OnlyOffice，请从根目录运行：
+运行服务后检查 `/api/health` 和 `/api/version`。
 
-```powershell
-npm run dev:office
-npm run dev:api:safe
-```
+## 相关文档
 
-依赖：
-
-- Model Provider 流式聊天接口 `POST /v1/chat/completions`
-- 渲染服务默认地址 `http://127.0.0.1:4002`
-
-Provider 配置约定：
-
-- 前端设置中的 `Base URL` 只填写 `https://<your_api_provider>`
-- API 服务会固定拼接 `/v1/chat/completions`
-- `API Key` 以 `Authorization: Bearer <key>` 方式透传给模型服务
-
-环境变量：
-
-- `API_HOST`
-- `API_PORT`
-- `RENDER_SERVICE_BASE_URL`
-- `ONLYOFFICE_DOCUMENT_SERVER_URL`：OnlyOffice Document Server 地址，可为 HTTP 或 HTTPS。
-- `PUBLIC_API_BASE_URL`：OnlyOffice 容器可访问的平台 API 公网地址。
-- `ONLYOFFICE_JWT_SECRET`：OnlyOffice Docs JWT 密钥，需与 Document Server 配置一致。
-- `ONLYOFFICE_ACCESS_TOKEN_SECRET`：说明书 file/callback 短期访问 token 密钥，未配置时回退到 `ONLYOFFICE_JWT_SECRET`。
-- `UML_DOCUMENT_STORAGE_DIR`：说明书持久化目录，生产环境建议放到 release 目录之外。
-
-说明书编辑器使用登录后的项目作用域隔离：前端只发送项目上下文，API 通过
-项目成员权限返回当前项目下的说明书。OnlyOffice 访问 DOCX 文件和保存回调时
-使用短期签名 URL，不依赖浏览器 header。
-
-如果 `4001` 端口被本机其他程序占用，可临时改端口启动：
-
-```powershell
-$env:API_PORT=4101
-npm run dev:api
-```
-
-本地 OnlyOffice 排查：
-
-```powershell
-docker version
-where.exe docker
-curl http://127.0.0.1:8080/healthcheck
-curl http://127.0.0.1:4101/api/version
-```
-
-如果 `where.exe docker` 找不到 Docker CLI，请安装 Docker Desktop，或把
-`C:\Program Files\Docker\Docker\resources\bin` 加入 PATH 后重新打开 PowerShell。
-如果 Docker 命令存在但 daemon 不可用，请启动 Docker Desktop 并等待它就绪。
-`/api/version` 中 `features.onlyOfficeDocumentServerConfigured` 为 `false` 时，说明 API
-进程没有拿到 `ONLYOFFICE_DOCUMENT_SERVER_URL`；使用根目录 `npm run dev` 或
-`npm run dev:api:safe` 启动即可。
+- [平台架构](../../docs/architecture/platform-overview.md)
+- [生产环境配置](../../docs/deployment/production-environment.md)
+- [模型供应商集成](../../docs/integrations/openai-compatible-provider.md)

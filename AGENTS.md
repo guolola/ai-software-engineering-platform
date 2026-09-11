@@ -17,6 +17,17 @@ This repository is a TypeScript monorepo for the UML experimental platform. Keep
 - Do not add noisy line-by-line comments or comments that merely restate the code.
 - Generated code should include useful intent comments around important logic so future Codex runs and human maintainers can quickly understand the design.
 
+## Documentation Standards
+
+- Project-authored Markdown files and documentation directories use lowercase English `kebab-case`; only protocol files named `README.md`, `AGENTS.md`, and `SKILL.md` keep their conventional uppercase names.
+- Do not create active documentation whose filename contains a date or process-state terms such as `plan`, `audit`, `final`, `followup`, or `fixes`. Merge durable conclusions into the relevant topic document instead.
+- Every Markdown file has exactly one H1 and non-skipping heading levels. Start non-protocol Markdown files with a short HTML responsibility comment.
+- Technical documents under `docs/` use the sections `概述`, `当前设计或配置`, `操作与维护`, `验证`, and `相关文档`, plus maintenance status, target audience, and factual source metadata.
+- In-app user guides use `适用场景`, `入口位置`, `前置条件`, `操作步骤`, `结果与产物`, `映射关系`, and `常见问题`. Service and component READMEs use `职责`, `边界`, `使用或常用命令`, `配置`, `验证`, and `相关文档`.
+- Use relative `/`-separated internal links. Never include local absolute paths, test accounts, real secrets, or unnecessary production server addresses in documentation.
+- Do not commit historical planning notes, audit logs, temporary screenshots, local documents, workspace secrets, or generated Sandpack files. The runtime Skill Markdown under `apps/api/src/code-skills/ui-ux-pro-max/` is exempt from ordinary documentation rewriting.
+- Run `npm run audit:docs` before committing documentation changes.
+
 ## API Layering
 
 - Keep `apps/api/src/index.ts` focused on entrypoint compatibility and server assembly; do not add new business responsibilities there.

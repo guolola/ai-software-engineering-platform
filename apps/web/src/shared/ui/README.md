@@ -1,12 +1,33 @@
-# Shared UI
+<!-- 说明 Web 共享 UI 层的职责、边界和验证要求。 -->
 
-This directory owns the project-level UI primitives for the web app. Components here should be reusable across feature domains, styled with Tailwind classes backed by `src/app/styles/theme.css`, and composed from Radix primitives when they need popovers, dialogs, menus, selection, focus management, or keyboard behavior.
+# 共享 UI
 
-Feature-specific UI belongs in `src/features/*/components` until it is reused across multiple domains. Keep business state, API calls, routing decisions, and workflow rules out of this directory.
+## 职责
 
-When adding or changing a shared component:
+提供跨页面复用的基础视觉组件、交互约定和可访问性能力，保持平台界面行为一致。
 
-- prefer existing shared primitives and `cn` before introducing another abstraction;
-- use `lucide-react` for icon buttons when a matching icon exists;
-- preserve accessible names, disabled states, focus-visible styles, and dark mode behavior;
-- add focused Vitest / Testing Library coverage for reusable behavior or user-visible state changes.
+## 边界
+
+共享 UI 不包含具体业务流程、服务请求或页面级状态。业务组合放在 `features`，领域数据放在 `entities`，页面编排放在 `app`。
+
+## 使用或常用命令
+
+优先复用现有组件和样式约定；新增组件时保持受控属性清晰，并为交互控件提供可访问名称。
+
+```bash
+npm run test:web
+npm run typecheck:web
+```
+
+## 配置
+
+组件应复用现有设计变量和主题机制，不在组件内写入环境相关地址或业务凭据。
+
+## 验证
+
+覆盖关键状态、键盘操作、禁用原因和用户可见反馈，并在生产构建中检查样式与资源。
+
+## 相关文档
+
+- [平台架构](../../../../../docs/architecture/platform-overview.md)
+- [仓库治理规范](../../../../../docs/development/repository-hygiene.md)

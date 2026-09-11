@@ -48,6 +48,9 @@ jobs:
           npm run build:contracts
           npm run build:prompts
 
+      - name: Audit documentation
+        run: npm run audit:docs
+
       - name: Test
         run: |
           npm run test:contracts

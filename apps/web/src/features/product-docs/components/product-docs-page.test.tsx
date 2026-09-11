@@ -40,7 +40,7 @@ describe("ProductDocsPage", () => {
       screen.getByRole("button", { name: /模型详情页、元素列表与追踪矩阵/u }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /推荐模型/u }),
+      screen.getByRole("button", { name: /模型选择指南/u }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /配置 Provider/u }),
@@ -110,9 +110,9 @@ describe("ProductDocsPage", () => {
       within(sidebar).getByRole("button", { name: /需求 UML 模型与图表查看/u }),
     ).toBeInTheDocument();
 
-    fireEvent.change(searchInput, { target: { value: "推荐模型" } });
+    fireEvent.change(searchInput, { target: { value: "模型选择" } });
     expect(
-      within(sidebar).getByRole("button", { name: /推荐模型/u }),
+      within(sidebar).getByRole("button", { name: /模型选择指南/u }),
     ).toBeInTheDocument();
 
     fireEvent.change(searchInput, { target: { value: "Provider" } });

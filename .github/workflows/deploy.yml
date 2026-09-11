@@ -76,6 +76,9 @@ jobs:
           npm run build:contracts
           npm run build:prompts
 
+      - name: Audit documentation
+        run: npm run audit:docs
+
       - name: Production PostgreSQL and OnlyOffice smoke
         env:
           NODE_ENV: production

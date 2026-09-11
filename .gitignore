@@ -69,8 +69,10 @@ trace*.json
 trace*.json.gz
 frontend-prototype.sandpack.json
 apps/web/public/vendor/
+apps/web/public/sandpack/
 .local-documents/
 apps/api/.local-documents/
+tmp/
 uml-run-snapshot.json
 uml-run-report.md
 data/

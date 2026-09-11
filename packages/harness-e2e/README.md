@@ -1,21 +1,32 @@
-# @uml-platform/harness-e2e
+<!-- 说明端到端测试工具包覆盖的场景与使用边界。 -->
 
-Browser-level acceptance checks for the UML experimental platform.
+# 端到端测试工具包
 
-This package verifies that trusted-chain evidence is visible, reviewable,
-exportable, and tied to representative generated workflows. It complements the
-API-level regression tests by exercising browser-visible evidence and business
-constraints.
+## 职责
 
-Current coverage includes:
+以真实工作流验证需求、模型、设计、代码、测试和文档等跨服务链路，并输出便于定位问题的测试证据。
 
-- Trusted coverage, traceability, and generated workflow business assertions.
-- Browser evidence display for screenshots, DOM, console, and network records.
-- A representative generated workflow covering permissions, required fields,
-  state transitions, boundary checks, exception feedback, and idempotency.
+## 边界
 
-Run from the repository root:
+本包用于端到端验收，不承载生产业务逻辑，也不替代各应用和共享包的单元测试。
 
-```powershell
+## 使用或常用命令
+
+```bash
 npm run test:harness-e2e
 ```
+
+需要针对已启动环境运行时，按测试入口要求提供对应服务地址和测试账号配置。
+
+## 配置
+
+配置应使用专用测试环境变量；禁止提交真实生产账号、密钥、服务器地址或生成产物。
+
+## 验证
+
+先完成共享契约构建，再运行端到端测试并检查所有场景及证据输出。
+
+## 相关文档
+
+- [可信生成链路](../../docs/architecture/trusted-generation.md)
+- [仓库治理规范](../../docs/development/repository-hygiene.md)

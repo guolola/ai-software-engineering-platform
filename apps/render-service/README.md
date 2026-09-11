@@ -1,34 +1,40 @@
-# Render Service
+<!-- 说明 PlantUML 渲染服务的运行边界与维护方式。 -->
 
-默认监听 `http://127.0.0.1:4002`。
+# PlantUML 渲染服务
 
-常用命令：
+## 职责
+
+接收 PlantUML 文本并输出 SVG 等渲染结果，同时通过健康检查报告 Java、Graphviz 和 PlantUML JAR 是否可用。
+
+## 边界
+
+渲染服务只负责语法渲染与运行时诊断，不解释业务模型，也不保存项目数据。API 负责调用它并把结果纳入生成流水线。
+
+## 使用或常用命令
 
 ```bash
-npm run dev:render
-npm run build:render
+npm run dev --workspace @uml-platform/render-service
+npm run build --workspace @uml-platform/render-service
+npm run test --workspace @uml-platform/render-service
+```
+
+服务默认监听 `4002`。
+
+## 配置
+
+核心配置包括监听地址、端口、跨域来源和 PlantUML JAR 路径。仓库保留 CI 与部署需要的固定 JAR；Graphviz 和 Java 由运行环境提供。
+
+## 验证
+
+```bash
 npm run test:render
+curl http://127.0.0.1:4002/health
 ```
 
-渲染方式：
+健康响应应为成功状态并表明 JAR 可用。
 
-- 调用 `plantuml/build/libs/plantuml-1.2026.3beta8.jar`
-- 通过 `java -jar ... -tsvg -pipe` 输出 SVG
+## 相关文档
 
-环境变量：
-
-- `RENDER_SERVICE_HOST`
-- `RENDER_SERVICE_PORT`
-
-推荐启动顺序：
-
-1. `npm run dev:render`
-2. `npm run dev:api`
-3. `npm run dev:web`
-
-如果 API 改成了非默认端口，前端开发时可这样覆盖：
-
-```powershell
-$env:VITE_APP_API_BASE_URL='http://127.0.0.1:4101'
-npm run dev:web
-```
+- [平台架构](../../docs/architecture/platform-overview.md)
+- [宝塔与 PM2 部署](../../docs/deployment/baota-pm2.md)
+- [生产环境配置](../../docs/deployment/production-environment.md)
