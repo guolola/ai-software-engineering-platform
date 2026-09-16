@@ -42,6 +42,14 @@ import {
 import { createStartFeasibilityRunInput } from "../../../services/workspace-repository/start-inputs";
 import { ApiClientError } from "../../../services/api-client";
 import { localizeApiFailure } from "../../../shared/i18n/api-errors";
+import {
+  FeedbackReopenButton,
+  useFeedbackDialog,
+  type FeedbackDialogState,
+} from "../../../shared/ui/feedback-dialog";
+import { generationResultFeedback } from "../../workspace-session/components/generation-dialogs";
+import { failedRunResultDialog } from "../../workspace-session/lib/generation-dialog-actions";
+import { useWorkspaceShell } from "../../workspace-shell/state";
 
 export type FeasibilityView =
   | "overview"
@@ -81,6 +89,8 @@ export function FeasibilityPage({
 }) {
   const { t } = useTranslation();
   const repository = useWorkspaceRepository();
+  const { openFeedback } = useFeedbackDialog();
+  const { openSystemRequirements } = useWorkspaceShell();
   const {
     syncFeasibilityArtifacts,
     feasibilityContextSaveStatus,
@@ -100,6 +110,8 @@ export function FeasibilityPage({
   const [failedArtifacts, setFailedArtifacts] = useState<ArtifactKind[]>([]);
   const [generationMessage, setGenerationMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastFailureFeedback, setLastFailureFeedback] =
+    useState<FeedbackDialogState | null>(null);
   const [selectedArtifacts, setSelectedArtifacts] = useState<ArtifactKind[]>(
     () => initialSelectedArtifacts ?? [],
   );
@@ -127,7 +139,16 @@ export function FeasibilityPage({
 
   const generate = async (selectedArtifacts: ArtifactKind[]) => {
     if (!repository.startFeasibilityRun || !repository.getFeasibilityRunSnapshot) {
-      setError(t("feasibility.repositoryUnsupported"));
+      const message = t("feasibility.repositoryUnsupported");
+      setError(message);
+      const feedback: FeedbackDialogState = {
+        dedupeKey: "feasibility:unsupported",
+        tone: "destructive",
+        title: t("feasibility.feedback.failureTitle"),
+        message,
+      };
+      setLastFailureFeedback(feedback);
+      openFeedback(feedback);
       return;
     }
     setGenerating(true);
@@ -136,6 +157,7 @@ export function FeasibilityPage({
     setError(null);
     let currentArtifact: ArtifactKind = selectedArtifacts[0] ?? "context";
     let clientTaskId: string | null = null;
+    let runId: string | null = null;
     let runFailureMessage: string | null = null;
     try {
       const input = createStartFeasibilityRunInput(selectedArtifacts);
@@ -143,7 +165,7 @@ export function FeasibilityPage({
         providerModel: input.providerSettings.model,
         startedAtMs: Date.now(),
       });
-      const { runId } = await repository.startFeasibilityRun(input);
+      ({ runId } = await repository.startFeasibilityRun(input));
       attachFeasibilityGenerationRun(
         clientTaskId,
         runId,
@@ -169,6 +191,7 @@ export function FeasibilityPage({
             setError(runFailureMessage);
           }
         });
+        if (runFailureMessage) throw new Error(runFailureMessage);
       } else {
         while (true) {
           const snapshot = await repository.getFeasibilityRunSnapshot(runId);
@@ -191,6 +214,16 @@ export function FeasibilityPage({
         }),
       );
       setGenerationMessage(t("feasibility.generation.completed"));
+      setLastFailureFeedback(null);
+      openFeedback({
+        dedupeKey: "feasibility:generation:completed",
+        revision: runId,
+        tone: "success",
+        title: t("feasibility.feedback.successTitle"),
+        message: t("feasibility.feedback.successMessage", {
+          count: selectedArtifacts.length,
+        }),
+      });
     } catch (cause) {
       const message = runFailureMessage
         ?? (cause instanceof ApiClientError ? cause.message : t("feasibility.errors.generate"));
@@ -199,6 +232,16 @@ export function FeasibilityPage({
       await reload().catch(() => undefined);
       setGenerationMessage(null);
       setError(message);
+      const feedback = generationResultFeedback(
+        failedRunResultDialog({
+          clientTaskId,
+          message,
+          runId,
+          stageLabel: t("feasibility.title"),
+        }),
+      );
+      setLastFailureFeedback(feedback);
+      openFeedback(feedback);
     } finally {
       setGenerating(false);
       setActiveArtifacts([]);
@@ -276,6 +319,30 @@ export function FeasibilityPage({
         : selectedArtifacts.length === 0
           ? t("feasibility.noArtifactSelected")
           : null;
+  const prerequisiteFeedback: FeedbackDialogState | null =
+    acceptedRules.length === 0
+      ? {
+          dedupeKey: "feasibility:prerequisite:requirements",
+          revision: workspace.rulesVersion,
+          tone: "warning",
+          title: t("feasibility.feedback.prerequisiteTitle"),
+          message: t("feasibility.prerequisiteRules"),
+          primaryAction: {
+            label: t("feedback.actions.systemRequirements"),
+            onSelect: openSystemRequirements,
+          },
+          keepReopenEntry: true,
+        }
+      : !hasProviderModel
+        ? {
+            dedupeKey: "feasibility:prerequisite:provider",
+            revision: defaultModel,
+            tone: "warning",
+            title: t("feasibility.feedback.prerequisiteTitle"),
+            message: t("feasibility.providerRequired"),
+            keepReopenEntry: true,
+          }
+        : null;
   const toggleArtifact = (artifact: ArtifactKind, selected: boolean) => {
     if (generating) return;
     setSelectedArtifacts((current) => {
@@ -408,7 +475,17 @@ export function FeasibilityPage({
           </div>
         </section>
 
-        {error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"><AlertTriangle className="size-4" />{error}</div>}
+        {prerequisiteFeedback ? (
+          <div className="flex justify-end">
+            <FeedbackReopenButton feedback={prerequisiteFeedback} />
+          </div>
+        ) : null}
+
+        {error && lastFailureFeedback ? (
+          <div role="alert" className="flex items-center gap-2">
+            <FeedbackReopenButton feedback={lastFailureFeedback} />
+          </div>
+        ) : null}
 
         <section className="rounded-xl border bg-card p-4" aria-label={t("feasibility.sourceConsistency.title")}>
           <div className="flex flex-wrap items-center justify-between gap-2">

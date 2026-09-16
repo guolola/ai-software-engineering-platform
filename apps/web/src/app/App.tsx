@@ -7,6 +7,7 @@ import {
 } from "../shared/ui/resizable";
 import { Toaster } from "../shared/ui/sonner";
 import { Button } from "../shared/ui/button";
+import { FeedbackDialogProvider } from "../shared/ui/feedback-dialog";
 import { ThemeProvider } from "./providers/theme-provider";
 import { useTranslation } from "react-i18next";
 import { AppI18nProvider, useAppI18n } from "./providers/i18n-provider";
@@ -60,6 +61,10 @@ import {
   AccountBillingPage,
   PricingBillingPage,
 } from "../features/user-platform/components/billing-pages";
+import {
+  PROJECT_TASK_DRAWER_REQUEST_EVENT,
+  type ProjectTaskDrawerRequest,
+} from "../shared/lib/app-navigation";
 
 function StandaloneRoutePage({ route }: { route: Exclude<ShellRoutePath, "/workspace"> }) {
   const { t } = useTranslation();
@@ -103,12 +108,14 @@ function ProjectWorkspaceShell({
   activeProjectDrawer,
   onActiveProjectDrawerChange,
   onNavigate,
+  preferredTaskRunId,
 }: {
   projectId: string;
   routeDrawer: ProjectDrawerKind | null;
   activeProjectDrawer: ProjectDrawerKind | null;
   onActiveProjectDrawerChange: (drawer: ProjectDrawerKind | null) => void;
   onNavigate: (route: string) => void;
+  preferredTaskRunId?: string | null;
 }) {
   const { t } = useTranslation();
   const { selection } = useWorkspaceShell();
@@ -310,6 +317,7 @@ function ProjectWorkspaceShell({
               activeDrawer={activeDrawer}
               onNavigate={onNavigate}
               onClose={closeDrawer}
+              preferredTaskRunId={preferredTaskRunId}
             />
           </div>
         </main>
@@ -349,6 +357,7 @@ function ProjectWorkspaceShell({
               activeDrawer={activeDrawer}
               onNavigate={onNavigate}
               onClose={closeDrawer}
+              preferredTaskRunId={preferredTaskRunId}
             />
           </div>
         </main>
@@ -361,6 +370,8 @@ export function Shell({ initialPath }: { initialPath?: string }) {
   const { t } = useTranslation();
   const { locale } = useAppI18n();
   const [activeProjectDrawer, setActiveProjectDrawer] = useState<ProjectDrawerKind | null>(null);
+  const [preferredTaskRunId, setPreferredTaskRunId] = useState<string | null>(null);
+  const { generationTasks, selectGenerationTask } = useWorkspaceSession();
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [route, setRoute] = useState<AppRoute>(() => {
     const pathname = initialPath ?? (typeof window === "undefined" ? "/" : window.location.pathname);
@@ -382,6 +393,24 @@ export function Shell({ initialPath }: { initialPath?: string }) {
       window.removeEventListener("popstate", handlePopState);
     };
   }, []);
+
+  useEffect(() => {
+    const openRequestedTask = (event: Event) => {
+      const detail = (event as CustomEvent<ProjectTaskDrawerRequest>).detail ?? {};
+      const localTask = detail.clientTaskId
+        ? generationTasks.find((task) => task.clientTaskId === detail.clientTaskId)
+        : detail.runId
+          ? generationTasks.find((task) => task.runId === detail.runId)
+          : null;
+      if (localTask) selectGenerationTask(localTask.clientTaskId);
+      setPreferredTaskRunId(localTask ? null : (detail.runId ?? null));
+      setActiveProjectDrawer("tasks");
+    };
+    window.addEventListener(PROJECT_TASK_DRAWER_REQUEST_EVENT, openRequestedTask);
+    return () => {
+      window.removeEventListener(PROJECT_TASK_DRAWER_REQUEST_EVENT, openRequestedTask);
+    };
+  }, [generationTasks, selectGenerationTask]);
 
   const navigate = useCallback((nextPath: string) => {
     const nextUrl = new URL(nextPath, window.location.origin);
@@ -448,6 +477,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
               activeProjectDrawer={activeProjectDrawer}
               onActiveProjectDrawerChange={setActiveProjectDrawer}
               onNavigate={navigate}
+              preferredTaskRunId={preferredTaskRunId}
             />
           </WorkspaceShellProvider>
         </ProjectWorkspaceAccessBoundary>
@@ -538,11 +568,13 @@ export default function App({ initialPath }: { initialPath?: string }) {
   return (
     <AppI18nProvider>
       <ThemeProvider>
-        <WorkspaceRepositoryProvider>
-          <WorkspaceSessionProvider>
-            <Shell initialPath={initialPath} />
-          </WorkspaceSessionProvider>
-        </WorkspaceRepositoryProvider>
+        <FeedbackDialogProvider>
+          <WorkspaceRepositoryProvider>
+            <WorkspaceSessionProvider>
+              <Shell initialPath={initialPath} />
+            </WorkspaceSessionProvider>
+          </WorkspaceRepositoryProvider>
+        </FeedbackDialogProvider>
       </ThemeProvider>
     </AppI18nProvider>
   );

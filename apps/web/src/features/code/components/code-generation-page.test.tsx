@@ -1,5 +1,6 @@
 // Verifies code generation page file browsing, preview rendering, generation actions, and diagnostics.
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceRepository } from "../../../services/workspace-repository";
 import {
@@ -253,6 +254,19 @@ describe("CodeGenerationPage", () => {
       minHeight: "0",
       overflow: "hidden",
     });
+  });
+
+  it("uses a compact feedback dialog for missing generation prerequisites", async () => {
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
+
+    await user.click(await screen.findByRole("button", { name: "有 1 项需要处理" }));
+    const dialog = screen.getByRole("dialog", { name: "代码原型暂时无法生成" });
+    expect(dialog).not.toHaveTextContent("影响：");
+    expect(dialog).not.toHaveTextContent("技术详情");
+    expect(
+      within(dialog).getByRole("button", { name: "前往设计模型" }),
+    ).toBeInTheDocument();
   });
 
   it("renders prototype files as a collapsible tree", async () => {

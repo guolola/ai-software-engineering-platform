@@ -16,9 +16,7 @@ import {
   type OnlyOfficeEditorConfigResponse,
 } from "@uml-platform/contracts";
 import {
-  AlertTriangle,
   ArrowLeft,
-  ArrowRight,
   Download,
   FileText,
   HardDrive,
@@ -35,6 +33,11 @@ import { Button } from "../../../shared/ui/button";
 import { Input } from "../../../shared/ui/input";
 import { ScaledToolbar } from "../../../shared/ui/scale-to-fit";
 import { SelectControl } from "../../../shared/ui/select";
+import {
+  FeedbackReopenButton,
+  useFeedbackDialog,
+  type FeedbackDialogState,
+} from "../../../shared/ui/feedback-dialog";
 import { cn } from "../../../shared/ui/utils";
 import { downloadBlobFile } from "../../../shared/lib/download";
 import { useWorkspaceRepository } from "../../../services/workspace-repository";
@@ -264,7 +267,7 @@ function TemplateDocumentCard({
   documentStyle,
   onOpenStyle,
   onGenerate,
-  blockedAction,
+  blockedFeedback,
 }: {
   definition: (typeof DOCUMENT_DEFINITIONS)[number];
   disabledReason: string | null;
@@ -272,10 +275,7 @@ function TemplateDocumentCard({
   documentStyle: DocumentStyleSettings;
   onOpenStyle: () => void;
   onGenerate: () => void;
-  blockedAction?: {
-    label: string;
-    onClick: () => void;
-  };
+  blockedFeedback?: FeedbackDialogState;
 }) {
   const { t } = useTranslation();
   return (
@@ -287,21 +287,15 @@ function TemplateDocumentCard({
       />
       <div className="flex flex-1 flex-col gap-2 border-t border-border bg-card p-3 sm:gap-3 sm:p-4">
         <div className="mt-auto flex min-h-9 items-center justify-between gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground sm:text-xs">
-          <span className="min-w-0">
-            {disabledReason ?? t("documentsPage.generatedHint")}
-          </span>
-          {blockedAction && (
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="h-auto shrink-0 gap-1 p-0 text-[11px] sm:text-xs"
-              onClick={blockedAction.onClick}
-            >
-              {blockedAction.label}
-              <ArrowRight className="size-3.5" />
-            </Button>
-          )}
+          {!blockedFeedback ? (
+            <span className="min-w-0">{t("documentsPage.generatedHint")}</span>
+          ) : null}
+          {blockedFeedback ? (
+            <FeedbackReopenButton
+              feedback={blockedFeedback}
+              label={t("feedback.needsAttention")}
+            />
+          ) : null}
         </div>
         <Button
           type="button"
@@ -398,6 +392,7 @@ export function InstructionDocumentsPage({
   const { t } = useTranslation();
   const repository = useWorkspaceRepository();
   const { theme } = useTheme();
+  const { openFeedbackOnce } = useFeedbackDialog();
   const {
     models,
     designModels,
@@ -406,13 +401,16 @@ export function InstructionDocumentsPage({
     generateFeasibilityStudy,
   } = useWorkspaceSession();
   const {
+    openDesignHome,
     openDocumentsHome,
     openDocumentEditor,
     openFeasibilityHome,
+    openRequirementsText,
   } = useWorkspaceShell();
   const [documents, setDocuments] = useState<DocumentLibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [listErrorRevision, setListErrorRevision] = useState(0);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<DocumentKind | "all">("all");
   const [editorConfig, setEditorConfig] =
@@ -439,6 +437,7 @@ export function InstructionDocumentsPage({
       setDocuments([]);
       setLoading(false);
       setErrorMessage(t("documentsPage.errors.listUnsupported"));
+      setListErrorRevision((revision) => revision + 1);
       return [];
     }
     try {
@@ -447,8 +446,9 @@ export function InstructionDocumentsPage({
       const nextDocuments = await repository.listDocuments();
       setDocuments(nextDocuments);
       return nextDocuments;
-    } catch (error) {
+    } catch {
       setErrorMessage(t("documentsPage.errors.listFailed"));
+      setListErrorRevision((revision) => revision + 1);
       return [];
     } finally {
       setLoading(false);
@@ -493,7 +493,7 @@ export function InstructionDocumentsPage({
         if (!active) return;
         setEditorConfig(config);
       })
-      .catch((error) => {
+      .catch(() => {
         if (!active) return;
         setEditorConfig(null);
         setEditorError(
@@ -506,7 +506,7 @@ export function InstructionDocumentsPage({
     return () => {
       active = false;
     };
-  }, [activeDocumentId, onlyOfficeUiTheme, repository]);
+  }, [activeDocumentId, onlyOfficeUiTheme, repository, t]);
 
   const handleOnlyOfficeLoadError = useCallback((description: string) => {
     setEditorError(description);
@@ -587,12 +587,67 @@ export function InstructionDocumentsPage({
         );
         downloadBlobFile(downloaded.fileName, downloaded.blob);
         toast.success(t("documentsPage.downloaded", { fileName: downloaded.fileName }));
-      } catch (error) {
+      } catch {
         toast.error(t("documentsPage.errors.downloadFailed"));
       }
     },
     [repository, t],
   );
+
+  const listErrorFeedback = useMemo<FeedbackDialogState | null>(() => {
+    if (!errorMessage) return null;
+    return {
+      dedupeKey: "documents:list-error",
+      revision: listErrorRevision,
+      tone: "destructive",
+      title: t("documentsPage.guidance.listErrorTitle"),
+      message: errorMessage,
+      primaryAction: {
+        label: t("feedback.actions.retry"),
+        onSelect: () => {
+          void loadDocuments();
+        },
+      },
+      keepReopenEntry: true,
+    };
+  }, [errorMessage, listErrorRevision, loadDocuments, t]);
+  const editorErrorFeedback = useMemo<FeedbackDialogState | null>(() => {
+    if (!activeDocumentId || editorLoading || editorConfig || !editorError) return null;
+    return {
+      dedupeKey: `documents:editor:${activeDocumentId}`,
+      revision: editorError,
+      tone: "warning",
+      title: t("documentsPage.editorNotReady"),
+      message: t("documentsPage.guidance.editorMessage"),
+      primaryAction: activeDocument
+        ? {
+            label: t("documentsPage.downloadCurrent"),
+            onSelect: () => downloadDocument(activeDocument),
+          }
+        : undefined,
+      secondaryAction: {
+        label: t("documentsPage.backToList"),
+        onSelect: openDocumentsHome,
+      },
+      keepReopenEntry: true,
+    };
+  }, [
+    activeDocument,
+    activeDocumentId,
+    downloadDocument,
+    editorConfig,
+    editorError,
+    editorLoading,
+    openDocumentsHome,
+    t,
+  ]);
+
+  useEffect(() => {
+    if (listErrorFeedback) openFeedbackOnce(listErrorFeedback);
+  }, [listErrorFeedback, openFeedbackOnce]);
+  useEffect(() => {
+    if (editorErrorFeedback) openFeedbackOnce(editorErrorFeedback);
+  }, [editorErrorFeedback, openFeedbackOnce]);
 
   const requirementDisabledReason = hasRequirementModels
     ? null
@@ -600,22 +655,60 @@ export function InstructionDocumentsPage({
   const designDisabledReason = hasDesignModels
     ? null
     : t("documentsPage.prerequisites.design");
-  const disabledReasonByKind: Record<DocumentKind, string | null> = {
-    requirementsSpec: requirementDisabledReason,
-    softwareDesignSpec: designDisabledReason,
-    feasibilityStudy: feasibilityDisabledReason(feasibilityState, t),
-  };
-  const feasibilityBlockedAction =
-    feasibilityState && !feasibilityState.reportReady
-      ? {
-          label: t("documentsPage.prerequisites.openFeasibility"),
-          onClick: () =>
-            openFeasibilityHome({
-              initialSelectedArtifacts: feasibilityState.requiredArtifacts,
-            }),
-        }
-      : undefined;
-
+  const disabledReasonByKind = useMemo<Record<DocumentKind, string | null>>(
+    () => ({
+      requirementsSpec: requirementDisabledReason,
+      softwareDesignSpec: designDisabledReason,
+      feasibilityStudy: feasibilityDisabledReason(feasibilityState, t),
+    }),
+    [designDisabledReason, feasibilityState, requirementDisabledReason, t],
+  );
+  const prerequisiteFeedbackByKind = useMemo<
+    Partial<Record<DocumentKind, FeedbackDialogState>>
+  >(() => {
+    const feedback: Partial<Record<DocumentKind, FeedbackDialogState>> = {};
+    for (const definition of DOCUMENT_DEFINITIONS) {
+      const reason = disabledReasonByKind[definition.kind];
+      if (!reason) continue;
+      const primaryAction =
+        definition.kind === "requirementsSpec"
+          ? {
+              label: t("feedback.actions.requirementModels"),
+              onSelect: openRequirementsText,
+            }
+          : definition.kind === "softwareDesignSpec"
+            ? {
+                label: t("feedback.actions.designModels"),
+                onSelect: openDesignHome,
+              }
+            : {
+                label: t("feedback.actions.feasibility"),
+                onSelect: () =>
+                  openFeasibilityHome({
+                    initialSelectedArtifacts: feasibilityState?.requiredArtifacts,
+                  }),
+              };
+      feedback[definition.kind] = {
+        dedupeKey: `documents:prerequisite:${definition.kind}`,
+        revision: reason,
+        tone: "warning",
+        title: t("documentsPage.guidance.prerequisiteTitle", {
+          title: localizedDocumentTitle(definition.kind, t),
+        }),
+        message: reason,
+        primaryAction,
+        keepReopenEntry: true,
+      };
+    }
+    return feedback;
+  }, [
+    disabledReasonByKind,
+    feasibilityState,
+    openDesignHome,
+    openFeasibilityHome,
+    openRequirementsText,
+    t,
+  ]);
   if (activeDocumentId) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-background">
@@ -685,29 +778,9 @@ export function InstructionDocumentsPage({
           )}
           {!editorLoading && !editorConfig && (
             <div className="flex h-full items-center justify-center p-6">
-              <div className="w-full max-w-xl rounded-xl border border-border bg-card p-5 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
-                  <div>
-                    <h2 className="text-base font-semibold text-foreground">
-                      {t("documentsPage.editorNotReady")}
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {editorError ?? t("documentsPage.editorConfigurationHint")}
-                    </p>
-                    {activeDocument && (
-                      <Button
-                        type="button"
-                        className="mt-4 h-9 rounded-full"
-                        onClick={() => void downloadDocument(activeDocument)}
-                      >
-                        <Download className="size-3.5" />
-                        {t("documentsPage.downloadCurrent")}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
+              {editorErrorFeedback ? (
+                <FeedbackReopenButton feedback={editorErrorFeedback} />
+              ) : null}
             </div>
           )}
         </div>
@@ -769,11 +842,11 @@ export function InstructionDocumentsPage({
           </ScaledToolbar>
         </section>
 
-        {errorMessage && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {errorMessage}
+        {listErrorFeedback?.keepReopenEntry ? (
+          <div className="flex justify-end">
+            <FeedbackReopenButton feedback={listErrorFeedback} />
           </div>
-        )}
+        ) : null}
 
         {loading ? (
           <div className="flex min-h-52 items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -798,11 +871,7 @@ export function InstructionDocumentsPage({
                     documentStyle={documentStyle}
                     onOpenStyle={() => setDocumentStyleDialogOpen(true)}
                     onGenerate={() => void generateDocument(definition.kind)}
-                    blockedAction={
-                      definition.kind === "feasibilityStudy"
-                        ? feasibilityBlockedAction
-                        : undefined
-                    }
+                    blockedFeedback={prerequisiteFeedbackByKind[definition.kind]}
                   />
                 );
               })}

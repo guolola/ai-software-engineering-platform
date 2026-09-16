@@ -1,8 +1,11 @@
 // Renders generation result and confirmation dialogs used by the workspace session provider.
-import { useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
+import {
+  FeedbackDialog,
+  type FeedbackDialogAction,
+  type FeedbackDialogState,
+} from "../../../shared/ui/feedback-dialog";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../shared/ui/dialog";
-import { cn } from "../../../shared/ui/utils";
 import { i18n } from "../../../shared/i18n/i18n";
 import type { GenerationConfirmationSummary } from "../lib/generation-planning";
 
@@ -19,12 +21,16 @@ export type GenerationResultDialogState = {
   title: string;
   message: string;
   tone: "success" | "warning" | "destructive";
-  details?: string[];
   runId?: string | null;
   requirementId?: string | null;
   ruleId?: string | null;
   stageLabel?: string;
   targetLabel?: string | null;
+  primaryAction?: FeedbackDialogAction;
+  secondaryAction?: FeedbackDialogAction;
+  dismissLabel?: string;
+  dedupeKey?: string;
+  revision?: string | number | null;
 };
 
 export type GenerationConfirmationDialogState =
@@ -52,6 +58,21 @@ function resultDialogMessage(result: GenerationResultDialogState) {
     return i18n.t("generation.dialog.problem");
   }
   return sanitizeResultDialogCopy(result.message);
+}
+
+export function generationResultFeedback(
+  result: GenerationResultDialogState,
+): FeedbackDialogState {
+  return {
+    dedupeKey: result.dedupeKey ?? generationResultDialogGroup(result),
+    revision: result.revision ?? result.runId ?? result.message,
+    tone: result.tone,
+    title: sanitizeResultDialogCopy(result.title),
+    message: resultDialogMessage(result),
+    primaryAction: result.primaryAction,
+    secondaryAction: result.secondaryAction,
+    dismissLabel: result.dismissLabel,
+  };
 }
 
 export function completedRunResultMessage({
@@ -93,69 +114,12 @@ export function GenerationResultDialog({
   result: GenerationResultDialogState | null;
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
-  const lastResultRef = useRef<GenerationResultDialogState | null>(null);
-  if (result) {
-    lastResultRef.current = result;
-  }
-  const visibleResult = result ?? lastResultRef.current;
-  if (!visibleResult) {
-    return null;
-  }
-  const displayTitle = sanitizeResultDialogCopy(visibleResult.title);
-  const displayMessage = resultDialogMessage(visibleResult);
-  const isFailure = visibleResult.tone === "destructive";
-  const Icon = isFailure ? XCircle : CheckCircle2;
-  const iconLabel = isFailure ? t("generation.dialog.failure") : t("generation.dialog.success");
-
   return (
-    <Dialog open={Boolean(result)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[calc(100%-2rem)] gap-0 overflow-hidden rounded-[12px] border-border/60 bg-card p-[33px] text-center shadow-lg sm:max-w-[448px] [&_[data-slot=dialog-close]]:hidden">
-        <DialogHeader className="items-center gap-0 space-y-0 text-center sm:text-center">
-          <div className="mb-6 h-[80px] w-[80px]">
-            <div
-              aria-label={iconLabel}
-              className={cn(
-                "relative flex size-[80px] items-center justify-center rounded-full",
-                isFailure
-                  ? "bg-destructive/10 text-destructive"
-                  : "bg-success/10 text-success",
-              )}
-            >
-              <Icon className="size-10" strokeWidth={3} />
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "absolute inset-0 rounded-full border opacity-20",
-                  isFailure ? "border-destructive/20" : "border-success/20",
-                )}
-              />
-            </div>
-          </div>
-          <DialogTitle className="text-center text-[20px] font-semibold leading-[28px] text-foreground">
-            {displayTitle}
-          </DialogTitle>
-          <DialogDescription className="mx-auto mt-2 max-w-[280px] text-center text-[14px] leading-[20px] text-muted-foreground">
-            {displayMessage}
-          </DialogDescription>
-          {(visibleResult.details?.length ?? 0) > 0 ? (
-            <details className="mt-4 w-full rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs text-muted-foreground">
-              <summary className="cursor-pointer font-medium text-foreground">{t("requirements.review.technicalDetails")}</summary>
-              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono">{visibleResult.details?.join("\n")}</pre>
-            </details>
-          ) : null}
-        </DialogHeader>
-        <DialogFooter className="mt-6 flex-row justify-center gap-3 sm:justify-center">
-          <Button
-            type="button"
-            className="h-10 rounded-[8px] px-6 text-[14px] font-normal shadow-sm"
-            onClick={onClose}
-          >
-            {t("common.confirm")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <FeedbackDialog
+      feedback={result ? generationResultFeedback(result) : null}
+      open={Boolean(result)}
+      onClose={onClose}
+    />
   );
 }
 

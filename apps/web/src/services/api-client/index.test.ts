@@ -59,6 +59,53 @@ describe("api-client", () => {
     } satisfies Partial<ApiClientError>);
   });
 
+  it("prefers a stable backend error code over an operation fallback", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ error: { code: "USER_ENTITLEMENT_REQUIRED" } }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(
+      requestJson("/api/runs", { errorKey: "errors.operations.startDesign" }),
+    ).rejects.toMatchObject({
+      message: "当前账户没有可用于 AI 生成的权益，请先购买次数包。",
+    });
+  });
+
+  it("uses the localized operation fallback when no stable code exists", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ message: "internal provider stack" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(
+      requestJson("/api/design-runs", { errorKey: "errors.operations.startDesign" }),
+    ).rejects.toMatchObject({
+      message: "设计模型生成未能启动，请稍后重试。",
+    });
+  });
+
+  it("keeps errorMessage as a compatibility fallback", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("legacy detail", { status: 500 })),
+    );
+
+    await expect(
+      requestJson("/api/legacy", { errorMessage: "当前操作失败，请重试。" }),
+    ).rejects.toMatchObject({ message: "当前操作失败，请重试。" });
+  });
+
   it("downloads blobs and reads utf-8 filenames", async () => {
     vi.stubGlobal(
       "fetch",

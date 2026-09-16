@@ -1,6 +1,7 @@
 // Loads the initial workspace snapshot and run history for the session provider.
 import {
   useEffect,
+  useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
@@ -26,6 +27,8 @@ export function useWorkspaceInitialization({
   setHistoryItems,
   setRunUiState,
 }: WorkspaceInitializationInput) {
+  const [initialized, setInitialized] = useState(false);
+
   useEffect(() => {
     let active = true;
 
@@ -74,7 +77,9 @@ export function useWorkspaceInitialization({
       void refreshWorkspaceAndHistory(!hasActiveGenerationTask);
     };
 
-    void refreshWorkspaceAndHistory(true);
+    void refreshWorkspaceAndHistory(true).finally(() => {
+      if (active) setInitialized(true);
+    });
 
     if (typeof window !== "undefined") {
       window.addEventListener("online", refreshAfterResume);
@@ -99,4 +104,6 @@ export function useWorkspaceInitialization({
     setHistoryItems,
     setRunUiState,
   ]);
+
+  return initialized;
 }

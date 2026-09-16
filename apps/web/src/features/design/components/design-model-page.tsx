@@ -1,5 +1,5 @@
 // Renders design-stage model generation controls, selection state, and requirement-to-design trace summaries.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DiagramModelSpec } from "@uml-platform/contracts";
 import {
@@ -28,6 +28,11 @@ import {
   DialogTitle,
 } from "../../../shared/ui/dialog";
 import { ModelPicker } from "../../../shared/ui/model-picker";
+import {
+  FeedbackReopenButton,
+  useFeedbackDialog,
+  type FeedbackDialogState,
+} from "../../../shared/ui/feedback-dialog";
 import { ScaleToFitFrame, ScaledToolbar } from "../../../shared/ui/scale-to-fit";
 import { cn } from "../../../shared/ui/utils";
 import {
@@ -63,6 +68,7 @@ import {
 } from "../../workspace-shell/components/mobile-density";
 import { ModelBentoCard } from "../../workspace-shell/components/model-bento-card";
 import { useWorkspaceSession } from "../../workspace-session/state";
+import { designBlockGuidance } from "../lib/design-feedback";
 
 type DesignSourceKey = DiagramType | "sequence" | "design-class" | "design-component";
 
@@ -80,6 +86,21 @@ const SEQUENCE_COVERAGE_BLOCK_REASON =
   "已有用例实现设计覆盖不足，请先手动更新用例实现设计";
 
 function localizeDesignBlockReason(reason: string, t: ReturnType<typeof useTranslation>["t"]) {
+  if (reason === "请先输入需求文本") {
+    return t("designPage.blocked.requirementText");
+  }
+  if (reason === "请先确认需求规则修复结果") {
+    return t("designPage.blocked.pendingRules");
+  }
+  if (reason === "需求模型追踪关系不完整，请先回到需求页处理") {
+    return t("designPage.blocked.traceability");
+  }
+  if (reason === "设计类图已存在但基于旧需求，请先手动更新设计类图") {
+    return t("designPage.blocked.staleDesignClass");
+  }
+  if (reason === "组件（构件）关系已存在但基于旧需求，请先手动更新组件（构件）关系") {
+    return t("designPage.blocked.staleDesignComponent");
+  }
   if (reason === "需求阶段用例模型没有可生成用例实现设计的用例") {
     return t("designPage.blocked.noUseCases");
   }
@@ -245,6 +266,7 @@ function stageRepairCopy(text: string) {
 export function DesignModelPage() {
   const { t } = useTranslation();
   const {
+    rules,
     models,
     selectedDesignDiagrams,
     setSelectedDesignDiagrams,
@@ -260,8 +282,17 @@ export function DesignModelPage() {
     generating,
     generateDesignDiagrams,
     designGenerationBlockedReason,
+    rulesVersion,
+    textVersion,
+    workspaceInitialized,
   } = useWorkspaceSession();
-  const { openDesignDiagram, openRequirementsText } = useWorkspaceShell();
+  const {
+    openDesignDiagram,
+    openRequirementTraceMatrix,
+    openRequirementsText,
+    openSystemRequirements,
+  } = useWorkspaceShell();
+  const { openFeedbackOnce } = useFeedbackDialog();
   const [defaultModel, setDefaultModel] = useState(
     () => loadUserSettings().defaultModel,
   );
@@ -419,18 +450,15 @@ export function DesignModelPage() {
   const visibleGenerationBlockReason =
     designGenerationBlockedReason ??
     selectedDesignBlockReason ??
-    existingSequenceCoverageBlockReason;
+    existingSequenceCoverageBlockReason ??
+    (rules.length === 0 && !Object.values(designModels).some(Boolean)
+      ? "请先输入并确认系统需求"
+      : null);
   const viewableSequenceModel = Object.values(designModels).find(
     (model) =>
       model.diagramKind === "sequence" &&
       Boolean(designSvgArtifacts[getDesignModelId(model)]),
   );
-  const isSequenceCoverageBlock =
-    visibleGenerationBlockReason === SEQUENCE_COVERAGE_BLOCK_REASON;
-  const showSequenceCoverageAction =
-    isSequenceCoverageBlock && Boolean(viewableSequenceModel);
-  const showRequirementUpdateAction =
-    Boolean(visibleGenerationBlockReason) && !isSequenceCoverageBlock;
   const localizedGenerationBlockReason = visibleGenerationBlockReason
     ? localizeDesignBlockReason(visibleGenerationBlockReason, t)
     : null;
@@ -491,14 +519,77 @@ export function DesignModelPage() {
     void generateDesignDiagrams(effectiveSelected);
   };
 
-  const openFirstSequenceDesign = () => {
+  const openFirstSequenceDesign = useCallback(() => {
     if (!viewableSequenceModel) return;
     openDesignDiagram(
       "sequence",
       getDesignModelId(viewableSequenceModel),
       viewableSequenceModel.title,
     );
-  };
+  }, [openDesignDiagram, viewableSequenceModel]);
+
+  const generationBlockFeedback = useMemo<FeedbackDialogState | null>(() => {
+    if (
+      !workspaceInitialized ||
+      !visibleGenerationBlockReason ||
+      !localizedGenerationBlockReason
+    ) {
+      return null;
+    }
+    const guidance = designBlockGuidance(visibleGenerationBlockReason);
+    const action = (() => {
+      switch (guidance.target) {
+        case "system-requirements":
+          return { label: t("feedback.actions.systemRequirements"), onSelect: openSystemRequirements };
+        case "requirement-traceability":
+          return {
+            label: t("feedback.actions.traceability"),
+            onSelect: () => openRequirementTraceMatrix("usecase"),
+          };
+        case "sequence-design":
+          return viewableSequenceModel
+            ? { label: t("feedback.actions.sequenceDesign"), onSelect: openFirstSequenceDesign }
+            : { label: t("feedback.actions.requirementModels"), onSelect: openRequirementsText };
+        case "design-class":
+          return { label: t("feedback.actions.designClass"), onSelect: () => openDesignDiagram("class") };
+        case "design-component":
+          return { label: t("feedback.actions.designComponent"), onSelect: () => openDesignDiagram("component") };
+        default:
+          return { label: t("feedback.actions.requirementModels"), onSelect: openRequirementsText };
+      }
+    })();
+    return {
+      dedupeKey: guidance.dedupeKey,
+      revision: `${textVersion}:${rulesVersion}:${currentDesignInputFingerprint}:${visibleGenerationBlockReason}`,
+      tone: "warning",
+      title: t("designPage.guidance.title"),
+      message: localizedGenerationBlockReason,
+      primaryAction: action,
+      keepReopenEntry: true,
+    };
+  }, [
+    currentDesignInputFingerprint,
+    localizedGenerationBlockReason,
+    openDesignDiagram,
+    openFirstSequenceDesign,
+    openRequirementTraceMatrix,
+    openRequirementsText,
+    openSystemRequirements,
+    rulesVersion,
+    t,
+    textVersion,
+    viewableSequenceModel,
+    visibleGenerationBlockReason,
+    workspaceInitialized,
+  ]);
+
+  useEffect(() => {
+    if (!generationBlockFeedback || !visibleGenerationBlockReason) return;
+    const isChangedOrRegressedState =
+      Object.values(designModels).some(Boolean) ||
+      /旧|过期|追踪|覆盖不足|修复结果/u.test(visibleGenerationBlockReason);
+    if (isChangedOrRegressedState) openFeedbackOnce(generationBlockFeedback);
+  }, [designModels, generationBlockFeedback, openFeedbackOnce, visibleGenerationBlockReason]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-auto bg-background">
@@ -548,36 +639,11 @@ export function DesignModelPage() {
             </ScaledToolbar>
           </header>
 
-          {visibleGenerationBlockReason && (
-            <div
-              role="alert"
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-            >
-              <span>{localizedGenerationBlockReason}</span>
-              {showSequenceCoverageAction && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 rounded-lg border-destructive/30 bg-card text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={openFirstSequenceDesign}
-                >
-                  {t("designPage.viewSequence")}
-                </Button>
-              )}
-              {showRequirementUpdateAction && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 rounded-lg border-destructive/30 bg-card text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={openRequirementsText}
-                >
-                  {t("designPage.backToRequirements")}
-                </Button>
-              )}
+          {generationBlockFeedback?.keepReopenEntry ? (
+            <div className="flex justify-end">
+              <FeedbackReopenButton feedback={generationBlockFeedback} />
             </div>
-          )}
+          ) : null}
 
           <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
             <main className="flex min-w-0 flex-col gap-4">

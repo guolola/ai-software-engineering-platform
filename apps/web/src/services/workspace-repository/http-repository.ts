@@ -129,7 +129,7 @@ export function createHttpWorkspaceRepository(
     const response = await requestJson<ProjectWorkspaceResponse>(
       `/api/projects/${encodeURIComponent(scopedProjectId)}/workspace`,
       withProjectHeaders(scopedProjectId, {
-        errorMessage: "读取项目工作台失败",
+        errorKey: "errors.operations.loadWorkspace",
       }),
     );
     projectWorkspaceVersion = response.version;
@@ -159,7 +159,7 @@ export function createHttpWorkspaceRepository(
           state: stableWorkspaceState(workspace),
           sourceRunId: sourceRunId ?? null,
         }),
-        errorMessage: "保存项目工作台失败",
+        errorKey: "errors.operations.saveWorkspace",
       }),
     );
     projectWorkspaceVersion = response.version;
@@ -213,7 +213,7 @@ export function createHttpWorkspaceRepository(
     return requestJson<ProjectRunDetailResponse>(
       `/api/projects/${encodeURIComponent(scopedProjectId)}/runs/${encodeURIComponent(runId)}`,
       withProjectHeaders(scopedProjectId, {
-        errorMessage: "读取项目运行详情失败",
+        errorKey: "errors.operations.loadRun",
       }),
     );
   }
@@ -228,7 +228,7 @@ export function createHttpWorkspaceRepository(
         body: JSON.stringify({
           mode: "restore",
         }),
-        errorMessage: "恢复项目工作台快照失败",
+        errorKey: "errors.operations.restoreWorkspace",
       }),
     );
     projectWorkspaceVersion = response.version;
@@ -246,7 +246,7 @@ export function createHttpWorkspaceRepository(
     return requestJson<ProjectRunsResponse>(
       `/api/projects/${encodeURIComponent(scopedProjectId)}/runs`,
       withProjectHeaders(scopedProjectId, {
-        errorMessage: "读取项目运行历史失败",
+        errorKey: "errors.operations.loadHistory",
       }),
     );
   }
@@ -321,7 +321,7 @@ export function createHttpWorkspaceRepository(
       const response = await requestJson<ProjectAccessResponse>(
         `/api/projects/${encodeURIComponent(scopedProjectId)}`,
         withProjectHeaders(scopedProjectId, {
-          errorMessage: "读取项目权限失败",
+          errorKey: "errors.operations.loadPermissions",
         }),
       );
       return response.capabilities ?? [];
@@ -455,13 +455,13 @@ export function createHttpWorkspaceRepository(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId: scopedProjectId, ...input }),
-        errorMessage: "启动可行性分析失败",
+        errorKey: "errors.operations.startFeasibility",
       }));
     },
 
     async getFeasibilityRunSnapshot(runId) {
       return requestJson<FeasibilityRunSnapshot>(`/api/feasibility-runs/${encodeURIComponent(runId)}`, withProjectHeaders(requireProjectScope(projectId), {
-        errorMessage: "读取可行性分析快照失败",
+        errorKey: "errors.operations.loadFeasibility",
       }));
     },
 
@@ -781,7 +781,7 @@ export function createHttpWorkspaceRepository(
           `/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(id)}`,
           withProjectHeaders(projectId, {
             method: "DELETE",
-            errorMessage: "删除项目运行历史失败",
+            errorKey: "errors.operations.deleteHistory",
           }),
         );
         const history = await readProjectRuns();
@@ -796,7 +796,7 @@ export function createHttpWorkspaceRepository(
           `/api/projects/${encodeURIComponent(projectId)}/runs`,
           withProjectHeaders(projectId, {
             method: "DELETE",
-            errorMessage: "清空项目运行历史失败",
+            errorKey: "errors.operations.clearHistory",
           }),
         );
         return;

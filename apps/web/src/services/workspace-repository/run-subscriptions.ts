@@ -157,7 +157,7 @@ export async function readRunSnapshot(
   projectId: string | null = null,
 ) {
   return requestJson<RunSnapshot>(`/api/runs/${runId}`, {
-    errorMessage: "读取运行快照失败",
+    errorKey: "errors.operations.loadRun",
     headers: projectHeaders(projectId),
   });
 }
@@ -167,7 +167,7 @@ export async function readDesignRunSnapshot(
   projectId: string | null = null,
 ) {
   return requestJson<DesignRunSnapshot>(`/api/design-runs/${runId}`, {
-    errorMessage: "读取设计运行快照失败",
+    errorKey: "errors.operations.loadRun",
     headers: projectHeaders(projectId),
   });
 }
@@ -178,7 +178,7 @@ export async function readCodeRunSnapshot(
 ) {
   try {
     return await requestJson<CodeRunSnapshot>(`/api/code-runs/${runId}`, {
-      errorMessage: "读取代码运行快照失败",
+      errorKey: "errors.operations.loadRun",
       headers: projectHeaders(projectId),
     });
   } catch (error) {
@@ -197,7 +197,7 @@ export async function readDocumentRunSnapshot(
   projectId: string | null = null,
 ) {
   return requestJson<DocumentRunSnapshot>(`/api/document-runs/${runId}`, {
-    errorMessage: "读取说明书运行快照失败",
+    errorKey: "errors.operations.loadRun",
     headers: projectHeaders(projectId),
   });
 }
@@ -298,7 +298,7 @@ export async function readFeasibilityRunSnapshot(
   projectId: string | null = null,
 ) {
   return requestJson<FeasibilityRunSnapshot>(`/api/feasibility-runs/${runId}`, {
-    errorMessage: "读取可行性分析快照失败",
+    errorKey: "errors.operations.loadFeasibility",
     headers: projectHeaders(projectId),
   });
 }

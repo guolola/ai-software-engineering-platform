@@ -20,7 +20,6 @@ import type {
   RunEvent,
 } from "@uml-platform/contracts";
 import {
-  getDesignModelId,
   getRequirementModelId,
   type DesignDiagramType,
   type DiagramType,
@@ -86,10 +85,7 @@ import {
   requirementGenerationSubtasks,
   resolveDesignGenerationDiagrams,
 } from "./lib/generation-planning";
-import {
-  runErrorMessage,
-  shouldRefreshRunSnapshotFromEvent,
-} from "./lib/run-events";
+import { shouldRefreshRunSnapshotFromEvent } from "./lib/run-events";
 import { useRequirementsSlice } from "./slices/requirements-slice";
 import { useDiagramsSlice } from "./slices/diagrams-slice";
 import { useDesignSlice } from "./slices/design-slice";
@@ -97,7 +93,6 @@ import { useCodeSlice } from "./slices/code-slice";
 import { useRunDiagnosticsSlice } from "./slices/run-diagnostics-slice";
 import {
   GenerationConfirmationDialog,
-  GenerationResultDialog,
 } from "./components/generation-dialogs";
 import {
   requirementRuleIdsBlockingGeneration,
@@ -463,10 +458,8 @@ export function WorkspaceSessionProvider({
   const workspacePermissions = useWorkspacePermissions(repository);
   const {
     closeGenerationConfirmationDialog,
-    closeGenerationResultDialog,
     confirmGeneration,
     generationConfirmationDialog,
-    generationResultDialog,
     openGenerationResultDialog,
   } = useGenerationDialogActions();
   const {
@@ -657,7 +650,7 @@ export function WorkspaceSessionProvider({
     });
   }, []);
 
-  useWorkspaceInitialization({
+  const workspaceInitialized = useWorkspaceInitialization({
     applyWorkspaceRecord,
     getHasActiveGenerationTask,
     repository,
@@ -1276,7 +1269,7 @@ export function WorkspaceSessionProvider({
           });
           setRunUiState(cancelledRunUiState(snapshot));
           openGenerationResultDialog(
-            cancelledRunResultDialog(snapshot, stageLabel),
+            cancelledRunResultDialog(snapshot, stageLabel, clientTaskId),
           );
           return null;
         }
@@ -1510,7 +1503,7 @@ export function WorkspaceSessionProvider({
         } else {
           openGenerationResultDialog(
             failedRunResultDialog({
-              details: ["请在当前页面查看问题并重新处理。"],
+              clientTaskId,
               message: detail,
               runId,
               stageLabel:
@@ -1797,7 +1790,7 @@ export function WorkspaceSessionProvider({
           });
           setRunUiState(cancelledRunUiState(snapshot));
           openGenerationResultDialog(
-            cancelledRunResultDialog(snapshot, "设计模型"),
+            cancelledRunResultDialog(snapshot, "设计模型", clientTaskId),
           );
           return null;
         }
@@ -1880,7 +1873,7 @@ export function WorkspaceSessionProvider({
         } else {
           openGenerationResultDialog(
             failedRunResultDialog({
-              details: ["设计生成未通过，请在设计模型页面查看问题并重新处理。"],
+              clientTaskId,
               message: detail,
               runId,
               stageLabel: "设计模型",
@@ -2202,7 +2195,7 @@ export function WorkspaceSessionProvider({
           });
           setRunUiState(cancelledRunUiState(snapshot));
           openGenerationResultDialog(
-            cancelledRunResultDialog(snapshot, "代码原型"),
+            cancelledRunResultDialog(snapshot, "代码原型", clientTaskId),
           );
           return;
         }
@@ -2275,7 +2268,7 @@ export function WorkspaceSessionProvider({
         } else {
           openGenerationResultDialog(
             failedRunResultDialog({
-              details: ["请在代码页面查看问题并重新处理。"],
+              clientTaskId,
               message: detail,
               runId,
               stageLabel: "代码原型",
@@ -2633,7 +2626,7 @@ export function WorkspaceSessionProvider({
           }
           setRunUiState(cancelledRunUiState(snapshot));
           openGenerationResultDialog(
-            cancelledRunResultDialog(snapshot, "说明书"),
+            cancelledRunResultDialog(snapshot, "说明书", clientTaskId),
           );
           return null;
         }
@@ -2724,7 +2717,7 @@ export function WorkspaceSessionProvider({
         } else {
           openGenerationResultDialog(
             failedRunResultDialog({
-              details: ["说明书生成未通过，请在说明书页面查看问题并重新处理。"],
+              clientTaskId,
               message: detail,
               runId,
               stageLabel: "说明书",
@@ -2880,9 +2873,7 @@ export function WorkspaceSessionProvider({
       setRunUiState(failedRunUiState(detail));
       openGenerationResultDialog(
         failedRunResultDialog({
-          details: [
-            "自动补齐后的需求规则映射未保存，已阻止下游生成。请重试生成，系统会先重新保存映射。",
-          ],
+          clientTaskId,
           message: detail,
           runId: null,
           stageLabel,
@@ -3158,6 +3149,7 @@ export function WorkspaceSessionProvider({
       generatedDiagrams,
       manualModelEditStatus,
       models,
+      openGenerationResultDialog,
       requirementBaseline,
       requirementInputFingerprint,
       requirementModelTraceability,
@@ -3225,6 +3217,7 @@ export function WorkspaceSessionProvider({
 
   const value = useMemo<WorkspaceSessionState>(
     () => ({
+      workspaceInitialized,
       requirementText,
       setRequirementText,
       rules,
@@ -3343,6 +3336,7 @@ export function WorkspaceSessionProvider({
       currentRunDiagnostics: visibleRunDiagnostics,
     }),
     [
+      workspaceInitialized,
       requirementText,
       setRequirementText,
       rules,
@@ -3460,10 +3454,6 @@ export function WorkspaceSessionProvider({
   return (
     <WorkspaceSessionContext.Provider value={value}>
       {children}
-      <GenerationResultDialog
-        result={generationResultDialog}
-        onClose={closeGenerationResultDialog}
-      />
       <GenerationConfirmationDialog
         confirmation={generationConfirmationDialog}
         onCancel={() => closeGenerationConfirmationDialog(false)}

@@ -3,7 +3,7 @@ export const feasibilityResourcesZh = {
   title: "可行性分析",
   targetArtifacts: "目标产物",
   generateAnalysis: "生成可行性分析",
-  providerRequired: "请先选择可用的 Provider 和模型。",
+  providerRequired: "请先选择可用的模型供应商和模型。",
   noArtifactSelected: "未选择目标产物",
   runPermissionDenied: "当前项目角色不能启动生成。",
   implementationTitle: "实现方案",
@@ -48,7 +48,7 @@ export const feasibilityResourcesZh = {
     "one-time-benefits": "一次性收益", "recurring-benefits": "非一次性收益", "intangible-benefits": "不可计量收益",
   },
   loading: "正在加载可行性分析…",
-  repositoryUnsupported: "当前工作区仓储不支持可行性运行。",
+  repositoryUnsupported: "当前运行环境不支持可行性分析生成。",
   prerequisiteRules: "请先在系统需求页确认需求规则",
   errors: {
     load: "读取可行性分析失败，请稍后重试。",
@@ -72,6 +72,12 @@ export const feasibilityResourcesZh = {
     rendering: "正在渲染系统上下文图（系统环境图）…",
     implementation: "正在生成实现方案…",
     completed: "生成完成",
+  },
+  feedback: {
+    successTitle: "可行性分析已生成",
+    successMessage: "已完成 {{count}} 项所选产物，可继续查看或编辑分析结果。",
+    failureTitle: "可行性分析生成失败",
+    prerequisiteTitle: "可行性分析暂时无法生成",
   },
   artifact: {
     context: "系统上下文图（系统环境图）",
@@ -356,6 +362,12 @@ export const feasibilityResourcesEn: typeof feasibilityResourcesZh = {
     deselectImplementation: "Deselect Technical Proposed Solution",
   },
   generation: { waiting: "Waiting for generation…", context: "Generating system context structure…", rendering: "Rendering System Context Diagram (System Environment Diagram)…", implementation: "Generating Technical Proposed Solution…", completed: "Generation completed" },
+  feedback: {
+    successTitle: "Feasibility analysis generated",
+    successMessage: "Generated {{count}} selected artifacts. You can now review or edit the results.",
+    failureTitle: "Feasibility analysis generation failed",
+    prerequisiteTitle: "Feasibility analysis cannot be generated yet",
+  },
   artifact: {
     context: "System Context Diagram (System Environment Diagram)",
     contextDescription: "The central system, people, external systems, and high-level interactions with traceability and details.",

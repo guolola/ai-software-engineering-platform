@@ -15,6 +15,7 @@ import { WorkspaceRepositoryProvider } from "../services/workspace-repository";
 import type { WorkspaceRepository } from "../services/workspace-repository";
 import type { DiagramType } from "../entities/diagram/model";
 import { DEFAULT_USER_SETTINGS, USER_SETTINGS_STORAGE_KEY } from "../shared/lib/user-settings";
+import { FeedbackDialogProvider } from "../shared/ui/feedback-dialog";
 
 export function createWorkspaceRecord(
   overrides: Partial<WorkspaceRecord> = {},
@@ -169,11 +170,13 @@ export function withWorkspaceProviders(
   return (
     <AppI18nProvider>
       <ThemeProvider>
-        <WorkspaceShellProvider>
-          <WorkspaceRepositoryProvider repository={repository}>
-            <WorkspaceSessionProvider>{children}</WorkspaceSessionProvider>
-          </WorkspaceRepositoryProvider>
-        </WorkspaceShellProvider>
+        <FeedbackDialogProvider>
+          <WorkspaceShellProvider>
+            <WorkspaceRepositoryProvider repository={repository}>
+              <WorkspaceSessionProvider>{children}</WorkspaceSessionProvider>
+            </WorkspaceRepositoryProvider>
+          </WorkspaceShellProvider>
+        </FeedbackDialogProvider>
       </ThemeProvider>
     </AppI18nProvider>
   );

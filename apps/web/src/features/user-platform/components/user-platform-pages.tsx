@@ -16,9 +16,7 @@ import {
   Clock3,
   GitBranch,
   Loader2,
-  Lock,
   MoreHorizontal,
-  RotateCw,
   Settings,
   ShieldCheck,
   Users,
@@ -39,7 +37,6 @@ import {
   ProjectGenerationTasksDrawerContent,
   ProjectWorkspaceActions,
 } from "../../workspace-shell/components/top-bar";
-import { formatDateTime } from "../lib/project-workspace-presentation";
 import {
   AUTH_SESSION_CHANGED_EVENT,
   PlatformApiError,
@@ -597,11 +594,13 @@ export function ProjectWorkspaceDrawer({
   activeDrawer,
   onClose,
   onNavigate,
+  preferredTaskRunId,
 }: {
   projectId: string;
   activeDrawer: ProjectDrawerKind | null;
   onClose: () => void;
   onNavigate?: Navigate;
+  preferredTaskRunId?: string | null;
 }) {
   const { t } = useTranslation();
   const overview = useProjectOverview(projectId);
@@ -627,7 +626,12 @@ export function ProjectWorkspaceDrawer({
   } else if (accessMessage || !overview.project) {
     content = accessMessage;
   } else if (activeDrawer === "tasks") {
-    content = <ProjectGenerationTasksDrawerContent projectRuns={overview.runs} />;
+    content = (
+      <ProjectGenerationTasksDrawerContent
+        projectRuns={overview.runs}
+        preferredRunId={preferredTaskRunId}
+      />
+    );
   } else if (activeDrawer === "settings") {
     content = (
       <ProjectSettings

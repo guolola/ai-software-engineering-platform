@@ -1,13 +1,28 @@
 // Verifies feasibility overview status and persistence of user-supplied research facts.
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMockWorkspaceRepository } from "../../../services/workspace-repository/mock-repository";
 import { createRule, withWorkspaceProviders } from "../../../test/workspace-test-utils";
 import { i18n } from "../../../shared/i18n/i18n";
 import { LOCALE_PREFERENCE_STORAGE_KEY } from "../../../shared/i18n/types";
 import { FeasibilityPage } from "./feasibility-page";
 import { snapshotInputFingerprint } from "@uml-platform/contracts";
+import { USER_SETTINGS_STORAGE_KEY } from "../../../shared/lib/user-settings";
+
+afterEach(() => localStorage.removeItem(USER_SETTINGS_STORAGE_KEY));
+
+function configureProviderModel() {
+  localStorage.setItem(
+    USER_SETTINGS_STORAGE_KEY,
+    JSON.stringify({
+      providerConfigId: "provider-test",
+      providerLabel: "测试供应商",
+      providerModelOptions: ["model-test"],
+      defaultModel: "model-test",
+    }),
+  );
+}
 
 function createContextWorkspace() {
   return {
@@ -101,6 +116,7 @@ function stubCompactViewport(matches: boolean) {
 
 describe("FeasibilityPage", () => {
   it("shows context and implementation as ordered overview artifacts", async () => {
+    const user = userEvent.setup();
     const repository = createMockWorkspaceRepository({ rules: [createRule()] });
     render(withWorkspaceProviders(<FeasibilityPage view="overview" />, repository));
     expect(await screen.findByRole("heading", { name: "可行性分析" })).toBeInTheDocument();
@@ -111,6 +127,65 @@ describe("FeasibilityPage", () => {
     expect(screen.getByRole("checkbox", { name: "选择系统上下文图（系统环境图）" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "选择实现方案" })).not.toBeChecked();
     expect(screen.getByRole("button", { name: "生成可行性分析" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "有 1 项需要处理" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "可行性分析暂时无法生成",
+    });
+    expect(dialog).toHaveTextContent("请先选择可用的模型供应商和模型");
+    expect(within(dialog).queryByRole("button", { name: /前往/ })).not.toBeInTheDocument();
+  });
+
+  it("shows a success dialog after a user-requested generation completes", async () => {
+    configureProviderModel();
+    const repository = createMockWorkspaceRepository({ rules: [createRule()] });
+    repository.startFeasibilityRun = vi.fn(async () => ({ runId: "feasibility-success" }));
+    repository.getFeasibilityRunSnapshot = vi.fn();
+    repository.subscribeToFeasibilityRun = vi.fn(async (_runId, onEvent) => {
+      onEvent({ type: "completed", snapshot: {} as never });
+    });
+    const user = userEvent.setup();
+
+    render(
+      withWorkspaceProviders(
+        <FeasibilityPage view="overview" initialSelectedArtifacts={["context"]} />,
+        repository,
+      ),
+    );
+    const generateButton = await screen.findByRole("button", { name: "生成可行性分析" });
+    await waitFor(() => expect(generateButton).toBeEnabled());
+    await user.click(generateButton);
+
+    expect(
+      await screen.findByRole("dialog", { name: "可行性分析已生成" }),
+    ).toHaveTextContent("已完成 1 项所选产物");
+  });
+
+  it("shows the same failure dialog after every user retry", async () => {
+    configureProviderModel();
+    const repository = createMockWorkspaceRepository({ rules: [createRule()] });
+    repository.startFeasibilityRun = vi.fn(async () => {
+      throw new Error("provider failed");
+    });
+    repository.getFeasibilityRunSnapshot = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      withWorkspaceProviders(
+        <FeasibilityPage view="overview" initialSelectedArtifacts={["context"]} />,
+        repository,
+      ),
+    );
+    const generateButton = await screen.findByRole("button", { name: "生成可行性分析" });
+    await waitFor(() => expect(generateButton).toBeEnabled());
+
+    await user.click(generateButton);
+    const first = await screen.findByRole("dialog", { name: "生成失败" });
+    expect(first).not.toHaveTextContent("provider failed");
+    await user.click(within(first).getByRole("button", { name: "我知道了" }));
+
+    await user.click(generateButton);
+    expect(await screen.findByRole("dialog", { name: "生成失败" })).toBeInTheDocument();
+    expect(repository.startFeasibilityRun).toHaveBeenCalledTimes(2);
   });
 
   it("applies artifact selections supplied by workspace navigation", async () => {

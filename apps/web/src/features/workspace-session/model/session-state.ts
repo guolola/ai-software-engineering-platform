@@ -125,6 +125,7 @@ export interface GenerationTaskRunSummary {
 }
 
 export interface WorkspaceSessionState {
+  workspaceInitialized: boolean;
   requirementText: string;
   setRequirementText: (value: string) => void;
   rules: RequirementRule[];

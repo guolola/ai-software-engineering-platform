@@ -1,6 +1,7 @@
 // Centralizes HTTP URL resolution, JSON requests, downloads, and error parsing.
 import { runErrorSchema, type RunError } from "@uml-platform/contracts";
 import { localizeApiFailure } from "../../shared/i18n/api-errors";
+import { i18n } from "../../shared/i18n/i18n";
 
 const APP_API_BASE_URL =
   import.meta.env.VITE_APP_API_BASE_URL ?? "";
@@ -67,9 +68,9 @@ function parseRunErrorFromPayload(payload: unknown) {
 
 export async function requestJson<T>(
   path: string,
-  options: RequestInit & { errorMessage?: string } = {},
+  options: RequestInit & { errorKey?: string; errorMessage?: string } = {},
 ): Promise<T> {
-  const { errorMessage: _errorMessage, ...requestOptions } = options;
+  const { errorKey, errorMessage, ...requestOptions } = options;
   const response = await fetch(buildApiUrl(path), {
     credentials: "include",
     ...requestOptions,
@@ -77,7 +78,11 @@ export async function requestJson<T>(
   if (!response.ok) {
     const payload = await parseErrorPayload(response);
     throw new ApiClientError(
-      localizeApiFailure(payload, response.status),
+      localizeApiFailure(
+        payload,
+        response.status,
+        errorKey ? i18n.t(errorKey) : errorMessage,
+      ),
       response.status,
       payload,
     );
@@ -89,7 +94,7 @@ export async function requestJson<T>(
 export function postJson<T>(
   path: string,
   body: unknown,
-  options: RequestInit & { errorMessage?: string } = {},
+  options: RequestInit & { errorKey?: string; errorMessage?: string } = {},
 ) {
   return requestJson<T>(path, {
     ...options,
@@ -104,9 +109,18 @@ export function postJson<T>(
 
 export async function downloadBlob(
   path: string,
-  options: RequestInit & { errorMessage?: string; defaultFileName?: string } = {},
+  options: RequestInit & {
+    errorKey?: string;
+    errorMessage?: string;
+    defaultFileName?: string;
+  } = {},
 ) {
-  const { errorMessage: _errorMessage, defaultFileName = "download", ...requestOptions } = options;
+  const {
+    errorKey,
+    errorMessage,
+    defaultFileName = "download",
+    ...requestOptions
+  } = options;
   const response = await fetch(buildApiUrl(path), {
     credentials: "include",
     ...requestOptions,
@@ -114,7 +128,11 @@ export async function downloadBlob(
   if (!response.ok) {
     const payload = await parseErrorPayload(response);
     throw new ApiClientError(
-      localizeApiFailure(payload, response.status),
+      localizeApiFailure(
+        payload,
+        response.status,
+        errorKey ? i18n.t(errorKey) : errorMessage,
+      ),
       response.status,
       payload,
     );

@@ -1449,7 +1449,7 @@ describe("TopBar", () => {
     expect(screen.getAllByText("生成需求模型").length).toBeGreaterThan(0);
     expect(screen.getAllByText("50%").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已完成").length).toBeGreaterThan(0);
-    await user.click(await screen.findByRole("button", { name: "确认" }));
+    await user.click(await screen.findByRole("button", { name: "我知道了" }));
     expect(screen.getByRole("button", { name: "清理已完成" })).toBeInTheDocument();
   });
 

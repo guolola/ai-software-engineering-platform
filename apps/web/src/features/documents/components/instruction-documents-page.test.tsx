@@ -451,6 +451,7 @@ describe("InstructionDocumentsPage", () => {
   it("renders template controls on the documents page instead of the automatic generate button", async () => {
     const repository = createMockWorkspaceRepository();
     repository.listDocuments = vi.fn(async () => []);
+    const user = userEvent.setup();
 
     const { container } = render(
       withWorkspaceProviders(<InstructionDocumentsPage />, repository),
@@ -475,6 +476,15 @@ describe("InstructionDocumentsPage", () => {
     expect(
       screen.queryByRole("checkbox", { name: /同时生成软件设计说明书/i }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(
+      within(requirementsCard).getByRole("button", { name: "有 1 项需要处理" }),
+    );
+    const feedback = screen.getByRole("dialog", {
+      name: "需求规格说明书暂时无法生成",
+    });
+    expect(feedback).not.toHaveTextContent("影响：");
+    expect(feedback).not.toHaveTextContent("技术详情");
   });
 
   it("enables the feasibility report from current analysis without requirement or design models", async () => {
@@ -526,18 +536,20 @@ describe("InstructionDocumentsPage", () => {
     await screen.findByRole("heading", { name: "已生成说明书" });
     const feasibilityCard = templateCard("可行性研究报告");
     expect(
-      within(feasibilityCard).getByText(
-        "需求规则已更新，系统上下文图（系统环境图）和实现方案需要重新生成",
-      ),
-    ).toBeInTheDocument();
-    expect(
       within(feasibilityCard).getByRole("button", { name: /生成并打开/i }),
     ).toBeDisabled();
 
     await user.click(
-      within(feasibilityCard).getByRole("button", {
-        name: "前往可行性分析",
-      }),
+      within(feasibilityCard).getByRole("button", { name: "有 1 项需要处理" }),
+    );
+    const guidance = await screen.findByRole("dialog", {
+      name: "可行性研究报告暂时无法生成",
+    });
+    expect(guidance).toHaveTextContent(
+      "需求规则已更新，系统上下文图（系统环境图）和实现方案需要重新生成",
+    );
+    await user.click(
+      within(guidance).getByRole("button", { name: "前往可行性分析" }),
     );
     expect(screen.getByTestId("active-selection")).toHaveTextContent(
       "feasibility-home:context,implementation",
@@ -564,16 +576,17 @@ describe("InstructionDocumentsPage", () => {
 
     await screen.findByRole("heading", { name: "已生成说明书" });
     const feasibilityCard = templateCard("可行性研究报告");
-    expect(
-      within(feasibilityCard).getByText(
-        "需求规则、上下文或补充资料已更新，实现方案需要重新生成",
-      ),
-    ).toBeInTheDocument();
-
     await user.click(
-      within(feasibilityCard).getByRole("button", {
-        name: "前往可行性分析",
-      }),
+      within(feasibilityCard).getByRole("button", { name: "有 1 项需要处理" }),
+    );
+    const guidance = await screen.findByRole("dialog", {
+      name: "可行性研究报告暂时无法生成",
+    });
+    expect(guidance).toHaveTextContent(
+      "需求规则、上下文或补充资料已更新，实现方案需要重新生成",
+    );
+    await user.click(
+      within(guidance).getByRole("button", { name: "前往可行性分析" }),
     );
     expect(screen.getByTestId("active-selection")).toHaveTextContent(
       "feasibility-home:implementation",
@@ -683,6 +696,27 @@ describe("InstructionDocumentsPage", () => {
     expect(screen.getByTestId("active-selection")).toHaveTextContent(
       "doc-design",
     );
+  });
+
+  it("shows a fresh list failure after every explicit retry", async () => {
+    const repository = createMockWorkspaceRepository();
+    repository.listDocuments = vi.fn(async () => {
+      throw new Error("list failed");
+    });
+    const user = userEvent.setup();
+
+    render(withWorkspaceProviders(<InstructionDocumentsPage />, repository));
+
+    const first = await screen.findByRole("dialog", {
+      name: "说明书暂时无法读取",
+    });
+    expect(first).not.toHaveTextContent("list failed");
+    await user.click(within(first).getByRole("button", { name: "重试" }));
+
+    expect(
+      await screen.findByRole("dialog", { name: "说明书暂时无法读取" }),
+    ).toBeInTheDocument();
+    expect(vi.mocked(repository.listDocuments!).mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it("loads OnlyOffice config with the project theme and passes it to the editor", async () => {

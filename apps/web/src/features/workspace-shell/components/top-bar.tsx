@@ -649,8 +649,10 @@ function buildStageTodoItems({
 
 export function ProjectGenerationTasksDrawerContent({
   projectRuns = EMPTY_PROJECT_RUNS,
+  preferredRunId,
 }: {
   projectRuns?: PlatformRunSummary[];
+  preferredRunId?: string | null;
 } = {}) {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage === "en" ? "en-US" : "zh-CN";
@@ -658,7 +660,6 @@ export function ProjectGenerationTasksDrawerContent({
   const {
     runStatus,
     runProgress,
-    runMessage,
     errorMessage,
     currentRunDiagnostics,
     generationTasks,
@@ -696,8 +697,12 @@ export function ProjectGenerationTasksDrawerContent({
     : null;
   const activeLocalTask =
     generationTasks.find(isActiveGenerationTask) ?? null;
-  const selectedTask =
-    activeProjectRuns.length > 0
+  const preferredProjectRun = preferredRunId
+    ? projectRuns.find((run) => run.runId === preferredRunId) ?? null
+    : null;
+  const selectedTask = preferredProjectRun
+    ? null
+    : activeProjectRuns.length > 0
       ? selectedLocalTask && isActiveGenerationTask(selectedLocalTask)
         ? selectedLocalTask
         : activeLocalTask
@@ -713,7 +718,7 @@ export function ProjectGenerationTasksDrawerContent({
   );
   const selectedProjectRun = selectedTask
     ? null
-    : (activeProjectRuns[0] ?? recentProjectRun);
+    : (preferredProjectRun ?? activeProjectRuns[0] ?? recentProjectRun);
   const visibleRunStatus = selectedProjectRun
     ? normalizeRunStatus(selectedProjectRun.status)
     : runStatus;

@@ -38,7 +38,7 @@ describe("ModelPicker", () => {
 
     await user.click(screen.getByRole("button", { name: "未选择模型" }));
 
-    expect(screen.getByText("请先选择托管 Provider")).toBeInTheDocument();
+    expect(screen.getByText("请先选择模型供应商")).toBeInTheDocument();
     expect(screen.queryByText("OpenAI")).not.toBeInTheDocument();
     expect(screen.queryByText("Claude")).not.toBeInTheDocument();
     expect(screen.queryByText("Google")).not.toBeInTheDocument();

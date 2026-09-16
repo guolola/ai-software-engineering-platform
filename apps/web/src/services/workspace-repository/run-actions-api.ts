@@ -34,7 +34,7 @@ export async function repairRequirementRuleRequest(
       projectId: scopedProjectId,
     }),
     {
-      errorMessage: "智能修复失败",
+      errorKey: "errors.operations.repairRule",
       headers: projectHeaders(scopedProjectId),
     },
   );
@@ -52,7 +52,7 @@ export async function repairRequirementRulesRequest(
       projectId: scopedProjectId,
     }),
     {
-      errorMessage: "批量智能修复失败",
+      errorKey: "errors.operations.repairRules",
       headers: projectHeaders(scopedProjectId),
     },
   );
@@ -74,7 +74,7 @@ export async function startRequirementRunRequest(
       providerSettings: input.providerSettings,
     }),
     {
-      errorMessage: "启动生成失败",
+      errorKey: "errors.operations.startRequirements",
       headers: projectHeaders(scopedProjectId),
     },
   );
@@ -94,7 +94,7 @@ export async function startDesignRunRequest(
       providerSettings: input.providerSettings,
     }),
     {
-      errorMessage: "启动设计生成失败",
+      errorKey: "errors.operations.startDesign",
       headers: projectHeaders(scopedProjectId),
     },
   );
@@ -113,7 +113,7 @@ export async function startCodeRunRequest(
       providerSettings: input.providerSettings,
     }),
     {
-      errorMessage: "启动代码生成失败",
+      errorKey: "errors.operations.startCode",
       headers: projectHeaders(scopedProjectId),
     },
   );
@@ -134,7 +134,7 @@ export async function startDocumentRunRequest(
       documentStyle: input.documentStyle,
     }),
     withProjectHeaders(scopedProjectId, {
-      errorMessage: "启动说明书生成失败",
+      errorKey: "errors.operations.startDocument",
     }),
   );
 }
@@ -152,7 +152,7 @@ export async function renderPlantUmlRequest(
       plantUmlSource,
     },
     {
-      errorMessage: "渲染 PlantUML 失败",
+      errorKey: "errors.operations.renderDiagram",
       headers: projectHeaders(scopedProjectId),
     },
   );
@@ -167,7 +167,7 @@ export async function renderStructuredModelRequest(
     "/api/render/model",
     { model },
     {
-      errorMessage: "重绘结构化模型失败",
+      errorKey: "errors.operations.redrawModel",
       headers: projectHeaders(scopedProjectId),
     },
   );
@@ -181,7 +181,7 @@ export async function testProviderSettingsRequest(
     message?: string;
     capability?: ModelCapability;
   }>("/api/provider/test", providerSettings, {
-    errorMessage: "连接测试失败",
+    errorKey: "errors.operations.providerTest",
   });
   if (!payload.ok || !payload.capability) {
     throw new Error(payload.message ?? "连接测试失败");

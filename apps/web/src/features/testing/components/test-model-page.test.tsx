@@ -1,5 +1,5 @@
 // Verifies black-box test generation stays compatible with historical use case models.
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { UseCaseDiagramSpec } from "@uml-platform/contracts";
@@ -30,6 +30,27 @@ function createRepository(record = createWorkspaceRecord()): WorkspaceRepository
 }
 
 describe("TestModelPage", () => {
+  it("keeps empty-project prerequisites compact until the user asks for details", async () => {
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<TestModelPage />, createRepository()));
+
+    const reopen = await screen.findByRole("button", { name: "有 1 项需要处理" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(reopen);
+    const guidance = screen.getByRole("dialog", {
+      name: "测试用例暂时无法生成",
+    });
+    expect(guidance).toHaveTextContent("需求阶段用例模型缺失，无法生成测试用例");
+    expect(guidance).not.toHaveTextContent("影响：");
+    expect(guidance).not.toHaveTextContent("技术详情");
+    expect(
+      within(guidance).getByRole("button", { name: "前往需求模型" }),
+    ).toBeInTheDocument();
+    await user.click(within(guidance).getByRole("button", { name: "我知道了" }));
+    expect(reopen).toBeInTheDocument();
+    expect(screen.queryByText("需求阶段用例模型缺失，无法生成测试用例")).not.toBeInTheDocument();
+  });
+
   it("generates fallback black-box cases for old use cases without event flows", async () => {
     const legacyUseCaseModel = {
       diagramKind: "usecase",
@@ -76,6 +97,10 @@ describe("TestModelPage", () => {
     await user.click(generateButton);
 
     expect(
+      await screen.findByRole("dialog", { name: "测试用例已生成" }),
+    ).toHaveTextContent("已生成并保存 1 条测试用例");
+
+    expect(
       await screen.findByText("借出图书 - 正常流程 - 主事件流"),
     ).toBeInTheDocument();
     expect(screen.getByText("tc-uc_borrow-uc_borrow-main")).toBeInTheDocument();
@@ -87,6 +112,51 @@ describe("TestModelPage", () => {
         ]),
       }),
     );
+  });
+
+  it("shows the same save failure after every user retry", async () => {
+    const useCaseModel = {
+      diagramKind: "usecase",
+      title: "预约用例模型",
+      summary: "预约流程",
+      notes: [],
+      actors: [],
+      useCases: [{
+        id: "uc-book",
+        name: "提交预约",
+        goal: "提交预约",
+        preconditions: [],
+        postconditions: ["预约已提交"],
+        supportingActorIds: [],
+        eventFlows: [],
+      }],
+      systemBoundaries: [],
+      relationships: [],
+    } as unknown as UseCaseDiagramSpec;
+    const repository = createRepository(
+      createWorkspaceRecord({
+        rules: [createRule({ id: "r-book", text: "用户可以提交预约。", relatedDiagrams: ["usecase"] })],
+        models: { usecase: useCaseModel },
+      }),
+    );
+    vi.mocked(repository.updateTestGenerationResult!).mockRejectedValue(
+      new Error("persist failed"),
+    );
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<TestModelPage />, repository));
+
+    const generateButton = await screen.findByRole("button", { name: "生成测试用例" });
+    await waitFor(() => expect(generateButton).toBeEnabled());
+    await user.click(generateButton);
+    const first = await screen.findByRole("dialog", { name: "测试用例生成失败" });
+    expect(first).not.toHaveTextContent("persist failed");
+    await user.click(within(first).getByRole("button", { name: "我知道了" }));
+
+    await user.click(generateButton);
+    expect(
+      await screen.findByRole("dialog", { name: "测试用例生成失败" }),
+    ).toBeInTheDocument();
+    expect(repository.updateTestGenerationResult).toHaveBeenCalledTimes(2);
   });
 
   it("restores persisted test assets when the workspace reloads", async () => {

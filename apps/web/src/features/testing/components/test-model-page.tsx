@@ -1,5 +1,5 @@
 // Builds black-box test cases and coverage links from requirement and design models.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { ClipboardCheck, Filter, Play, ShieldCheck } from "lucide-react";
@@ -19,7 +19,13 @@ import { Badge } from "../../../shared/ui/badge";
 import { Button } from "../../../shared/ui/button";
 import { ScaledTable, ScaledToolbar } from "../../../shared/ui/scale-to-fit";
 import { SelectControl } from "../../../shared/ui/select";
+import {
+  FeedbackReopenButton,
+  useFeedbackDialog,
+  type FeedbackDialogState,
+} from "../../../shared/ui/feedback-dialog";
 import { cn } from "../../../shared/ui/utils";
+import { useWorkspaceShell } from "../../workspace-shell/state";
 import { useWorkspaceSession } from "../../workspace-session/state";
 
 const SCENARIO_TYPES: Array<TestScenarioType | "all"> = [
@@ -295,7 +301,11 @@ export function TestModelPage() {
     requirementModelTraceability,
     testGenerationResult: result,
     updateTestGenerationResult,
+    rulesVersion,
+    workspaceInitialized,
   } = useWorkspaceSession();
+  const { openRequirementsText, openSystemRequirements } = useWorkspaceShell();
+  const { openFeedback, openFeedbackOnce } = useFeedbackDialog();
   const [scenarioFilter, setScenarioFilter] = useState<TestScenarioType | "all">("all");
   const useCaseModel = models.usecase;
   const blockedReason =
@@ -304,6 +314,41 @@ export function TestModelPage() {
       : rules.length === 0
         ? t("testingPage.blocked.rules")
         : null;
+  const blockedByUseCase = Boolean(blockedReason) && blockedReason === t("testingPage.blocked.usecase");
+  const blockFeedback = useMemo<FeedbackDialogState | null>(() => {
+    if (!workspaceInitialized || !blockedReason) return null;
+    return {
+      dedupeKey: blockedByUseCase
+        ? "test-generation:usecase"
+        : "test-generation:requirements",
+      revision: `${rulesVersion}:${blockedReason}`,
+      tone: "warning",
+      title: t("testingPage.guidance.title"),
+      message: blockedReason,
+      primaryAction: blockedByUseCase
+        ? {
+            label: t("feedback.actions.requirementModels"),
+            onSelect: openRequirementsText,
+          }
+        : {
+            label: t("feedback.actions.systemRequirements"),
+            onSelect: openSystemRequirements,
+          },
+      keepReopenEntry: true,
+    };
+  }, [
+    blockedByUseCase,
+    blockedReason,
+    openRequirementsText,
+    openSystemRequirements,
+    rulesVersion,
+    t,
+    workspaceInitialized,
+  ]);
+
+  useEffect(() => {
+    if (blockFeedback && result?.testCases.length) openFeedbackOnce(blockFeedback);
+  }, [blockFeedback, openFeedbackOnce, result]);
 
   const filteredCases = useMemo(() => {
     const cases = result?.testCases ?? [];
@@ -314,7 +359,7 @@ export function TestModelPage() {
 
   const coverageByCase = useMemo(() => {
     return new Map((result?.coverageRelations ?? []).map((item) => [item.testCaseId, item]));
-  }, [result]);
+  }, [result?.coverageRelations]);
 
   const coveredRequirements = new Set(
     (result?.coverageRelations ?? []).flatMap((item) => item.requirementIds),
@@ -336,25 +381,45 @@ export function TestModelPage() {
                     {t("testingPage.title")}
                   </h2>
                 </div>
-                {blockedReason && (
-                  <p className="mt-2 text-sm text-destructive">{blockedReason}</p>
-                )}
+                {blockFeedback?.keepReopenEntry ? (
+                  <div className="mt-2">
+                    <FeedbackReopenButton feedback={blockFeedback} />
+                  </div>
+                ) : null}
               </div>
               <Button
                 type="button"
                 className="shrink-0 gap-2"
                 disabled={Boolean(blockedReason)}
-                onClick={() => {
+                onClick={async () => {
                   if (!useCaseModel || !("useCases" in useCaseModel)) return;
-                  void updateTestGenerationResult(
-                    generateBlackBoxTests(
+                  try {
+                    const nextResult = generateBlackBoxTests(
                       rules,
                       useCaseModel,
                       Object.values(designModels),
                       requirementModelTraceability,
                       t,
-                    ),
-                  );
+                    );
+                    await updateTestGenerationResult(nextResult);
+                    openFeedback({
+                      dedupeKey: "testing:generation:completed",
+                      revision: rulesVersion,
+                      tone: "success",
+                      title: t("testingPage.feedback.successTitle"),
+                      message: t("testingPage.feedback.successMessage", {
+                        count: nextResult.testCases.length,
+                      }),
+                    });
+                  } catch {
+                    openFeedback({
+                      dedupeKey: "testing:generation:failed",
+                      revision: rulesVersion,
+                      tone: "destructive",
+                      title: t("testingPage.feedback.failureTitle"),
+                      message: t("testingPage.feedback.failureMessage"),
+                    });
+                  }
                 }}
               >
                 <Play className="size-4" />

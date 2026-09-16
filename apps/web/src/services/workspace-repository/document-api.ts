@@ -38,7 +38,7 @@ export async function downloadDocumentRunFile(
   return downloadBlob(
     `/api/document-runs/${runId}/download`,
     withProjectHeaders(scopedProjectId, {
-      errorMessage: "下载说明书失败",
+      errorKey: "documentsPage.errors.downloadFailed",
       defaultFileName: defaultFileName ?? "说明书.docx",
     }),
   );
@@ -49,7 +49,7 @@ export async function listDocumentLibraryItems(projectId: string | null = null) 
   const response = await requestJson<DocumentLibraryListResponse>(
     `/api/projects/${encodeURIComponent(scopedProjectId)}/documents`,
     withProjectHeaders(scopedProjectId, {
-      errorMessage: "读取说明书列表失败",
+      errorKey: "documentsPage.errors.listFailed",
     }),
   );
   return response.documents;
@@ -65,7 +65,7 @@ export async function readOnlyOfficeEditorConfig(
   return requestJson<OnlyOfficeEditorConfigResponse>(
     `/api/projects/${encodeURIComponent(scopedProjectId)}/documents/${encodeURIComponent(documentId)}/editor-config${query}`,
     withProjectHeaders(scopedProjectId, {
-      errorMessage: "读取 OnlyOffice 编辑器配置失败",
+      errorKey: "documentsPage.errors.editorConfigFailed",
     }),
   );
 }
@@ -79,7 +79,7 @@ export async function downloadDocumentFile(
   return downloadBlob(
     `/api/projects/${encodeURIComponent(scopedProjectId)}/documents/${encodeURIComponent(documentId)}/download`,
     withProjectHeaders(scopedProjectId, {
-      errorMessage: "下载说明书失败",
+      errorKey: "documentsPage.errors.downloadFailed",
       defaultFileName: defaultFileName ?? "说明书.docx",
     }),
   );

@@ -43,7 +43,12 @@ import {
 } from "./prototype-preview";
 import { useWorkspaceSession } from "../../workspace-session/state";
 import { useCompactViewport } from "../../workspace-shell/hooks/use-compact-viewport";
+import { useWorkspaceShell } from "../../workspace-shell/state";
 import { usePrototypeFiles } from "../hooks/use-prototype-files";
+import {
+  FeedbackReopenButton,
+  type FeedbackDialogState,
+} from "../../../shared/ui/feedback-dialog";
 
 
 
@@ -89,6 +94,7 @@ export function CodeGenerationPage() {
     recordCodePreviewDiagnostic,
     clearCodePreviewDiagnostics,
   } = useWorkspaceSession();
+  const { openDesignHome, openSystemRequirements } = useWorkspaceShell();
   const compactViewport = useCompactViewport();
   const [mobilePane, setMobilePane] = useState<"files" | "editor" | "preview">("editor");
   const [defaultModel, setDefaultModel] = useState(
@@ -161,6 +167,31 @@ export function CodeGenerationPage() {
   const designModelCount = Object.values(designModels).filter(Boolean).length;
   const requirementSourceMissing = requirementText.trim().length === 0;
   const canGenerate = designModelCount > 0 && !requirementSourceMissing;
+  const generationBlockFeedback: FeedbackDialogState | null = canGenerate
+    ? null
+    : {
+        dedupeKey: requirementSourceMissing
+          ? "code:prerequisite:requirements"
+          : "code:prerequisite:design",
+        revision: `${requirementText.length}:${designModelCount}`,
+        tone: "warning",
+        title: t("code.guidanceTitle"),
+        message: t(
+          requirementSourceMissing
+            ? "code.missingRequirementPrerequisite"
+            : "code.missingDesignPrerequisite",
+        ),
+        primaryAction: requirementSourceMissing
+          ? {
+              label: t("feedback.actions.systemRequirements"),
+              onSelect: openSystemRequirements,
+            }
+          : {
+              label: t("feedback.actions.designModels"),
+              onSelect: openDesignHome,
+            },
+        keepReopenEntry: true,
+      };
   const generatedFileCount = Object.keys(codeFiles).length;
   const previewReady = generatedFileCount > 0 && Boolean(codeEntryFile || codeFiles["/src/main.tsx"]);
   const codeDiagnosticSummary = useMemo(
@@ -401,9 +432,8 @@ export function CodeGenerationPage() {
       </div>
 
       {!canGenerate && (
-        <div className="flex items-center gap-2 border-b border-warning/40 bg-warning/10 px-3 py-2 text-xs">
-          <AlertTriangle className="size-3.5 shrink-0 text-warning" />
-          <span>{t("code.missingPrerequisites")}</span>
+        <div className="flex justify-end border-b border-border px-3 py-2">
+          <FeedbackReopenButton feedback={generationBlockFeedback!} />
         </div>
       )}
       {modelCapability.structuredOutputMode === "compatible" && defaultModel.trim() && (

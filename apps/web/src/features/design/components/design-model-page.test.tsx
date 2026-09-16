@@ -97,6 +97,42 @@ describe("DesignModelPage", () => {
     localStorage.clear();
   });
 
+  it("does not interrupt an empty project with an automatic prerequisite dialog", async () => {
+    const repository: WorkspaceRepository = {
+      loadWorkspace: vi.fn(async () => createWorkspaceRecord()),
+      updateRequirementText: vi.fn(async () => {}),
+      startRun: vi.fn(),
+      subscribeToRun: vi.fn(),
+      getRunSnapshot: vi.fn(),
+      startDesignRun: vi.fn(),
+      subscribeToDesignRun: vi.fn(),
+      getDesignRunSnapshot: vi.fn(),
+      renderPlantUml: vi.fn(),
+      testProviderSettings: vi.fn(),
+      saveRunHistory: vi.fn(),
+      listRunHistory: vi.fn(async () => []),
+      restoreRunHistory: vi.fn(async () => null),
+      deleteRunHistory: vi.fn(async () => []),
+      clearRunHistory: vi.fn(async () => {}),
+    };
+    const user = userEvent.setup();
+
+    render(withWorkspaceProviders(<DesignModelPage />, repository));
+
+    const reopen = await screen.findByRole("button", { name: "有 1 项需要处理" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(reopen);
+    const guidance = screen.getByRole("dialog", {
+      name: "设计模型暂时无法生成",
+    });
+    expect(guidance).toHaveTextContent("请先输入并确认系统需求");
+    expect(guidance).not.toHaveTextContent("影响：");
+    expect(guidance).not.toHaveTextContent("技术详情");
+    expect(
+      within(guidance).getByRole("button", { name: "前往系统需求" }),
+    ).toBeInTheDocument();
+  });
+
   it("treats per-use-case analysis models as available requirement sources", async () => {
     const repository: WorkspaceRepository = {
       loadWorkspace: vi.fn(async () =>
@@ -743,8 +779,9 @@ describe("DesignModelPage", () => {
 
     await screen.findByText("已生成设计模型");
     expect(screen.getByText("0/7")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: /设计类图/ })).not.toBeChecked();
-    const blocker = await screen.findByRole("alert");
+    const blocker = await screen.findByRole("dialog", {
+      name: "设计模型暂时无法生成",
+    });
     await waitFor(() => {
       expect(
         within(blocker).getByText("已有用例实现设计覆盖不足，请先手动更新用例实现设计"),
@@ -753,6 +790,10 @@ describe("DesignModelPage", () => {
     expect(
       within(blocker).getByRole("button", { name: "查看用例实现设计" }),
     ).toBeInTheDocument();
+    await userEvent.click(within(blocker).getByRole("button", { name: "我知道了" }));
+    expect(screen.getByRole("checkbox", { name: /设计类图/ })).not.toBeChecked();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "有 1 项需要处理" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /生成设计模型/ })).toBeDisabled();
     expect(screen.getByText("已生成设计模型")).toBeInTheDocument();
     expect(startDesignRun).not.toHaveBeenCalled();

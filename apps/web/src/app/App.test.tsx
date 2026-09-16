@@ -18,6 +18,7 @@ import {
 } from "../features/user-platform/components/user-platform-pages";
 import { formatProjectDateTimeMinute } from "../features/user-platform/lib/project-presentation";
 import { i18n, LOCALE_PREFERENCE_STORAGE_KEY } from "../shared/i18n";
+import { requestOpenGenerationTask } from "../shared/lib/app-navigation";
 
 let projectApiMode: "unauthenticated" | "authenticated" | "empty" | "forbidden" | "offline";
 let caseProjectApiMode: "success" | "failure";
@@ -3395,6 +3396,20 @@ describe("App shell routes", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "成员管理" })).not.toBeInTheDocument();
     });
+  });
+
+  it("opens the real task drawer and selects the requested server run", async () => {
+    projectApiMode = "authenticated";
+    window.history.pushState({}, "", "/projects/library-booking");
+
+    render(withWorkspaceProviders(<Shell />, createRepository()));
+    expect(await screen.findByText("智慧图书馆预约系统")).toBeInTheDocument();
+
+    act(() => requestOpenGenerationTask({ runId: "run-1" }));
+
+    const drawer = await screen.findByRole("dialog", { name: "生成任务" });
+    expect(within(drawer).getByText("run-1")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/projects/library-booking");
   });
 
   it("switches project workspace drawers from banner shortcuts while a drawer is open", async () => {

@@ -22,7 +22,6 @@ import {
   markRequirementReviewed,
   mergeReviewedRequirement,
   rebuildRequirementReviewQualityReport,
-  uniqueIssueMessages,
 } from "./requirement-review";
 
 interface RequirementRuleCreateInput {
@@ -179,14 +178,11 @@ export function useRequirementReviewActions({
   }, [clearRequirementRulesBase, invalidateRequirementReviewArtifacts]);
 
   const showRequirementReviewSaveFailure = useCallback(
-    (error: unknown, ruleId: string) => {
+    (_error: unknown, ruleId: string) => {
       openGenerationResultDialog({
         title: "保存失败",
         tone: "destructive",
         message: "复核结果没有保存，请稍后重试。",
-        details: [
-          error instanceof Error ? error.message : "项目工作台保存失败。",
-        ],
         ruleId,
         stageLabel: "需求规则",
         targetLabel:
@@ -303,7 +299,6 @@ export function useRequirementReviewActions({
           title: "字段建议已拒绝",
           tone: "warning",
           message: "智能修复补齐建议已标记为拒绝，需求仍保留待确认提示。",
-          details: uniqueIssueMessages(relatedIssues),
           requirementId: requirement.id,
           ruleId,
           stageLabel: "需求规则",
@@ -314,7 +309,6 @@ export function useRequirementReviewActions({
           title: "字段仍需确认",
           tone: "warning",
           message: "编辑稿已保存，当前需求仍保留质量提示。",
-          details: uniqueIssueMessages(relatedIssues),
           requirementId: requirement.id,
           ruleId,
           stageLabel: "需求规则",
@@ -383,7 +377,6 @@ export function useRequirementReviewActions({
           title: "需求语义仍不完整",
           tone: "destructive",
           message: "当前提示涉及原始业务语义丢失，不能直接确认。",
-          details: uniqueIssueMessages(semanticLossIssues),
           requirementId: requirement.id,
           ruleId,
           stageLabel: "需求规则",
@@ -658,11 +651,6 @@ export function useRequirementReviewActions({
             title: "无法采纳有害修复",
             tone: "destructive",
             message: "智能修复删除了原始业务语义，请拒绝候选或手动修正。",
-            details: [
-              `丢失内容：${semanticDiff.lostFacts
-                .map((fact) => fact.label)
-                .join("、")}`,
-            ],
             requirementId: candidate.beforeRequirement.id,
             ruleId,
             stageLabel: "需求规则",

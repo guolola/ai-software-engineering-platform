@@ -31,12 +31,16 @@ function httpFallbackKey(status: number) {
   return "errors.http.unknown";
 }
 
-export function localizeApiFailure(payload: unknown, status: number) {
+export function localizeApiFailure(
+  payload: unknown,
+  status: number,
+  operationFallback?: string,
+) {
   const nested = payload && typeof payload === "object" && "error" in payload
     ? (payload as { error?: unknown }).error
     : payload;
   const error = localizableError(nested);
-  const fallback = i18n.t(httpFallbackKey(status));
+  const fallback = operationFallback?.trim() || i18n.t(httpFallbackKey(status));
   if (!error) return fallback;
   return i18n.t(`errors.codes.${error.code}`, {
     ...error.params,

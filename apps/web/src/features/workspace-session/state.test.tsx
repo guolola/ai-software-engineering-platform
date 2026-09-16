@@ -303,7 +303,7 @@ describe("WorkspaceSessionProvider", () => {
       within(successDialog).queryByRole("button", { name: "取消" }),
     ).not.toBeInTheDocument();
     await user.click(
-      within(successDialog).getByRole("button", { name: "确认" }),
+      within(successDialog).getByRole("button", { name: "我知道了" }),
     );
     await waitFor(() => {
       expect(
@@ -322,7 +322,7 @@ describe("WorkspaceSessionProvider", () => {
     ).not.toBeInTheDocument();
     expect(toastMessage).not.toHaveBeenCalled();
     await user.click(
-      within(successDialogAgain).getByRole("button", { name: "确认" }),
+      within(successDialogAgain).getByRole("button", { name: "我知道了" }),
     );
     await waitFor(() => {
       expect(
@@ -373,10 +373,17 @@ describe("WorkspaceSessionProvider", () => {
       within(failedDialog).queryByRole("button", { name: "取消" }),
     ).not.toBeInTheDocument();
     expect(
-      within(failedDialog).getByRole("button", { name: "确认" }),
+      within(failedDialog).getByRole("button", { name: "我知道了" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Trusted chain/u)).not.toBeInTheDocument();
-    expect(screen.queryByText(/runId/u)).not.toBeInTheDocument();
+    expect(within(failedDialog).queryByText("影响：")).not.toBeInTheDocument();
+    expect(within(failedDialog).queryByText("技术详情")).not.toBeInTheDocument();
+    expect(failedDialog).not.toHaveTextContent("run-failed-dialog");
+
+    await user.click(within(failedDialog).getByRole("button", { name: "我知道了" }));
+    await user.click(screen.getByRole("button", { name: "生成需求规则" }));
+    expect(
+      await screen.findByRole("dialog", { name: "生成失败" }),
+    ).toBeInTheDocument();
   });
 
   it("records failed rules-only snapshots in history without clearing existing rules", async () => {
@@ -554,7 +561,7 @@ describe("WorkspaceSessionProvider", () => {
       screen.queryByRole("dialog", { name: "需求规则已生成" }),
     ).not.toBeInTheDocument();
     await user.click(
-      within(failedDialog).getByRole("button", { name: "确认" }),
+      within(failedDialog).getByRole("button", { name: "我知道了" }),
     );
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -3591,6 +3598,12 @@ describe("WorkspaceSessionProvider", () => {
         (subtask) => subtask.label === "修复需求规则",
       ),
     ).toBe(true);
+    const completionDialog = await screen.findByRole("dialog", {
+      name: "需求规则已生成",
+    });
+    await user.click(
+      within(completionDialog).getByRole("button", { name: "我知道了" }),
+    );
 
     startRun.mockClear();
     let blockedGeneration: Promise<void> | null = null;
@@ -3600,7 +3613,7 @@ describe("WorkspaceSessionProvider", () => {
     expect(
       await screen.findByRole("dialog", { name: "需求规则待确认" }),
     ).toBeInTheDocument();
-    await user.click(await screen.findByRole("button", { name: "确认" }));
+    await user.click(await screen.findByRole("button", { name: "我知道了" }));
     await act(async () => {
       await blockedGeneration;
     });
@@ -4037,7 +4050,7 @@ describe("WorkspaceSessionProvider", () => {
       ),
     ).toBeInTheDocument();
     await user.click(
-      within(blockedDialog).getByRole("button", { name: "确认" }),
+      within(blockedDialog).getByRole("button", { name: "我知道了" }),
     );
     await act(async () => {
       await generation;

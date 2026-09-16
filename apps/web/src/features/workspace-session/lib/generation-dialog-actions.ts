@@ -1,14 +1,16 @@
 // Owns generation result and confirmation dialog state for the session provider.
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   completedRunResultMessage,
-  generationResultDialogGroup,
+  generationResultFeedback,
   type GenerationConfirmationDialogState,
   type GenerationResultDialogState,
 } from "../components/generation-dialogs";
+import { useFeedbackDialog } from "../../../shared/ui/feedback-dialog";
 import type { GenerationConfirmationSummary } from "./generation-planning";
 import { cancelledRunMessage } from "./run-events";
 import { i18n } from "../../../shared/i18n/i18n";
+import { requestOpenGenerationTask } from "../../../shared/lib/app-navigation";
 
 type CancelledRunDialogSnapshot = {
   error?: { message?: string } | null;
@@ -18,6 +20,7 @@ type CancelledRunDialogSnapshot = {
 export function cancelledRunResultDialog(
   snapshot: CancelledRunDialogSnapshot,
   stageLabel: string,
+  clientTaskId?: string | null,
 ): GenerationResultDialogState {
   return {
     title: i18n.t("generation.dialog.titles.cancelled"),
@@ -25,11 +28,16 @@ export function cancelledRunResultDialog(
     message: cancelledRunMessage(snapshot),
     runId: snapshot.runId ?? null,
     stageLabel,
+    primaryAction: {
+      label: i18n.t("feedback.actions.taskDetails"),
+      onSelect: () =>
+        requestOpenGenerationTask({ clientTaskId, runId: snapshot.runId }),
+    },
   };
 }
 
 export function failedRunResultDialog(input: {
-  details: string[];
+  clientTaskId?: string | null;
   message: string;
   runId: string | null;
   stageLabel: string;
@@ -38,9 +46,16 @@ export function failedRunResultDialog(input: {
     title: i18n.t("generation.dialog.titles.failed"),
     tone: "destructive",
     message: input.message,
-    details: input.details,
     runId: input.runId,
     stageLabel: input.stageLabel,
+    primaryAction: {
+      label: i18n.t("feedback.actions.taskDetails"),
+      onSelect: () =>
+        requestOpenGenerationTask({
+          clientTaskId: input.clientTaskId,
+          runId: input.runId,
+        }),
+    },
   };
 }
 
@@ -141,53 +156,16 @@ export function documentRunCompletionDialog(input: {
 }
 
 export function useGenerationDialogActions() {
-  const [generationResultDialog, setGenerationResultDialog] =
-    useState<GenerationResultDialogState | null>(null);
+  const { openFeedback } = useFeedbackDialog();
   const [generationConfirmationDialog, setGenerationConfirmationDialog] =
     useState<GenerationConfirmationDialogState | null>(null);
-  const closedGenerationResultDialogRef = useRef<{
-    group: string;
-    closedAt: number;
-  } | null>(null);
 
   const openGenerationResultDialog = useCallback(
     (input: GenerationResultDialogState) => {
-      const nextGroup = generationResultDialogGroup(input);
-      const openedAt = Date.now();
-      const isCompletion = input.tone !== "destructive";
-      setGenerationResultDialog((current) => {
-        const currentGroup = current
-          ? generationResultDialogGroup(current)
-          : null;
-        if (isCompletion && currentGroup === nextGroup) {
-          return current;
-        }
-        const recentlyClosed = closedGenerationResultDialogRef.current;
-        if (
-          isCompletion &&
-          recentlyClosed &&
-          recentlyClosed.group === nextGroup &&
-          openedAt - recentlyClosed.closedAt < 10_000
-        ) {
-          return current;
-        }
-        return input;
-      });
+      openFeedback(generationResultFeedback(input));
     },
-    [],
+    [openFeedback],
   );
-
-  const closeGenerationResultDialog = useCallback(() => {
-    setGenerationResultDialog((current) => {
-      if (current) {
-        closedGenerationResultDialogRef.current = {
-          group: generationResultDialogGroup(current),
-          closedAt: Date.now(),
-        };
-      }
-      return null;
-    });
-  }, []);
 
   const confirmGeneration = useCallback(
     (summary: GenerationConfirmationSummary) =>
@@ -212,10 +190,8 @@ export function useGenerationDialogActions() {
 
   return {
     closeGenerationConfirmationDialog,
-    closeGenerationResultDialog,
     confirmGeneration,
     generationConfirmationDialog,
-    generationResultDialog,
     openGenerationResultDialog,
   };
 }

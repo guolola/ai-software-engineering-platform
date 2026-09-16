@@ -39,7 +39,7 @@ import {
 
 type PreflightBlock = Pick<
   GenerationResultDialogState,
-  "title" | "tone" | "message" | "details" | "stageLabel" | "targetLabel"
+  "title" | "tone" | "message" | "stageLabel" | "targetLabel"
 >;
 
 type RequirementGenerationPreflight =
@@ -112,7 +112,6 @@ function pendingReviewBlock(
     title: "需求规则待确认",
     tone: "warning",
     message: "请先确认需求规则修复结果",
-    details: pendingReviews,
     stageLabel: "需求规则",
     targetLabel,
   };
