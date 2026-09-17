@@ -11,6 +11,7 @@ import {
 
 export interface EvalFixture {
   id: string;
+  taskType: "requirements_to_uml";
   requirementText: string;
   selectedDiagrams: DiagramKind[];
   expectedFacts: string[];
@@ -18,6 +19,8 @@ export interface EvalFixture {
 
 export interface EvalCaseResult {
   fixtureId: string;
+  taskType: "requirements_to_uml";
+  attempt: number;
   status: RunSnapshot["status"] | "configuration_error";
   rulesCount: number;
   modelsCount: number;
@@ -36,12 +39,32 @@ export interface EvalCaseResult {
   terminalStateConsistent: boolean;
   prototypeBuildPassed: boolean | null;
   documentUsable: boolean | null;
+  qualityScore: number;
+  automaticVerdict: "pass" | "fail";
+}
+
+export interface EvalPassMetrics {
+  fixtureCount: number;
+  attemptCount: number;
+  k: number;
+  passAt1: number | null;
+  passAtK: number | null;
+  passPowerK: number | null;
+  bestAtK: number | null;
 }
 
 export interface EvalReport {
+  suiteVersion: string;
+  evaluatorVersion: string;
   generatedAt: string;
   mode: "mock" | "api";
   model: string;
+  strategyId: string;
+  strategyVersion: string;
+  attemptsPerFixture: number;
+  budgetDimension: "wall_clock_ms" | "tokens" | "model_calls" | null;
+  budgetValue: number | null;
+  passMetrics: EvalPassMetrics;
   totals: {
     cases: number;
     completed: number;
@@ -101,6 +124,7 @@ export async function loadFixtures(): Promise<EvalFixture[]> {
   return Promise.all(
     names.map(async (name) => ({
       id: basename(name, ".txt"),
+      taskType: "requirements_to_uml" as const,
       requirementText: (await readFile(join(dir, name), "utf8")).trim(),
       selectedDiagrams: DEFAULT_DIAGRAMS,
       expectedFacts: RETEST_EXPECTED_FACTS[basename(name, ".txt")] ?? [],
@@ -294,9 +318,26 @@ function summarizeSnapshot(
   fixture: EvalFixture,
   snapshot: RunSnapshot,
   durationMs: number,
+  attempt: number,
 ): EvalCaseResult {
+  const quality = summarizeQuality(fixture, snapshot);
+  const semanticRate = quality.semanticAccuracyRate ?? 1;
+  const traceRate = quality.effectiveTraceCoverageRate ?? 1;
+  const diagramCompleteness = fixture.selectedDiagrams.length > 0
+    ? Math.min(1, snapshot.svgArtifacts.length / fixture.selectedDiagrams.length)
+    : 1;
+  const qualityScore = Math.max(0, Math.min(100, Math.round(
+    semanticRate * 40 + traceRate * 25 + diagramCompleteness * 25 +
+      (quality.terminalStateConsistent ? 10 : 0),
+  )));
+  const hardGatesPassed = snapshot.status === "completed" &&
+    quality.terminalStateConsistent && Object.keys(snapshot.diagramErrors).length === 0 &&
+    snapshot.svgArtifacts.length >= fixture.selectedDiagrams.length &&
+    quality.harmfulRepairCount === 0 && quality.unfoundedAdditionCount === 0;
   return {
     fixtureId: fixture.id,
+    taskType: fixture.taskType,
+    attempt,
     status: snapshot.status,
     rulesCount: snapshot.rules.length,
     modelsCount: snapshot.models.length,
@@ -304,7 +345,33 @@ function summarizeSnapshot(
     diagramErrorCount: Object.keys(snapshot.diagramErrors).length,
     durationMs,
     errorMessage: snapshot.error?.message ?? null,
-    ...summarizeQuality(fixture, snapshot),
+    ...quality,
+    qualityScore,
+    automaticVerdict: hardGatesPassed && qualityScore >= 80 ? "pass" : "fail",
+  };
+}
+
+export function calculatePassMetrics(results: EvalCaseResult[], configuredK = 5): EvalPassMetrics {
+  const byFixture = new Map<string, EvalCaseResult[]>();
+  for (const result of results) {
+    byFixture.set(result.fixtureId, [...(byFixture.get(result.fixtureId) ?? []), result]);
+  }
+  const groups = Array.from(byFixture.values()).map((rows) =>
+    rows.slice().sort((left, right) => left.attempt - right.attempt),
+  );
+  const k = Math.max(1, Math.min(configuredK, 100));
+  const selected = (rows: EvalCaseResult[]) => rows.slice(0, k);
+  const ratio = (count: number) => groups.length ? count / groups.length : null;
+  return {
+    fixtureCount: groups.length,
+    attemptCount: results.length,
+    k,
+    passAt1: ratio(groups.filter((rows) => selected(rows)[0]?.automaticVerdict === "pass").length),
+    passAtK: ratio(groups.filter((rows) => selected(rows).some((row) => row.automaticVerdict === "pass")).length),
+    passPowerK: ratio(groups.filter((rows) => selected(rows).length === k && selected(rows).every((row) => row.automaticVerdict === "pass")).length),
+    bestAtK: groups.length
+      ? groups.reduce((sum, rows) => sum + Math.max(...selected(rows).map((row) => row.qualityScore)), 0) / groups.length
+      : null,
   };
 }
 
@@ -313,19 +380,23 @@ export async function runEval(env: NodeJS.ProcessEnv = process.env): Promise<Eva
   const fixtures = await loadFixtures();
   const mode = env.UML_EVAL_MOCK === "1" ? "mock" : "api";
   const results: EvalCaseResult[] = [];
+  const attemptsPerFixture = Math.max(1, Math.min(100, Number.parseInt(env.UML_EVAL_ATTEMPTS ?? "5", 10) || 5));
   const startedAt = Date.now();
 
   for (const fixture of fixtures) {
-    const caseStartedAt = Date.now();
-    try {
-      const snapshot =
-        mode === "mock" ? createMockSnapshot(fixture) : await runViaApi(fixture, env);
-      results.push(
-        summarizeSnapshot(fixture, snapshot, Date.now() - caseStartedAt),
-      );
-    } catch (error) {
-      results.push({
+    for (let attempt = 1; attempt <= attemptsPerFixture; attempt += 1) {
+      const caseStartedAt = Date.now();
+      try {
+        const snapshot =
+          mode === "mock" ? createMockSnapshot(fixture) : await runViaApi(fixture, env);
+        results.push(
+          summarizeSnapshot(fixture, snapshot, Date.now() - caseStartedAt, attempt),
+        );
+      } catch (error) {
+        results.push({
         fixtureId: fixture.id,
+        taskType: fixture.taskType,
+        attempt,
         status: "configuration_error",
         rulesCount: 0,
         modelsCount: 0,
@@ -344,7 +415,10 @@ export async function runEval(env: NodeJS.ProcessEnv = process.env): Promise<Eva
         terminalStateConsistent: false,
         prototypeBuildPassed: null,
         documentUsable: null,
-      });
+        qualityScore: 0,
+        automaticVerdict: "fail",
+        });
+      }
     }
   }
 
@@ -364,10 +438,23 @@ export async function runEval(env: NodeJS.ProcessEnv = process.env): Promise<Eva
     (sum, item) => sum + item.effectiveTraceCovered,
     0,
   );
+  const generatedAt = new Date().toISOString();
+  const budgetDimension = env.UML_EVAL_BUDGET_DIMENSION === "wall_clock_ms" ||
+    env.UML_EVAL_BUDGET_DIMENSION === "tokens" || env.UML_EVAL_BUDGET_DIMENSION === "model_calls"
+    ? env.UML_EVAL_BUDGET_DIMENSION : null;
+  const budgetValue = budgetDimension ? Number.parseInt(env.UML_EVAL_BUDGET_VALUE ?? "", 10) : null;
   return {
-    generatedAt: new Date().toISOString(),
+    suiteVersion: env.UML_EVAL_SUITE_VERSION ?? "uml-eval-v1",
+    evaluatorVersion: "uml-quality-v1",
+    generatedAt,
     mode,
     model: env.UML_EVAL_MODEL ?? "mock",
+    strategyId: env.UML_EVAL_STRATEGY_ID ?? "single-model",
+    strategyVersion: env.UML_EVAL_STRATEGY_VERSION ?? "1",
+    attemptsPerFixture,
+    budgetDimension,
+    budgetValue: budgetValue !== null && Number.isFinite(budgetValue) ? budgetValue : null,
+    passMetrics: calculatePassMetrics(results, attemptsPerFixture),
     totals: {
       cases: results.length,
       completed: results.filter((item) => item.status === "completed").length,
@@ -407,6 +494,12 @@ export function renderMarkdownReport(report: EvalReport) {
   lines.push(`- 生成时间: ${report.generatedAt}`);
   lines.push(`- 模式: ${report.mode}`);
   lines.push(`- 模型: ${report.model}`);
+  lines.push(`- 策略: ${report.strategyId}@${report.strategyVersion}`);
+  lines.push(`- 每个用例独立运行: ${report.attemptsPerFixture} 次`);
+  lines.push(`- Pass@1: ${report.passMetrics.passAt1 === null ? "N/A" : `${(report.passMetrics.passAt1 * 100).toFixed(1)}%`}`);
+  lines.push(`- Pass@${report.passMetrics.k}: ${report.passMetrics.passAtK === null ? "N/A" : `${(report.passMetrics.passAtK * 100).toFixed(1)}%`}`);
+  lines.push(`- Pass^${report.passMetrics.k}: ${report.passMetrics.passPowerK === null ? "N/A" : `${(report.passMetrics.passPowerK * 100).toFixed(1)}%`}`);
+  lines.push(`- Best@${report.passMetrics.k}: ${report.passMetrics.bestAtK?.toFixed(1) ?? "N/A"}`);
   lines.push(`- 用例数: ${report.totals.cases}`);
   lines.push(`- 成功: ${report.totals.completed}`);
   lines.push(`- 失败: ${report.totals.failed}`);
@@ -430,12 +523,15 @@ export function renderMarkdownReport(report: EvalReport) {
   );
   lines.push(`- 终态矛盾数: ${report.totals.terminalInconsistencyCount}`);
   lines.push("");
-  lines.push("| Fixture | Status | Semantics | Harmful Repairs | Unfounded | Trace | Terminal | Duration | Error |");
-  lines.push("| --- | --- | ---: | ---: | ---: | ---: | --- | ---: | --- |");
+  lines.push("| Fixture | Attempt | Verdict | Quality | Status | Semantics | Harmful Repairs | Unfounded | Trace | Terminal | Duration | Error |");
+  lines.push("| --- | ---: | --- | ---: | --- | ---: | ---: | ---: | ---: | --- | ---: | --- |");
   for (const result of report.results) {
     lines.push(
       [
         result.fixtureId,
+        result.attempt,
+        result.automaticVerdict,
+        result.qualityScore,
         result.status,
         result.semanticAccuracyRate === null
           ? "N/A"
@@ -454,6 +550,52 @@ export function renderMarkdownReport(report: EvalReport) {
   return lines.join("\n");
 }
 
+export function createEvaluationImport(report: EvalReport, importId: string) {
+  return {
+    importId,
+    suiteVersion: report.suiteVersion,
+    evaluatorVersion: report.evaluatorVersion,
+    generatedAt: report.generatedAt,
+    attempts: report.results.map((result) => ({
+      id: `${importId}:${result.fixtureId}:${result.attempt}`,
+      fixtureId: result.fixtureId,
+      taskType: result.taskType,
+      provider: null,
+      model: report.model,
+      strategyId: report.strategyId,
+      strategyVersion: report.strategyVersion,
+      attempt: result.attempt,
+      k: report.attemptsPerFixture,
+      budgetDimension: report.budgetDimension,
+      budgetValue: report.budgetValue,
+      qualityScore: result.qualityScore,
+      automaticVerdict: result.automaticVerdict,
+      durationMs: result.durationMs,
+      inputTokens: null,
+      outputTokens: null,
+      cachedInputTokens: null,
+      reasoningTokens: null,
+      totalTokens: null,
+      modelCallCount: null,
+      createdAt: report.generatedAt,
+    })),
+  };
+}
+
+async function importEvaluationReport(report: EvalReport, env: NodeJS.ProcessEnv) {
+  if (!env.UML_EVAL_INGEST_URL || !env.UML_EVAL_INGEST_TOKEN) return;
+  const importId = env.UML_EVAL_IMPORT_ID ?? `${report.suiteVersion}:${report.model}:${report.generatedAt}`;
+  const response = await fetch(env.UML_EVAL_INGEST_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.UML_EVAL_INGEST_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(createEvaluationImport(report, importId)),
+  });
+  if (!response.ok) throw new Error(`导入评测报告失败：HTTP ${response.status}`);
+}
+
 async function writeReports(report: EvalReport, outputDir: string) {
   await mkdir(outputDir, { recursive: true });
   await writeFile(join(outputDir, "eval-report.json"), JSON.stringify(report, null, 2), "utf8");
@@ -462,6 +604,7 @@ async function writeReports(report: EvalReport, outputDir: string) {
 
 async function main() {
   const report = await runEval();
+  await importEvaluationReport(report, process.env);
   const outputDir = process.env.UML_EVAL_OUTPUT_DIR;
   if (outputDir) {
     await writeReports(report, outputDir);

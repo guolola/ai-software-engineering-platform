@@ -29,6 +29,7 @@ import {
   normalizeRunError,
 } from "./shared/errors.js";
 import { runFeasibilityStagePipeline } from "./feasibility-pipeline.js";
+import type { AdminAnalyticsStore } from "../../admin/admin-analytics-store.js";
 
 type RequirementPipeline = (
   record: RunRecord,
@@ -133,6 +134,17 @@ function taskTypeForRecord(record: RunRecord): ProviderTaskType {
   return "requirements_to_uml";
 }
 
+function requestedModelCountForRecord(record: RunRecord, taskType: ProviderTaskType) {
+  if (taskType !== "requirements_to_uml" && taskType !== "design_modeling") return null;
+  const snapshot = record.snapshot as { requestedDiagrams?: unknown; selectedDiagrams?: unknown };
+  const requested = Array.isArray(snapshot.requestedDiagrams)
+    ? snapshot.requestedDiagrams
+    : Array.isArray(snapshot.selectedDiagrams)
+      ? snapshot.selectedDiagrams
+      : null;
+  return requested?.length ?? null;
+}
+
 function documentInputFromSnapshot(record: RunRecord): StartDocumentRunRequest {
   const snapshot = record.snapshot;
   if (!("documentKind" in snapshot)) {
@@ -167,6 +179,7 @@ function createRunLlmTransport({
   taskType,
   llmTransport,
   llmScheduler,
+  analyticsStore,
 }: {
   record: RunRecord;
   providerSettings: ProviderSettings;
@@ -174,6 +187,7 @@ function createRunLlmTransport({
   taskType: ProviderTaskType;
   llmTransport: LlmTransport;
   llmScheduler?: LlmScheduler;
+  analyticsStore?: Pick<AdminAnalyticsStore, "recordTelemetry">;
 }) {
   if (!llmScheduler) return llmTransport;
   const emitQueueStatus = (
@@ -230,9 +244,14 @@ function createRunLlmTransport({
       providerConfigId,
       model: providerSettings.model,
       taskType,
+      requestedModelCount: requestedModelCountForRecord(record, taskType),
     },
-    deriveContext: deriveLlmSubtaskContext,
+    deriveContext: (input) => ({
+      stage: record.snapshot.currentStage ?? null,
+      ...deriveLlmSubtaskContext(input),
+    }),
     onStatus: emitQueueStatus,
+    analyticsStore,
   });
 }
 
@@ -304,12 +323,14 @@ export function startRunRecordPipeline({
   addCodeDiagnostic,
   documentInput,
   billingEntitlements,
+  analyticsStore,
 }: {
   record: RunRecord;
   providerSettings: ProviderSettings;
   providerConfigId: string | null;
   llmTransport: LlmTransport;
   llmScheduler?: LlmScheduler;
+  analyticsStore?: Pick<AdminAnalyticsStore, "recordTelemetry">;
   renderClient: RenderClient;
   pngRenderClient: PngRenderClient;
   documentLibrary: DocumentLibrary;
@@ -344,6 +365,7 @@ export function startRunRecordPipeline({
     addCodeDiagnostic,
     documentInput,
     billingEntitlements,
+    analyticsStore,
   });
 }
 
@@ -355,12 +377,14 @@ export function startFeasibilityRecordPipeline({
   llmScheduler,
   renderClient,
   billingEntitlements,
+  analyticsStore,
 }: {
   record: RunRecord;
   providerSettings: ProviderSettings;
   providerConfigId: string | null;
   llmTransport: LlmTransport;
   llmScheduler?: LlmScheduler;
+  analyticsStore?: Pick<AdminAnalyticsStore, "recordTelemetry">;
   renderClient: RenderClient;
   billingEntitlements?: Pick<
     BillingService,
@@ -374,6 +398,7 @@ export function startFeasibilityRecordPipeline({
     taskType: "feasibility_analysis",
     llmTransport,
     llmScheduler,
+    analyticsStore,
   });
   const entitlementTransport = createEntitlementConfirmingTransport({
     record,
@@ -421,12 +446,14 @@ export async function runRunRecordPipeline({
   addCodeDiagnostic,
   documentInput,
   billingEntitlements,
+  analyticsStore,
 }: {
   record: RunRecord;
   providerSettings: ProviderSettings;
   providerConfigId: string | null;
   llmTransport: LlmTransport;
   llmScheduler?: LlmScheduler;
+  analyticsStore?: Pick<AdminAnalyticsStore, "recordTelemetry">;
   renderClient: RenderClient;
   pngRenderClient: PngRenderClient;
   documentLibrary: DocumentLibrary;
@@ -453,6 +480,7 @@ export async function runRunRecordPipeline({
     taskType,
     llmTransport,
     llmScheduler,
+    analyticsStore,
   });
 
   const entitlementTransport = createEntitlementConfirmingTransport({

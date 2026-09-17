@@ -79,6 +79,7 @@ import type { GenerationUsageService } from "../../generation/generation-usage.j
 import type { BillingService } from "../../billing/billing-service.js";
 import { reserveBillingRunUsage } from "../../runs/billing/run-billing-gates.js";
 import { RUN_ROUTE_CONFIG } from "./run-route-config.js";
+import type { AdminAnalyticsStore } from "../../admin/admin-analytics-store.js";
 import {
   resolveCodeRunInput,
   resolveDesignRunInput,
@@ -233,6 +234,7 @@ export function registerRunRoutes({
   loadProjectWorkspace,
   syncProjectWorkspace,
   runQueue,
+  analyticsStore,
 }: {
   app: FastifyInstance;
   runs: RunRecordStore;
@@ -264,6 +266,7 @@ export function registerRunRoutes({
   loadProjectWorkspace?: LoadProjectWorkspaceForRun;
   syncProjectWorkspace?: ProjectWorkspaceSync;
   runQueue?: RunQueue;
+  analyticsStore?: Pick<AdminAnalyticsStore, "recordTelemetry">;
 }) {
   const sideEffectRecords = new WeakSet<RunRecord>();
   const attachRunSideEffects = (record: RunRecord) => {
@@ -308,6 +311,7 @@ export function registerRunRoutes({
       addCodeDiagnostic,
       documentInput,
       billingEntitlements: runBillingEntitlements,
+      analyticsStore,
     });
   };
 

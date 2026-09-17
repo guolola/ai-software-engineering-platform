@@ -88,6 +88,7 @@ export async function createApiServer(options?: {
     systemNoticeStore,
     billingRepository,
     academicStore,
+    analyticsStore,
   } = await createApiPersistence({
     nodeEnv: runtimeNodeEnv,
     overrides: {
@@ -168,6 +169,7 @@ export async function createApiServer(options?: {
     generationUsage,
     nodeEnv: runtimeNodeEnv,
     academicStore,
+    analyticsStore,
     runs,
     documentLibrary,
     providerConfigs,

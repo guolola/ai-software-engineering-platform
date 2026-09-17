@@ -15,6 +15,8 @@ export type AdminRole = z.infer<typeof adminRoleSchema>;
 
 export const adminPermissionSchema = z.enum([
   "admin.metrics.read",
+  "admin.evaluations.read",
+  "admin.evaluations.review",
   "admin.roles.write",
   "admin.users.read",
   "admin.users.write",
@@ -50,6 +52,8 @@ export type AdminDataScope = z.infer<typeof adminDataScopeSchema>;
 
 export const adminCapabilitySchema = z.enum([
   "viewDashboard",
+  "viewEvaluations",
+  "reviewEvaluations",
   "viewUsers",
   "manageUsers",
   "viewProjects",
@@ -74,6 +78,7 @@ export const adminRolePermissions = {
   super_admin: allAdminPermissions,
   system_operator: [
     "admin.metrics.read",
+    "admin.evaluations.read",
     "admin.projects.read",
     "admin.projects.write",
     "admin.runs.read",
@@ -103,6 +108,7 @@ export const adminRolePermissions = {
   ],
   auditor: [
     "admin.metrics.read",
+    "admin.evaluations.read",
     "admin.users.read",
     "admin.projects.read",
     "admin.runs.read",
@@ -124,6 +130,8 @@ export const adminRolePermissions = {
   ],
   model_admin: [
     "admin.metrics.read",
+    "admin.evaluations.read",
+    "admin.evaluations.review",
     "admin.provider_configs.read",
     "admin.provider_configs.write",
     "admin.rate_limits.read",
@@ -151,6 +159,7 @@ export const adminRoleCapabilities = {
   super_admin: allAdminCapabilities,
   system_operator: [
     "viewDashboard",
+    "viewEvaluations",
     "viewProjects",
     "manageProjects",
     "viewRuns",
@@ -177,6 +186,7 @@ export const adminRoleCapabilities = {
   ],
   auditor: [
     "viewDashboard",
+    "viewEvaluations",
     "viewUsers",
     "viewProjects",
     "viewRuns",
@@ -196,6 +206,8 @@ export const adminRoleCapabilities = {
   ],
   model_admin: [
     "viewDashboard",
+    "viewEvaluations",
+    "reviewEvaluations",
     "viewProviderConfigs",
     "manageProviderConfigs",
     "viewRateLimits",

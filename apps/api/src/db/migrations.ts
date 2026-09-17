@@ -975,6 +975,87 @@ alter table payment_notifications
   add constraint payment_notifications_provider_check check (provider in ('alipay')) not valid;
 `;
 
+export const adminAnalyticsSql = `
+create table if not exists llm_request_telemetry (
+  id text primary key,
+  run_id text not null,
+  project_id text,
+  user_id text,
+  provider_config_id text,
+  model text not null,
+  task_type text not null,
+  stage text,
+  diagram_kind text,
+  subtask_id text,
+  requested_model_count integer,
+  queued_at timestamptz not null,
+  provider_started_at timestamptz,
+  first_reasoning_at timestamptz,
+  first_visible_at timestamptz,
+  last_visible_at timestamptz,
+  completed_at timestamptz not null,
+  queue_ms integer,
+  provider_ttft_ms integer,
+  ttft_ms integer,
+  reasoning_ms integer,
+  decode_ms integer,
+  total_ms integer not null,
+  input_tokens integer,
+  output_tokens integer,
+  cached_input_tokens integer,
+  reasoning_tokens integer,
+  total_tokens integer,
+  outcome text not null check (outcome in ('success', 'failed', 'cancelled')),
+  status_code integer,
+  error_category text,
+  retry_count integer not null default 0,
+  format_fallback_count integer not null default 0,
+  usage_unavailable_reason text
+);
+create index if not exists llm_telemetry_window_idx on llm_request_telemetry(queued_at, task_type);
+create index if not exists llm_telemetry_model_idx on llm_request_telemetry(provider_config_id, model, queued_at);
+
+create table if not exists evaluation_imports (
+  id text primary key,
+  suite_version text not null,
+  evaluator_version text not null,
+  generated_at timestamptz not null,
+  imported_at timestamptz not null default now()
+);
+create table if not exists evaluation_attempts (
+  id text primary key,
+  import_id text not null references evaluation_imports(id) on delete cascade,
+  suite_version text not null,
+  evaluator_version text not null,
+  fixture_id text not null,
+  task_type text not null,
+  provider text,
+  model text not null,
+  strategy_id text not null,
+  strategy_version text not null,
+  attempt integer not null,
+  k integer not null,
+  budget_dimension text check (budget_dimension in ('wall_clock_ms', 'tokens', 'model_calls')),
+  budget_value integer,
+  quality_score double precision not null,
+  automatic_verdict text not null check (automatic_verdict in ('pass', 'fail')),
+  duration_ms integer not null,
+  input_tokens integer,
+  output_tokens integer,
+  cached_input_tokens integer,
+  reasoning_tokens integer,
+  total_tokens integer,
+  model_call_count integer,
+  created_at timestamptz not null,
+  review_verdict text check (review_verdict in ('pass', 'fail')),
+  review_reason text,
+  reviewed_by text,
+  reviewed_at timestamptz
+);
+create index if not exists evaluation_attempt_window_idx on evaluation_attempts(created_at, task_type, model);
+create index if not exists evaluation_attempt_review_idx on evaluation_attempts(review_verdict, created_at desc);
+`;
+
 export const migrations = [
   {
     id: "001_user_admin_platform_base",
@@ -1059,6 +1140,10 @@ export const migrations = [
   {
     id: "021_epay_alipay_only",
     sql: epayAlipayOnlySql,
+  },
+  {
+    id: "022_admin_analytics",
+    sql: adminAnalyticsSql,
   },
 ] as const;
 

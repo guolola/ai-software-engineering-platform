@@ -155,6 +155,7 @@ async function start() {
           addCodeDiagnostic,
           documentInput: job.documentInput,
           billingEntitlements: provider.billingRequired ? billingService : undefined,
+          analyticsStore: persistence.analyticsStore,
         });
       } catch (error) {
         handleRunPipelineError(record, error, addCodeDiagnostic);

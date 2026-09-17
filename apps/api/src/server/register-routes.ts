@@ -46,6 +46,7 @@ import type { AcademicAdminRepository } from "../db/academic-admin-repository.js
 import type { SystemNoticeStore } from "../system-notices/records/system-notice-store.js";
 import { DEFAULT_SSE_ALLOW_ORIGIN } from "./defaults.js";
 import { resolveRuntimeCwd } from "./runtime.js";
+import type { AdminAnalyticsStore } from "../admin/admin-analytics-store.js";
 
 export type { RunAccessContext } from "../routes/runs/run-access.js";
 
@@ -72,6 +73,7 @@ export type RegisterApiRoutesOptions = {
   renderClient: RenderClient;
   pngRenderClient: PngRenderClient;
   systemNoticeStore: SystemNoticeStore;
+  analyticsStore: AdminAnalyticsStore;
   testRunAccessContext?: RunAccessContext;
   disableBillingEntitlementGuard?: boolean;
 };
@@ -109,6 +111,7 @@ export function registerApiRoutes({
   renderClient,
   pngRenderClient,
   systemNoticeStore,
+  analyticsStore,
   testRunAccessContext,
   disableBillingEntitlementGuard,
 }: RegisterApiRoutesOptions) {
@@ -210,6 +213,7 @@ export function registerApiRoutes({
       runCodeStagePipeline,
       runDocumentStagePipeline,
       addCodeDiagnostic,
+      analyticsStore,
     });
   };
 
@@ -274,6 +278,7 @@ export function registerApiRoutes({
     riskEvents: () => riskEvents.map((event) => ({ ...event })),
     academicStore,
     billingService,
+    analyticsStore,
   });
   registerDocumentRoutes({
     app,
@@ -311,6 +316,7 @@ export function registerApiRoutes({
     llmTransport,
     llmScheduler,
     runQueue,
+    analyticsStore,
     renderClient,
     pngRenderClient,
     defaultSseAllowOrigin: DEFAULT_SSE_ALLOW_ORIGIN,
@@ -365,6 +371,7 @@ export function registerApiRoutes({
     llmTransport,
     llmScheduler,
     runQueue,
+    analyticsStore,
     providerConfigs,
     providerUsageTracker,
     generationUsage,

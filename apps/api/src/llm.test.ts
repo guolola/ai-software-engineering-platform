@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createRealLlmTransport,
   listOpenAiCompatibleModels,
+  normalizeStreamTokenUsage,
   parseChatCompletionSse,
   ProviderHttpError,
   resolveChatCompletionsUrl,
@@ -12,6 +13,30 @@ import {
 import type { OpenAiCompatibleClientFactory } from "./llm.js";
 
 const resolvePublicHostname = async () => ["8.8.8.8"];
+
+test("normalizeStreamTokenUsage supports OpenAI and Responses-compatible fields", () => {
+  assert.deepEqual(normalizeStreamTokenUsage({
+    prompt_tokens: 120,
+    completion_tokens: 30,
+    total_tokens: 150,
+    prompt_tokens_details: { cached_tokens: 40 },
+    completion_tokens_details: { reasoning_tokens: 12 },
+  }), {
+    inputTokens: 120,
+    outputTokens: 30,
+    cachedInputTokens: 40,
+    reasoningTokens: 12,
+    totalTokens: 150,
+  });
+  assert.deepEqual(normalizeStreamTokenUsage({ input_tokens: 20, output_tokens: 5 }), {
+    inputTokens: 20,
+    outputTokens: 5,
+    cachedInputTokens: null,
+    reasoningTokens: null,
+    totalTokens: 25,
+  });
+  assert.equal(normalizeStreamTokenUsage({}), null);
+});
 
 function createResponseFromSse(blocks: string[]) {
   const encoder = new TextEncoder();

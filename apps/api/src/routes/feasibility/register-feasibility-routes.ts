@@ -42,6 +42,7 @@ import {
 } from "../../runs/providers/run-provider-gates.js";
 import { reserveBillingRunUsage } from "../../runs/billing/run-billing-gates.js";
 import { startFeasibilityRecordPipeline } from "../../runs/pipelines/run-record-pipeline-starter.js";
+import type { AdminAnalyticsStore } from "../../admin/admin-analytics-store.js";
 import {
   attachProjectWorkspaceSync,
   type ProjectWorkspaceSync,
@@ -108,6 +109,7 @@ export function registerFeasibilityRoutes({
   canUpdateProject,
   loadWorkspace,
   syncProjectWorkspace,
+  analyticsStore,
 }: {
   app: FastifyInstance;
   runs: RunRecordStore;
@@ -124,6 +126,7 @@ export function registerFeasibilityRoutes({
   canUpdateProject: (projectId: string, userId: string) => Promise<boolean>;
   loadWorkspace: (projectId: string) => Promise<ProjectWorkspace>;
   syncProjectWorkspace?: ProjectWorkspaceSync;
+  analyticsStore?: Pick<AdminAnalyticsStore, "recordTelemetry">;
 }) {
   const usageAccess = {
     async resolveRunAccess(request: FastifyRequest) {
@@ -259,6 +262,7 @@ export function registerFeasibilityRoutes({
         llmScheduler,
         renderClient,
         billingEntitlements: runBillingEntitlements,
+        analyticsStore,
       });
     }
     return reply.code(202).send({ runId });

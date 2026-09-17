@@ -38,6 +38,11 @@ import {
 } from "../system-notices/records/system-notice-store.js";
 import { createPostgresSystemNoticeStore } from "../system-notices/records/postgres-system-notice-store.js";
 import { DEFAULT_DOCUMENT_STORAGE_DIR } from "./defaults.js";
+import {
+  createInMemoryAdminAnalyticsStore,
+  createPostgresAdminAnalyticsStore,
+  type AdminAnalyticsStore,
+} from "../admin/admin-analytics-store.js";
 
 export type ApiPersistenceOverrides = {
   authStore?: AuthStore;
@@ -45,6 +50,7 @@ export type ApiPersistenceOverrides = {
   runRecordStore?: RunRecordStore;
   documentLibrary?: DocumentLibrary;
   systemNoticeStore?: SystemNoticeStore;
+  analyticsStore?: AdminAnalyticsStore;
 };
 
 export type ApiPersistence = {
@@ -57,6 +63,7 @@ export type ApiPersistence = {
   systemNoticeStore: SystemNoticeStore;
   billingRepository: BillingRepository;
   academicStore: AcademicAdminRepository;
+  analyticsStore: AdminAnalyticsStore;
 };
 
 function hasInjectedPersistence(overrides: ApiPersistenceOverrides) {
@@ -130,6 +137,9 @@ export async function createApiPersistence({
   const academicStore = pool
     ? createPostgresAcademicAdminRepository(pool)
     : createInMemoryAcademicAdminRepository();
+  const analyticsStore = overrides.analyticsStore ?? (pool
+    ? createPostgresAdminAnalyticsStore(pool)
+    : createInMemoryAdminAnalyticsStore());
 
   return {
     pool,
@@ -141,5 +151,6 @@ export async function createApiPersistence({
     systemNoticeStore,
     billingRepository,
     academicStore,
+    analyticsStore,
   };
 }

@@ -54,6 +54,17 @@ export interface StreamChatCompletionInput {
   responseFormat?: ChatCompletionResponseFormat | null;
   abortSignal?: AbortSignal;
   onResponseFormatFallback?: (event: ResponseFormatFallbackEvent) => void;
+  onTokenUsage?: (usage: StreamTokenUsage) => void;
+  onReasoningChunk?: () => void;
+  onUsageUnavailable?: (reason: string) => void;
+}
+
+export interface StreamTokenUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cachedInputTokens: number | null;
+  reasoningTokens: number | null;
+  totalTokens: number | null;
 }
 
 export interface LlmTransport {
@@ -365,6 +376,19 @@ function shouldRetryJsonSchemaAsJsonObject(status: number, detail: string | null
   return mentionsSchema && looksUnsupported;
 }
 
+function shouldRetryWithoutStreamUsage(status: number, detail: string | null) {
+  if (status !== 400 && status !== 422) return false;
+  const normalized = (detail ?? "").toLowerCase();
+  if (!normalized) return false;
+  const mentionsUsage = normalized.includes("stream_options") ||
+    normalized.includes("include_usage") || normalized.includes("include usage");
+  const looksUnsupported = normalized.includes("unsupported") ||
+    normalized.includes("not support") || normalized.includes("invalid") ||
+    normalized.includes("unrecognized") || normalized.includes("unknown") ||
+    normalized.includes("not allowed") || normalized.includes("unexpected");
+  return mentionsUsage && looksUnsupported;
+}
+
 function formatHttpLlmError(status: number, detail: string | null) {
   return detail
     ? `LLM request failed with HTTP ${status}: ${detail}`
@@ -521,36 +545,69 @@ function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T> {
   );
 }
 
+function tokenCount(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : null;
+}
+
+export function normalizeStreamTokenUsage(value: unknown): StreamTokenUsage | null {
+  if (!value || typeof value !== "object") return null;
+  const usage = value as Record<string, unknown>;
+  const inputDetails = (usage.prompt_tokens_details ?? usage.input_tokens_details) as Record<string, unknown> | undefined;
+  const outputDetails = (usage.completion_tokens_details ?? usage.output_tokens_details) as Record<string, unknown> | undefined;
+  const inputTokens = tokenCount(usage.prompt_tokens ?? usage.input_tokens);
+  const outputTokens = tokenCount(usage.completion_tokens ?? usage.output_tokens);
+  const cachedInputTokens = tokenCount(inputDetails?.cached_tokens ?? usage.cache_read_input_tokens);
+  const reasoningTokens = tokenCount(outputDetails?.reasoning_tokens ?? usage.reasoning_tokens);
+  const reportedTotal = tokenCount(usage.total_tokens);
+  const totalTokens = reportedTotal ?? (inputTokens !== null && outputTokens !== null ? inputTokens + outputTokens : null);
+  if ([inputTokens, outputTokens, cachedInputTokens, reasoningTokens, totalTokens].every((item) => item === null)) return null;
+  return { inputTokens, outputTokens, cachedInputTokens, reasoningTokens, totalTokens };
+}
+
 async function* extractChatCompletionText(
   stream: AsyncIterable<ChatCompletionChunk>,
+  observer: Pick<StreamChatCompletionInput, "onTokenUsage" | "onReasoningChunk" | "onUsageUnavailable"> = {},
 ) {
+  let usageSeen = false;
   for await (const chunk of stream) {
+    const rawChunk = chunk as unknown as Record<string, unknown>;
+    const usage = normalizeStreamTokenUsage(rawChunk.usage);
+    if (usage) {
+      usageSeen = true;
+      observer.onTokenUsage?.(usage);
+    }
     const choice = chunk.choices?.[0] as
       | {
-          delta?: { content?: unknown };
+          delta?: { content?: unknown; reasoning?: unknown; reasoning_content?: unknown };
           message?: { content?: unknown };
         }
       | undefined;
+    const reasoning = choice?.delta?.reasoning_content ?? choice?.delta?.reasoning;
+    if (typeof reasoning === "string" && reasoning) observer.onReasoningChunk?.();
     const text = choice?.delta?.content ?? choice?.message?.content ?? "";
     if (typeof text === "string" && text) {
       yield text;
     }
   }
+  if (!usageSeen) observer.onUsageUnavailable?.("provider_stream_did_not_return_usage");
 }
 
 function createStreamingChatCompletionBody({
   providerSettings,
   messages,
   responseFormat,
+  includeUsage = true,
 }: {
   providerSettings: ProviderSettings;
   messages: ChatMessage[];
   responseFormat: ChatCompletionResponseFormat | null;
+  includeUsage?: boolean;
 }): ChatCompletionCreateParamsStreaming {
   return {
     model: providerSettings.model,
     messages: asChatMessages(messages),
     stream: true,
+    ...(includeUsage ? { stream_options: { include_usage: true } } : {}),
     temperature: 0.2,
     ...(responseFormat === null ? {} : { response_format: responseFormat }),
     tools: [],
@@ -789,6 +846,9 @@ export function createRealLlmTransport(
       responseFormat,
       abortSignal,
       onResponseFormatFallback,
+      onTokenUsage,
+      onReasoningChunk,
+      onUsageUnavailable,
     }: StreamChatCompletionInput) {
       const safeBaseUrl = normalizeManagedProviderBaseUrl(
         providerSettings.apiBaseUrl,
@@ -821,6 +881,7 @@ export function createRealLlmTransport(
       replaceActiveAbortController();
       const requestCompletionStream = async (
         nextResponseFormat: ChatCompletionResponseFormat | null,
+        includeUsage = true,
       ) => {
         await assertProviderBaseUrlSafe(safeBaseUrl, options.resolveHostname);
         const response = await withTimeout(
@@ -829,6 +890,7 @@ export function createRealLlmTransport(
               providerSettings,
               messages,
               responseFormat: nextResponseFormat,
+              includeUsage,
             }),
             { signal: activeAbortController.signal },
           ),
@@ -842,8 +904,23 @@ export function createRealLlmTransport(
       };
       try {
         let stream: AsyncIterable<ChatCompletionChunk>;
+        const requestWithUsageFallback = async (
+          nextResponseFormat: ChatCompletionResponseFormat | null,
+        ) => {
+          try {
+            return await requestCompletionStream(nextResponseFormat, true);
+          } catch (error) {
+            const httpError = toProviderHttpError(error, "LLM request failed");
+            if (!httpError || !shouldRetryWithoutStreamUsage(httpError.status, httpError.detail)) {
+              throw error;
+            }
+            onUsageUnavailable?.("provider_rejected_stream_usage");
+            replaceActiveAbortController();
+            return requestCompletionStream(nextResponseFormat, false);
+          }
+        };
         try {
-          stream = await requestCompletionStream(requestResponseFormat);
+          stream = await requestWithUsageFallback(requestResponseFormat);
         } catch (error) {
           const httpError = toProviderHttpError(error, "LLM request failed");
           if (
@@ -865,7 +942,7 @@ export function createRealLlmTransport(
             });
             replaceActiveAbortController();
             try {
-              stream = await requestCompletionStream({ type: "json_object" });
+              stream = await requestWithUsageFallback({ type: "json_object" });
             } catch (retryError) {
               throw normalizeProviderError(retryError, "LLM request failed");
             }
@@ -875,7 +952,7 @@ export function createRealLlmTransport(
         }
 
         for await (const text of withIdleTimeout(
-          extractChatCompletionText(stream),
+          extractChatCompletionText(stream, { onTokenUsage, onReasoningChunk, onUsageUnavailable }),
           responseTimeoutMs,
           () => activeAbortController.abort(),
         )) {

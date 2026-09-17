@@ -1,4 +1,5 @@
 // Registers admin endpoints and delegates provider key handling to secure storage.
+import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
@@ -89,6 +90,16 @@ import {
 } from "../../admin/admin-provider-telemetry.js";
 import { buildAdminAuditLogView } from "../../admin/admin-audit-log-view.js";
 import { buildAdminMetricsView } from "../../admin/admin-metrics-view.js";
+import {
+  buildAdminEvaluationMetricsView,
+  buildAdminPerformanceView,
+  parseAnalyticsFilters,
+} from "../../admin/admin-performance-view.js";
+import {
+  evaluationReportImportSchema,
+  evaluationReviewRequestSchema,
+  type AdminAnalyticsStore,
+} from "../../admin/admin-analytics-store.js";
 import {
   buildAdminRunListView,
   getAdminRunDetail,
@@ -215,6 +226,15 @@ function sendAdminOnly(
   app.get(path, handler);
 }
 
+function hasEvaluationIngestToken(request: FastifyRequest) {
+  const expected = process.env.UML_EVAL_INGEST_TOKEN?.trim();
+  const actual = String(request.headers.authorization ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (!expected || !actual) return false;
+  const expectedBuffer = Buffer.from(expected);
+  const actualBuffer = Buffer.from(actual);
+  return expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer);
+}
+
 export function registerAdminRoutes({
   app,
   authStore,
@@ -228,6 +248,7 @@ export function registerAdminRoutes({
   providerRateLimitPolicy = resolveProviderRateLimitPolicy(),
   academicStore: providedAcademicStore,
   billingService,
+  analyticsStore,
 }: {
   app: FastifyInstance;
   authStore: AuthStore;
@@ -241,6 +262,7 @@ export function registerAdminRoutes({
   providerRateLimitPolicy?: ProviderRateLimitPolicy;
   academicStore?: AcademicAdminRepository;
   billingService?: Pick<BillingService, "getSummary">;
+  analyticsStore: AdminAnalyticsStore;
 }) {
   const rateLimitPolicyStore =
     createRateLimitPolicyStoreWithFallback(providerUsageTracker);
@@ -293,6 +315,88 @@ export function registerAdminRoutes({
       return { message: metrics.message };
     }
     return metrics.view;
+  });
+
+  sendAdminOnly(app, "/api/admin/performance-metrics", async (request, reply) => {
+    const actor = await requireAdminPermission(request, reply, authStore, "admin.metrics.read");
+    if ("message" in actor) return actor;
+    const parsed = parseAnalyticsFilters(request.query as Record<string, unknown>);
+    if (!parsed.ok) {
+      reply.code(400);
+      return { message: parsed.message };
+    }
+    return buildAdminPerformanceView({ analyticsStore, filters: parsed.filters, runs });
+  });
+
+  sendAdminOnly(app, "/api/admin/evaluation-metrics", async (request, reply) => {
+    const actor = await requireAdminPermission(request, reply, authStore, "admin.evaluations.read");
+    if ("message" in actor) return actor;
+    const parsed = parseAnalyticsFilters(request.query as Record<string, unknown>);
+    if (!parsed.ok) {
+      reply.code(400);
+      return { message: parsed.message };
+    }
+    return buildAdminEvaluationMetricsView({ analyticsStore, filters: parsed.filters });
+  });
+
+  sendAdminOnly(app, "/api/admin/evaluation-reviews", async (request, reply) => {
+    const actor = await requireAdminPermission(request, reply, authStore, "admin.evaluations.read");
+    if ("message" in actor) return actor;
+    const parsed = parseAnalyticsFilters(request.query as Record<string, unknown>);
+    if (!parsed.ok) {
+      reply.code(400);
+      return { message: parsed.message };
+    }
+    const query = request.query as { status?: unknown };
+    const attempts = await analyticsStore.listEvaluationAttempts(parsed.filters);
+    return {
+      generatedAt: new Date().toISOString(),
+      attempts: query.status === "pending"
+        ? attempts.filter((attempt) => attempt.reviewVerdict === null)
+        : attempts,
+    };
+  });
+
+  app.post("/api/admin/evaluation-reviews/:id", async (request, reply) => {
+    const actor = await requireAdminPermission(request, reply, authStore, "admin.evaluations.review");
+    if ("message" in actor) return actor;
+    const parsed = evaluationReviewRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid evaluation review", issues: parsed.error.issues };
+    }
+    const { id } = request.params as { id: string };
+    const attempt = await analyticsStore.reviewEvaluationAttempt({
+      attemptId: id,
+      reviewerId: actor.id,
+      review: parsed.data,
+    });
+    if (!attempt) {
+      reply.code(404);
+      return { message: "Evaluation attempt not found" };
+    }
+    await authStore.recordAuditLog({
+      actorUserId: actor.id,
+      action: "admin.evaluation.review",
+      targetType: "evaluation_attempt",
+      targetId: id,
+      outcome: "success",
+      message: `Evaluation verdict reviewed as ${parsed.data.verdict}`,
+    });
+    return { attempt };
+  });
+
+  app.post("/api/internal/evaluations/import", async (request, reply) => {
+    if (!hasEvaluationIngestToken(request)) {
+      reply.code(401);
+      return { message: "Valid evaluation ingest token required" };
+    }
+    const parsed = evaluationReportImportSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid evaluation report", issues: parsed.error.issues };
+    }
+    return analyticsStore.importEvaluationReport(parsed.data);
   });
 
   sendAdminOnly(app, "/api/admin/users", async (request, reply) => {

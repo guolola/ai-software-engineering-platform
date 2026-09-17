@@ -6,6 +6,12 @@ import type {
   LlmTransport,
   StreamChatCompletionInput,
 } from "../../llm.js";
+import { ProviderHttpError } from "../../llm.js";
+import {
+  newTelemetryId,
+  type AdminAnalyticsStore,
+  type LlmRequestTelemetry,
+} from "../../admin/admin-analytics-store.js";
 
 export type LlmQueueReason = "global" | "provider" | "project" | "user" | "run";
 
@@ -20,6 +26,7 @@ export interface LlmScheduleContext {
   diagramKind?: string | null;
   subtaskId?: string | null;
   subtaskLabel?: string | null;
+  requestedModelCount?: number | null;
 }
 
 export interface LlmScheduleStatus {
@@ -352,31 +359,138 @@ export function createScheduledLlmTransport({
   context,
   deriveContext,
   onStatus,
+  analyticsStore,
 }: {
   transport: LlmTransport;
   scheduler: LlmScheduler;
   context: LlmScheduleContext;
   deriveContext?: (input: StreamChatCompletionInput) => Partial<LlmScheduleContext>;
   onStatus?: (status: LlmScheduleStatus, context: LlmScheduleContext) => void;
+  analyticsStore?: Pick<AdminAnalyticsStore, "recordTelemetry">;
 }): LlmTransport {
   return {
-    streamChatCompletion(input: StreamChatCompletionInput): AsyncIterable<string> {
+    async *streamChatCompletion(input: StreamChatCompletionInput): AsyncIterable<string> {
       const requestContext = {
         ...context,
         ...deriveContext?.(input),
       };
-      return scheduler.stream(
+      const queuedAt = Date.now();
+      let providerStartedAt: number | null = null;
+      let firstReasoningAt: number | null = null;
+      let firstVisibleAt: number | null = null;
+      let lastVisibleAt: number | null = null;
+      let queueMs: number | null = null;
+      let usage: LlmRequestTelemetry["usage"] = null;
+      let usageUnavailableReason: string | null = null;
+      let formatFallbackCount = 0;
+      let failure: unknown = null;
+      let completedNormally = false;
+
+      const stream = scheduler.stream(
         requestContext,
-        () =>
-          transport.streamChatCompletion({
+        async function* () {
+          const providerStream = transport.streamChatCompletion({
             providerSettings: input.providerSettings,
             messages: input.messages as ChatMessage[],
             responseFormat:
               input.responseFormat as ChatCompletionResponseFormat | null | undefined,
             abortSignal: input.abortSignal,
-          }),
-        (status) => onStatus?.(status, requestContext),
+            onResponseFormatFallback(event) {
+              formatFallbackCount += 1;
+              input.onResponseFormatFallback?.(event);
+            },
+            onTokenUsage(value) {
+              usage = { ...value };
+              input.onTokenUsage?.(value);
+            },
+            onReasoningChunk() {
+              firstReasoningAt ??= Date.now();
+              input.onReasoningChunk?.();
+            },
+            onUsageUnavailable(reason) {
+              usageUnavailableReason ??= reason;
+              input.onUsageUnavailable?.(reason);
+            },
+          });
+          for await (const chunk of providerStream) {
+            if (chunk.length > 0) {
+              const observedAt = Date.now();
+              firstVisibleAt ??= observedAt;
+              lastVisibleAt = observedAt;
+            }
+            yield chunk;
+          }
+        },
+        (status) => {
+          if (status.status === "running") {
+            providerStartedAt ??= Date.now();
+            queueMs = status.waitMs ?? providerStartedAt - queuedAt;
+          }
+          onStatus?.(status, requestContext);
+        },
       );
+
+      try {
+        for await (const chunk of stream) yield chunk;
+        completedNormally = true;
+      } catch (error) {
+        failure = error;
+        throw error;
+      } finally {
+        if (analyticsStore) {
+          const completedAt = Date.now();
+          const providerError = failure instanceof ProviderHttpError ? failure : null;
+          const message = failure instanceof Error ? failure.message.toLowerCase() : "";
+          const cancelled = input.abortSignal?.aborted || message.includes("cancel");
+          const errorCategory = completedNormally
+            ? null
+            : cancelled
+              ? "cancelled"
+              : providerError?.status === 429
+                ? "rate_limit"
+                : message.includes("timed out") || message.includes("timeout")
+                  ? "timeout"
+                  : providerError
+                    ? "provider"
+                    : "unknown";
+          const telemetry: LlmRequestTelemetry = {
+            id: newTelemetryId(),
+            runId: requestContext.runId,
+            projectId: requestContext.projectId ?? null,
+            userId: requestContext.userId ?? null,
+            providerConfigId: requestContext.providerConfigId ?? null,
+            model: requestContext.model,
+            taskType: requestContext.taskType,
+            stage: requestContext.stage ?? null,
+            diagramKind: requestContext.diagramKind ?? null,
+            subtaskId: requestContext.subtaskId ?? null,
+            requestedModelCount: requestContext.requestedModelCount ?? null,
+            queuedAt: new Date(queuedAt).toISOString(),
+            providerStartedAt: providerStartedAt === null ? null : new Date(providerStartedAt).toISOString(),
+            firstReasoningAt: firstReasoningAt === null ? null : new Date(firstReasoningAt).toISOString(),
+            firstVisibleAt: firstVisibleAt === null ? null : new Date(firstVisibleAt).toISOString(),
+            lastVisibleAt: lastVisibleAt === null ? null : new Date(lastVisibleAt).toISOString(),
+            completedAt: new Date(completedAt).toISOString(),
+            queueMs,
+            providerTtftMs: providerStartedAt !== null && firstVisibleAt !== null
+              ? firstVisibleAt - providerStartedAt : null,
+            ttftMs: firstVisibleAt === null ? null : firstVisibleAt - queuedAt,
+            reasoningMs: firstReasoningAt !== null && firstVisibleAt !== null
+              ? Math.max(0, firstVisibleAt - firstReasoningAt) : null,
+            decodeMs: firstVisibleAt !== null && lastVisibleAt !== null
+              ? Math.max(0, lastVisibleAt - firstVisibleAt) : null,
+            totalMs: Math.max(0, completedAt - queuedAt),
+            usage,
+            outcome: completedNormally ? "success" : cancelled ? "cancelled" : "failed",
+            statusCode: providerError?.status ?? null,
+            errorCategory,
+            retryCount: usageUnavailableReason === "provider_rejected_stream_usage" ? 1 : 0,
+            formatFallbackCount,
+            usageUnavailableReason: usage ? null : usageUnavailableReason ?? "provider_did_not_return_usage",
+          };
+          await analyticsStore.recordTelemetry(telemetry).catch(() => undefined);
+        }
+      }
     },
   };
 }
