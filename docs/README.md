@@ -45,6 +45,6 @@ npm run audit:docs
 
 ## 相关文档
 
-- [仓库首页](../README.md)
+- [仓库首页（简体中文）](../readme-zh-cn.md)
 - [项目协作规范](../AGENTS.md)
 - [应用内使用手册](../apps/web/src/features/product-docs/content/quick-start.md)

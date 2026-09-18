@@ -38,4 +38,4 @@ npm run build:web:production
 
 - [宝塔与 PM2 部署](baota-pm2.md)
 - [生产环境配置](production-environment.md)
-- [仓库首页](../../README.md)
+- [仓库首页（简体中文）](../../readme-zh-cn.md)

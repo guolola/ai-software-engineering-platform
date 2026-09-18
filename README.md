@@ -1,3 +1,5 @@
+**English** | [简体中文](./readme-zh-cn.md)
+
 <p align="center">
   <a href="https://jianglisoftware.com">
     <img src="https://img.shields.io/badge/Software%20Engineering-Practice%20Platform-181717?style=flat-square" alt="Software Engineering Practice Platform" />
@@ -6,17 +8,17 @@
 
 <div align="center">
 
-# 软件工程实践平台
+# Software Engineering Practice Platform
 
 <p>
-  <strong>AI 辅助 UML 建模、可信追踪与前端原型生成工作台</strong><br />
-  从需求基线、可行性分析、UML 模型到 React 原型、测试与三类说明书<br />
-  <sub>PlantUML 渲染 × 可信链路 × 通用 Skill Runtime</sub>
+  <strong>An AI-assisted workspace for UML modeling, trusted traceability, and frontend prototype generation</strong><br />
+  From requirement baselines, feasibility studies, and UML models to React prototypes, tests, and engineering documents<br />
+  <sub>PlantUML rendering × trusted generation chains × general-purpose Skill Runtime</sub>
 </p>
 
 <p>
-  <a href="https://jianglisoftware.com"><img src="https://img.shields.io/badge/在线体验-访问平台-2563eb?style=for-the-badge" alt="在线体验" /></a>
-  <a href="https://jianglisoftware.com/tutorial"><img src="https://img.shields.io/badge/使用手册-在线阅读-0f766e?style=for-the-badge" alt="使用手册" /></a>
+  <a href="https://jianglisoftware.com"><img src="https://img.shields.io/badge/Live%20Demo-Open%20Platform-2563eb?style=for-the-badge" alt="Open the live platform" /></a>
+  <a href="https://jianglisoftware.com/tutorial"><img src="https://img.shields.io/badge/User%20Guide-Read%20Online-0f766e?style=for-the-badge" alt="Read the user guide" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Proprietary-7c3aed?style=for-the-badge" alt="Proprietary License" /></a>
 </p>
 
@@ -27,144 +29,146 @@
   <img src="https://img.shields.io/badge/Runtime-Node.js%2022-339933?style=flat-square" alt="Node.js 22" />
 </p>
 
-> 把系统需求、可行性研究、UML、设计模型、前端原型、测试和说明书沉淀为可追踪、可验证、可修复的工程产物。
+> Turn system requirements, feasibility studies, UML models, design artifacts, frontend prototypes, tests, and documents into traceable, verifiable, and repairable engineering deliverables.
 
 </div>
 
-## 项目简介
+## Overview
 
-软件工程实践平台面向软件工程课程、实验和项目原型验证。它不是一次性的模型调用页面，而是一套阶段化工作台：先确认需求事实，再生成模型与设计，最后形成代码、测试、文档及可复盘证据。
+The Software Engineering Practice Platform is designed for software engineering courses, laboratory exercises, and project prototyping. It is not a one-shot model invocation page. Instead, it provides a staged workspace that establishes confirmed requirement facts before generating models and designs, then produces code, tests, documents, and reviewable evidence.
 
-| 🧭 端到端阶段 | 🔗 可信机制 | 📦 可交付产物 |
+| 🧭 End-to-end stages | 🔗 Trust mechanisms | 📦 Deliverables |
 | --- | --- | --- |
-| 需求 → 可行性 → UML → 设计 → 代码 → 测试 → 文档 | 基线、运行历史、覆盖矩阵、追踪矩阵、人工确认 | SVG、React 原型、测试用例、DOCX、证据记录 |
+| Requirements → Feasibility → UML → Design → Code → Tests → Documents | Baselines, run history, coverage matrices, traceability matrices, human confirmation | SVG, React prototypes, test cases, DOCX files, evidence records |
 
-### 为什么做这个平台
+### Why this platform exists
 
-- **让生成有依据**：下游产物引用已确认需求和上游元素，不把模型输出当作天然正确。
-- **让失败可定位**：生成阶段、事件、错误、修复记录和渲染结果都能在任务历史中追踪。
-- **让成果可交付**：模型、原型、测试和说明书位于同一项目上下文中，减少人工搬运。
-- **让模型可替换**：支持经过安全校验的 OpenAI 兼容 Provider，不把业务流程绑定到单一模型。
+- **Ground generation in evidence:** downstream artifacts reference confirmed requirements and upstream elements instead of treating model output as inherently correct.
+- **Make failures diagnosable:** generation stages, events, errors, repair records, and rendering results remain traceable in task history.
+- **Produce usable deliverables:** models, prototypes, tests, and documents share the same project context, reducing manual transfer work.
+- **Keep models replaceable:** securely validated OpenAI-compatible providers can be used without binding the workflow to a single model vendor.
 
-## 在线访问
+> The current product interface and online tutorial are primarily available in Simplified Chinese. This README provides an English technical overview for international readers and contributors.
 
-| 入口 | 地址 | 用途 |
+## Online Access
+
+| Destination | Address | Purpose |
 | --- | --- | --- |
-| 🌐 平台首页 | [jianglisoftware.com](https://jianglisoftware.com) | 了解产品并进入工作台 |
-| 📖 使用手册 | [在线教程](https://jianglisoftware.com/tutorial) | 查询页面入口、前置条件和操作步骤 |
-| 💚 服务状态 | [健康检查](https://jianglisoftware.com/api/health) | 检查 API 是否正常运行 |
+| 🌐 Platform | [jianglisoftware.com](https://jianglisoftware.com) | Explore the product and enter the workspace |
+| 📖 User guide | [Online tutorial](https://jianglisoftware.com/tutorial) | Review page entry points, prerequisites, and operating steps (Simplified Chinese) |
+| 💚 Service status | [Health check](https://jianglisoftware.com/api/health) | Verify that the API is available |
 
-## 核心能力
+## Core Capabilities
 
-| 能力 | 说明 | 主要产物 |
+| Capability | Description | Primary artifacts |
 | --- | --- | --- |
-| 📝 需求基线 | 从需求文本抽取规则，处理质量提示与人工确认 | `RequirementBaseline` |
-| 🧭 可行性分析 | 建立系统上下文，比较实现方案、成本收益与风险 | 上下文图、候选方案、研究报告 |
-| 📐 需求 UML | 生成并校验需求阶段的结构与行为模型 | PlantUML、SVG、模型元素 |
-| 🏗️ 设计建模 | 从需求模型推导架构、类、交互、界面与数据设计 | 设计模型、设计图、元素详情 |
-| 🔗 追踪与覆盖 | 连接需求、设计、代码、测试和说明书 | 覆盖矩阵、追踪矩阵、链路图 |
-| 💻 代码原型 | 抽取业务逻辑并生成可预览 React 原型 | TypeScript、CSS、运行预览 |
-| 🧪 测试设计 | 根据需求与设计生成测试场景并检查覆盖 | 测试用例、覆盖关系 |
-| 📄 文档交付 | 生成、在线编辑、版本化并下载三类说明书 | DOCX、文档版本 |
-| 🤖 模型管理 | 发现、测试和选择个人或托管 Provider 模型 | Provider 配置、模型目录 |
-| 📡 任务中心 | 展示排队、运行、完成、失败、重试与恢复 | 运行事件、快照、错误证据 |
+| 📝 Requirement baseline | Extract rules from requirement text, surface quality issues, and record human confirmation | `RequirementBaseline` |
+| 🧭 Feasibility analysis | Model the system context and compare implementation options, costs, benefits, and risks | Context diagram, candidate solutions, study report |
+| 📐 Requirement UML | Generate and validate structural and behavioral models for the requirement stage | PlantUML, SVG, model elements |
+| 🏗️ Design modeling | Derive architecture, classes, interactions, interfaces, and data designs from requirement models | Design models, diagrams, element details |
+| 🔗 Traceability and coverage | Connect requirements, designs, code, tests, and documents | Coverage matrix, traceability matrix, lineage graph |
+| 💻 Code prototype | Extract business logic and generate a previewable React prototype | TypeScript, CSS, runtime preview |
+| 🧪 Test design | Generate test scenarios from requirements and designs, then evaluate coverage | Test cases, coverage relations |
+| 📄 Document delivery | Generate, edit online, version, and download three types of engineering documents | DOCX files, document versions |
+| 🤖 Model management | Discover, test, and select personal or managed provider models | Provider configurations, model catalog |
+| 📡 Task center | Track queued, running, completed, failed, retried, and recovered jobs | Run events, snapshots, error evidence |
 
-### 可信边界
+### Trust boundary
 
-平台适合课程实验、普通业务系统与原型验证。它能显式暴露缺失覆盖、低置信映射和生成失败，但不承诺在安全关键、强监管或完全无人复核的场景中自动给出正确结论。正式交付前仍需领域评审、真实运行验收与针对项目的测试证据。
+The platform is intended for coursework, conventional business systems, and prototype validation. It exposes missing coverage, low-confidence mappings, and generation failures, but it does not guarantee correct results for safety-critical, heavily regulated, or fully unattended scenarios. Production delivery still requires domain review, real-world acceptance testing, and project-specific test evidence.
 
-## 界面预览
+## Interface Preview
 
-<p align="center"><strong>从公开首页到项目交付，六个关键界面</strong></p>
+<p align="center"><strong>Six key views, from the public landing page to project delivery</strong></p>
 
-### 🌐 平台首页
+### 🌐 Platform landing page
 
-![平台首页](docs/images/readme-homepage.png)
+![Platform landing page](docs/images/readme-homepage.png)
 
-### 📂 项目首页
+### 📂 Project home
 
-![项目首页](docs/images/readme-project-home.png)
+![Project home](docs/images/readme-project-home.png)
 
-### 📝 需求分析工作台
+### 📝 Requirement analysis workspace
 
-![需求分析工作台](docs/images/readme-requirements-workbench.png)
+![Requirement analysis workspace](docs/images/readme-requirements-workbench.png)
 
-### 🧭 可行性分析工作台
+### 🧭 Feasibility analysis workspace
 
-![可行性分析工作台](docs/images/readme-feasibility.png)
+![Feasibility analysis workspace](docs/images/readme-feasibility.png)
 
-### 💻 前端原型与预览
+### 💻 Frontend prototype and preview
 
-![前端原型与预览](docs/images/readme-code-prototype.png)
+![Frontend prototype and preview](docs/images/readme-code-prototype.png)
 
-### 📄 三类说明书
+### 📄 Engineering documents
 
-![三类说明书](docs/images/readme-documents.png)
+![Engineering documents](docs/images/readme-documents.png)
 
-## 技术架构
+## Architecture
 
-### 生成链路
+### Generation flow
 
 ```mermaid
 flowchart LR
-  A["需求文本"] --> B["需求规则"]
-  B --> C["需求基线"]
-  C --> D["可行性分析"]
-  C --> E["需求 UML"]
-  E --> F["设计模型"]
-  F --> G["React 原型"]
-  F --> H["测试用例"]
-  D --> I["可行性报告"]
-  E --> J["需求规格说明书"]
-  F --> K["软件设计说明书"]
-  C -.覆盖与追踪.-> L["运行证据"]
-  E -.覆盖与追踪.-> L
-  F -.覆盖与追踪.-> L
-  G -.质量诊断.-> L
-  H -.覆盖关系.-> L
+  A["Requirement text"] --> B["Requirement rules"]
+  B --> C["Requirement baseline"]
+  C --> D["Feasibility analysis"]
+  C --> E["Requirement UML"]
+  E --> F["Design model"]
+  F --> G["React prototype"]
+  F --> H["Test cases"]
+  D --> I["Feasibility report"]
+  E --> J["Requirements specification"]
+  F --> K["Software design description"]
+  C -.Coverage and traceability.-> L["Run evidence"]
+  E -.Coverage and traceability.-> L
+  F -.Coverage and traceability.-> L
+  G -.Quality diagnostics.-> L
+  H -.Coverage relations.-> L
 ```
 
-### Monorepo 组成
+### Monorepo layout
 
 ```text
 uml-experimental-platform/
 ├── apps/
-│   ├── api/             # Fastify API、生成流水线、文档与外部适配器
-│   ├── render-service/  # PlantUML SVG/PNG 渲染服务
-│   └── web/             # React + Vite 用户界面
+│   ├── api/             # Fastify API, generation pipelines, documents, and external adapters
+│   ├── render-service/  # PlantUML SVG/PNG rendering service
+│   └── web/             # React + Vite user interface
 ├── packages/
-│   ├── contracts/       # 前后端共享契约
-│   ├── prompts/         # 生成提示与结构约束
-│   ├── harness-e2e/     # 端到端验收
-│   └── harness-eval/    # 质量评估
-├── docs/                # 架构、部署、开发与集成文档
-├── scripts/             # 审计、开发、部署与维护脚本
-└── plantuml/            # 生产与 CI 使用的 PlantUML JAR
+│   ├── contracts/       # Shared frontend and backend contracts
+│   ├── prompts/         # Generation prompts and structural constraints
+│   ├── harness-e2e/     # End-to-end acceptance harness
+│   └── harness-eval/    # Quality evaluation harness
+├── docs/                # Architecture, deployment, development, and integration documentation
+├── scripts/             # Audit, development, deployment, and maintenance scripts
+└── plantuml/            # PlantUML JAR used in production and CI
 ```
 
-| 层级 | 技术 | 边界 |
+| Layer | Technology | Responsibility boundary |
 | --- | --- | --- |
-| Web | React、Vite、TypeScript、Tailwind CSS、Radix UI、Sandpack | 页面组合、业务交互、领域展示与远端调用 |
-| API | Fastify、Zod、PostgreSQL、Redis/BullMQ | 契约、认证、生成流水线、记录与文档组装 |
-| 渲染 | Java、PlantUML、Graphviz | 隔离渲染与运行时诊断 |
-| 文档 | `docx`、OnlyOffice | DOCX 生成、版本、在线编辑与下载 |
-| 部署 | GitHub Actions、PM2、Nginx | 测试、构建、原子 release 与健康检查 |
+| Web | React, Vite, TypeScript, Tailwind CSS, Radix UI, Sandpack | Page composition, business interaction, domain presentation, and remote calls |
+| API | Fastify, Zod, PostgreSQL, Redis/BullMQ | Contracts, authentication, generation pipelines, records, and document assembly |
+| Rendering | Java, PlantUML, Graphviz | Isolated rendering and runtime diagnostics |
+| Documents | `docx`, OnlyOffice | DOCX generation, versioning, online editing, and downloads |
+| Deployment | GitHub Actions, PM2, Nginx | Testing, builds, atomic releases, and health checks |
 
-详细设计见[平台架构](docs/architecture/platform-overview.md)和[可信生成链路](docs/architecture/trusted-generation.md)。
+For more detail, see the [platform architecture](docs/architecture/platform-overview.md) and [trusted generation flow](docs/architecture/trusted-generation.md). These supporting documents are currently maintained in Simplified Chinese.
 
-## 快速开始
+## Quick Start
 
-### 1. 准备环境
+### 1. Prepare the environment
 
-| 依赖 | 建议版本 | 用途 |
+| Dependency | Recommended version | Purpose |
 | --- | --- | --- |
-| Node.js | 22 | 应用与工具链运行时 |
-| npm | 10 | Monorepo 依赖与脚本 |
-| Java | 21 | PlantUML 运行时 |
-| Graphviz | 当前稳定版 | PlantUML 图布局 |
-| Docker Desktop | 可选 | 本地 OnlyOffice 在线编辑 |
+| Node.js | 22 | Application and toolchain runtime |
+| npm | 10 | Monorepo dependency and script management |
+| Java | 21 | PlantUML runtime |
+| Graphviz | Current stable release | PlantUML graph layout |
+| Docker Desktop | Optional | Local OnlyOffice editing |
 
-### 2. 获取并安装
+### 2. Clone and install
 
 ```bash
 git clone <repository-url>
@@ -172,74 +176,76 @@ cd uml-experimental-platform
 npm ci
 ```
 
-### 3. 启动完整开发环境
+### 3. Start the complete development environment
 
 ```bash
 npm run dev
 ```
 
-启动脚本会检查本地 OnlyOffice，并并行启动 Web、API 和渲染服务。
+The startup script checks the local OnlyOffice service, then launches the Web app, API, and rendering service in parallel.
 
-| 服务 | 本地地址或端口 |
+| Service | Local address or port |
 | --- | --- |
-| Web | Vite 输出地址，通常为 `http://localhost:5173` |
-| API | 安全开发配置使用 `4101` |
+| Web | The address reported by Vite, usually `http://localhost:5173` |
+| API | Port `4101` under the safe development configuration |
 | Render Service | `4002` |
 | OnlyOffice | `8080` |
 
-### 4. 配置模型服务
+### 4. Configure a model provider
 
-登录后在账号设置中新增 OpenAI 兼容 Provider，填写供应商 HTTPS Base URL 与 API Key，完成模型发现和连接测试后选择默认模型。生产环境应使用服务端托管配置，并关闭 legacy 明文回退入口。
+After signing in, add an OpenAI-compatible provider in account settings. Enter the provider's HTTPS base URL and API key, complete model discovery and the connection test, then select a default model. Production environments should use server-managed configurations and disable the legacy plaintext fallback.
 
-## 常用命令
+## Common Commands
 
-### 开发与构建
+### Development and builds
 
-| 命令 | 用途 |
+| Command | Purpose |
 | --- | --- |
-| `npm run dev` | 启动完整本地开发环境 |
-| `npm run dev:api:safe` | 以安全开发配置单独启动 API |
-| `npm run dev:render` | 单独启动 PlantUML 渲染服务 |
-| `npm run dev:web:safe` | 以安全开发配置单独启动 Web |
-| `npm run build` | 构建共享包和全部应用 |
-| `npm run build:web:production` | 按生产站点配置构建 Web |
+| `npm run dev` | Start the complete local development environment |
+| `npm run dev:api:safe` | Start only the API with the safe development configuration |
+| `npm run dev:render` | Start only the PlantUML rendering service |
+| `npm run dev:web:safe` | Start only the Web app with the safe development configuration |
+| `npm run build` | Build shared packages and all applications |
+| `npm run build:web:production` | Build the Web app with production site settings |
 
-### 测试与治理
+### Testing and governance
 
-| 命令 | 用途 |
+| Command | Purpose |
 | --- | --- |
-| `npm run test:contracts` | 验证共享契约 |
-| `npm run test:api` | 运行 API 测试 |
-| `npm run test:render` | 运行渲染服务测试 |
-| `npm run test:web` | 运行完整 Web 测试 |
-| `npm run test:harness-e2e` | 运行端到端验收 |
-| `npm run typecheck:web` | 检查 Web 类型 |
-| `npm run audit:architecture` | 检查架构边界 |
-| `npm run audit:docs` | 检查文档命名、结构、链接和杂物 |
+| `npm run test:contracts` | Validate shared contracts |
+| `npm run test:api` | Run API tests |
+| `npm run test:render` | Run rendering service tests |
+| `npm run test:web` | Run the complete Web test suite |
+| `npm run test:harness-e2e` | Run end-to-end acceptance checks |
+| `npm run typecheck:web` | Type-check the Web application |
+| `npm run audit:architecture` | Validate architecture boundaries |
+| `npm run audit:docs` | Validate documentation names, structure, links, and repository hygiene |
 
-> `apps/web/public/sandpack/` 由 Web 预开发和预构建脚本自动生成并保持 Git 忽略，无需手工提交。
+> `apps/web/public/sandpack/` is generated by the Web pre-development and pre-build scripts and remains Git-ignored. Do not commit it manually.
 
-## 文档导航
+## Documentation
 
-| 分类 | 文档 | 内容 |
+| Category | Document | Coverage |
 | --- | --- | --- |
-| 📚 总览 | [文档索引](docs/README.md) | 当前有效文档的统一入口 |
-| 🏛️ 架构 | [平台架构](docs/architecture/platform-overview.md) | 组件边界、调用链与运行依赖 |
-| 🔗 架构 | [可信生成链路](docs/architecture/trusted-generation.md) | 基线、证据、覆盖与人工责任 |
-| 🚀 部署 | [宝塔与 PM2](docs/deployment/baota-pm2.md) | GitHub Actions 与生产发布 |
-| ⚙️ 部署 | [生产环境配置](docs/deployment/production-environment.md) | 环境变量、凭据边界与验证 |
-| 📡 部署 | [生成任务 Worker](docs/deployment/generation-workers.md) | 队列、并发、重试与恢复 |
-| 🔍 部署 | [SEO 运维](docs/deployment/seo.md) | 预渲染与公开页面检查 |
-| 🤖 集成 | [OpenAI 兼容 Provider](docs/integrations/openai-compatible-provider.md) | 接口合同与安全限制 |
-| 🧹 开发 | [仓库治理规范](docs/development/repository-hygiene.md) | 文档、生成目录与临时产物规则 |
-| 📖 用户 | [应用内快速开始](apps/web/src/features/product-docs/content/quick-start.md) | 从项目创建到成果交付 |
+| 📚 Overview | [Documentation index](docs/README.md) | Central index of currently maintained documentation |
+| 🏛️ Architecture | [Platform architecture](docs/architecture/platform-overview.md) | Component boundaries, call flow, and runtime dependencies |
+| 🔗 Architecture | [Trusted generation flow](docs/architecture/trusted-generation.md) | Baselines, evidence, coverage, and human responsibility |
+| 🚀 Deployment | [BaoTa and PM2](docs/deployment/baota-pm2.md) | GitHub Actions and production releases |
+| ⚙️ Deployment | [Production environment](docs/deployment/production-environment.md) | Environment variables, credential boundaries, and validation |
+| 📡 Deployment | [Generation workers](docs/deployment/generation-workers.md) | Queues, concurrency, retries, and recovery |
+| 🔍 Deployment | [SEO operations](docs/deployment/seo.md) | Prerendering and public-page checks |
+| 🤖 Integration | [OpenAI-compatible providers](docs/integrations/openai-compatible-provider.md) | Interface contract and security constraints |
+| 🧹 Development | [Repository hygiene](docs/development/repository-hygiene.md) | Documentation, generated directories, and temporary artifact rules |
+| 📖 User guide | [In-app quick start](apps/web/src/features/product-docs/content/quick-start.md) | From project creation to deliverable generation |
 
-## 授权
+The linked supporting documentation is currently written primarily in Simplified Chinese.
+
+## License
 
 <div align="center">
 
-**Copyright © 2026 软件工程实践平台 · All rights reserved**
+**Copyright © 2026 Software Engineering Practice Platform · All rights reserved**
 
-本项目为专有软件，不授予开源许可。未经权利人事先书面许可，不得复制、修改、发布、分发、再许可、销售或制作衍生作品。完整条款见 [LICENSE](LICENSE)。
+This repository contains proprietary software and does not grant an open-source license. No part may be copied, modified, published, distributed, sublicensed, sold, or used to create derivative works without prior written permission from the rights holder. See [LICENSE](LICENSE) for the complete terms.
 
 </div>

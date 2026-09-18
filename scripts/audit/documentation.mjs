@@ -90,15 +90,15 @@ function validateLinks(file, content) {
 }
 
 const rootReadmeSections = [
-  "项目简介",
-  "在线访问",
-  "核心能力",
-  "界面预览",
-  "技术架构",
-  "快速开始",
-  "常用命令",
-  "文档导航",
-  "授权",
+  "Overview",
+  "Online Access",
+  "Core Capabilities",
+  "Interface Preview",
+  "Architecture",
+  "Quick Start",
+  "Common Commands",
+  "Documentation",
+  "License",
 ];
 const technicalSections = ["概述", "当前设计或配置", "操作与维护", "验证", "相关文档"];
 const guideSections = ["适用场景", "入口位置", "前置条件", "操作步骤", "结果与产物", "映射关系", "常见问题"];
