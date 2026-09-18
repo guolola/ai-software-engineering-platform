@@ -177,6 +177,11 @@ export function createInMemoryBillingRepository(): BillingRepository {
         : null;
     },
 
+    async getLedgerEntryById(id) {
+      const entry = [...ledger.values()].find((candidate) => candidate.id === id);
+      return entry ? clone(entry) : null;
+    },
+
     async addLedgerEntry(input: CreateLedgerEntryInput) {
       const key = sourceKey(input.sourceType, input.sourceId);
       const existing = ledger.get(key);
@@ -215,6 +220,7 @@ export function createInMemoryBillingRepository(): BillingRepository {
         projectId: input.projectId ?? null,
         taskType: input.taskType,
         entitlementKind: input.entitlementKind,
+        ledgerEntryId: input.ledgerEntryId ?? null,
         creditDelta: input.creditDelta,
         status: "reserved",
         reservedAt: input.reservedAt,
@@ -228,6 +234,17 @@ export function createInMemoryBillingRepository(): BillingRepository {
 
     async getReservationByRunId(runId) {
       return reservations.has(runId) ? clone(reservations.get(runId)!) : null;
+    },
+
+    async listReservationsForUser(userId) {
+      return [...reservations.values()]
+        .filter((reservation) => reservation.userId === userId)
+        .sort((left, right) => left.reservedAt.localeCompare(right.reservedAt))
+        .map(clone);
+    },
+
+    async lockUserEntitlements(_userId) {
+      // In-memory transactions are serialized by the calling test/runtime process.
     },
 
     async confirmUsageReservation(runId, confirmedAt) {

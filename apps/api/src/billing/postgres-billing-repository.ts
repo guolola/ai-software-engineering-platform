@@ -89,6 +89,7 @@ type ReservationRow = {
   project_id: string | null;
   task_type: string;
   reservation_kind: BillingReservationKind;
+  ledger_entry_id: string | null;
   credit_delta: number;
   status: BillingReservationStatus;
   created_at: string | Date;
@@ -199,6 +200,7 @@ function mapReservationRow(row: ReservationRow): BillingUsageReservationRecord {
     projectId: row.project_id,
     taskType: row.task_type as BillingUsageReservationRecord["taskType"],
     entitlementKind: row.reservation_kind,
+    ledgerEntryId: row.ledger_entry_id,
     creditDelta: Number(row.credit_delta),
     status: row.status,
     reservedAt: toIsoString(row.created_at) ?? new Date().toISOString(),
@@ -489,7 +491,7 @@ class PostgresBillingRepository implements BillingRepository {
           }),
         ],
       );
-      const entry = await this.getLedgerById(result.rows[0]!.id);
+      const entry = await this.getLedgerEntryById(result.rows[0]!.id);
       if (!entry) throw new Error("Billing ledger entry was not persisted");
       return entry;
     } catch (error) {
@@ -512,9 +514,9 @@ class PostgresBillingRepository implements BillingRepository {
       `
         insert into billing_usage_reservations (
           id, run_id, user_id, project_id, task_type, reservation_kind,
-          credit_delta, status, created_at, metadata_json
+          ledger_entry_id, credit_delta, status, created_at, metadata_json
         )
-        values ($1, $2, $3, $4, $5, $6, $7, 'reserved', $8, $9::jsonb)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, 'reserved', $9, $10::jsonb)
         on conflict (run_id) do nothing
       `,
       [
@@ -524,6 +526,7 @@ class PostgresBillingRepository implements BillingRepository {
         input.projectId ?? null,
         input.taskType,
         input.entitlementKind,
+        input.ledgerEntryId ?? null,
         input.creditDelta,
         input.reservedAt,
         JSON.stringify(input.metadata ?? {}),
@@ -538,13 +541,27 @@ class PostgresBillingRepository implements BillingRepository {
     const result = await this.db.query<ReservationRow>(
       `
         select id, run_id, user_id, project_id, task_type, reservation_kind,
-          credit_delta, status, created_at, confirmed_at, released_at, metadata_json
+          ledger_entry_id, credit_delta, status, created_at, confirmed_at, released_at, metadata_json
         from billing_usage_reservations
         where run_id = $1
       `,
       [runId],
     );
     return result.rows[0] ? mapReservationRow(result.rows[0]) : null;
+  }
+
+  async listReservationsForUser(userId: string) {
+    const result = await this.db.query<ReservationRow>(
+      `select id, run_id, user_id, project_id, task_type, reservation_kind,
+         ledger_entry_id, credit_delta, status, created_at, confirmed_at, released_at, metadata_json
+       from billing_usage_reservations where user_id = $1 order by created_at asc`,
+      [userId],
+    );
+    return result.rows.map(mapReservationRow);
+  }
+
+  async lockUserEntitlements(userId: string) {
+    await this.db.query("select pg_advisory_xact_lock(hashtext($1))", [`billing:${userId}`]);
   }
 
   async confirmUsageReservation(runId: string, confirmedAt: string) {
@@ -653,7 +670,7 @@ class PostgresBillingRepository implements BillingRepository {
     return result.rows.map(mapNotificationRow);
   }
 
-  private async getLedgerById(id: string) {
+  async getLedgerEntryById(id: string) {
     const result = await this.db.query<LedgerRow>(
       `${ledgerSelect} where ledger.id = $1 limit 1`,
       [id],

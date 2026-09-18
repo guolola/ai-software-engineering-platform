@@ -74,6 +74,7 @@ export type RegisterApiRoutesOptions = {
   pngRenderClient: PngRenderClient;
   systemNoticeStore: SystemNoticeStore;
   analyticsStore: AdminAnalyticsStore;
+  databaseProbe?: () => Promise<void>;
   testRunAccessContext?: RunAccessContext;
   disableBillingEntitlementGuard?: boolean;
 };
@@ -112,6 +113,7 @@ export function registerApiRoutes({
   pngRenderClient,
   systemNoticeStore,
   analyticsStore,
+  databaseProbe,
   testRunAccessContext,
   disableBillingEntitlementGuard,
 }: RegisterApiRoutesOptions) {
@@ -279,6 +281,8 @@ export function registerApiRoutes({
     academicStore,
     billingService,
     analyticsStore,
+    mailAdapter,
+    databaseProbe,
   });
   registerDocumentRoutes({
     app,

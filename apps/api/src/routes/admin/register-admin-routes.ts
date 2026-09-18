@@ -28,6 +28,16 @@ import {
 } from "@uml-platform/contracts";
 import type { DocumentLibrary } from "../../documents/library/document-library.js";
 import type { BillingService } from "../../billing/billing-service.js";
+import {
+  buildTokenMail,
+  createMailAdapterFromEnv,
+  type MailAdapter,
+} from "../../mail/mail-adapter.js";
+import { hashPassword } from "../../security/password-hashing.js";
+import {
+  readAdminSessionCookie,
+  readSessionCookie,
+} from "../../auth/session-cookie.js";
 import type { RunRecordStore } from "../../runs/records/run-record-store.js";
 import { buildOrganizationUnits } from "../../admin/admin-route-presenters.js";
 import { requireHighRiskAdmin } from "../../admin/admin-route-security.js";
@@ -103,6 +113,7 @@ import {
 import {
   buildAdminRunListView,
   getAdminRunDetail,
+  listAdminRunDtos,
 } from "../../admin/admin-run-read-model.js";
 import {
   cancelAdminRun,
@@ -120,7 +131,9 @@ import {
 import {
   buildAdminProjectListView,
   buildAdminUserListView,
+  getAdminProjectDetailView,
   getAdminUserLoginRecordView,
+  getAdminUserProjectsView,
 } from "../../admin/admin-user-project-read-model.js";
 import {
   buildPromptRuntimeListView,
@@ -218,6 +231,43 @@ const providerTestRequestSchema = z
   .strict()
   .default({});
 
+const invitationalAdminRoleSchema = z.enum([
+  "system_operator",
+  "course_admin",
+  "project_admin",
+  "auditor",
+  "security_admin",
+  "model_admin",
+  "teacher_assistant",
+]);
+
+const createAdminInvitationRequestSchema = z
+  .object({
+    email: z.string().trim().email().transform((value) => value.toLowerCase()),
+    displayName: z.string().trim().min(1).max(120).optional(),
+    role: invitationalAdminRoleSchema,
+  })
+  .strict();
+
+const acceptAdminInvitationRequestSchema = z
+  .object({
+    token: z.string().trim().min(16).max(256),
+    username: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,32}$/u).optional(),
+    displayName: z.string().trim().min(1).max(120).optional(),
+    password: z.string().min(8).max(128).optional(),
+  })
+  .strict();
+
+const ADMIN_ROLE_LABELS = {
+  system_operator: "系统运维",
+  course_admin: "教务/课程管理员",
+  project_admin: "项目管理员",
+  auditor: "审计员",
+  security_admin: "安全管理员",
+  model_admin: "模型管理员",
+  teacher_assistant: "教师/助教",
+} as const;
+
 function sendAdminOnly(
   app: FastifyInstance,
   path: string,
@@ -249,6 +299,8 @@ export function registerAdminRoutes({
   academicStore: providedAcademicStore,
   billingService,
   analyticsStore,
+  mailAdapter = createMailAdapterFromEnv(),
+  databaseProbe,
 }: {
   app: FastifyInstance;
   authStore: AuthStore;
@@ -263,6 +315,8 @@ export function registerAdminRoutes({
   academicStore?: AcademicAdminRepository;
   billingService?: Pick<BillingService, "getSummary">;
   analyticsStore: AdminAnalyticsStore;
+  mailAdapter?: MailAdapter;
+  databaseProbe?: () => Promise<void>;
 }) {
   const rateLimitPolicyStore =
     createRateLimitPolicyStoreWithFallback(providerUsageTracker);
@@ -415,6 +469,189 @@ export function registerAdminRoutes({
     });
   });
 
+  sendAdminOnly(app, "/api/admin/admin-invitations", async (request, reply) => {
+    const actor = await requireAdminPermission(
+      request,
+      reply,
+      authStore,
+      "admin.admin_invitations.write",
+    );
+    if ("message" in actor) return actor;
+    return { invitations: await authStore.listAdminInvitations() };
+  });
+
+  app.post("/api/admin/admin-invitations", async (request, reply) => {
+    const actor = await requireAdminPermission(
+      request,
+      reply,
+      authStore,
+      "admin.admin_invitations.write",
+    );
+    if ("message" in actor) return actor;
+    const input = createAdminInvitationRequestSchema.parse(request.body);
+    const existingUser = await authStore.findUserByEmail(input.email);
+    if (existingUser?.systemRoles.includes(input.role)) {
+      reply.code(409);
+      return { message: "该账号已经拥有此管理员角色" };
+    }
+    const created = await authStore.createAdminInvitation({
+      ...input,
+      invitedByUserId: actor.id,
+    });
+    if (!created) {
+      reply.code(409);
+      return { message: "相同邮箱和角色已有待处理邀请" };
+    }
+    await mailAdapter.send(
+      buildTokenMail({
+        email: input.email,
+        purpose: "admin_invitation",
+        token: created.token,
+        expiresAt: created.invitation.expiresAt,
+        adminRoleLabel: ADMIN_ROLE_LABELS[input.role],
+      }),
+    );
+    await authStore.recordAuditLog({
+      actorUserId: actor.id,
+      action: "admin.invitation.create",
+      targetType: "admin_invitation",
+      targetId: created.invitation.id,
+      outcome: "success",
+      message: `管理员邀请已创建：${input.role}`,
+    });
+    reply.code(201);
+    return {
+      invitation: created.invitation,
+      ...(process.env.NODE_ENV === "production" ? {} : { devToken: created.token }),
+    };
+  });
+
+  app.post("/api/admin/admin-invitations/:id/resend", async (request, reply) => {
+    const actor = await requireAdminPermission(
+      request,
+      reply,
+      authStore,
+      "admin.admin_invitations.write",
+    );
+    if ("message" in actor) return actor;
+    const { id } = request.params as { id: string };
+    const resent = await authStore.resendAdminInvitation(id, actor.id);
+    if (!resent) {
+      reply.code(404);
+      return { message: "待处理邀请不存在" };
+    }
+    await mailAdapter.send(
+      buildTokenMail({
+        email: resent.invitation.email,
+        purpose: "admin_invitation",
+        token: resent.token,
+        expiresAt: resent.invitation.expiresAt,
+        adminRoleLabel: ADMIN_ROLE_LABELS[resent.invitation.role],
+      }),
+    );
+    await authStore.recordAuditLog({
+      actorUserId: actor.id,
+      action: "admin.invitation.resend",
+      targetType: "admin_invitation",
+      targetId: id,
+      outcome: "success",
+      message: "管理员邀请已重发，旧令牌已失效",
+    });
+    return { invitation: resent.invitation };
+  });
+
+  app.delete("/api/admin/admin-invitations/:id", async (request, reply) => {
+    const actor = await requireAdminPermission(
+      request,
+      reply,
+      authStore,
+      "admin.admin_invitations.write",
+    );
+    if ("message" in actor) return actor;
+    const { id } = request.params as { id: string };
+    const invitation = await authStore.revokeAdminInvitation(id);
+    if (!invitation) {
+      reply.code(404);
+      return { message: "待处理邀请不存在" };
+    }
+    await authStore.recordAuditLog({
+      actorUserId: actor.id,
+      action: "admin.invitation.revoke",
+      targetType: "admin_invitation",
+      targetId: id,
+      outcome: "success",
+      message: "管理员邀请已撤销",
+    });
+    return { invitation };
+  });
+
+  app.get("/api/admin-invitations/inspect", async (request, reply) => {
+    const token = String((request.query as { token?: unknown }).token ?? "").trim();
+    const invitation = token ? await authStore.findActiveAdminInvitationToken(token) : null;
+    if (!invitation) {
+      reply.code(404);
+      return { message: "邀请无效或已过期" };
+    }
+    return {
+      invitation: {
+        email: invitation.email,
+        displayName: invitation.displayName,
+        role: invitation.role,
+        expiresAt: invitation.expiresAt,
+        existingAccount: Boolean(await authStore.findUserByEmail(invitation.email)),
+      },
+    };
+  });
+
+  app.post("/api/admin-invitations/accept", async (request, reply) => {
+    const input = acceptAdminInvitationRequestSchema.parse(request.body);
+    const invitation = await authStore.findActiveAdminInvitationToken(input.token);
+    if (!invitation) {
+      reply.code(404);
+      return { message: "邀请无效或已过期" };
+    }
+    let user = await authStore.findUserByEmail(invitation.email);
+    if (user) {
+      const sessionId = readSessionCookie(request) ?? readAdminSessionCookie(request);
+      const session = sessionId ? await authStore.getActiveSession(sessionId) : null;
+      if (!session || session.userId !== user.id) {
+        reply.code(401);
+        return { message: "请先使用被邀请邮箱登录后再接受邀请" };
+      }
+    } else {
+      if (!input.username || !input.displayName || !input.password) {
+        reply.code(400);
+        return { message: "新账号必须填写用户名、显示名称和密码" };
+      }
+      user = await authStore.createUser({
+        email: invitation.email,
+        username: input.username,
+        displayName: input.displayName,
+        passwordHash: hashPassword(input.password),
+        emailVerified: true,
+        status: "active",
+      });
+      if (!user) {
+        reply.code(409);
+        return { message: "用户名或邮箱已被使用" };
+      }
+    }
+    const accepted = await authStore.acceptAdminInvitation(input.token, user.id);
+    if (!accepted || "error" in accepted) {
+      reply.code(accepted?.error === "email_mismatch" ? 403 : 409);
+      return { message: accepted?.error === "email_mismatch" ? "登录邮箱与邀请不一致" : "邀请已被处理" };
+    }
+    await authStore.recordAuditLog({
+      actorUserId: accepted.user.id,
+      action: "admin.invitation.accept",
+      targetType: "admin_invitation",
+      targetId: accepted.invitation.id,
+      outcome: "success",
+      message: `管理员邀请已接受：${accepted.invitation.role}`,
+    });
+    return { accepted: true, role: accepted.invitation.role };
+  });
+
   sendAdminOnly(app, "/api/admin/users/:id/login-records", async (request, reply) => {
     const actor = await requireAdminPermission(
       request,
@@ -436,6 +673,29 @@ export function registerAdminRoutes({
     return result.body;
   });
 
+  sendAdminOnly(app, "/api/admin/users/:id/projects", async (request, reply) => {
+    const actor = await requireAdminPermission(
+      request,
+      reply,
+      authStore,
+      "admin.users.read",
+    );
+    if ("message" in actor) return actor;
+    if (!actor.permissions.includes("admin.projects.read")) {
+      reply.code(403);
+      return { message: "Missing admin permission: admin.projects.read" };
+    }
+    const { id } = request.params as { id: string };
+    const result = await getAdminUserProjectsView({
+      academicStore,
+      authStore,
+      actor,
+      userId: id,
+    });
+    reply.code(result.statusCode);
+    return result.body;
+  });
+
   sendAdminOnly(app, "/api/admin/projects", async (request, reply) => {
     const actor = await requireAdminPermission(
       request,
@@ -449,6 +709,54 @@ export function registerAdminRoutes({
       authStore,
       actor,
     });
+  });
+
+  sendAdminOnly(app, "/api/admin/projects/:id", async (request, reply) => {
+    const actor = await requireAdminPermission(
+      request,
+      reply,
+      authStore,
+      "admin.projects.read",
+    );
+    if ("message" in actor) return actor;
+    const { id } = request.params as { id: string };
+    const result = await getAdminProjectDetailView({
+      academicStore,
+      authStore,
+      actor,
+      projectId: id,
+    });
+    reply.code(result.statusCode);
+    return result.body;
+  });
+
+  sendAdminOnly(app, "/api/admin/projects/:id/runs", async (request, reply) => {
+    const actor = await requireAdminPermission(
+      request,
+      reply,
+      authStore,
+      "admin.runs.read",
+    );
+    if ("message" in actor) return actor;
+    const { id } = request.params as { id: string };
+    const visible = await getAdminProjectDetailView({
+      academicStore,
+      authStore,
+      actor,
+      projectId: id,
+    });
+    if (visible.statusCode !== 200) {
+      reply.code(visible.statusCode);
+      return visible.body;
+    }
+    const projectRuns = (await listAdminRunDtos({
+      academicStore,
+      authStore,
+      actor,
+      runs,
+      providerConfigs,
+    })).filter((run) => run.projectId === id);
+    return { generatedAt: new Date().toISOString(), runs: projectRuns };
   });
 
   sendAdminOnly(app, "/api/admin/organizations", async (request, reply) => {
@@ -1637,7 +1945,7 @@ export function registerAdminRoutes({
       "admin.system_health.read",
     );
     if ("message" in actor) return actor;
-    return buildSystemHealthView();
+    return buildSystemHealthView({ providerConfigs, databaseProbe });
   });
 
   sendAdminOnly(app, "/api/admin/system/config", async (request, reply) => {

@@ -170,6 +170,11 @@ export async function createApiServer(options?: {
     nodeEnv: runtimeNodeEnv,
     academicStore,
     analyticsStore,
+    databaseProbe: pool
+      ? async () => {
+          await pool.query("select 1 as ok");
+        }
+      : undefined,
     runs,
     documentLibrary,
     providerConfigs,

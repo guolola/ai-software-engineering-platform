@@ -1,6 +1,6 @@
 // Builds admin user/project list views after route-level permission checks.
 import type { BillingService } from "../billing/billing-service.js";
-import { toLoginEventDto, toProjectDto } from "../auth/dto.js";
+import { toLoginEventDto, toProjectDto, toProjectMemberDto } from "../auth/dto.js";
 import type { AuthStore } from "../auth/in-memory-auth-store.js";
 import type { AcademicAdminRepository } from "../db/academic-admin-repository.js";
 import type { AdminActor } from "../security/admin-guard.js";
@@ -27,7 +27,14 @@ export async function listVisibleAdminUserDtos({
   const visibleUsers = (await authStore.listUsers()).filter(
     (user) => visibleUserIds === null || visibleUserIds.has(user.id),
   );
-  return Promise.all(visibleUsers.map((user) => toAdminUserDto(user, billingService)));
+  const latestLogins = new Map(
+    (await authStore.listLatestSuccessfulLoginEvents(visibleUsers.map((user) => user.id)))
+      .map(toLoginEventDto)
+      .flatMap((event) => (event.userId ? [[event.userId, event] as const] : [])),
+  );
+  return Promise.all(
+    visibleUsers.map((user) => toAdminUserDto(user, billingService, latestLogins.get(user.id))),
+  );
 }
 
 export async function buildAdminUserListView({
@@ -117,4 +124,61 @@ export async function buildAdminProjectListView({
       actor,
     }),
   };
+}
+
+export async function getAdminUserProjectsView({
+  academicStore,
+  authStore,
+  actor,
+  userId,
+}: {
+  academicStore: AcademicAdminRepository;
+  authStore: AuthStore;
+  actor: AdminActor;
+  userId: string;
+}) {
+  const visibleUserIds = await visibleUserIdsForAdmin(academicStore, authStore, actor);
+  if (visibleUserIds !== null && !visibleUserIds.has(userId)) {
+    return { statusCode: 403, body: { message: "User is outside admin data scope" } } as const;
+  }
+  const user = await authStore.getUser(userId);
+  if (!user) return { statusCode: 404, body: { message: "User not found" } } as const;
+  const projects = await visibleProjectsForAdmin(academicStore, authStore, actor);
+  const related = [];
+  for (const project of projects) {
+    const members = await authStore.listProjectMembers(project.id);
+    if (
+      project.ownerUserId === userId ||
+      members.some((member) => member.userId === userId && member.status === "active")
+    ) {
+      related.push(toProjectDto(project));
+    }
+  }
+  return { statusCode: 200, body: { generatedAt: new Date().toISOString(), projects: related } } as const;
+}
+
+export async function getAdminProjectDetailView({
+  academicStore,
+  authStore,
+  actor,
+  projectId,
+}: {
+  academicStore: AcademicAdminRepository;
+  authStore: AuthStore;
+  actor: AdminActor;
+  projectId: string;
+}) {
+  const project = (await visibleProjectsForAdmin(academicStore, authStore, actor)).find(
+    (candidate) => candidate.id === projectId,
+  );
+  if (!project) return { statusCode: 404, body: { message: "Project not found" } } as const;
+  const members = await authStore.listProjectMembers(project.id);
+  return {
+    statusCode: 200,
+    body: {
+      generatedAt: new Date().toISOString(),
+      project: toProjectDto(project),
+      members: members.map(toProjectMemberDto),
+    },
+  } as const;
 }

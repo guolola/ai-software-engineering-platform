@@ -38,6 +38,10 @@ export class BillingNotFoundError extends Error {
   readonly statusCode = 404;
 }
 
+export class BillingConflictError extends Error {
+  readonly statusCode = 409;
+}
+
 export type BillingEntitlementDecision =
   | {
       allowed: true;
@@ -94,6 +98,43 @@ function merchantOrderNo(now: Date) {
 
 function isValidLedgerEntry(entry: BillingLedgerEntryRecord, nowIso: string) {
   return entry.validFrom <= nowIso && (!entry.validUntil || entry.validUntil > nowIso);
+}
+
+async function nextCreditSource(
+  repository: BillingRepository,
+  userId: string,
+  nowIso: string,
+) {
+  const [ledger, reservations] = await Promise.all([
+    repository.listLedgerEntriesForUser(userId),
+    repository.listReservationsForUser(userId),
+  ]);
+  const active = ledger.filter((entry) => isValidLedgerEntry(entry, nowIso));
+  const candidates = active
+    .filter((entry) => entry.creditDelta > 0)
+    .map((entry) => {
+      const consumed = active
+        .filter(
+          (candidate) =>
+            candidate.creditDelta < 0 && candidate.metadata.fundingLedgerEntryId === entry.id,
+        )
+        .reduce((total, candidate) => total + Math.abs(candidate.creditDelta), 0);
+      const reserved = reservations
+        .filter(
+          (reservation) =>
+            reservation.status === "reserved" && reservation.ledgerEntryId === entry.id,
+        )
+        .reduce((total, reservation) => total + Math.abs(reservation.creditDelta), 0);
+      return { entry, remaining: entry.creditDelta - consumed - reserved };
+    })
+    .filter((candidate) => candidate.remaining > 0)
+    .sort((left, right) => {
+      if (!left.entry.validUntil && right.entry.validUntil) return 1;
+      if (left.entry.validUntil && !right.entry.validUntil) return -1;
+      return (left.entry.validUntil ?? "").localeCompare(right.entry.validUntil ?? "") ||
+        left.entry.createdAt.localeCompare(right.entry.createdAt);
+    });
+  return candidates[0] ?? null;
 }
 
 function isOrderExpired(order: PaymentOrderRecord, current: Date) {
@@ -555,19 +596,26 @@ export function createBillingService({
 
   async function reserveRunUsage(input: ReserveRunUsageInput): Promise<BillingEntitlementDecision> {
     return repository.withTransaction(async (tx) => {
+      await tx.lockUserEntitlements(input.userId);
       const summary = await readSummary(tx, input.userId);
       if (summary.creditBalance < 0) {
         return entitlementError(summary, "negative_balance", 402);
       }
       if (summary.creditBalance > 0) {
+        const source = await nextCreditSource(tx, input.userId, now().toISOString());
+        if (!source) return entitlementError(summary, "no_entitlement", 402);
         return {
           allowed: true,
           reservation: await tx.createUsageReservation({
             ...input,
             entitlementKind: "credit",
+            ledgerEntryId: source.entry.id,
             creditDelta: -1,
             reservedAt: now().toISOString(),
-            metadata: { fallbackReason: "credit_pack" },
+            metadata: {
+              allocationPolicy: "earliest_expiry_first",
+              fundingLedgerEntryId: source.entry.id,
+            },
           }),
         };
       }
@@ -581,16 +629,20 @@ export function createBillingService({
       if (!reservation || reservation.status !== "reserved") return reservation;
       const confirmedAt = now().toISOString();
       if (reservation.entitlementKind === "credit") {
+        const source = reservation.ledgerEntryId
+          ? await tx.getLedgerEntryById(reservation.ledgerEntryId)
+          : null;
         await tx.addLedgerEntry({
           userId: reservation.userId,
           sourceType: "usage",
           sourceId: `run:${runId}`,
           creditDelta: -1,
           validFrom: confirmedAt,
-          validUntil: null,
+          validUntil: source?.validUntil ?? null,
           metadata: {
             runId,
             taskType: reservation.taskType,
+            fundingLedgerEntryId: source?.id ?? null,
           },
         });
       }
@@ -617,6 +669,9 @@ export function createBillingService({
       if (!reservation || reservation.status === "released") return reservation;
       const compensatedAt = now().toISOString();
       if (reservation.status === "confirmed" && reservation.entitlementKind === "credit") {
+        const source = reservation.ledgerEntryId
+          ? await tx.getLedgerEntryById(reservation.ledgerEntryId)
+          : null;
         const sourceId = `run-compensation:${runId}`;
         const existing = await tx.getLedgerEntryBySource("admin_adjustment", sourceId);
         if (!existing) {
@@ -626,12 +681,13 @@ export function createBillingService({
             sourceId,
             creditDelta: Math.abs(reservation.creditDelta || 1),
             validFrom: compensatedAt,
-            validUntil: null,
+            validUntil: source?.validUntil ?? null,
             metadata: {
               runId,
               taskType: reservation.taskType,
               errorCode,
               compensationReason: reason,
+              fundingLedgerEntryId: source?.id ?? null,
             },
           });
         }
@@ -655,14 +711,50 @@ export function createBillingService({
     if (!Number.isInteger(creditAmount) || creditAmount === 0) {
       throw new BillingValidationError("Credit adjustment must be a non-zero integer");
     }
-    return repository.addLedgerEntry({
-      userId,
-      sourceType: "admin_adjustment",
-      sourceId: `admin:${actorUserId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
-      creditDelta: creditAmount,
-      validFrom: now().toISOString(),
-      validUntil: null,
-      metadata: { reason, actorUserId },
+    return repository.withTransaction(async (tx) => {
+      await tx.lockUserEntitlements(userId);
+      const adjustedAt = now().toISOString();
+      if (creditAmount > 0) {
+        return tx.addLedgerEntry({
+          userId,
+          sourceType: "admin_adjustment",
+          sourceId: `admin:${actorUserId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+          creditDelta: creditAmount,
+          validFrom: adjustedAt,
+          validUntil: null,
+          metadata: { reason, actorUserId },
+        });
+      }
+      const summary = await readSummary(tx, userId);
+      if (summary.creditBalance + creditAmount < 0) {
+        throw new BillingConflictError("Credit adjustment cannot make the balance negative");
+      }
+      let remaining = Math.abs(creditAmount);
+      let firstEntry: BillingLedgerEntryRecord | null = null;
+      let allocation = 0;
+      while (remaining > 0) {
+        const source = await nextCreditSource(tx, userId, adjustedAt);
+        if (!source) throw new BillingConflictError("No active credit source is available");
+        const amount = Math.min(remaining, source.remaining);
+        const entry = await tx.addLedgerEntry({
+          userId,
+          sourceType: "admin_adjustment",
+          sourceId: `admin:${actorUserId}:${Date.now()}:${allocation}:${Math.random().toString(36).slice(2, 8)}`,
+          creditDelta: -amount,
+          validFrom: adjustedAt,
+          validUntil: source.entry.validUntil,
+          metadata: {
+            reason,
+            actorUserId,
+            fundingLedgerEntryId: source.entry.id,
+            allocationPolicy: "earliest_expiry_first",
+          },
+        });
+        firstEntry ??= entry;
+        remaining -= amount;
+        allocation += 1;
+      }
+      return firstEntry!;
     });
   }
 

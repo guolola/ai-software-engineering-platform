@@ -11,6 +11,7 @@ import type {
 export interface RunRecord {
   snapshot: RunSnapshot | DesignRunSnapshot | CodeRunSnapshot | DocumentRunSnapshot | FeasibilityRunSnapshot;
   events: RunEvent[];
+  eventCreatedAt?: string[];
   listeners: Set<(event: RunEvent) => void>;
   terminal: boolean;
   documentBuffer?: Buffer;
@@ -51,6 +52,7 @@ export interface RunRecordMetadata {
 export interface SerializedRunRecord {
   snapshot: RunRecord["snapshot"];
   events: RunEvent[];
+  eventCreatedAt?: string[];
   terminal: boolean;
   metadata?: RunRecordMetadata;
   documentBufferBase64?: string;
@@ -101,6 +103,7 @@ export function createRunRecordStore(
     store.set(record.snapshot.runId, {
       snapshot: record.snapshot,
       events: record.events,
+      eventCreatedAt: record.eventCreatedAt,
       listeners: new Set(),
       terminal: record.terminal,
       metadata: record.metadata,
@@ -120,6 +123,7 @@ export function serializeRunRecordStore(
     records: Array.from(runs.values(), (record) => ({
       snapshot: record.snapshot,
       events: record.events,
+      eventCreatedAt: record.eventCreatedAt,
       terminal: record.terminal,
       metadata: record.metadata,
       documentBufferBase64: record.documentBuffer?.toString("base64"),
@@ -144,6 +148,7 @@ export function emitEvent(record: RunRecord, event: RunEvent) {
   const storeEvent = shouldStoreEvent(event);
   if (storeEvent) {
     record.events.push(event);
+    (record.eventCreatedAt ??= []).push(new Date().toISOString());
   }
   for (const listener of record.listeners) {
     listener(event);

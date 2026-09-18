@@ -5,6 +5,7 @@ import {
   type AdminRole,
 } from "@uml-platform/contracts";
 import { ADMIN_ROLES } from "../../security/admin-rbac.js";
+import type { ProviderConfigStore } from "../../provider-configs/provider-config-store.js";
 
 const ADMIN_ROLE_NAMES: Record<AdminRole, string> = {
   super_admin: "超级管理员",
@@ -211,18 +212,107 @@ export function buildSystemLogsView() {
   };
 }
 
-export function buildSystemHealthServices() {
-  return [
-    { name: "API", status: "healthy", note: "admin endpoints registered" },
-    { name: "Provider config store", status: "healthy", note: "managed provider API active" },
-  ];
+type ServiceHealthItem = {
+  name: string;
+  status: "healthy" | "degraded" | "down";
+  latencyMs: number | null;
+  measuredAt: string;
+  note: string;
+  source: string;
+};
+
+let healthCache: { expiresAt: number; services: ServiceHealthItem[] } | null = null;
+
+async function timedProbe({
+  name,
+  source,
+  probe,
+}: {
+  name: string;
+  source: string;
+  probe?: () => Promise<void>;
+}): Promise<ServiceHealthItem> {
+  const measuredAt = new Date().toISOString();
+  if (!probe) {
+    return { name, source, measuredAt, latencyMs: null, status: "degraded", note: "未配置探测" };
+  }
+  const startedAt = performance.now();
+  try {
+    await probe();
+    const latencyMs = Math.max(1, Math.round(performance.now() - startedAt));
+    return {
+      name,
+      source,
+      measuredAt,
+      latencyMs,
+      status: latencyMs >= 1_000 ? "degraded" : "healthy",
+      note: latencyMs >= 1_000 ? "服务可用，但响应偏慢" : "服务探测成功",
+    };
+  } catch {
+    return {
+      name,
+      source,
+      measuredAt,
+      latencyMs: null,
+      status: "down",
+      note: "服务探测失败或超时",
+    };
+  }
 }
 
-export function buildSystemHealthView() {
-  return {
-    generatedAt: new Date().toISOString(),
-    services: buildSystemHealthServices(),
+function httpProbe(baseUrl: string | undefined, path = "/") {
+  if (!baseUrl?.trim()) return undefined;
+  return async () => {
+    const url = new URL(path, `${baseUrl.replace(/\/+$/u, "")}/`).toString();
+    const response = await fetch(url, {
+      method: "GET",
+      signal: AbortSignal.timeout(3_000),
+      redirect: "manual",
+    });
+    if (!response.ok && response.status !== 301 && response.status !== 302) {
+      throw new Error("health probe failed");
+    }
   };
+}
+
+export async function buildSystemHealthView({
+  providerConfigs,
+  databaseProbe,
+}: {
+  providerConfigs: ProviderConfigStore;
+  databaseProbe?: () => Promise<void>;
+}) {
+  if (healthCache && healthCache.expiresAt > Date.now()) {
+    return { generatedAt: new Date().toISOString(), services: healthCache.services };
+  }
+  const services = await Promise.all([
+    timedProbe({ name: "管理 API", source: "internal", probe: async () => undefined }),
+    timedProbe({ name: "数据库", source: "postgres", probe: databaseProbe }),
+    timedProbe({
+      name: "供应商配置存储",
+      source: "provider_config_store",
+      probe: async () => {
+        await providerConfigs.list();
+      },
+    }),
+    timedProbe({
+      name: "Render Service",
+      source: "render_service",
+      probe: httpProbe(process.env.RENDER_SERVICE_URL, "/health"),
+    }),
+    timedProbe({
+      name: "PlantUML",
+      source: "plantuml",
+      probe: httpProbe(process.env.PLANTUML_SERVER_URL),
+    }),
+    timedProbe({
+      name: "OnlyOffice",
+      source: "onlyoffice",
+      probe: httpProbe(process.env.ONLYOFFICE_DOCUMENT_SERVER_URL, "/healthcheck"),
+    }),
+  ]);
+  healthCache = { expiresAt: Date.now() + 30_000, services };
+  return { generatedAt: new Date().toISOString(), services };
 }
 
 export function buildSystemReleases() {

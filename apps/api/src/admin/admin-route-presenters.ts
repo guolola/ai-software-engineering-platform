@@ -2,6 +2,7 @@
 import type { BillingService } from "../billing/billing-service.js";
 import type { DocumentLibrary } from "../documents/library/document-library.js";
 import type { AuthStore, UserRecord } from "../auth/in-memory-auth-store.js";
+import type { LoginEventDto } from "@uml-platform/contracts";
 import type { AdminActor } from "../security/admin-guard.js";
 import type { ProviderConfigStore } from "../provider-configs/provider-config-store.js";
 import type {
@@ -35,6 +36,7 @@ export function metric(label: string, value: string, trend = "", tone = "neutral
 export async function toAdminUserDto(
   user: UserRecord,
   billingService?: Pick<BillingService, "getSummary">,
+  latestLogin?: LoginEventDto | null,
 ) {
   return {
     id: user.id,
@@ -48,6 +50,8 @@ export async function toAdminUserDto(
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     lastLoginAt: user.lastLoginAt,
+    lastLoginLocation: latestLogin?.locationLabel ?? null,
+    lastLoginRegion: latestLogin?.region ?? null,
     billingSummary: billingService ? await billingService.getSummary(user.id) : undefined,
   };
 }

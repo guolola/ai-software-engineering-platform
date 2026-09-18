@@ -1056,6 +1056,56 @@ create index if not exists evaluation_attempt_window_idx on evaluation_attempts(
 create index if not exists evaluation_attempt_review_idx on evaluation_attempts(review_verdict, created_at desc);
 `;
 
+const adminInvitationsSql = `
+create table if not exists admin_invitations (
+  id text primary key,
+  email text not null,
+  display_name text,
+  role text not null check (role in (
+    'system_operator', 'course_admin', 'project_admin', 'auditor',
+    'security_admin', 'model_admin', 'teacher_assistant'
+  )),
+  token_hash text not null unique,
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'revoked', 'expired')),
+  invited_by_user_id text not null references users(id) on delete restrict,
+  accepted_by_user_id text references users(id) on delete set null,
+  expires_at timestamptz not null,
+  accepted_at timestamptz,
+  revoked_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists admin_invitations_email_idx
+  on admin_invitations (lower(email), created_at desc);
+create unique index if not exists admin_invitations_pending_role_unique
+  on admin_invitations (lower(email), role)
+  where status = 'pending' and revoked_at is null and accepted_at is null;
+`;
+
+const billingCreditProvenanceSql = `
+alter table billing_usage_reservations
+  add column if not exists ledger_entry_id text references billing_entitlement_ledger(id) on delete set null;
+
+alter table billing_entitlement_ledger
+  drop constraint if exists billing_entitlement_ledger_source_type_check;
+alter table billing_entitlement_ledger
+  add constraint billing_entitlement_ledger_source_type_check
+  check (source_type in ('purchase', 'signup_bonus', 'usage', 'refund', 'admin_adjustment', 'reversal'));
+
+create unique index if not exists billing_reversal_ledger_unique
+  on billing_entitlement_ledger(source_type, source_id)
+  where source_type = 'reversal' and source_id is not null;
+create index if not exists billing_reservations_ledger_entry_idx
+  on billing_usage_reservations(ledger_entry_id)
+  where ledger_entry_id is not null;
+
+alter table admin_invitations
+  drop constraint if exists admin_invitations_status_check;
+alter table admin_invitations
+  add constraint admin_invitations_status_check
+  check (status in ('pending', 'accepted', 'revoked', 'expired'));
+`;
+
 export const migrations = [
   {
     id: "001_user_admin_platform_base",
@@ -1144,6 +1194,14 @@ export const migrations = [
   {
     id: "022_admin_analytics",
     sql: adminAnalyticsSql,
+  },
+  {
+    id: "023_admin_invitations",
+    sql: adminInvitationsSql,
+  },
+  {
+    id: "024_billing_credit_provenance",
+    sql: billingCreditProvenanceSql,
   },
 ] as const;
 

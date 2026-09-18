@@ -14,6 +14,7 @@ import type {
 } from "@uml-platform/contracts";
 import type { Queryable } from "../db/transactions.js";
 import type {
+  AdminInvitationRecord,
   AuditLogInput,
   ProjectMemberRecord,
   ProjectRecord,
@@ -126,6 +127,21 @@ type ProjectInvitationTokenRow = {
   created_at: string | Date;
 };
 
+type AdminInvitationRow = {
+  id: string;
+  email: string;
+  display_name: string | null;
+  role: Exclude<AdminRole, "super_admin">;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  invited_by_user_id: string;
+  accepted_by_user_id: string | null;
+  expires_at: string | Date;
+  accepted_at: string | Date | null;
+  revoked_at: string | Date | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
 type ProjectWorkspaceRow = {
   project_id: string;
   version: number;
@@ -140,6 +156,7 @@ const EMAIL_VERIFICATION_TOKEN_TTL_MS = 1000 * 60 * 60 * 24;
 const PASSWORD_RESET_TOKEN_TTL_MS = 1000 * 60 * 60;
 const MFA_CHALLENGE_TOKEN_TTL_MS = 1000 * 60 * 5;
 const PROJECT_INVITATION_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+const ADMIN_INVITATION_TOKEN_TTL_MS = 1000 * 60 * 60 * 72;
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -262,6 +279,23 @@ function mapProjectInvitationTokenRow(row: ProjectInvitationTokenRow) {
     acceptedAt: row.accepted_at ? toIsoString(row.accepted_at) : null,
     createdByUserId: row.created_by_user_id,
     createdAt: toIsoString(row.created_at),
+  };
+}
+
+function mapAdminInvitationRow(row: AdminInvitationRow): AdminInvitationRecord {
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    role: row.role,
+    status: row.status,
+    invitedByUserId: row.invited_by_user_id,
+    acceptedByUserId: row.accepted_by_user_id,
+    expiresAt: toIsoString(row.expires_at),
+    acceptedAt: row.accepted_at ? toIsoString(row.accepted_at) : null,
+    revokedAt: row.revoked_at ? toIsoString(row.revoked_at) : null,
+    createdAt: toIsoString(row.created_at),
+    updatedAt: toIsoString(row.updated_at),
   };
 }
 
@@ -397,6 +431,21 @@ const projectInvitationTokenColumns = `
   accepted_at,
   created_by_user_id,
   created_at
+`;
+
+const adminInvitationColumns = `
+  id,
+  email,
+  display_name,
+  role,
+  status,
+  invited_by_user_id,
+  accepted_by_user_id,
+  expires_at,
+  accepted_at,
+  revoked_at,
+  created_at,
+  updated_at
 `;
 
 const projectWorkspaceColumns = `
@@ -900,6 +949,122 @@ export function createPostgresAuthRepository(db: Queryable) {
       );
       const tokenRow = result.rows[0];
       return tokenRow ? this.getUser(tokenRow.user_id) : null;
+    },
+
+    async listAdminInvitations() {
+      await db.query(
+        `update admin_invitations set status = 'expired', updated_at = now()
+         where status = 'pending' and expires_at <= now()`,
+      );
+      const result = await db.query<AdminInvitationRow>(
+        `select ${adminInvitationColumns} from admin_invitations order by created_at desc`,
+      );
+      return result.rows.map(mapAdminInvitationRow);
+    },
+
+    async createAdminInvitation(input: {
+      email: string;
+      displayName?: string | null;
+      role: Exclude<AdminRole, "super_admin">;
+      invitedByUserId: string;
+    }) {
+      const email = normalizeEmail(input.email);
+      await db.query(
+        `update admin_invitations set status = 'expired', updated_at = now()
+         where status = 'pending' and expires_at <= now()`,
+      );
+      const duplicate = await db.query<{ id: string }>(
+        `select id from admin_invitations
+         where lower(email) = $1 and role = $2 and status = 'pending'
+           and revoked_at is null and accepted_at is null and expires_at > now()
+         limit 1`,
+        [email, input.role],
+      );
+      if (duplicate.rows[0]) return null;
+      const token = randomUUID();
+      const expiresAt = new Date(Date.now() + ADMIN_INVITATION_TOKEN_TTL_MS).toISOString();
+      const result = await db.query<AdminInvitationRow>(
+        `insert into admin_invitations (
+           id, email, display_name, role, token_hash, status,
+           invited_by_user_id, expires_at
+         ) values ($1, $2, $3, $4, $5, 'pending', $6, $7)
+         returning ${adminInvitationColumns}`,
+        [
+          randomUUID(),
+          email,
+          input.displayName?.trim() || null,
+          input.role,
+          hashToken(token),
+          input.invitedByUserId,
+          expiresAt,
+        ],
+      );
+      return { invitation: mapAdminInvitationRow(result.rows[0]), token };
+    },
+
+    async findActiveAdminInvitationToken(token: string) {
+      const result = await db.query<AdminInvitationRow>(
+        `select ${adminInvitationColumns}
+         from admin_invitations
+         where token_hash = $1 and status = 'pending'
+           and revoked_at is null and accepted_at is null and expires_at > now()
+         limit 1`,
+        [hashToken(token)],
+      );
+      return result.rows[0] ? mapAdminInvitationRow(result.rows[0]) : null;
+    },
+
+    async resendAdminInvitation(id: string, invitedByUserId: string) {
+      const token = randomUUID();
+      const expiresAt = new Date(Date.now() + ADMIN_INVITATION_TOKEN_TTL_MS).toISOString();
+      const result = await db.query<AdminInvitationRow>(
+        `update admin_invitations
+         set token_hash = $2, invited_by_user_id = $3, expires_at = $4, updated_at = now()
+         where id = $1 and status = 'pending' and revoked_at is null and accepted_at is null
+         returning ${adminInvitationColumns}`,
+        [id, hashToken(token), invitedByUserId, expiresAt],
+      );
+      return result.rows[0]
+        ? { invitation: mapAdminInvitationRow(result.rows[0]), token }
+        : null;
+    },
+
+    async revokeAdminInvitation(id: string) {
+      const result = await db.query<AdminInvitationRow>(
+        `update admin_invitations
+         set status = 'revoked', revoked_at = now(), updated_at = now()
+         where id = $1 and status = 'pending'
+         returning ${adminInvitationColumns}`,
+        [id],
+      );
+      return result.rows[0] ? mapAdminInvitationRow(result.rows[0]) : null;
+    },
+
+    async acceptAdminInvitation(token: string, userId: string) {
+      const invitation = await this.findActiveAdminInvitationToken(token);
+      const user = await this.getUser(userId);
+      if (!invitation || !user) return null;
+      if (normalizeEmail(user.email) !== invitation.email) {
+        return { error: "email_mismatch" as const, invitation };
+      }
+      const accepted = await db.query<AdminInvitationRow>(
+        `update admin_invitations
+         set status = 'accepted', accepted_by_user_id = $2,
+           accepted_at = now(), updated_at = now()
+         where id = $1 and status = 'pending' and revoked_at is null
+           and accepted_at is null and expires_at > now()
+         returning ${adminInvitationColumns}`,
+        [invitation.id, user.id],
+      );
+      if (!accepted.rows[0]) return null;
+      const nextUser = await this.updateUser(user.id, {
+        emailVerified: true,
+        status: user.status === "pending_email_verification" ? "active" : user.status,
+        systemRoles: [...new Set([...user.systemRoles, invitation.role])],
+      });
+      return nextUser
+        ? { invitation: mapAdminInvitationRow(accepted.rows[0]), user: nextUser }
+        : null;
     },
 
     async revokeProjectInvitationTokens(projectMemberId: string) {
@@ -1503,6 +1668,18 @@ export function createPostgresAuthRepository(db: Queryable) {
           order by created_at desc
         `,
         [userId],
+      );
+      return result.rows.map(mapLoginEventRow);
+    },
+
+    async listLatestSuccessfulLoginEvents(userIds: string[]) {
+      if (userIds.length === 0) return [];
+      const result = await db.query<LoginEventRow>(
+        `select distinct on (user_id) ${loginEventColumns}
+         from login_events
+         where user_id = any($1::text[]) and outcome = 'success'
+         order by user_id, created_at desc`,
+        [userIds],
       );
       return result.rows.map(mapLoginEventRow);
     },

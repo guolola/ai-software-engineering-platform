@@ -45,6 +45,7 @@
     "audit:architecture": "node scripts/audit/architecture-boundaries.mjs",
     "audit:architecture:strict": "node scripts/audit/architecture-boundaries.mjs --strict",
     "audit:docs": "node scripts/audit/documentation.mjs",
-    "eval:harness": "npm run eval --workspace @uml-platform/harness-eval"
+    "eval:harness": "npm run eval --workspace @uml-platform/harness-eval",
+    "billing:repair-negative-balances": "node scripts/ops/repair-negative-credit-balances.mjs"
   }
 }

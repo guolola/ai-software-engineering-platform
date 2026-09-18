@@ -20,6 +20,7 @@ export const adminPermissionSchema = z.enum([
   "admin.roles.write",
   "admin.users.read",
   "admin.users.write",
+  "admin.admin_invitations.write",
   "admin.projects.read",
   "admin.projects.write",
   "admin.runs.read",

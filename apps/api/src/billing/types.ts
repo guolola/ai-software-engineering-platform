@@ -37,7 +37,8 @@ export type BillingLedgerSourceType =
   | "signup_bonus"
   | "admin_adjustment"
   | "refund"
-  | "usage";
+  | "usage"
+  | "reversal";
 
 export type BillingLedgerEntryRecord = {
   id: string;
@@ -63,6 +64,7 @@ export type BillingUsageReservationRecord = {
   projectId: string | null;
   taskType: ProviderTaskType;
   entitlementKind: BillingReservationKind;
+  ledgerEntryId: string | null;
   creditDelta: number;
   status: BillingReservationStatus;
   reservedAt: string;
@@ -112,6 +114,7 @@ export type CreateUsageReservationInput = {
   projectId?: string | null;
   taskType: ProviderTaskType;
   entitlementKind: BillingReservationKind;
+  ledgerEntryId?: string | null;
   creditDelta: number;
   reservedAt: string;
   metadata?: Record<string, unknown>;
@@ -162,10 +165,13 @@ export interface BillingRepository {
     sourceType: BillingLedgerSourceType,
     sourceId: string,
   ): Promise<BillingLedgerEntryRecord | null>;
+  getLedgerEntryById(id: string): Promise<BillingLedgerEntryRecord | null>;
   addLedgerEntry(input: CreateLedgerEntryInput): Promise<BillingLedgerEntryRecord>;
   listLedgerEntriesForUser(userId: string): Promise<BillingLedgerEntryRecord[]>;
   createUsageReservation(input: CreateUsageReservationInput): Promise<BillingUsageReservationRecord>;
   getReservationByRunId(runId: string): Promise<BillingUsageReservationRecord | null>;
+  listReservationsForUser(userId: string): Promise<BillingUsageReservationRecord[]>;
+  lockUserEntitlements(userId: string): Promise<void>;
   confirmUsageReservation(runId: string, confirmedAt: string): Promise<BillingUsageReservationRecord | null>;
   releaseUsageReservation(runId: string, releasedAt: string): Promise<BillingUsageReservationRecord | null>;
   voidUsageReservation(runId: string, releasedAt: string): Promise<BillingUsageReservationRecord | null>;

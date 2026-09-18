@@ -1,7 +1,11 @@
 // Provides mail delivery adapters for auth, MFA, and invitation workflows.
 import nodemailer from "nodemailer";
 
-export type MailPurpose = "verify_email" | "reset_password" | "project_invitation";
+export type MailPurpose =
+  | "verify_email"
+  | "reset_password"
+  | "project_invitation"
+  | "admin_invitation";
 
 export type MailMessage = {
   to: string;
@@ -68,12 +72,14 @@ export function buildTokenMail({
   token,
   expiresAt,
   projectName,
+  adminRoleLabel,
 }: {
   email: string;
   purpose: MailPurpose;
   token: string;
   expiresAt: string;
   projectName?: string;
+  adminRoleLabel?: string;
 }): MailMessage {
   if (purpose === "reset_password") {
     const resetUrl = buildPublicWebUrl(
@@ -102,7 +108,23 @@ export function buildTokenMail({
       subject: `项目邀请：${projectName ?? "软件工程实践平台项目"}`,
       text: invitationUrl
         ? `你被邀请加入项目「${projectName ?? "软件工程实践平台项目"}」。\n\n请点击以下链接接受邀请：${invitationUrl}\n\n如果链接无法打开，请在注册页的邀请码中粘贴以下邀请 token：${token}\n过期时间：${expiresAt}`
-        : `你被邀请加入项目「${projectName ?? "软件工程实践平台项目"}」。请在注册页的邀请码中粘贴以下邀请 token：${token}\n过期时间：${expiresAt}`,
+      : `你被邀请加入项目「${projectName ?? "软件工程实践平台项目"}」。请在注册页的邀请码中粘贴以下邀请 token：${token}\n过期时间：${expiresAt}`,
+    };
+  }
+  if (purpose === "admin_invitation") {
+    const configured = process.env.ADMIN_PUBLIC_WEB_BASE_URL?.trim();
+    const invitationUrl = configured
+      ? `${configured.replace(/\/+$/u, "")}/admin-invitations/accept?token=${encodeURIComponent(token)}`
+      : null;
+    return {
+      to: email,
+      purpose,
+      token,
+      expiresAt,
+      subject: "UML 实验平台管理员邀请",
+      text: invitationUrl
+        ? `你被邀请成为 UML 实验平台的${adminRoleLabel ?? "管理员"}。\n\n请点击以下链接接受邀请：${invitationUrl}\n\n邀请将在 ${expiresAt} 失效。如果这不是你的预期，请忽略此邮件。`
+        : `你被邀请成为 UML 实验平台的${adminRoleLabel ?? "管理员"}。邀请 token：${token}\n过期时间：${expiresAt}`,
     };
   }
   const verificationUrl = buildPublicWebUrl(

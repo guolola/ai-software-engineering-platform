@@ -27,6 +27,7 @@ interface RunEventRow {
   run_id: string;
   sequence: number;
   payload: PersistedRunEvent;
+  created_at: Date | string;
 }
 
 type PersistedCompletedRunEvent = {
@@ -198,7 +199,7 @@ class PostgresRunRecordStore extends Map<string, RunRecord> implements Persisten
       order by created_at asc
     `);
     const events = await this.db.query<RunEventRow>(`
-      select run_id, sequence, payload
+      select run_id, sequence, payload, created_at
       from run_events
       order by run_id asc, sequence asc
     `);
@@ -254,7 +255,7 @@ class PostgresRunRecordStore extends Map<string, RunRecord> implements Persisten
     if (runIds.length === 0) return [];
     const events = await this.db.query<RunEventRow>(
       `
-        select run_id, sequence, payload
+        select run_id, sequence, payload, created_at
         from run_events
         where run_id = any($1::text[])
         order by run_id asc, sequence asc
@@ -282,6 +283,9 @@ class PostgresRunRecordStore extends Map<string, RunRecord> implements Persisten
       const events = (eventRowsByRun.get(row.id) ?? []).map((eventRow) =>
         hydratePersistedEvent(eventRow.payload, snapshot),
       );
+      const eventCreatedAt = (eventRowsByRun.get(row.id) ?? []).map(
+        (eventRow) => toIsoString(eventRow.created_at) ?? row.created_at.toString(),
+      );
       const activeStatus = isActiveStatus(row.status);
       const staleActiveWithCompletedAt = activeStatus && Boolean(row.completed_at);
       const restoredInterruptedRun =
@@ -289,6 +293,7 @@ class PostgresRunRecordStore extends Map<string, RunRecord> implements Persisten
       const record: RunRecord = {
         snapshot,
         events,
+        eventCreatedAt,
         listeners: existing?.listeners ?? new Set(),
         terminal:
           restoredInterruptedRun ||

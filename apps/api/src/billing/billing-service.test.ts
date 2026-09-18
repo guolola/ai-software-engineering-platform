@@ -262,6 +262,64 @@ test("run reservation requires a positive credit balance", async () => {
   assert.equal(creditReservation.reservation?.entitlementKind, "credit");
 });
 
+test("credit usage keeps the earliest-expiring funding source", async () => {
+  const { repository, service } = await createTestService();
+  await repository.addLedgerEntry({
+    userId: "user-expiry",
+    sourceType: "admin_adjustment",
+    sourceId: "permanent",
+    creditDelta: 2,
+    validFrom: "2026-06-01T00:00:00.000Z",
+    validUntil: null,
+    metadata: {},
+  });
+  const expiring = await repository.addLedgerEntry({
+    userId: "user-expiry",
+    sourceType: "signup_bonus",
+    sourceId: "expiring",
+    creditDelta: 1,
+    validFrom: "2026-06-01T00:00:00.000Z",
+    validUntil: "2026-06-06T00:00:00.000Z",
+    metadata: {},
+  });
+  const reservation = await service.reserveRunUsage({
+    runId: "run-expiry",
+    userId: "user-expiry",
+    projectId: "project-expiry",
+    taskType: "requirements_to_uml",
+  });
+  assert.equal(reservation.allowed, true);
+  assert.equal(reservation.reservation?.ledgerEntryId, expiring.id);
+  await service.confirmRunUsage("run-expiry");
+  const usage = (await repository.listLedgerEntriesForUser("user-expiry"))
+    .find((entry) => entry.sourceId === "run:run-expiry");
+  assert.equal(usage?.validUntil, expiring.validUntil);
+  assert.equal(usage?.metadata.fundingLedgerEntryId, expiring.id);
+});
+
+test("admin credit deduction cannot make a balance negative", async () => {
+  const { repository, service } = await createTestService();
+  await repository.addLedgerEntry({
+    userId: "user-adjustment",
+    sourceType: "admin_adjustment",
+    sourceId: "grant",
+    creditDelta: 2,
+    validFrom: "2026-06-01T00:00:00.000Z",
+    validUntil: null,
+    metadata: {},
+  });
+  await assert.rejects(
+    service.compensateCredits({
+      userId: "user-adjustment",
+      creditAmount: -3,
+      reason: "manual correction",
+      actorUserId: "admin",
+    }),
+    /cannot make the balance negative/i,
+  );
+  assert.equal((await service.getSummary("user-adjustment")).creditBalance, 2);
+});
+
 test("payment callbacks verify signatures, validate amount, and grant purchases idempotently", async () => {
   const { service } = await createTestService();
   const paid = await payOrder({

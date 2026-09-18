@@ -8,6 +8,7 @@ import type {
   RunRecord,
   RunRecordStore,
 } from "../runs/records/run-record-store.js";
+import type { RunStage, RunStatus } from "@uml-platform/contracts";
 import type { ProviderConfigStore } from "../provider-configs/provider-config-store.js";
 import { snapshotErrorMessage } from "../runs/records/admin-run-summaries.js";
 import type { AdminActor } from "../security/admin-guard.js";
@@ -173,6 +174,146 @@ function runDiagnosticSummary(record: RunRecord) {
   };
 }
 
+const RUN_STAGE_LABELS: Record<RunStage, string> = {
+  extract_rules: "提取需求规则",
+  generate_models: "生成需求模型",
+  generate_design_sequence: "规划设计序列",
+  generate_design_models: "生成设计模型",
+  generate_tests: "生成测试",
+  analyze_code_business_logic: "分析业务逻辑",
+  analyze_code_product: "分析产品结构",
+  plan_code_ui: "规划界面",
+  generate_code_ui_mockup: "生成界面原型",
+  analyze_code_ui_mockup: "分析界面原型",
+  generate_code_ui_ir: "生成界面中间表示",
+  load_web_design_skill: "加载设计技能",
+  select_code_skills: "选择代码技能",
+  plan_code_files: "规划代码文件",
+  generate_code_spec: "生成代码规格",
+  generate_code_files: "生成代码文件",
+  plan_code: "规划代码",
+  write_code_files: "写入代码文件",
+  audit_code_quality: "审查代码质量",
+  verify_code_ui_fidelity: "校验界面还原度",
+  verify_code_rendered_preview: "校验渲染预览",
+  verify_code_business_assertions: "校验业务断言",
+  verify_code_preview: "校验代码预览",
+  repair_code_files: "修复代码文件",
+  generate_document_text: "生成文档内容",
+  render_document_file: "渲染文档文件",
+  generate_plantuml: "生成 PlantUML",
+  render_svg: "渲染模型图",
+  generate_context: "生成可行性上下文",
+  render_context: "整理可行性证据",
+  generate_implementation: "生成实施方案",
+};
+
+function eventStage(event: RunRecord["events"][number]) {
+  return "stage" in event ? event.stage : null;
+}
+
+function failedEventMessage(event: RunRecord["events"][number]) {
+  const compatible = event as unknown as { message?: unknown; error?: { message?: unknown } };
+  if (typeof compatible.error?.message === "string") return compatible.error.message;
+  return typeof compatible.message === "string" ? compatible.message : "任务阶段失败";
+}
+
+function buildAdminRunStages(record: RunRecord) {
+  const timeline: Array<{
+    code: RunStage;
+    name: string;
+    status: RunStatus;
+    progress: number | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    durationMs: number | null;
+    note: string;
+  }> = [];
+  const byStage = new Map<RunStage, (typeof timeline)[number]>();
+  record.events.forEach((event, index) => {
+    const stage = eventStage(event);
+    if (!stage) return;
+    let item = byStage.get(stage);
+    const createdAt = record.eventCreatedAt?.[index] ?? null;
+    if (!item) {
+      item = {
+        code: stage,
+        name: RUN_STAGE_LABELS[stage],
+        status: "running",
+        progress: null,
+        startedAt: createdAt,
+        completedAt: null,
+        durationMs: null,
+        note: "阶段已开始",
+      };
+      const previous = timeline.at(-1);
+      if (previous && previous.status === "running") {
+        previous.status = "completed";
+        previous.completedAt = createdAt;
+      }
+      timeline.push(item);
+      byStage.set(stage, item);
+    }
+    if (event.type === "stage_progress") {
+      item.progress = event.progress;
+      if (event.message) item.note = event.message;
+      if (event.subtaskStatus === "failed") item.status = "failed";
+    } else if (event.type === "artifact_ready") {
+      item.note = "阶段产物已生成";
+    } else if (event.type === "failed") {
+      item.status = "failed";
+      item.note = failedEventMessage(event);
+      item.completedAt = createdAt;
+    } else if (event.type === "cancelled") {
+      item.status = "cancelled";
+      item.note = event.message;
+      item.completedAt = createdAt;
+    }
+  });
+  const last = timeline.at(-1);
+  if (last) {
+    if (record.snapshot.status === "completed") last.status = "completed";
+    if (record.snapshot.status === "failed") last.status = "failed";
+    if (record.snapshot.status === "cancelled") last.status = "cancelled";
+    if (last.status !== "running") last.completedAt ??= record.metadata?.completedAt ?? null;
+  } else if (record.snapshot.currentStage) {
+    timeline.push({
+      code: record.snapshot.currentStage,
+      name: RUN_STAGE_LABELS[record.snapshot.currentStage],
+      status: record.snapshot.status,
+      progress: null,
+      startedAt: null,
+      completedAt: record.metadata?.completedAt ?? null,
+      durationMs: null,
+      note: "历史任务未保留阶段事件时间",
+    });
+  }
+  for (const item of timeline) {
+    const start = item.startedAt ? Date.parse(item.startedAt) : Number.NaN;
+    const end = item.completedAt ? Date.parse(item.completedAt) : Number.NaN;
+    item.durationMs = Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : null;
+  }
+  return timeline;
+}
+
+function buildAdminDiagnosticEvents(record: RunRecord) {
+  return record.events
+    .map((event, index) => ({ event, createdAt: record.eventCreatedAt?.[index] ?? null }))
+    .filter(({ event }) => event.type !== "llm_chunk" && event.type !== "code_file_changed")
+    .map(({ event, createdAt }) => ({
+      type: event.type,
+      stage: eventStage(event),
+      message:
+        event.type === "stage_progress" || event.type === "cancelled"
+          ? event.message ?? null
+          : event.type === "failed"
+            ? failedEventMessage(event)
+            : null,
+      action: event.type === "run_action" ? event.action : null,
+      createdAt,
+    }));
+}
+
 async function getReadableAdminRunRecord({
   academicStore,
   authStore,
@@ -224,8 +365,8 @@ export async function getAdminRunDetail(input: AdminRunReadInput & { runId: stri
         metadata: run.metadata ?? null,
         terminal: run.terminal,
         diagnostics: runDiagnosticSummary(run),
-        snapshot: run.snapshot,
-        events: run.events,
+        stages: buildAdminRunStages(run),
+        events: buildAdminDiagnosticEvents(run),
       },
     },
   };
