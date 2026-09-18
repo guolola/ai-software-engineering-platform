@@ -10,7 +10,9 @@ import type {
 } from "../runs/records/run-record-store.js";
 import type { RunStage, RunStatus } from "@uml-platform/contracts";
 import type { ProviderConfigStore } from "../provider-configs/provider-config-store.js";
+import type { RenderClient } from "../adapters/render/render-client.js";
 import { snapshotErrorMessage } from "../runs/records/admin-run-summaries.js";
+import { ensureAdminRunSvgPreviews } from "./admin-run-artifact-preview.js";
 import type { AdminActor } from "../security/admin-guard.js";
 import {
   canSeeProjectByScope,
@@ -24,6 +26,7 @@ type AdminRunReadInput = {
   actor: AdminActor;
   runs: RunRecordStore;
   providerConfigs?: ProviderConfigStore;
+  renderClient?: RenderClient;
 };
 
 function compareRunsNewestFirst(left: RunRecord, right: RunRecord) {
@@ -349,15 +352,30 @@ export async function getAdminRunDetail(input: AdminRunReadInput & { runId: stri
   }
 
   const run = access.record;
+  const previewFailures = input.renderClient
+    ? await ensureAdminRunSvgPreviews(run, input.renderClient)
+    : [];
+  const runDto = await buildAdminRunDto(run, input.authStore, {
+    includeArtifactPreviews: true,
+    providerConfigs: input.providerConfigs,
+  });
+  for (const failure of previewFailures) {
+    const item = runDto.artifactItems.find((candidate) =>
+      failure.modelId
+        ? candidate.modelId === failure.modelId
+        : candidate.diagramKind === failure.diagramKind && !candidate.previewAvailable
+    );
+    if (item) {
+      item.previewState = "failed";
+      item.previewError = failure.message;
+    }
+  }
   return {
     statusCode: 200,
     body: {
       generatedAt: new Date().toISOString(),
       run: {
-        ...(await buildAdminRunDto(run, input.authStore, {
-          includeArtifactPreviews: true,
-          providerConfigs: input.providerConfigs,
-        })),
+        ...runDto,
         id: run.snapshot.runId,
         status: run.snapshot.status,
         currentStage: run.snapshot.currentStage,

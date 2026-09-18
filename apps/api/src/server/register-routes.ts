@@ -283,6 +283,7 @@ export function registerApiRoutes({
     analyticsStore,
     mailAdapter,
     databaseProbe,
+    renderClient,
   });
   registerDocumentRoutes({
     app,

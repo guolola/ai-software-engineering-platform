@@ -63,6 +63,8 @@ export type AdminRunArtifactItem = {
   sourceLength?: number;
   renderMeta?: unknown;
   previewAvailable: boolean;
+  previewState?: "ready" | "renderable" | "unavailable" | "failed";
+  previewError?: string;
   preview?: {
     kind: "svg";
     svg: string;
@@ -275,17 +277,40 @@ export function buildRunArtifactItems(
     });
   }
 
+  type DiagramArtifact = Omit<AdminRunArtifactItem, "id" | "previewAvailable"> & {
+    key: string;
+    previewAvailable?: boolean;
+  };
+  const diagrams = new Map<string, DiagramArtifact>();
+  const diagramKey = (record: Record<string, unknown>, index: number) => {
+    const diagramKind = typeof record.diagramKind === "string" ? record.diagramKind : "diagram";
+    return String(stringOrNumber(record.modelId) ?? stringOrNumber(record.id) ?? `${diagramKind}:${index}`);
+  };
+  const mergeDiagram = (key: string, value: Partial<DiagramArtifact>) => {
+    const existing = diagrams.get(key);
+    diagrams.set(key, {
+      key,
+      type: existing?.type ?? (taskType === "design_modeling" ? "设计模型" : "UML 模型"),
+      title: existing?.title ?? "模型图",
+      ...existing,
+      ...value,
+    });
+  };
+
   for (const [index, model] of (Array.isArray(source.models) ? source.models : []).entries()) {
     const record = asRecord(model);
     const diagramKind = typeof record.diagramKind === "string" ? record.diagramKind : undefined;
     const type = taskType === "design_modeling" ? "设计模型" : "UML 模型";
-    add({
-      key: stringOrNumber(record.id) ?? stringOrNumber(record.modelId) ?? diagramKind ?? index,
+    const modelId = typeof record.modelId === "string"
+      ? record.modelId
+      : typeof record.id === "string"
+        ? record.id
+        : undefined;
+    mergeDiagram(diagramKey(record, index), {
       type,
       title: typeof record.title === "string" ? record.title : `${diagramKindLabel(diagramKind)}模型`,
       diagramKind,
-      modelId: typeof record.modelId === "string" ? record.modelId : typeof record.id === "string" ? record.id : undefined,
-      previewAvailable: false,
+      modelId,
     });
   }
 
@@ -294,14 +319,11 @@ export function buildRunArtifactItems(
     const diagramKind = typeof record.diagramKind === "string" ? record.diagramKind : undefined;
     const modelId = typeof record.modelId === "string" ? record.modelId : undefined;
     const plantUmlSource = typeof record.source === "string" ? record.source : "";
-    add({
-      key: `${diagramKind ?? index}:${modelId ?? index}`,
-      type: "PlantUML",
-      title: `${diagramKindLabel(diagramKind)} PlantUML`,
+    mergeDiagram(diagramKey(record, index), {
+      title: diagrams.get(diagramKey(record, index))?.title ?? `${diagramKindLabel(diagramKind)}模型图`,
       diagramKind,
       modelId,
       sourceLength: plantUmlSource.length || undefined,
-      previewAvailable: false,
     });
   }
 
@@ -311,10 +333,8 @@ export function buildRunArtifactItems(
     const modelId = typeof record.modelId === "string" ? record.modelId : undefined;
     const svg = typeof record.svg === "string" ? record.svg : "";
     const renderMeta = record.renderMeta;
-    add({
-      key: `${diagramKind ?? index}:${modelId ?? index}`,
-      type: "SVG/PNG",
-      title: `${diagramKindLabel(diagramKind)}模型图`,
+    mergeDiagram(diagramKey(record, index), {
+      title: diagrams.get(diagramKey(record, index))?.title ?? `${diagramKindLabel(diagramKind)}模型图`,
       diagramKind,
       modelId,
       renderMeta,
@@ -322,6 +342,20 @@ export function buildRunArtifactItems(
       preview: options.includePreviews && svg
         ? { kind: "svg", svg, renderMeta }
         : undefined,
+    });
+  }
+
+  for (const diagram of diagrams.values()) {
+    const { key, ...item } = diagram;
+    add({
+      key,
+      ...item,
+      previewAvailable: Boolean(item.previewAvailable),
+      previewState: item.previewAvailable
+        ? "ready"
+        : item.sourceLength
+          ? "renderable"
+          : "unavailable",
     });
   }
 

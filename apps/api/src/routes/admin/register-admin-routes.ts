@@ -39,6 +39,7 @@ import {
   readSessionCookie,
 } from "../../auth/session-cookie.js";
 import type { RunRecordStore } from "../../runs/records/run-record-store.js";
+import type { RenderClient } from "../../adapters/render/render-client.js";
 import { buildOrganizationUnits } from "../../admin/admin-route-presenters.js";
 import { requireHighRiskAdmin } from "../../admin/admin-route-security.js";
 import {
@@ -301,6 +302,7 @@ export function registerAdminRoutes({
   analyticsStore,
   mailAdapter = createMailAdapterFromEnv(),
   databaseProbe,
+  renderClient,
 }: {
   app: FastifyInstance;
   authStore: AuthStore;
@@ -317,6 +319,7 @@ export function registerAdminRoutes({
   analyticsStore: AdminAnalyticsStore;
   mailAdapter?: MailAdapter;
   databaseProbe?: () => Promise<void>;
+  renderClient?: RenderClient;
 }) {
   const rateLimitPolicyStore =
     createRateLimitPolicyStoreWithFallback(providerUsageTracker);
@@ -1240,6 +1243,7 @@ export function registerAdminRoutes({
       actor,
       runs,
       providerConfigs,
+      renderClient,
       runId: id,
     });
     reply.code(result.statusCode);

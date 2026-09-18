@@ -241,6 +241,7 @@ async function createAdminRouteTestApp({
   documentLibrary = {} as DocumentLibrary,
   llmScheduler,
   startRunPipeline,
+  renderClient,
 }: {
   providerUsageTracker?: ProviderUsageTracker;
   riskEvents?: () => AdminRiskEvent[];
@@ -248,6 +249,7 @@ async function createAdminRouteTestApp({
   documentLibrary?: DocumentLibrary;
   llmScheduler?: Parameters<typeof registerAdminRoutes>[0]["llmScheduler"];
   startRunPipeline?: Parameters<typeof registerAdminRoutes>[0]["startRunPipeline"];
+  renderClient?: Parameters<typeof registerAdminRoutes>[0]["renderClient"];
 } = {}) {
   const app = Fastify({ logger: false });
   const authStore = createInMemoryAuthStore();
@@ -271,6 +273,7 @@ async function createAdminRouteTestApp({
     providerUsageTracker,
     llmScheduler,
     startRunPipeline,
+    renderClient,
     riskEvents,
   });
   return {
@@ -2286,12 +2289,95 @@ test("admin run detail endpoint exposes readable run metadata and artifact summa
   assert.ok(
     detail.json().run.artifactItems.some(
       (item: { type: string; preview?: { svg?: string } }) =>
-        item.type === "SVG/PNG" && item.preview?.svg === "<svg><text>登录用例</text></svg>",
+        item.type === "UML 模型" && item.preview?.svg === "<svg><text>登录用例</text></svg>",
     ),
   );
   assert.equal(detail.json().run.diagnostics.eventCount, 3);
   assert.equal(detail.json().run.diagnostics.errorMessage, "LLM failed");
   assert.equal(auditorDetail.statusCode, 200);
+
+  await app.close();
+});
+
+test("admin run detail restores and persists missing historical SVG previews", async () => {
+  const runs = createRunRecordStore();
+  let renderCalls = 0;
+  const { app, authStore, cookie } = await createAdminRouteTestApp({
+    runs,
+    renderClient: async (artifact) => {
+      renderCalls += 1;
+      return {
+        svg: `<svg><text>${artifact.modelId}</text></svg>`,
+        renderMeta: {
+          engine: "plantuml",
+          generatedAt: "2026-09-18T00:00:00.000Z",
+          sourceLength: artifact.source.length,
+          durationMs: 18,
+        },
+      };
+    },
+  });
+  const owner = authStore.createUser({
+    email: "history-owner@example.com",
+    displayName: "历史任务用户",
+    passwordHash: hashPassword("password-123"),
+  });
+  assert.ok(owner);
+  const { project } = authStore.createProject({
+    ownerUserId: owner.id,
+    name: "历史任务项目",
+    description: "历史模型图补画",
+    visibility: "private",
+  });
+  putRunRecord(runs, {
+    runId: "run-history-preview",
+    projectId: project.id,
+    userId: owner.id,
+    status: "completed",
+    terminal: true,
+    completedAt: "2026-05-22T00:01:00.000Z",
+  });
+  const record = runs.get("run-history-preview");
+  assert.ok(record);
+  record.snapshot.models.push({
+    modelId: "usecase:history",
+    diagramKind: "usecase",
+    title: "历史用例模型",
+    summary: "历史模型",
+    notes: [],
+    actors: [],
+    useCases: [],
+    relationships: [],
+  });
+  record.snapshot.plantUml.push({
+    modelId: "usecase:history",
+    diagramKind: "usecase",
+    source: "@startuml\n@enduml",
+  });
+  let persistCalls = 0;
+  record.persist = async () => {
+    persistCalls += 1;
+  };
+
+  const detail = await app.inject({
+    method: "GET",
+    url: "/api/admin/runs/run-history-preview",
+    headers: { cookie },
+  });
+  const secondDetail = await app.inject({
+    method: "GET",
+    url: "/api/admin/runs/run-history-preview",
+    headers: { cookie },
+  });
+
+  assert.equal(detail.statusCode, 200);
+  assert.equal(secondDetail.statusCode, 200);
+  assert.equal(renderCalls, 1);
+  assert.equal(persistCalls, 1);
+  assert.equal(detail.json().run.artifactItems.length, 1);
+  assert.equal(detail.json().run.artifactItems[0].title, "历史用例模型");
+  assert.equal(detail.json().run.artifactItems[0].previewState, "ready");
+  assert.match(detail.json().run.artifactItems[0].preview.svg, /usecase:history/);
 
   await app.close();
 });
@@ -2443,7 +2529,7 @@ test("admin run list classifies run kinds and returns readable summaries", async
     assert.equal(run.durationMs, 5_000);
     assert.equal(run.artifactSummary.title, expectedTitle);
     if (snapshot.runId === "run-req" || snapshot.runId === "run-design") {
-      assert.ok(run.artifactItems.some((item) => item.type === "SVG/PNG" && item.previewAvailable));
+      assert.ok(run.artifactItems.some((item) => /模型/.test(item.type) && item.previewAvailable));
       assert.ok(run.artifactItems.every((item) => !item.preview));
     }
   }
