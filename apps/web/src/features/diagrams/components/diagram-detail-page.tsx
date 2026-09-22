@@ -12,7 +12,7 @@ import {
   diagramModelSpecSchema,
   type ContextDiagramSpec,
 } from "@uml-platform/contracts";
-import { toast } from "sonner";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
 import {
   AlertTriangle,
   Search,
@@ -39,6 +39,7 @@ import { useWorkspaceShell } from "../../workspace-shell/state";
 import { useCompactViewport } from "../../workspace-shell/hooks/use-compact-viewport";
 import { useSvgPanZoom } from "../hooks/use-svg-pan-zoom";
 import { mobileTouchTargetClass } from "../../workspace-shell/components/mobile-density";
+import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 import { useWorkspaceSession } from "../../workspace-session/state";
 import {
   buildDiagramDetailModel,
@@ -330,10 +331,10 @@ function DiagramDetailView({
       }
       persistedDraftFingerprintRef.current = draftFingerprint(canonicalDraft);
       setSaveStatus("saved");
-      toast.message(t("diagrams.detail.savedToast"));
+      floatingAlert.message(t("diagrams.detail.savedToast"));
     } catch {
       setSaveStatus("error");
-      toast.error(t("diagrams.detail.saveFailedToast"));
+      floatingAlert.error(t("diagrams.detail.saveFailedToast"));
       return;
     } finally {
       setSaving(false);
@@ -560,7 +561,10 @@ function DiagramDetailView({
                   {t("diagrams.detail.generatedFailed", { label: metaLabel })}
                 </div>
                 <div className="mt-2 leading-relaxed text-foreground">
-                  {diagramError.error.message}
+                  {localizeRunFailure(
+                    diagramError.error,
+                    t("errors.codes.RUN_INTERNAL_ERROR"),
+                  )}
                 </div>
               </Card>
             ) : (

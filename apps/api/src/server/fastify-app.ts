@@ -94,10 +94,15 @@ export async function createConfiguredFastifyApp() {
       typeof nestedError === "object" &&
       nestedError !== null &&
       typeof (nestedError as Record<string, unknown>).code === "string";
-    if (hasStructuredError || (
+    if (hasStructuredError) {
+      return typeof candidate.requestId === "string"
+        ? payload
+        : { ...candidate, requestId: request.id };
+    }
+    if (
       typeof candidate.message !== "string" &&
       typeof nestedError !== "string"
-    )) {
+    ) {
       return payload;
     }
     // Legacy routes may still construct `{ message }`; normalize them at the boundary

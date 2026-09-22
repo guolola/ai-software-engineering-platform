@@ -1003,7 +1003,8 @@ test("requirement rule repair rejects invalid model output without mutating base
   });
 
   assert.equal(response.statusCode, 422);
-  assert.match(response.json().message, /智能修复失败/);
+  assert.equal(response.json().error.code, "RUN_STRUCTURED_OUTPUT_INVALID");
+  assert.equal("rawOutput" in response.json(), false);
 });
 
 test("project run snapshots reject unauthenticated and cross-project users", async () => {
@@ -1496,7 +1497,7 @@ test("project run rejects missing personal provider settings instead of using pr
   });
 
   assert.equal(response.statusCode, 400);
-  assert.match(response.json().message, /admin-managed provider config/i);
+  assert.equal(response.json().error.code, "PROVIDER_CONFIG_INVALID");
   assert.equal(resolvedProviderSettings, null);
   assert.equal(Array.from(runs.values()).length, 0);
 
@@ -1593,7 +1594,7 @@ test("project run starts reject managed provider models not allowed by the confi
   });
 
   assert.equal(response.statusCode, 400);
-  assert.match(response.body, /model/i);
+  assert.equal(response.json().error.code, "PROVIDER_CONFIG_INVALID");
   assert.equal(pipelineCalls, 0);
 
   await app.close();
@@ -2263,7 +2264,7 @@ test("deleted project document disables source run history download even when ru
   assert.equal(detail.json().run.documentDownloadAvailable, false);
   assert.equal(detail.json().run.documentStatus, "deleted");
   assert.equal(download.statusCode, 409);
-  assert.match(download.json().message, /deleted/u);
+  assert.equal(download.json().error.code, "DOCUMENT_RESTORE_REQUIRED");
   assert.equal(bufferLookups, 0);
 
   await app.close();
@@ -2426,7 +2427,7 @@ test("failed document runs with saved artifacts are not exposed as completed dow
   assert.equal(history.json().runs[0].status, "failed");
   assert.equal(history.json().runs[0].documentDownloadAvailable, false);
   assert.equal(download.statusCode, 409);
-  assert.match(download.json().message, /not completed successfully/);
+  assert.equal(download.json().error.code, "DOCUMENT_RUN_NOT_COMPLETED");
 
   await app.close();
 });
@@ -2689,7 +2690,7 @@ test("project run history clear rejects active project records without deleting 
   });
 
   assert.equal(clearResponse.statusCode, 409);
-  assert.deepEqual(clearResponse.json().activeRunIds, [activeRunId]);
+  assert.deepEqual(clearResponse.json().error.details.activeRunIds, [activeRunId]);
   assert.deepEqual(
     history.json().runs.map((run: { runId: string }) => run.runId).sort(),
     [activeRunId, "run-terminal"].sort(),
@@ -2875,8 +2876,8 @@ test("project design start command rejects stale requirement model sources befor
   });
 
   assert.equal(response.statusCode, 409);
-  assert.match(response.json().message, /Requirement models are stale/u);
-  assert.match(response.json().message, /usecase/u);
+  assert.equal(response.json().error.code, "REQUIREMENT_MODELS_STALE");
+  assert.deepEqual(response.json().error.details.diagramKinds, ["usecase"]);
   assert.equal(runs.size, 0);
 
   await app.close();
@@ -2973,8 +2974,9 @@ test("project start commands reject pending requirement review candidates before
       payload: request.payload,
     });
     assert.equal(response.statusCode, 409, response.body);
-    assert.match(response.json().message, /请先确认需求规则修复结果/u);
-    assert.match(response.json().message, /REQ-001/u);
+    assert.equal(response.json().error.code, "REQUIREMENT_REVIEWS_PENDING");
+    assert.equal(response.json().error.params.count, 1);
+    assert.deepEqual(response.json().error.details.ruleIds, ["REQ-001"]);
   }
   assert.equal(runs.size, 0);
 
@@ -2994,7 +2996,7 @@ test("project-scoped generation commands reject incomplete workspace state befor
         projectId: "project-a",
         selectedDiagrams: ["usecase"],
       },
-      message: /需求源为空/u,
+      code: "REQUIREMENT_SOURCE_MISSING",
     },
     {
       label: "design without requirement traceability",
@@ -3007,7 +3009,7 @@ test("project-scoped generation commands reject incomplete workspace state befor
         projectId: "project-a",
         selectedDiagrams: ["sequence"],
       },
-      message: /需求模型缺少元素级映射/u,
+      code: "REQUIREMENT_TRACEABILITY_MISSING",
     },
     {
       label: "code without design models",
@@ -3023,7 +3025,7 @@ test("project-scoped generation commands reject incomplete workspace state befor
         projectId: "project-a",
         generationMode: "continue",
       },
-      message: /缺少设计模型/u,
+      code: "DESIGN_MODELS_MISSING",
     },
     {
       label: "code with generated design missing metadata",
@@ -3037,7 +3039,7 @@ test("project-scoped generation commands reject incomplete workspace state befor
         projectId: "project-a",
         generationMode: "continue",
       },
-      message: /设计模型已生成但链路元数据不完整/u,
+      code: "DESIGN_MODELS_INVALID",
     },
     {
       label: "requirements spec without requirement PlantUML",
@@ -3051,7 +3053,7 @@ test("project-scoped generation commands reject incomplete workspace state befor
         documentKind: "requirementsSpec",
         useAiText: false,
       },
-      message: /需求模型缺少 PlantUML/u,
+      code: "REQUIREMENT_PLANTUML_MISSING",
     },
   ];
 
@@ -3077,7 +3079,7 @@ test("project-scoped generation commands reject incomplete workspace state befor
     });
 
     assert.equal(response.statusCode, 409, entry.label);
-    assert.match(response.json().message, entry.message);
+    assert.equal(response.json().error.code, entry.code, entry.label);
     assert.equal(runs.size, 0, entry.label);
 
     await app.close();
@@ -3458,7 +3460,7 @@ test("project software design document command rejects incomplete design chain m
   });
 
   assert.equal(response.statusCode, 409, response.body);
-  assert.match(response.json().message, /完整且新鲜的设计链路/);
+  assert.equal(response.json().error.code, "DESIGN_MODELS_INVALID");
   assert.equal(documentPipelineCalled, false);
 
   await app.close();
@@ -3755,7 +3757,7 @@ test("project start commands reject missing workspace generation context before 
   });
 
   assert.equal(response.statusCode, 409);
-  assert.match(response.json().message, /缺少需求模型/);
+  assert.equal(response.json().error.code, "REQUIREMENT_MODELS_MISSING");
 
   await app.close();
 });
@@ -3864,6 +3866,12 @@ test("project run history supports detail and status filters for authorized memb
       diagramId: "class",
       stage: "render_svg",
       message: "PlantUML repair failed for class",
+      error: {
+        code: "RUN_RENDER_FAILED",
+        message: "PlantUML repair failed for class",
+        category: "external",
+        retryable: true,
+      },
     },
   ]);
   assert.equal(history.json().runs[0].partialFailure, true);
@@ -4162,10 +4170,7 @@ test("blocked requirement baseline no longer blocks design or code starts but st
   });
 
   assert.equal(documentResponse.statusCode, 409);
-  assert.match(
-    documentResponse.json().message,
-    /RequirementBaseline blocked downstream generation/u,
-  );
+  assert.equal(documentResponse.json().error.code, "REQUIREMENT_BASELINE_BLOCKED");
   assert.equal(runs.size, 2);
 
   await app.close();

@@ -1,7 +1,7 @@
 // Provides run history list, restore, delete, clear, and save actions for the session provider.
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
 import type { WorkspaceRecord } from "../../../entities/workspace/model";
 import type {
   RunHistoryItem,
@@ -65,7 +65,7 @@ export function useRunHistoryActions({
         setHistoryItems(await repository.listRunHistory());
       } catch (error) {
         console.warn("Failed to save run history snapshot", error);
-        toast.message(t("historyDrawer.snapshotSkipped"));
+        floatingAlert.message(t("historyDrawer.snapshotSkipped"));
         try {
           setHistoryItems(await repository.listRunHistory());
         } catch {

@@ -2,6 +2,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import {
+  apiErrorResponseSchema,
   codeRunSnapshotSchema,
   documentRunSnapshotSchema,
   designRunSnapshotSchema,
@@ -55,6 +56,7 @@ import {
 import { registerRunEventsRoute } from "../../runs/records/run-events.js";
 import { assertRequirementBaselineAllowsDownstream } from "../../runs/baselines/requirement-baseline.js";
 import { stageProgressValue } from "../../runs/pipelines/shared/pipeline-events.js";
+import { normalizeRunError } from "../../runs/pipelines/shared/errors.js";
 import {
   handleRunPipelineError,
   startRunRecordPipeline,
@@ -141,6 +143,61 @@ function isActiveRunRecord(record: RunRecord) {
 function documentWorkspaceIdForRun(record: RunRecord) {
   const projectId = record.metadata?.projectId;
   return projectId ? projectDocumentWorkspaceId(projectId) : null;
+}
+
+function unresolvedProviderSettingsResponse(reply: FastifyReply) {
+  const statusCode = reply.statusCode;
+  const code = statusCode === 401
+    ? "AUTHENTICATION_REQUIRED"
+    : statusCode === 503
+      ? "PROVIDER_CIRCUIT_OPEN"
+      : statusCode >= 500
+        ? "INTERNAL_ERROR"
+        : "PROVIDER_CONFIG_INVALID";
+  return apiErrorResponseSchema.parse({
+    error: {
+      code,
+      category: statusCode === 401
+        ? "authentication"
+        : statusCode >= 500 && statusCode !== 503
+          ? "internal"
+          : "provider",
+      retryable: statusCode >= 500 && statusCode !== 503,
+    },
+  });
+}
+
+function requirementRepairFailure(error: unknown) {
+  const runError = normalizeRunError(error);
+  const statusCode = runError.code === "PLATFORM_PROVIDER_RATE_LIMITED"
+    ? 429
+    : runError.code === "PLATFORM_PROVIDER_TIMEOUT"
+      ? 504
+      : runError.category === "platform_provider"
+        ? 502
+        : runError.code === "RUN_STRUCTURED_OUTPUT_INVALID" || runError.code === "RUN_MODEL_OUTPUT_EMPTY"
+          ? 422
+          : 500;
+  return {
+    code: runError.code,
+    safeMessage: runError.code === "PLATFORM_PROVIDER_AUTH_FAILED"
+      ? "模型供应商鉴权失败，无法完成当前规则修复。"
+      : runError.code === "PLATFORM_PROVIDER_RATE_LIMITED"
+        ? "模型供应商请求过于频繁，请稍后重新修复。"
+        : runError.code === "PLATFORM_PROVIDER_TIMEOUT"
+          ? "模型供应商响应超时，请稍后重新修复。"
+          : runError.code === "PLATFORM_PROVIDER_UNAVAILABLE"
+            ? "模型供应商暂时不可用，请稍后重新修复。"
+            : "模型返回的修复结果不完整或格式无效，请重新修复。",
+    statusCode,
+    response: apiErrorResponseSchema.parse({
+      error: {
+        code: runError.code,
+        category: runError.category === "platform_provider" ? "provider" : "internal",
+        retryable: runError.retryable,
+      },
+    }),
+  };
 }
 
 async function currentDocumentForRun(
@@ -356,14 +413,15 @@ export function registerRunRoutes({
     try {
       assertRequirementBaselineAllowsDownstream(baseline);
       return null;
-    } catch (error) {
+    } catch {
       reply.code(409);
-      return {
-        message:
-          error instanceof Error
-            ? error.message
-            : "RequirementBaseline blocked downstream generation",
-      };
+      return apiErrorResponseSchema.parse({
+        error: {
+          code: "REQUIREMENT_BASELINE_BLOCKED",
+          category: "conflict",
+          retryable: false,
+        },
+      });
     }
   };
 
@@ -387,9 +445,7 @@ export function registerRunRoutes({
       reply,
     });
     if (!providerSettings) {
-      return {
-        message: "Runs must use an admin-managed provider config with an allowed model.",
-      };
+      return unresolvedProviderSettingsResponse(reply);
     }
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
@@ -424,14 +480,13 @@ export function registerRunRoutes({
       });
       return result;
     } catch (error) {
-      reply.code(422);
-      return {
-        message:
-          error instanceof Error
-            ? `智能修复失败：${error.message}`
-            : "智能修复失败：模型返回内容无法解析",
-        rawOutput,
-      };
+      const failure = requirementRepairFailure(error);
+      request.log.warn(
+        { errorCode: failure.code },
+        "Requirement rule repair failed",
+      );
+      reply.code(failure.statusCode);
+      return failure.response;
     }
   });
 
@@ -455,10 +510,7 @@ export function registerRunRoutes({
       reply,
     });
     if (!providerSettings) {
-      return {
-        message:
-          "Runs must use an admin-managed provider config with an allowed model.",
-      };
+      return unresolvedProviderSettingsResponse(reply);
     }
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
@@ -531,10 +583,14 @@ export function registerRunRoutes({
             ...singleResult,
           });
         } catch (error) {
+          const repairFailure = requirementRepairFailure(error);
+          request.log.warn(
+            { errorCode: repairFailure.code, ruleId: failure.ruleId },
+            "Single-rule repair fallback failed",
+          );
           remainingFailures.push({
             ruleId: failure.ruleId,
-            errorMessage:
-              error instanceof Error ? error.message : String(error),
+            errorMessage: repairFailure.safeMessage,
           });
         }
       }
@@ -548,14 +604,13 @@ export function registerRunRoutes({
       });
       return result;
     } catch (error) {
-      reply.code(422);
-      return {
-        message:
-          error instanceof Error
-            ? `批量智能修复失败：${error.message}`
-            : "批量智能修复失败：模型返回内容无法解析",
-        rawOutput,
-      };
+      const failure = requirementRepairFailure(error);
+      request.log.warn(
+        { errorCode: failure.code },
+        "Requirement rule batch repair failed",
+      );
+      reply.code(failure.statusCode);
+      return failure.response;
     }
   });
 
@@ -615,9 +670,7 @@ export function registerRunRoutes({
       reply,
     });
     if (!providerSettings) {
-      return {
-        message: "Runs must use an admin-managed provider config with an allowed model.",
-      };
+      return unresolvedProviderSettingsResponse(reply);
     }
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
@@ -750,9 +803,7 @@ export function registerRunRoutes({
       reply,
     });
     if (!providerSettings) {
-      return {
-        message: "Runs must use an admin-managed provider config with an allowed model.",
-      };
+      return unresolvedProviderSettingsResponse(reply);
     }
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
@@ -872,9 +923,7 @@ export function registerRunRoutes({
       reply,
     });
     if (!providerSettings) {
-      return {
-        message: "Runs must use an admin-managed provider config with an allowed model.",
-      };
+      return unresolvedProviderSettingsResponse(reply);
     }
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
@@ -1028,9 +1077,7 @@ export function registerRunRoutes({
       reply,
     });
     if (!providerSettings) {
-      return {
-        message: "Runs must use an admin-managed provider config with an allowed model.",
-      };
+      return unresolvedProviderSettingsResponse(reply);
     }
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
@@ -1061,11 +1108,15 @@ export function registerRunRoutes({
     });
     if (input.documentKind === "requirementsSpec" && input.requirementModels.length === 0) {
       reply.code(400);
-      return { message: "请先在需求模型页生成需求模型，再导出需求规格说明书" };
+      return apiErrorResponseSchema.parse({
+        error: { code: "REQUIREMENT_MODELS_MISSING", category: "conflict", retryable: false },
+      });
     }
     if (input.documentKind === "softwareDesignSpec" && input.designModels.length === 0) {
       reply.code(400);
-      return { message: "请先在设计模型页生成设计模型，再导出软件设计说明书" };
+      return apiErrorResponseSchema.parse({
+        error: { code: "DESIGN_MODELS_MISSING", category: "conflict", retryable: false },
+      });
     }
     const runId = randomUUID();
     const runBillingEntitlements = await billingEntitlementsForProvider({
@@ -1156,7 +1207,9 @@ export function registerRunRoutes({
     const record = await refreshRunRecordIfAvailable(runs, runId);
     if (!record || record.metadata?.projectId !== projectId) {
       reply.code(404);
-      return { message: "Run not found" };
+      return apiErrorResponseSchema.parse({
+        error: { code: "RUN_NOT_FOUND", category: "not_found", retryable: false },
+      });
     }
 
     const includeEvents = queryValue(request.query, "includeEvents") === "true";
@@ -1192,10 +1245,15 @@ export function registerRunRoutes({
       .map(([runId]) => runId);
     if (activeRunIds.length > 0) {
       reply.code(409);
-      return {
-        message: "Active runs cannot be deleted",
-        activeRunIds,
-      };
+      return apiErrorResponseSchema.parse({
+        error: {
+          code: "RUN_ACTIVE_DELETE_CONFLICT",
+          category: "conflict",
+          retryable: false,
+          params: { count: activeRunIds.length },
+          details: { activeRunIds },
+        },
+      });
     }
 
     const deletedRunIds = projectRecords.map(([runId]) => runId);
@@ -1226,11 +1284,20 @@ export function registerRunRoutes({
     const record = await refreshRunRecordIfAvailable(runs, runId);
     if (!record || record.metadata?.projectId !== projectId) {
       reply.code(404);
-      return { message: "Run not found" };
+      return apiErrorResponseSchema.parse({
+        error: { code: "RUN_NOT_FOUND", category: "not_found", retryable: false },
+      });
     }
     if (isActiveRunRecord(record)) {
       reply.code(409);
-      return { message: "Active runs cannot be deleted" };
+      return apiErrorResponseSchema.parse({
+        error: {
+          code: "RUN_ACTIVE_DELETE_CONFLICT",
+          category: "conflict",
+          retryable: false,
+          params: { count: 1 },
+        },
+      });
     }
 
     runs.delete(runId);
@@ -1255,11 +1322,19 @@ export function registerRunRoutes({
     const record = await refreshRunRecordIfAvailable(runs, runId);
     if (!record || record.metadata?.projectId !== projectId) {
       reply.code(404);
-      return { message: "Run not found" };
+      return apiErrorResponseSchema.parse({
+        error: { code: "RUN_NOT_FOUND", category: "not_found", retryable: false },
+      });
     }
     if (record.terminal) {
       reply.code(409);
-      return { message: "Terminal runs cannot be cancelled again" };
+      return apiErrorResponseSchema.parse({
+        error: {
+          code: "RUN_ALREADY_TERMINAL",
+          category: "conflict",
+          retryable: false,
+        },
+      });
     }
 
     llmScheduler?.cancelRun(runId);
@@ -1337,7 +1412,9 @@ export function registerRunRoutes({
     const record = await refreshRunRecordIfAvailable(runs, runId);
     if (!record) {
       reply.code(404);
-      return { message: RUN_ROUTE_CONFIG.requirements.notFoundMessage };
+      return apiErrorResponseSchema.parse({
+        error: { code: "RUN_NOT_FOUND", category: "not_found", retryable: false },
+      });
     }
     if (!(await canReadRunRecord(request, reply, record, runAccessGuard, "view_runs"))) {
       return reply;
@@ -1350,7 +1427,9 @@ export function registerRunRoutes({
     const record = await refreshRunRecordIfAvailable(runs, runId);
     if (!record) {
       reply.code(404);
-      return { message: RUN_ROUTE_CONFIG.design.notFoundMessage };
+      return apiErrorResponseSchema.parse({
+        error: { code: "RUN_NOT_FOUND", category: "not_found", retryable: false },
+      });
     }
     if (!(await canReadRunRecord(request, reply, record, runAccessGuard, "view_runs"))) {
       return reply;
@@ -1363,9 +1442,9 @@ export function registerRunRoutes({
     const record = await refreshRunRecordIfAvailable(runs, runId);
     if (!record) {
       reply.code(404);
-      return {
-        message: RUN_ROUTE_CONFIG.code.lostSnapshotMessage,
-      };
+      return apiErrorResponseSchema.parse({
+        error: { code: "RUN_NOT_FOUND", category: "not_found", retryable: false },
+      });
     }
     if (!(await canReadRunRecord(request, reply, record, runAccessGuard, "view_runs"))) {
       return reply;
@@ -1378,7 +1457,9 @@ export function registerRunRoutes({
     const record = await refreshRunRecordIfAvailable(runs, runId);
     if (!record) {
       reply.code(404);
-      return { message: RUN_ROUTE_CONFIG.document.notFoundMessage };
+      return apiErrorResponseSchema.parse({
+        error: { code: "RUN_NOT_FOUND", category: "not_found", retryable: false },
+      });
     }
     if (!(await canReadRunRecord(request, reply, record, runAccessGuard, "view_runs"))) {
       return reply;
@@ -1391,7 +1472,9 @@ export function registerRunRoutes({
     const record = await refreshRunRecordIfAvailable(runs, runId);
     if (!record) {
       reply.code(404);
-      return { message: "Document file not found" };
+      return apiErrorResponseSchema.parse({
+        error: { code: "DOCUMENT_FILE_NOT_FOUND", category: "not_found", retryable: false },
+      });
     }
     if (!(await canReadRunRecord(request, reply, record, runAccessGuard, "view_documents"))) {
       return reply;
@@ -1399,12 +1482,16 @@ export function registerRunRoutes({
     const snapshot = documentRunSnapshotSchema.parse(record.snapshot);
     if (snapshot.status !== "completed") {
       reply.code(409);
-      return { message: "Document run has not completed successfully" };
+      return apiErrorResponseSchema.parse({
+        error: { code: "DOCUMENT_RUN_NOT_COMPLETED", category: "conflict", retryable: false },
+      });
     }
     const currentDocument = await currentDocumentForRun(record, documentLibrary);
     if (currentDocument?.status === "deleted") {
       reply.code(409);
-      return { message: "Document has been deleted. Restore it before downloading." };
+      return apiErrorResponseSchema.parse({
+        error: { code: "DOCUMENT_RESTORE_REQUIRED", category: "conflict", retryable: false },
+      });
     }
     let documentBuffer = record.documentBuffer;
     if (!documentBuffer && record.metadata?.projectId && snapshot.documentId) {
@@ -1415,7 +1502,9 @@ export function registerRunRoutes({
     }
     if (!documentBuffer) {
       reply.code(404);
-      return { message: "Document file not found" };
+      return apiErrorResponseSchema.parse({
+        error: { code: "DOCUMENT_FILE_NOT_FOUND", category: "not_found", retryable: false },
+      });
     }
     reply.header(
       "Content-Type",

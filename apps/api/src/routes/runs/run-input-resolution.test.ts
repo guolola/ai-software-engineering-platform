@@ -144,7 +144,7 @@ test("missing feasibility solution still blocks report generation", async () => 
   assert.equal(result.ok, false);
   if (result.ok) return;
   assert.equal(result.statusCode, 409);
-  assert.match(result.body.message, /系统上下文图（系统环境图）和实现方案/u);
+  assert.equal(result.body.error.code, "FEASIBILITY_CONTEXT_MISSING");
 });
 
 test("stale feasibility analysis still blocks report generation", async () => {
@@ -160,5 +160,5 @@ test("stale feasibility analysis still blocks report generation", async () => {
   assert.equal(result.ok, false);
   if (result.ok) return;
   assert.equal(result.statusCode, 409);
-  assert.match(result.body.message, /实现方案已过期/u);
+  assert.equal(result.body.error.code, "FEASIBILITY_IMPLEMENTATION_STALE");
 });

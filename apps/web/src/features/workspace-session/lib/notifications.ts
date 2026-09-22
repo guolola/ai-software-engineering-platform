@@ -1,7 +1,7 @@
 // Owns user-facing generation notifications and completion events.
 
-import { toast } from "sonner";
 import { i18n } from "../../../shared/i18n/i18n";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
 import type { DocumentKind } from "@uml-platform/contracts";
 
 export const GENERATION_COMPLETED_EVENT = "uml-generation-completed";
@@ -28,5 +28,5 @@ export function notifyGenerationFailed(message: string) {
 }
 
 export function notifyGenerationResultStale() {
-  toast.message(i18n.t("generation.resultStale"));
+  floatingAlert.message(i18n.t("generation.resultStale"));
 }

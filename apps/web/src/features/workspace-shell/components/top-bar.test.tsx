@@ -28,9 +28,12 @@ const { toastMessage, toastSuccess, toastError } = vi.hoisted(() => ({
   toastError: vi.fn(),
 }));
 
-vi.mock("sonner", () => {
+vi.mock("../../../shared/ui/floating-alert", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../shared/ui/floating-alert")>();
   return {
-    toast: {
+    ...actual,
+    floatingAlert: {
+      ...actual.floatingAlert,
       message: toastMessage,
       success: toastSuccess,
       error: toastError,
@@ -1416,7 +1419,7 @@ describe("TopBar", () => {
     expect(screen.queryByText(/模型 gpt-5\.5/)).not.toBeInTheDocument();
   });
 
-  it("keeps active server runs visible when local terminal tasks remain in the drawer", async () => {
+  it("keeps an explicitly selected local terminal task ahead of an active server run", async () => {
     const snapshot = createRunSnapshot({
       runId: "local-completed-run",
       requirementText: "生成 UML",
@@ -1476,11 +1479,62 @@ describe("TopBar", () => {
       );
     });
 
-    expect(screen.getAllByText("生成需求模型").length).toBeGreaterThan(0);
-    expect(within(screen.getByTestId("generation-transcript")).queryByText("已完成")).not.toBeInTheDocument();
+    expect(screen.getByText("生成中 50%")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("generation-transcript")).getByText(
+        "已生成 0 个图形预览。",
+      ),
+    ).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "我知道了" }));
     expect(screen.queryByRole("button", { name: "清理已完成" })).not.toBeInTheDocument();
     expect(screen.queryByText("任务列表")).not.toBeInTheDocument();
+  });
+
+  it("keeps a local startup failure visible instead of falling back to an older remote success", async () => {
+    const repository: WorkspaceRepository = {
+      loadWorkspace: vi.fn(async () =>
+        createWorkspaceRecord({ requirementText: "生成 UML" }),
+      ),
+      updateRequirementText: vi.fn(async () => {}),
+      startRun: vi.fn(async () => {
+        throw new Error("ECONNRESET upstream-secret-value");
+      }),
+      subscribeToRun: vi.fn(),
+      getRunSnapshot: vi.fn(async () => null),
+      renderPlantUml: vi.fn(),
+      testProviderSettings: vi.fn(),
+      saveRunHistory: vi.fn(),
+      listRunHistory: vi.fn(async () => []),
+      restoreRunHistory: vi.fn(async () => null),
+      deleteRunHistory: vi.fn(async () => []),
+      clearRunHistory: vi.fn(async () => {}),
+    };
+    const completedRun: PlatformRunSummary = {
+      runId: "older-server-run-completed",
+      status: "completed",
+      stage: "render_svg",
+      runKind: "requirements",
+      updatedAt: "2026-06-18T08:30:00.000Z",
+    };
+
+    const user = userEvent.setup();
+    render(
+      withWorkspaceProviders(
+        <TopBarTaskWithProjectRunsHarness projectRuns={[completedRun]} />,
+        repository,
+      ),
+    );
+
+    await user.click(await screen.findByRole("button", { name: "开始测试任务" }));
+    await screen.findByRole("dialog", { name: "任务遇到内部错误" });
+
+    const transcript = screen.getByTestId("generation-transcript");
+    expect(within(transcript).getAllByText("启动校验").length).toBeGreaterThan(0);
+    expect(
+      within(transcript).getAllByText("生成任务失败，请稍后重试。").length,
+    ).toBeGreaterThan(0);
+    expect(within(transcript).queryByText("已完成")).not.toBeInTheDocument();
+    expect(screen.queryByText(/ECONNRESET|upstream-secret-value/u)).not.toBeInTheDocument();
   });
 
   it("shows the latest terminal server run when there is no active task", async () => {

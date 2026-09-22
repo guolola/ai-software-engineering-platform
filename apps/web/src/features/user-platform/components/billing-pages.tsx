@@ -44,7 +44,8 @@ import { cn } from "../../../shared/ui/utils";
 import { PageContainer } from "../../../shared/template/layout/page";
 import { useAppI18n } from "../../../shared/i18n";
 import { billingApi } from "../services/billing-api";
-import { toast } from "sonner";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 
 type Navigate = (path: string) => void;
 
@@ -151,7 +152,7 @@ function useBillingSkus(t: TFunction) {
       })
       .catch((nextError: unknown) => {
         if (!active) return;
-        setError(nextError instanceof Error ? nextError.message : t("billing.errors.skusLoadFailed"));
+        setError(localizeCaughtFailure(nextError, t("billing.errors.skusLoadFailed")));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -223,7 +224,6 @@ function PaymentConfirmDialog({
   sku,
   open,
   creating,
-  error,
   channel,
   locale,
   t,
@@ -234,7 +234,6 @@ function PaymentConfirmDialog({
   sku: BillingSkuDto | null;
   open: boolean;
   creating: boolean;
-  error: string;
   channel: PaymentChannel;
   locale: string;
   t: TFunction;
@@ -298,11 +297,6 @@ function PaymentConfirmDialog({
                   t={t}
                 />
               </div>
-              {error && (
-                <Alert variant="destructive" className="border px-3 py-2 text-sm">
-                  {error}
-                </Alert>
-              )}
             </div>
           )}
           <div className="flex items-center justify-between gap-3 border-t border-border bg-muted/40 px-6 py-4">
@@ -582,7 +576,6 @@ function AccountCreditPackSelector({
   error,
   channel,
   creating,
-  purchaseError,
   onChannelChange,
   onPurchase,
   locale,
@@ -593,7 +586,6 @@ function AccountCreditPackSelector({
   error: string;
   channel: PaymentChannel;
   creating: boolean;
-  purchaseError: string;
   onChannelChange: (channel: PaymentChannel) => void;
   onPurchase: (sku: BillingSkuDto) => void;
   locale: string;
@@ -778,11 +770,6 @@ function AccountCreditPackSelector({
                 {formatCny(selectedSku.amountCents, locale)}
               </span>
             </div>
-            {purchaseError && (
-              <Alert variant="destructive" className="border px-3 py-2 text-sm">
-                {purchaseError}
-              </Alert>
-            )}
             <Button
               type="button"
               data-testid="billing-account-buy-button"
@@ -805,13 +792,11 @@ function usePaymentFlow(onNavigate: Navigate, t: TFunction, onPaid?: () => void)
   const [selectedSku, setSelectedSku] = useState<BillingSkuDto | null>(null);
   const [channel, setChannel] = useState<PaymentChannel>("alipay");
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState("");
 
   const createOrder = async (skuOverride?: BillingSkuDto) => {
     const orderSku = skuOverride ?? selectedSku;
     if (!orderSku) return;
     setCreating(true);
-    setError("");
     try {
       const response = await billingApi.createOrder({
         skuCode: orderSku.code,
@@ -829,7 +814,7 @@ function usePaymentFlow(onNavigate: Navigate, t: TFunction, onPaid?: () => void)
       }
       onNavigate(`/billing/alipay/return?orderId=${encodeURIComponent(response.orderId)}`);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : t("billing.errors.orderCreateFailed"));
+      floatingAlert.error(localizeCaughtFailure(nextError, t("billing.errors.orderCreateFailed")));
     } finally {
       setCreating(false);
     }
@@ -841,7 +826,6 @@ function usePaymentFlow(onNavigate: Navigate, t: TFunction, onPaid?: () => void)
     channel,
     setChannel,
     creating,
-    error,
     createOrder,
   };
 }
@@ -896,7 +880,6 @@ export function PricingBillingPage({
             sku={payment.selectedSku}
             open={Boolean(payment.selectedSku)}
             creating={payment.creating}
-            error={payment.error}
             channel={payment.channel}
             locale={locale}
             t={t}
@@ -972,7 +955,6 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [summaryError, setSummaryError] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(true);
-  const [orderActionError, setOrderActionError] = useState("");
   const [resumingOrderId, setResumingOrderId] = useState<string | null>(null);
   const refreshSummary = () => {
     setSummaryLoading(true);
@@ -983,7 +965,7 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
         setSummaryError("");
       })
       .catch((nextError: unknown) => {
-        setSummaryError(nextError instanceof Error ? nextError.message : t("billing.errors.summaryLoadFailed"));
+        setSummaryError(localizeCaughtFailure(nextError, t("billing.errors.summaryLoadFailed")));
       })
       .finally(() => setSummaryLoading(false));
   };
@@ -992,7 +974,7 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     if (searchParams.get("payment") === "success") {
-      toast.success(t("billing.account.paymentSuccess"));
+      floatingAlert.success(t("billing.account.paymentSuccess"));
       searchParams.delete("payment");
       searchParams.delete("orderId");
       const nextSearch = searchParams.toString();
@@ -1004,7 +986,6 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
 
   const resumeOrder = async (order: BillingOrderStatusDto) => {
     setResumingOrderId(order.orderId);
-    setOrderActionError("");
     try {
       const response = await billingApi.resumeOrder(order.orderId);
       if (response.paymentFormHtml) {
@@ -1016,7 +997,7 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
       }
       onNavigate(`/billing/alipay/return?orderId=${encodeURIComponent(response.orderId)}`);
     } catch (nextError) {
-      setOrderActionError(nextError instanceof Error ? nextError.message : t("billing.errors.resumePaymentFailed"));
+      floatingAlert.error(localizeCaughtFailure(nextError, t("billing.errors.resumePaymentFailed")));
       refreshSummary();
     } finally {
       setResumingOrderId(null);
@@ -1057,11 +1038,6 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
               {summaryError}
             </Alert>
           )}
-          {orderActionError && (
-            <Alert variant="destructive" className="border p-5 text-sm leading-6">
-              {orderActionError}
-            </Alert>
-          )}
           {summary && <SummaryPanel summary={summary} locale={locale} t={t} />}
           <section className="grid gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1078,7 +1054,6 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
               error={error}
               channel={payment.channel}
               creating={payment.creating}
-              purchaseError={payment.error}
               onChannelChange={payment.setChannel}
               onPurchase={(sku) => void payment.createOrder(sku)}
               locale={locale}
@@ -1207,7 +1182,7 @@ export function AlipayReturnPage({ onNavigate }: { onNavigate: Navigate }) {
           setOrder(response);
         })
         .catch((nextError: unknown) => {
-          if (active) setError(nextError instanceof Error ? nextError.message : t("billing.errors.orderStatusLoadFailed"));
+          if (active) setError(localizeCaughtFailure(nextError, t("billing.errors.orderStatusLoadFailed")));
         });
     };
     load();

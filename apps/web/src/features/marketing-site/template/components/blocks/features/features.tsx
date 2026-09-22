@@ -100,13 +100,13 @@ const Features = () => {
                     slide={{ direction: 'down', offset: 35 }}
                     delay={0.3}
                     transition={{ duration: 0.5 }}
-                    className='relative flex w-full rounded-xl border px-4 py-6'
+                    className='relative flex w-full min-w-0 rounded-xl border px-2 py-6 sm:px-4'
                   >
                     {visitorData.map((item, index) => (
                       <div
                         key={index}
                         className={cn(
-                          'flex grow flex-col gap-2.5 border-dashed px-3 py-2',
+                          'flex min-w-0 basis-0 flex-col items-center gap-2.5 border-dashed px-2 py-2 text-center sm:px-3',
                           index < visitorData.length - 1 && 'border-r'
                         )}
                       >
@@ -116,7 +116,7 @@ const Features = () => {
                         <div className='flex min-h-25 flex-1 items-end'>
                           <div className={cn('bg-primary grow rounded-xl', item.heightClass, item.color)}></div>
                         </div>
-                        <div className='flex items-center justify-between gap-2'>
+                        <div className='flex w-full min-w-0 items-center justify-center gap-1 sm:justify-between sm:gap-2'>
                           <span className='text-muted-foreground text-sm'>{item.amount}</span>
                           {item.trend === 'up' ? (
                             <ArrowUpRightIcon className='size-4' />
@@ -129,7 +129,7 @@ const Features = () => {
                     <Magnetic
                       range={130}
                       strength={0.25}
-                      className='absolute -bottom-14 left-1/2 w-71.5 -translate-x-1/2'
+                      className='absolute inset-x-2 -bottom-14 mx-auto max-w-full sm:left-1/2 sm:right-auto sm:w-71.5 sm:-translate-x-1/2'
                     >
                       <MotionPreset
                         fade

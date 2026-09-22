@@ -595,7 +595,7 @@ describe("buildLineageGraph", () => {
     const ruleNode = graph.nodes.find((node) => node.id === "rule:empty");
     expect(ruleNode?.status).toBe("error");
     expect(ruleNode?.reason).toContain("需求规则抽取失败");
-    expect(ruleNode?.reason).toContain("rules 必须是数组");
+    expect(ruleNode?.reason).toContain("模型返回的结构化结果不合法");
     expect(ruleNode?.actionLabel).toBe("重试");
   });
 

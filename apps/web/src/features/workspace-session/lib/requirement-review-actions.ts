@@ -22,7 +22,9 @@ import {
   markRequirementReviewed,
   mergeReviewedRequirement,
   rebuildRequirementReviewQualityReport,
+  resolveSafeRequirementReviewCandidates,
 } from "./requirement-review";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 
 interface RequirementRuleCreateInput {
   category: RequirementRule["category"];
@@ -126,6 +128,53 @@ export function useRequirementReviewActions({
     },
     [
       repository,
+      setRequirementBaseline,
+      setRequirementQualityReport,
+      setRequirementReviewCandidates,
+    ],
+  );
+
+  const autoAcceptSafeRequirementReviewCandidates = useCallback(
+    async (
+      baselineOverride?: RequirementBaseline | null,
+      candidatesOverride?: WorkspaceRecord["requirementReviewCandidates"],
+    ) => {
+      const activeBaseline = baselineOverride ?? requirementBaseline;
+      const activeCandidates = candidatesOverride ?? requirementReviewCandidates;
+      if (!activeBaseline) {
+        return {
+          acceptedRuleIds: [] as string[],
+          baseline: activeBaseline,
+          blockingRuleIds: [] as string[],
+          candidates: activeCandidates,
+        };
+      }
+      const resolution = resolveSafeRequirementReviewCandidates(
+        activeBaseline,
+        activeCandidates,
+      );
+      const shouldPersist =
+        resolution.acceptedRuleIds.length > 0 ||
+        baselineOverride !== undefined ||
+        candidatesOverride !== undefined;
+      if (!shouldPersist) return resolution;
+      if (!repository.updateRequirementReviewState) {
+        throw new Error("当前环境不支持原子保存需求复核结果");
+      }
+      // Baseline and candidate decisions must become visible together or downstream stays blocked.
+      await repository.updateRequirementReviewState(
+        resolution.baseline,
+        resolution.candidates,
+      );
+      setRequirementBaseline(resolution.baseline);
+      setRequirementQualityReport(resolution.baseline.qualityReport);
+      setRequirementReviewCandidates(resolution.candidates);
+      return resolution;
+    },
+    [
+      repository,
+      requirementBaseline,
+      requirementReviewCandidates,
       setRequirementBaseline,
       setRequirementQualityReport,
       setRequirementReviewCandidates,
@@ -475,8 +524,10 @@ export function useRequirementReviewActions({
           repairRationale: null,
           blockingReasons: [],
           status: "failed",
-          errorMessage:
-            error instanceof Error ? error.message : "模型返回内容无法解析。",
+          errorMessage: localizeCaughtFailure(
+            error,
+            "模型返回的修复结果无法解析，请重新修复。",
+          ),
           createdAt,
         };
       }
@@ -584,8 +635,10 @@ export function useRequirementReviewActions({
         }
         return nextCandidates;
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "模型返回内容无法解析。";
+        const errorMessage = localizeCaughtFailure(
+          error,
+          "模型返回的修复结果无法解析，请重新修复。",
+        );
         return Object.fromEntries(
           ruleIds
             .map(
@@ -696,6 +749,7 @@ export function useRequirementReviewActions({
 
   return {
     acceptRequirementAiSuggestions,
+    autoAcceptSafeRequirementReviewCandidates,
     clearRequirementRules,
     confirmRequirementQualityHint,
     createRequirementRule,

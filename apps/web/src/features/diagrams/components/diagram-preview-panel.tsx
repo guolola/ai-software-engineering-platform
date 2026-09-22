@@ -18,19 +18,18 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "../../../shared/ui/button";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
 import { Badge } from "../../../shared/ui/badge";
 import { cn } from "../../../shared/ui/utils";
 import { downloadTextFile } from "../../../shared/lib/download";
 import { InlineSvg } from "./inline-svg";
 import { getRelationDisplayLabel } from "../lib/diagram-detail-view-model";
 import { diagramDetailFieldLabel, semanticElementLabel } from "../lib/diagram-presentation";
+import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 
 type DiagramPreviewError = {
-  error?: {
-    message?: string;
-  };
+  error?: unknown;
 } | null;
 
 type DiagramPreviewPanelProps = {
@@ -116,17 +115,17 @@ export function DiagramPreviewPanel({
           <h3 className="text-sm font-semibold text-foreground">{t("diagrams.detail.preview")}</h3>
           <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto pb-1">
           <Button
             variant={isOverviewPanelOpen ? "secondary" : "outline"}
             size="sm"
-            className="h-8"
+            className="size-8 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-3"
             onClick={isOverviewPanelOpen ? onCloseOverviewPanel : onOpenOverviewPanel}
             aria-label={isOverviewPanelOpen ? t("diagrams.detail.collapseOverview") : t("diagrams.detail.openOverview")}
             aria-expanded={isOverviewPanelOpen}
             aria-controls={overviewPanelId}
           >
-            <PanelRightOpen className="size-3.5" /> {t("diagrams.detail.modelOverview")}
+            <PanelRightOpen className="size-3.5" /> <span className="hidden sm:inline">{t("diagrams.detail.modelOverview")}</span>
           </Button>
           {normalizedSvgMarkup ? (
             <>
@@ -161,20 +160,22 @@ export function DiagramPreviewPanel({
                 <Maximize2 className="size-3.5" />
               </Button>
               {svgUrl && (
-                <Button role="link" variant="outline" size="sm" className="h-8" render={<a href={svgUrl} target="_blank" rel="noreferrer" />} nativeButton={false}>
-                  <ExternalLink className="size-3.5" /> {t("diagrams.detail.newTab")}
+                <Button role="link" variant="outline" size="sm" className="size-8 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-3" aria-label={t("diagrams.detail.newTab")} title={t("diagrams.detail.newTab")} render={<a href={svgUrl} target="_blank" rel="noreferrer" />} nativeButton={false}>
+                  <ExternalLink className="size-3.5" /> <span className="hidden sm:inline">{t("diagrams.detail.newTab")}</span>
                 </Button>
               )}
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8"
+                className="size-8 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-3"
+                aria-label="SVG"
+                title="SVG"
                 onClick={() => {
                   downloadTextFile(`${fileStem}.svg`, normalizedSvgMarkup, "image/svg+xml");
-                  toast.success(t("diagrams.detail.exported", { file: `${fileStem}.svg` }));
+                  floatingAlert.success(t("diagrams.detail.exported", { file: `${fileStem}.svg` }));
                 }}
               >
-                <Download className="size-3.5" /> SVG
+                <Download className="size-3.5" /> <span className="hidden sm:inline">SVG</span>
               </Button>
             </>
           ) : null}
@@ -182,13 +183,15 @@ export function DiagramPreviewPanel({
             <Button
               variant="outline"
               size="sm"
-              className="h-8"
+              className="size-8 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-3"
+              aria-label="PlantUML"
+              title="PlantUML"
               onClick={() => {
                 downloadTextFile(`${fileStem}.puml`, plantUmlSource, "text/plain");
-                toast.success(t("diagrams.detail.exported", { file: `${fileStem}.puml` }));
+                floatingAlert.success(t("diagrams.detail.exported", { file: `${fileStem}.puml` }));
               }}
             >
-              <Download className="size-3.5" /> PlantUML
+              <Download className="size-3.5" /> <span className="hidden sm:inline">PlantUML</span>
             </Button>
           ) : null}
         </div>
@@ -230,7 +233,10 @@ export function DiagramPreviewPanel({
                   {t("diagrams.detail.generatedFailed", { label: diagramLabel })}
                 </div>
                 <div className="mt-2 leading-relaxed text-foreground">
-                  {diagramError.error?.message}
+                  {localizeRunFailure(
+                    diagramError.error,
+                    t("errors.codes.RUN_INTERNAL_ERROR"),
+                  )}
                 </div>
               </Alert>
             </div>

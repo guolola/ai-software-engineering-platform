@@ -18,13 +18,15 @@ const { downloadTextFileMock } = vi.hoisted(() => ({
   downloadTextFileMock: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("../../../shared/ui/floating-alert", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../shared/ui/floating-alert")>();
+  return { ...actual, floatingAlert: {
+    ...actual.floatingAlert,
     message: toastMessage,
     error: toastError,
     success: vi.fn(),
-  },
-}));
+  } };
+});
 
 vi.mock("../../../shared/lib/download", () => ({
   downloadTextFile: downloadTextFileMock,
@@ -137,8 +139,11 @@ describe("DiagramView", () => {
 
     expect(await screen.findByText("总体业务流程 生成失败")).toBeInTheDocument();
     expect(
-      screen.getByText(/PlantUML repair failed for activity: Syntax Error\?/),
+      screen.getByText("图形渲染失败，请检查模型结果后重试。"),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/PlantUML repair failed|Syntax Error/u),
+    ).not.toBeInTheDocument();
   });
 
   it("offers PlantUML export without exposing source tabs or inline source", async () => {

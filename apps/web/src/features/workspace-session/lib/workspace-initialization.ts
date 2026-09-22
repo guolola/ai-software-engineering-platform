@@ -9,6 +9,7 @@ import type { WorkspaceRecord } from "../../../entities/workspace/model";
 import type { RunHistoryItem } from "../../../entities/run-history";
 import type { WorkspaceRepository } from "../../../services/workspace-repository";
 import type { createEmptyRunUiState } from "./run-ui-state";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 
 type RunUiState = ReturnType<typeof createEmptyRunUiState>;
 
@@ -41,8 +42,7 @@ export function useWorkspaceInitialization({
         if (!active) return;
         setRunUiState((current) => ({
           ...current,
-          errorMessage:
-            error instanceof Error ? error.message : "读取运行历史失败",
+          errorMessage: localizeCaughtFailure(error, "读取运行历史失败，请稍后重试。"),
         }));
       }
     };
@@ -57,8 +57,7 @@ export function useWorkspaceInitialization({
           if (!active) return;
           setRunUiState((current) => ({
             ...current,
-            errorMessage:
-              error instanceof Error ? error.message : "加载工作台失败",
+            errorMessage: localizeCaughtFailure(error, "加载工作台失败，请稍后重试。"),
           }));
           return;
         }

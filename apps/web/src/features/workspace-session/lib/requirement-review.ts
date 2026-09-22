@@ -6,6 +6,10 @@ import type {
   RequirementQualityIssue,
   RequirementQualityReport,
 } from "@uml-platform/contracts";
+import {
+  compareRequirementSemantics,
+  unsupportedRequirementFacts,
+} from "@uml-platform/contracts";
 import type { WorkspaceRecord } from "../../../entities/workspace/model";
 
 export function uniqueIssueMessages(issues: RequirementQualityIssue[]) {
@@ -228,6 +232,98 @@ export function markRequirementReviewed(requirement: AtomicRequirement) {
     };
   }
   return next;
+}
+
+export function markRequirementAutomaticallyReviewed(
+  requirement: AtomicRequirement,
+) {
+  const next = structuredClone(requirement) as AtomicRequirement;
+  next.status = "accepted";
+  next.confidence = Math.max(next.confidence, 0.72);
+  for (const field of REVIEWABLE_REQUIREMENT_FIELDS) {
+    const provenance = next.fieldProvenance[field];
+    if (!provenance) continue;
+    next.fieldProvenance[field] = {
+      ...provenance,
+      status: "accepted",
+      rationale: "质量检查自动通过：字段来源完整，且未发现语义丢失或无依据新增。",
+    };
+  }
+  return next;
+}
+
+export function resolveSafeRequirementReviewCandidates(
+  baseline: RequirementBaseline,
+  candidates: WorkspaceRecord["requirementReviewCandidates"],
+) {
+  let nextBaseline = structuredClone(baseline) as RequirementBaseline;
+  const nextCandidates = structuredClone(
+    candidates,
+  ) as WorkspaceRecord["requirementReviewCandidates"];
+  const acceptedRuleIds: string[] = [];
+
+  for (const [ruleId, candidate] of Object.entries(nextCandidates)) {
+    if (
+      candidate.status !== "pending" ||
+      !candidate.afterRequirement ||
+      candidate.blockingReasons.length > 0
+    ) {
+      continue;
+    }
+    const after = candidate.afterRequirement;
+    if (
+      after.status === "conflict" ||
+      Object.values(after.fieldProvenance).some(
+        (item) => item?.status === "pending-review" || item?.status === "rejected",
+      )
+    ) {
+      continue;
+    }
+    const semanticDiff = compareRequirementSemantics(
+      candidate.beforeRequirement,
+      after,
+    );
+    const unsupportedFacts = unsupportedRequirementFacts(
+      candidate.beforeRequirement.sourceFragment,
+      after,
+    );
+    if (semanticDiff.lostFacts.length > 0 || unsupportedFacts.length > 0) {
+      continue;
+    }
+
+    const reviewed = markRequirementAutomaticallyReviewed(after);
+    const tentativeBaseline = mergeReviewedRequirement(nextBaseline, reviewed);
+    const remainingIssues = tentativeBaseline.qualityReport.issues.filter(
+      (issue) => issue.requirementId === reviewed.id,
+    );
+    if (
+      remainingIssues.length > 0 ||
+      tentativeBaseline.qualityReport.reviewRequiredRequirementIds.includes(
+        reviewed.id,
+      )
+    ) {
+      continue;
+    }
+
+    nextBaseline = tentativeBaseline;
+    nextCandidates[ruleId] = {
+      ...candidate,
+      afterRequirement: reviewed,
+      status: "accepted",
+      errorMessage: null,
+    };
+    acceptedRuleIds.push(ruleId);
+  }
+
+  return {
+    acceptedRuleIds,
+    baseline: nextBaseline,
+    blockingRuleIds: requirementRuleIdsBlockingGeneration(
+      nextBaseline,
+      nextCandidates,
+    ),
+    candidates: nextCandidates,
+  };
 }
 
 function readableSlot(value: string | null | undefined) {

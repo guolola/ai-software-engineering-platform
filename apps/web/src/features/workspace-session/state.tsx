@@ -43,7 +43,11 @@ import {
   type RunHistorySnapshot,
 } from "../../entities/run-history";
 import { useRunController } from "./run-controller";
-import type { RunMode, WorkspaceSessionState } from "./model/session-state";
+import type {
+  GenerationSubtask,
+  RunMode,
+  WorkspaceSessionState,
+} from "./model/session-state";
 import {
   notifyGenerationCompleted,
   notifyGenerationFailed,
@@ -95,7 +99,6 @@ import {
   GenerationConfirmationDialog,
 } from "./components/generation-dialogs";
 import {
-  requirementRuleIdsBlockingGeneration,
   requirementRuleIdsNeedingReview,
 } from "./lib/requirement-review";
 import { parseBillingEntitlementError } from "./lib/billing-entitlement";
@@ -121,6 +124,12 @@ import { useWorkspaceInitialization } from "./lib/workspace-initialization";
 import { useLatestGenerationInputRef } from "./lib/latest-generation-input";
 import { useAutoCompletedRuleMappingActions } from "./lib/auto-completed-rule-mapping-actions";
 import { usePlantUmlRenderActions } from "./lib/plantuml-render-actions";
+import {
+  operationFailureForCode,
+  operationFailurePresentation,
+  PresentedOperationError,
+  type OperationFailurePresentation,
+} from "./lib/operation-failure";
 import { deriveWorkspaceStatus } from "./lib/workspace-derived-status";
 import {
   removeCodePreviewDiagnostics,
@@ -194,6 +203,26 @@ function downstreamDesignBlockReason(input: {
   return null;
 }
 
+function withStartupValidationFailure(
+  subtasks: GenerationSubtask[],
+  failure: OperationFailurePresentation,
+  detail: string,
+) {
+  const validationFailure: GenerationSubtask = {
+    id: "start_validation",
+    label: "启动校验",
+    status: "failed",
+    message: null,
+    messageCode: failure.code,
+    messageParams: failure.params,
+    errorMessage: detail,
+  };
+  return [
+    validationFailure,
+    ...subtasks.filter((subtask) => subtask.id !== validationFailure.id),
+  ];
+}
+
 function latestTrustedMatrices(historyItems: RunHistoryItem[]) {
   const latest = [...historyItems]
     .sort(
@@ -247,6 +276,7 @@ const WorkspaceSessionContext = createContext<WorkspaceSessionState | null>(
 );
 
 type RunGenerationOptions = {
+  abortOnPendingRuleReviews?: boolean;
   deferRulesOnlySnapshotApplication?: boolean;
   suppressSuccessDialog?: boolean;
   skipRuleRepairCandidates?: boolean;
@@ -470,12 +500,12 @@ export function WorkspaceSessionProvider({
 
   const {
     acceptRequirementAiSuggestions,
+    autoAcceptSafeRequirementReviewCandidates,
     clearRequirementRules,
     confirmRequirementQualityHint,
     createRequirementRule,
     decideRequirementReviewCandidate,
     deleteRequirementRule,
-    persistRequirementReviewCandidates,
     rejectRequirementAiSuggestions,
     repairRequirementRule,
     repairRequirementRuleCandidates,
@@ -496,6 +526,28 @@ export function WorkspaceSessionProvider({
     setRequirementReviewCandidates,
     updateRequirementRuleBase,
   });
+
+  const requireResolvedRequirementReviews = useCallback(
+    async (
+      baselineOverride?: RequirementBaseline | null,
+      candidatesOverride?: WorkspaceRecord["requirementReviewCandidates"],
+    ) => {
+      const resolution = await autoAcceptSafeRequirementReviewCandidates(
+        baselineOverride,
+        candidatesOverride,
+      );
+      if (resolution.blockingRuleIds.length > 0) {
+        throw new PresentedOperationError(
+          operationFailureForCode("REQUIREMENT_REVIEWS_PENDING", {
+            params: { count: resolution.blockingRuleIds.length },
+            details: { ruleIds: resolution.blockingRuleIds },
+          }),
+        );
+      }
+      return resolution;
+    },
+    [autoAcceptSafeRequirementReviewCandidates],
+  );
 
   const addRequirementRule = useCallback(() => {
     createRequirementRule({
@@ -537,6 +589,7 @@ export function WorkspaceSessionProvider({
     generationTasks,
     reconcileGenerationTasksWithProjectRuns,
     selectGenerationTask,
+    selectedGenerationTaskId,
     updateGenerationTask,
     visibleGenerationTask,
   } = useGenerationTaskActions();
@@ -1095,16 +1148,8 @@ export function WorkspaceSessionProvider({
 
       try {
         await flushRequirementTextSave();
-        const currentPendingRequirementReviews =
-          requirementRuleIdsBlockingGeneration(
-            requirementBaseline,
-            requirementReviewCandidates,
-          );
-        if (
-          mode.kind !== "rules-only" &&
-          currentPendingRequirementReviews.length > 0
-        ) {
-          throw new Error("请先确认需求规则修复结果");
+        if (mode.kind !== "rules-only") {
+          await requireResolvedRequirementReviews();
         }
         const startInput = createStartRunInput(
           requirementText,
@@ -1281,6 +1326,7 @@ export function WorkspaceSessionProvider({
         }
         let repairPendingCount = 0;
         let repairFailedCount = 0;
+        let pendingReviewRuleIds: string[] = [];
         // Internal auto-upstream runs should hand their snapshot to the requested model run,
         // while explicit rule generation still owns repair review creation.
         if (
@@ -1355,9 +1401,17 @@ export function WorkspaceSessionProvider({
               snapshot.requirementBaseline,
               snapshot.rules,
             );
-            await persistRequirementReviewCandidates(nextCandidates);
-          } else {
-            await persistRequirementReviewCandidates({});
+            // A repair service may legitimately return no candidates. In that case there is
+            // no decision to persist, and the internal mapping run can continue unchanged.
+            if (Object.keys(nextCandidates).length > 0) {
+              const reviewResolution =
+                await autoAcceptSafeRequirementReviewCandidates(
+                  snapshot.requirementBaseline,
+                  nextCandidates,
+                );
+              nextCandidates = reviewResolution.candidates;
+              pendingReviewRuleIds = reviewResolution.blockingRuleIds;
+            }
           }
           repairPendingCount = Object.values(nextCandidates).filter(
             (candidate) => candidate.status === "pending",
@@ -1409,6 +1463,29 @@ export function WorkspaceSessionProvider({
           providerModel,
           durationMs: Date.now() - startedAtMs,
         });
+        if (
+          options?.abortOnPendingRuleReviews &&
+          pendingReviewRuleIds.length > 0
+        ) {
+          const failure = operationFailureForCode(
+            "REQUIREMENT_REVIEWS_PENDING",
+            {
+              params: { count: pendingReviewRuleIds.length },
+              details: { ruleIds: pendingReviewRuleIds },
+            },
+          );
+          setRunUiState(failedRunUiState(failure.message));
+          openGenerationResultDialog(
+            failedRunResultDialog({
+              clientTaskId,
+              failure,
+              runId: snapshot.runId,
+              stageLabel: "需求规则",
+            }),
+          );
+          notifyGenerationFailed(failure.message);
+          return null;
+        }
         setRunUiState(completedRunUiState("生成完成"));
         const qualityHintCount =
           snapshot.requirementBaseline?.qualityReport.issues.length ?? 0;
@@ -1439,20 +1516,26 @@ export function WorkspaceSessionProvider({
         return snapshot;
       } catch (error) {
         const billingBlock = parseBillingEntitlementError(error);
+        const failure = operationFailurePresentation(error, {
+          hasTaskDetails: Boolean(runId || clientTaskId),
+        });
         const detail =
           billingBlock?.message ??
-          (error instanceof Error ? error.message : "生成失败");
+          failure.message;
         if (clientTaskId) {
           updateGenerationTask(clientTaskId, (task) => ({
             ...task,
             status: "failed",
             progress: 100,
             message: null,
+            messageCode: billingBlock ? task.messageCode : failure.code,
+            messageParams: billingBlock ? task.messageParams : failure.params,
             errorMessage: detail,
             finishedAt: new Date().toISOString(),
             diagnostics: addLocalFailureToDiagnostics(task.diagnostics, detail),
-            subtasks:
-              mode.kind === "rules-only"
+            subtasks: !runId
+              ? withStartupValidationFailure(task.subtasks, failure, detail)
+              : mode.kind === "rules-only"
                 ? task.subtasks.map((subtask) =>
                     subtask.id === "extract_rules"
                       ? {
@@ -1504,7 +1587,7 @@ export function WorkspaceSessionProvider({
           openGenerationResultDialog(
             failedRunResultDialog({
               clientTaskId,
-              message: detail,
+              failure,
               runId,
               stageLabel:
                 mode.kind === "rules-only" ? "需求规则" : "需求模型",
@@ -1520,10 +1603,10 @@ export function WorkspaceSessionProvider({
     },
     [
       applyRunSnapshot,
+      autoAcceptSafeRequirementReviewCandidates,
       models,
       openBillingEntitlementDialog,
       openGenerationResultDialog,
-      persistRequirementReviewCandidates,
       repository,
       repairRequirementRuleCandidates,
       flushRequirementTextSave,
@@ -1531,6 +1614,7 @@ export function WorkspaceSessionProvider({
       requirementModelTraceability,
       requirementReviewCandidates,
       requirementText,
+      requireResolvedRequirementReviews,
       rules,
       runController,
       saveHistorySnapshot,
@@ -1579,11 +1663,9 @@ export function WorkspaceSessionProvider({
           requirementText,
           requirementContext?.rules ?? rules,
         );
-        const currentPendingRequirementReviews =
-          requirementRuleIdsBlockingGeneration(
-            requirementBaseline,
-            requirementReviewCandidates,
-          );
+        if (!requirementContext) {
+          await requireResolvedRequirementReviews();
+        }
         const currentRulesStale =
           rules.length > 0 &&
           (requirementInputFingerprint
@@ -1632,20 +1714,21 @@ export function WorkspaceSessionProvider({
           !requirementContext &&
           (currentRulesStale || currentStaleDiagrams.length > 0)
         ) {
-          throw new Error("需求模型基于旧需求规则，请先重新生成需求模型");
-        }
-        if (
-          !requirementContext &&
-          currentPendingRequirementReviews.length > 0
-        ) {
-          throw new Error("请先确认需求规则修复结果");
+          throw new PresentedOperationError(
+            operationFailureForCode("REQUIREMENT_MODELS_STALE", {
+              params: { count: Math.max(1, currentStaleDiagrams.length) },
+              details: { diagramKinds: currentStaleDiagrams },
+            }),
+          );
         }
         if (
           !requirementContext &&
           currentRequirementDiagrams.length > 0 &&
           requirementTraceabilityMissing
         ) {
-          throw new Error("需求模型缺少完整元素级映射，请先重新生成需求模型");
+          throw new PresentedOperationError(
+            operationFailureForCode("REQUIREMENT_TRACEABILITY_MISSING"),
+          );
         }
         if (
           !repository.startDesignRun ||
@@ -1655,8 +1738,8 @@ export function WorkspaceSessionProvider({
           throw new Error("当前仓储未实现设计阶段生成能力");
         }
         if (!activeRequirementBaseline) {
-          throw new Error(
-            "请先生成并确认需求规则，形成需求基线后再生成设计模型",
+          throw new PresentedOperationError(
+            operationFailureForCode("REQUIREMENT_BASELINE_BLOCKED"),
           );
         }
         const startInput = createStartDesignRunInput(
@@ -1831,18 +1914,26 @@ export function WorkspaceSessionProvider({
         return snapshot;
       } catch (error) {
         const billingBlock = parseBillingEntitlementError(error);
+        const failure = operationFailurePresentation(error, {
+          hasTaskDetails: Boolean(runId || clientTaskId),
+        });
         const detail =
           billingBlock?.message ??
-          (error instanceof Error ? error.message : "设计生成失败");
+          failure.message;
         if (clientTaskId) {
           updateGenerationTask(clientTaskId, (task) => ({
             ...task,
             status: "failed",
             progress: 100,
             message: null,
+            messageCode: billingBlock ? task.messageCode : failure.code,
+            messageParams: billingBlock ? task.messageParams : failure.params,
             errorMessage: detail,
             finishedAt: new Date().toISOString(),
             diagnostics: addLocalFailureToDiagnostics(task.diagnostics, detail),
+            subtasks: runId
+              ? task.subtasks
+              : withStartupValidationFailure(task.subtasks, failure, detail),
           }));
         }
         if (!runController.isCurrentRun(runRequestId, "design")) {
@@ -1874,7 +1965,7 @@ export function WorkspaceSessionProvider({
           openGenerationResultDialog(
             failedRunResultDialog({
               clientTaskId,
-              message: detail,
+              failure,
               runId,
               stageLabel: "设计模型",
             }),
@@ -1908,6 +1999,7 @@ export function WorkspaceSessionProvider({
       requirementModelTraceability,
       requirementReviewCandidates,
       requirementText,
+      requireResolvedRequirementReviews,
       runController,
       rules,
       rulesBasedOnTextVersion,
@@ -1946,7 +2038,9 @@ export function WorkspaceSessionProvider({
           (model): model is DesignDiagramModelSpec => Boolean(model),
         );
         if (availableDesignModels.length === 0) {
-          throw new Error("请先生成设计模型，再生成前端原型代码");
+          throw new PresentedOperationError(
+            operationFailureForCode("DESIGN_MODELS_MISSING"),
+          );
         }
         const designBlockReason = downstreamDesignBlockReason({
           designDiagramErrors,
@@ -1954,16 +2048,13 @@ export function WorkspaceSessionProvider({
           models,
         });
         if (designBlockReason) {
-          throw new Error(designBlockReason);
-        }
-        const currentPendingRequirementReviews =
-          requirementRuleIdsBlockingGeneration(
-            requirementBaseline,
-            requirementReviewCandidates,
+          throw new PresentedOperationError(
+            operationFailureForCode("DESIGN_MODELS_INVALID", {
+              params: { count: 1 },
+            }),
           );
-        if (currentPendingRequirementReviews.length > 0) {
-          throw new Error("请先确认需求规则修复结果");
         }
+        await requireResolvedRequirementReviews();
         const activeRequirementFingerprint = requirementInputFingerprintFor(
           requirementText,
           rules,
@@ -2032,13 +2123,20 @@ export function WorkspaceSessionProvider({
           Object.values(models),
         );
         if (currentRulesStale || currentStaleDiagrams.length > 0) {
-          throw new Error("需求模型基于旧需求规则，请先重新生成需求模型");
+          throw new PresentedOperationError(
+            operationFailureForCode("REQUIREMENT_MODELS_STALE", {
+              params: { count: Math.max(1, currentStaleDiagrams.length) },
+              details: { diagramKinds: currentStaleDiagrams },
+            }),
+          );
         }
         if (
           currentRequirementDiagrams.length > 0 &&
           requirementTraceabilityMissing
         ) {
-          throw new Error("需求模型缺少完整元素级映射，请先重新生成需求模型");
+          throw new PresentedOperationError(
+            operationFailureForCode("REQUIREMENT_TRACEABILITY_MISSING"),
+          );
         }
         if (
           generatedDesignDiagrams.length > 0 &&
@@ -2050,10 +2148,11 @@ export function WorkspaceSessionProvider({
             manualModelEditStatus,
             requirementModels: Object.values(models),
           });
-          throw new Error(
-            details
-              ? `设计模型缺少完整元素级映射，请先重新生成设计模型（${details}）`
-              : "设计模型缺少完整元素级映射，请先重新生成设计模型",
+          throw new PresentedOperationError(
+            operationFailureForCode("DESIGN_MODELS_INVALID", {
+              params: { count: 1 },
+              details: { reason: details },
+            }),
           );
         }
         const availableDesignPlantUml = Object.entries(designPlantUml)
@@ -2226,18 +2325,26 @@ export function WorkspaceSessionProvider({
         }
       } catch (error) {
         const billingBlock = parseBillingEntitlementError(error);
+        const failure = operationFailurePresentation(error, {
+          hasTaskDetails: Boolean(runId || clientTaskId),
+        });
         const detail =
           billingBlock?.message ??
-          (error instanceof Error ? error.message : "代码生成失败");
+          failure.message;
         if (clientTaskId) {
           updateGenerationTask(clientTaskId, (task) => ({
             ...task,
             status: "failed",
             progress: 100,
             message: null,
+            messageCode: billingBlock ? task.messageCode : failure.code,
+            messageParams: billingBlock ? task.messageParams : failure.params,
             errorMessage: detail,
             finishedAt: new Date().toISOString(),
             diagnostics: addLocalFailureToDiagnostics(task.diagnostics, detail),
+            subtasks: runId
+              ? task.subtasks
+              : withStartupValidationFailure(task.subtasks, failure, detail),
           }));
         }
         if (!runController.isCurrentRun(runRequestId, "code")) {
@@ -2269,7 +2376,7 @@ export function WorkspaceSessionProvider({
           openGenerationResultDialog(
             failedRunResultDialog({
               clientTaskId,
-              message: detail,
+              failure,
               runId,
               stageLabel: "代码原型",
             }),
@@ -2307,6 +2414,7 @@ export function WorkspaceSessionProvider({
       requirementModelTraceability,
       requirementReviewCandidates,
       requirementText,
+      requireResolvedRequirementReviews,
       runController,
       rules,
       rulesBasedOnTextVersion,
@@ -2383,13 +2491,17 @@ export function WorkspaceSessionProvider({
           documentKind === "requirementsSpec" &&
           requirementModels.length === 0
         ) {
-          throw new Error("请先在需求模型页生成需求模型，再导出需求规格说明书");
+          throw new PresentedOperationError(
+            operationFailureForCode("REQUIREMENT_MODELS_MISSING"),
+          );
         }
         if (
           documentKind === "softwareDesignSpec" &&
           availableDesignModels.length === 0
         ) {
-          throw new Error("请先在设计模型页生成设计模型，再导出软件设计说明书");
+          throw new PresentedOperationError(
+            operationFailureForCode("DESIGN_MODELS_MISSING"),
+          );
         }
         const designBlockReason =
           documentKind === "softwareDesignSpec"
@@ -2400,20 +2512,17 @@ export function WorkspaceSessionProvider({
               })
             : null;
         if (designBlockReason) {
-          throw new Error(designBlockReason);
+          throw new PresentedOperationError(
+            operationFailureForCode("DESIGN_MODELS_INVALID", {
+              params: { count: 1 },
+            }),
+          );
         }
         const activeRequirementFingerprint = requirementInputFingerprintFor(
           requirementText,
           rules,
         );
-        const currentPendingRequirementReviews =
-          requirementRuleIdsBlockingGeneration(
-            requirementBaseline,
-            requirementReviewCandidates,
-          );
-        if (currentPendingRequirementReviews.length > 0) {
-          throw new Error("请先确认需求规则修复结果");
-        }
+        await requireResolvedRequirementReviews();
         const currentRulesStale =
           rules.length > 0 &&
           (requirementInputFingerprint
@@ -2485,7 +2594,16 @@ export function WorkspaceSessionProvider({
             (currentRequirementDiagrams.length > 0 &&
               requirementTraceabilityMissing))
         ) {
-          throw new Error("需求模型或元素级映射已过期，请先重新生成需求模型");
+          throw new PresentedOperationError(
+            operationFailureForCode(
+              requirementTraceabilityMissing
+                ? "REQUIREMENT_TRACEABILITY_MISSING"
+                : "REQUIREMENT_MODELS_STALE",
+              requirementTraceabilityMissing
+                ? undefined
+                : { params: { count: Math.max(1, currentStaleDiagrams.length) } },
+            ),
+          );
         }
         if (
           documentKind === "softwareDesignSpec" &&
@@ -2502,10 +2620,11 @@ export function WorkspaceSessionProvider({
             manualModelEditStatus,
             requirementModels: Object.values(models),
           });
-          throw new Error(
-            details
-              ? `设计链路或元素级映射已过期，请先重新生成需求模型和设计模型（${details}）`
-              : "设计链路或元素级映射已过期，请先重新生成需求模型和设计模型",
+          throw new PresentedOperationError(
+            operationFailureForCode("DESIGN_MODELS_INVALID", {
+              params: { count: 1 },
+              details: { reason: details },
+            }),
           );
         }
 
@@ -2679,18 +2798,26 @@ export function WorkspaceSessionProvider({
         return snapshot;
       } catch (error) {
         const billingBlock = parseBillingEntitlementError(error);
+        const failure = operationFailurePresentation(error, {
+          hasTaskDetails: Boolean(runId || clientTaskId),
+        });
         const detail =
           billingBlock?.message ??
-          (error instanceof Error ? error.message : "说明书生成失败");
+          failure.message;
         if (clientTaskId) {
           updateGenerationTask(clientTaskId, (task) => ({
             ...task,
             status: "failed",
             progress: 100,
             message: null,
+            messageCode: billingBlock ? task.messageCode : failure.code,
+            messageParams: billingBlock ? task.messageParams : failure.params,
             errorMessage: detail,
             finishedAt: new Date().toISOString(),
             diagnostics: addLocalFailureToDiagnostics(task.diagnostics, detail),
+            subtasks: runId
+              ? task.subtasks
+              : withStartupValidationFailure(task.subtasks, failure, detail),
           }));
         }
         if (runId && repository.getDocumentRunSnapshot) {
@@ -2718,7 +2845,7 @@ export function WorkspaceSessionProvider({
           openGenerationResultDialog(
             failedRunResultDialog({
               clientTaskId,
-              message: detail,
+              failure,
               runId,
               stageLabel: "说明书",
             }),
@@ -2757,6 +2884,7 @@ export function WorkspaceSessionProvider({
       requirementModelTraceability,
       requirementReviewCandidates,
       requirementText,
+      requireResolvedRequirementReviews,
       runController,
       rules,
       rulesBasedOnTextVersion,
@@ -2838,11 +2966,11 @@ export function WorkspaceSessionProvider({
   );
 
   const handleAutoCompletedRuleMappingPersistenceFailure = useCallback(
-    (error: unknown, stageLabel: "需求模型" | "设计模型") => {
-      const detail =
-        error instanceof Error
-          ? error.message
-          : "需求规则映射保存失败，已阻止下游生成。";
+    (_error: unknown, stageLabel: "需求模型" | "设计模型") => {
+      const failure = operationFailureForCode("REQUIREMENT_REVIEW_SAVE_FAILED", {
+        retryable: true,
+      });
+      const detail = failure.message;
       const startedAtMs = Date.now();
       const clientTaskId = enqueueGenerationTask({
         kind: stageLabel === "设计模型" ? "design" : "requirements",
@@ -2865,6 +2993,8 @@ export function WorkspaceSessionProvider({
         status: "failed",
         progress: 100,
         message: null,
+        messageCode: failure.code,
+        messageParams: failure.params,
         errorMessage: detail,
         phaseSummary: "自动补齐后的需求规则映射未保存，已阻止下游生成。",
         finishedAt: new Date().toISOString(),
@@ -2874,7 +3004,7 @@ export function WorkspaceSessionProvider({
       openGenerationResultDialog(
         failedRunResultDialog({
           clientTaskId,
-          message: detail,
+          failure,
           runId: null,
           stageLabel,
         }),
@@ -2886,6 +3016,29 @@ export function WorkspaceSessionProvider({
 
   const generateDiagrams = useCallback(
     async (only?: DiagramType[]) => {
+      let reviewResolution: Awaited<
+        ReturnType<typeof autoAcceptSafeRequirementReviewCandidates>
+      >;
+      try {
+        reviewResolution = await autoAcceptSafeRequirementReviewCandidates();
+      } catch (error) {
+        handleAutoCompletedRuleMappingPersistenceFailure(error, "需求模型");
+        return;
+      }
+      if (reviewResolution.blockingRuleIds.length > 0) {
+        const failure = operationFailureForCode("REQUIREMENT_REVIEWS_PENDING", {
+          params: { count: reviewResolution.blockingRuleIds.length },
+          details: { ruleIds: reviewResolution.blockingRuleIds },
+        });
+        showGenerationPreflightBlock(
+          failedRunResultDialog({
+            failure,
+            runId: null,
+            stageLabel: "需求模型",
+          }),
+        );
+        return;
+      }
       const preflight = analyzeRequirementGenerationPreflight({
         diagramInputFingerprints,
         diagramVersions,
@@ -2893,10 +3046,10 @@ export function WorkspaceSessionProvider({
         manualModelEditStatus,
         models,
         only,
-        requirementBaseline,
+        requirementBaseline: reviewResolution.baseline,
         requirementInputFingerprint,
         requirementModelTraceability,
-        requirementReviewCandidates,
+        requirementReviewCandidates: reviewResolution.candidates,
         requirementText,
         rules,
         rulesBasedOnTextVersion,
@@ -2923,9 +3076,9 @@ export function WorkspaceSessionProvider({
 
       const rulesSnapshot = plan.needsRulesRun
         ? await runGeneration([], { kind: "rules-only" }, undefined, {
+            abortOnPendingRuleReviews: true,
             deferRulesOnlySnapshotApplication: plan.rulesRunMode === "merge",
             suppressSuccessDialog: true,
-            skipRuleRepairCandidates: true,
           })
         : null;
       if (plan.needsRulesRun && !rulesSnapshot) return;
@@ -2967,6 +3120,7 @@ export function WorkspaceSessionProvider({
     },
     [
       appendAutoGeneratedUpstreamReviews,
+      autoAcceptSafeRequirementReviewCandidates,
       confirmGeneration,
       diagramInputFingerprints,
       diagramVersions,
@@ -2992,6 +3146,29 @@ export function WorkspaceSessionProvider({
 
   const generateDesignDiagrams = useCallback(
     async (only?: DesignDiagramType[]) => {
+      let reviewResolution: Awaited<
+        ReturnType<typeof autoAcceptSafeRequirementReviewCandidates>
+      >;
+      try {
+        reviewResolution = await autoAcceptSafeRequirementReviewCandidates();
+      } catch (error) {
+        handleAutoCompletedRuleMappingPersistenceFailure(error, "设计模型");
+        return;
+      }
+      if (reviewResolution.blockingRuleIds.length > 0) {
+        const failure = operationFailureForCode("REQUIREMENT_REVIEWS_PENDING", {
+          params: { count: reviewResolution.blockingRuleIds.length },
+          details: { ruleIds: reviewResolution.blockingRuleIds },
+        });
+        showGenerationPreflightBlock(
+          failedRunResultDialog({
+            failure,
+            runId: null,
+            stageLabel: "设计模型",
+          }),
+        );
+        return;
+      }
       const preflight = analyzeDesignGenerationPreflight({
         designInputFingerprints,
         designDiagramErrors,
@@ -3003,10 +3180,10 @@ export function WorkspaceSessionProvider({
         manualModelEditStatus,
         models,
         only,
-        requirementBaseline,
+        requirementBaseline: reviewResolution.baseline,
         requirementInputFingerprint,
         requirementModelTraceability,
-        requirementReviewCandidates,
+        requirementReviewCandidates: reviewResolution.candidates,
         requirementText,
         rules,
         rulesBasedOnTextVersion,
@@ -3041,10 +3218,10 @@ export function WorkspaceSessionProvider({
 
       const rulesSnapshot = requirementPlan.needsRulesRun
         ? await runGeneration([], { kind: "rules-only" }, undefined, {
+            abortOnPendingRuleReviews: true,
             deferRulesOnlySnapshotApplication:
               requirementPlan.rulesRunMode === "merge",
             suppressSuccessDialog: true,
-            skipRuleRepairCandidates: true,
           })
         : null;
       if (requirementPlan.needsRulesRun && !rulesSnapshot) return;
@@ -3139,6 +3316,7 @@ export function WorkspaceSessionProvider({
     },
     [
       appendAutoGeneratedUpstreamReviews,
+      autoAcceptSafeRequirementReviewCandidates,
       confirmGeneration,
       designDiagramErrors,
       designInputFingerprints,
@@ -3290,7 +3468,7 @@ export function WorkspaceSessionProvider({
       clearBillingGenerationBlock,
       generationTasks,
       visibleGenerationTask,
-      selectedGenerationTaskId: visibleGenerationTask?.clientTaskId ?? null,
+      selectedGenerationTaskId,
       selectGenerationTask,
       clearCompletedGenerationTasks,
       reconcileGenerationTasksWithProjectRuns,
@@ -3405,6 +3583,7 @@ export function WorkspaceSessionProvider({
       clearBillingGenerationBlock,
       generationTasks,
       visibleGenerationTask,
+      selectedGenerationTaskId,
       selectGenerationTask,
       clearCompletedGenerationTasks,
       reconcileGenerationTasksWithProjectRuns,

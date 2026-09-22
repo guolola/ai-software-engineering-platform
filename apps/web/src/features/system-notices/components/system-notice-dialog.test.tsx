@@ -4,6 +4,7 @@ import confetti from "canvas-confetti";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SystemNoticeButton } from "./system-notice-dialog";
 import { i18n } from "../../../shared/i18n/i18n";
+import { FloatingAlertProvider } from "../../../shared/ui/floating-alert";
 
 vi.mock("canvas-confetti", () => ({
   default: vi.fn(),
@@ -81,7 +82,7 @@ describe("SystemNoticeButton", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const user = userEvent.setup();
-    render(<SystemNoticeButton className="size-10" />);
+    render(<FloatingAlertProvider><SystemNoticeButton className="size-10" /></FloatingAlertProvider>);
 
     await waitFor(() => {
       expect(
@@ -192,7 +193,7 @@ describe("SystemNoticeButton", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const user = userEvent.setup();
-    render(<SystemNoticeButton className="size-10" />);
+    render(<FloatingAlertProvider><SystemNoticeButton className="size-10" /></FloatingAlertProvider>);
 
     await screen.findByRole("button", { name: "系统通知，2 条未读" });
     await user.click(screen.getByRole("button", { name: "系统通知，2 条未读" }));
@@ -214,7 +215,7 @@ describe("SystemNoticeButton", () => {
     )));
 
     const user = userEvent.setup();
-    render(<SystemNoticeButton />);
+    render(<FloatingAlertProvider><SystemNoticeButton /></FloatingAlertProvider>);
     await user.click(await screen.findByRole("button", { name: "System notices, 2 unread" }));
 
     expect(await screen.findByRole("dialog", { name: "System notices" })).toBeInTheDocument();

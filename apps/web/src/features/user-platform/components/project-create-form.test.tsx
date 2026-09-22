@@ -2,12 +2,13 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { toast } from "sonner";
+import { floatingAlert as toast } from "../../../shared/ui/floating-alert";
 import { ProjectCreateForm } from "./project-create-form";
 
-vi.mock("sonner", () => ({
-  toast: { success: vi.fn() },
-}));
+vi.mock("../../../shared/ui/floating-alert", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../shared/ui/floating-alert")>();
+  return { ...actual, floatingAlert: { ...actual.floatingAlert, success: vi.fn(), error: vi.fn() } };
+});
 
 describe("ProjectCreateForm", () => {
   beforeEach(() => {

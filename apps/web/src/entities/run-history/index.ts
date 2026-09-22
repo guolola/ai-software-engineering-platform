@@ -5,6 +5,7 @@ import type {
   DocumentKind,
   DocumentRunSnapshot,
   RequirementRule,
+  RunError,
   RunSnapshot,
 } from "@uml-platform/contracts";
 import {
@@ -12,6 +13,7 @@ import {
   DIAGRAM_META,
 } from "../diagram/model";
 import { formatCodeDiagnosticSummary } from "../../shared/lib/code-diagnostics";
+import { localizeRunFailure } from "../../shared/i18n/api-errors";
 
 export const RUN_HISTORY_STORAGE_KEY = "uml-platform.run-history.v1";
 export const RUN_HISTORY_LIMIT = 12;
@@ -70,6 +72,7 @@ export interface RunHistoryItem {
 export interface RunHistoryDiagramErrorSummary {
   diagramId: string;
   stage?: string | null;
+  error?: RunError | null;
   message: string;
 }
 
@@ -368,8 +371,11 @@ function getDesignDiagramLabel(diagramId: string) {
 }
 
 function summarizeDiagramError(error: RunHistoryDiagramErrorSummary) {
-  const details = [error.stage, error.message].filter(Boolean).join("：");
-  return details || error.message;
+  const message = localizeRunFailure(
+    error.error,
+    "图表生成失败，请稍后重试。",
+  );
+  return [error.stage, message].filter(Boolean).join("：") || message;
 }
 
 export function formatRunHistoryDiagramErrorSummary(
@@ -408,12 +414,16 @@ function readSnapshotDiagramErrorSummary(
 ): RunHistoryDiagramErrorSummary[] {
   if (!("diagramErrors" in snapshot)) return [];
   return Object.entries(snapshot.diagramErrors).flatMap(([diagramId, value]) => {
-    const message = value?.error?.message;
-    if (!message) return [];
+    if (!value?.error) return [];
+    const message = localizeRunFailure(
+      value.error,
+      "模型生成失败，请稍后重试。",
+    );
     return [
       {
         diagramId,
         stage: value.stage,
+        error: value.error,
         message,
       },
     ];
@@ -459,7 +469,9 @@ export function getRunHistorySnapshotSummary(snapshot: RunHistorySnapshot) {
   ) {
     return [
       "需求规则抽取失败",
-      snapshot.error?.message,
+      snapshot.error
+        ? localizeRunFailure(snapshot.error, "生成任务失败，请稍后重试。")
+        : null,
     ].filter(Boolean).join("：");
   }
 

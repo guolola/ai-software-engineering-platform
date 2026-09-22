@@ -1,5 +1,6 @@
 // Projects ordered run events into user-readable steps, keeping parallel calls and retries separate.
 import type { RunEvent, RunStage } from "@uml-platform/contracts";
+import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 import { formatStageForDiagnostics, sanitizeDiagnosticText } from "../../workspace-session/lib/diagnostics";
 import type { GenerationSubtask } from "../../workspace-session/model/session-state";
 
@@ -214,8 +215,40 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
     } else if (event.type === "failed" || event.type === "cancelled") {
       terminalAt = at;
       status = event.type;
-      finalMessage = event.type === "failed" ? readableTaskText(event.error.message) : "任务已停止，已完成的过程保留。";
+      finalMessage = event.type === "failed"
+        ? readableTaskText(localizeRunFailure(event.error, "生成任务失败，请稍后重试。"))
+        : "任务已停止，已完成的过程保留。";
       break;
+    }
+  }
+  const startupValidation = subtasks.find(
+    (subtask) => subtask.id === "start_validation",
+  );
+  if (startupValidation) {
+    const step = getStep("extract_rules");
+    step.title = readableTaskText(startupValidation.label);
+    const call = getCall(
+      step,
+      "extract_rules:start_validation",
+      undefined,
+      undefined,
+      startupValidation.label,
+    );
+    call.title = readableTaskText(startupValidation.label);
+    call.status = startupValidation.status as TranscriptStatus;
+    if (startupValidation.status === "failed") {
+      const localizedMessage = startupValidation.messageCode
+        ? localizeRunFailure(
+            {
+              code: startupValidation.messageCode,
+              params: startupValidation.messageParams,
+            },
+            "生成任务失败，请稍后重试。",
+          )
+        : "生成任务失败，请稍后重试。";
+      call.message = localizedMessage;
+      finalMessage = localizedMessage;
+      status = "failed";
     }
   }
   const terminal = !["queued", "running", "idle"].includes(status);
@@ -230,7 +263,14 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       call.title = readableTaskText(subtask.label);
       call.status = ["repairing", "rendering"].includes(subtask.status) ? "running" : subtask.status as TranscriptStatus;
       if (subtask.status === "pending_review") call.message = `有 ${subtask.pendingReviewCount ?? 1} 条追踪关系需复核`;
-      else if (subtask.status === "failed") call.message = "此模型未能完成生成，可重试。";
+      else if (subtask.status === "failed") {
+        call.message = subtask.messageCode
+          ? localizeRunFailure(
+              { code: subtask.messageCode, params: subtask.messageParams },
+              "生成任务失败，请稍后重试。",
+            )
+          : "此模型未能完成生成，可重试。";
+      }
     }
     for (const call of step.calls) {
       if (terminal && ["running", "queued"].includes(call.status)) {

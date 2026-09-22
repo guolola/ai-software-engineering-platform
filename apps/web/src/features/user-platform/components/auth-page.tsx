@@ -31,6 +31,7 @@ import { Input } from "../../../shared/ui/input";
 import { Checkbox } from '../../../shared/ui/checkbox';
 import { Label } from "../../../shared/ui/label";
 import { LanguagePreferenceMenu } from "../../../shared/i18n/components/language-preference-menu";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 import {
   getQueryParam,
   getSafeRedirectPath,
@@ -164,7 +165,7 @@ export function AuthPage({
       ""
     );
   });
-  const [message, setMessage] = useState("");
+  const [termsError, setTermsError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const urlToken =
     typeof window === "undefined"
@@ -174,6 +175,7 @@ export function AuthPage({
   const queryEmail = getQueryParam("email");
   const authReason = getQueryParam("reason");
   const redirectPath = getSafeRedirectPath();
+  const resetTokenMissing = path === "/reset-password" && !urlToken;
 
   useEffect(() => {
     if (path === "/verify-email") {
@@ -198,7 +200,7 @@ export function AuthPage({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
-    setMessage("");
+    setTermsError("");
     try {
       if (path === "/login") {
         if (mfaChallenge) {
@@ -208,7 +210,7 @@ export function AuthPage({
           });
           writeRememberedLoginCredentials({ email, password }, rememberLogin);
           notifyAuthSessionChanged();
-          setMessage(t("auth.page.mfaSuccess"));
+          showAlert({ title: t("auth.page.mfaSuccess"), tone: "success" });
           onNavigate(redirectPath);
           return;
         }
@@ -224,18 +226,17 @@ export function AuthPage({
         if (nextMfaChallenge) {
           setMfaChallenge(nextMfaChallenge);
           setMfaCode("");
-          setMessage("");
           return;
         }
         writeRememberedLoginCredentials({ email, password }, rememberLogin);
         notifyAuthSessionChanged();
-        setMessage(t("auth.page.loginSuccess"));
+        showAlert({ title: t("auth.page.loginSuccess"), tone: "success" });
         onNavigate(redirectPath);
         return;
       }
       if (path === "/register") {
         if (!termsAccepted) {
-          setMessage(t("auth.page.termsRequired"));
+          setTermsError(t("auth.page.termsRequired"));
           return;
         }
         const trimmedInvitationToken = invitationToken.trim();
@@ -248,6 +249,7 @@ export function AuthPage({
             ? { invitationToken: trimmedInvitationToken }
             : {}),
         });
+        showAlert({ title: t("auth.page.registerSuccess"), tone: "success" });
         if (trimmedInvitationToken) {
           await platformApi.acceptInvitation(trimmedInvitationToken);
           onNavigate(`/verify-email?email=${encodeURIComponent(email)}&sent=1`);
@@ -258,16 +260,16 @@ export function AuthPage({
       }
       if (path === "/forgot-password") {
         await platformApi.forgotPassword({ email });
-        setMessage(t("auth.page.resetSent", { email: email || t("auth.page.yourEmail") }));
+        showAlert({
+          title: t("auth.page.resetSent", { email: email || t("auth.page.yourEmail") }),
+          tone: "success",
+        });
         return;
       }
       if (path === "/reset-password") {
-        if (!urlToken) {
-          setMessage(t("auth.page.resetTokenMissing"));
-          return;
-        }
+        if (!urlToken) return;
         await platformApi.resetPassword({ token: urlToken, newPassword: password });
-        setMessage(t("auth.page.resetSuccess"));
+        showAlert({ title: t("auth.page.resetSuccess"), tone: "success" });
         onNavigate("/login");
         return;
       }
@@ -276,23 +278,23 @@ export function AuthPage({
         if (token) {
           await platformApi.verifyEmail({ token });
           const loginEmail = email || queryEmail;
-          setMessage(t("auth.page.verifySuccessRedirect"));
+          showAlert({ title: t("auth.page.verifySuccessRedirect"), tone: "success" });
           onNavigate(
             loginEmail ? `/login?email=${encodeURIComponent(loginEmail)}` : "/login",
           );
           return;
         }
         await platformApi.resendVerification({ email: email || queryEmail });
-        setMessage(t("auth.page.verifyResentToken"));
+        showAlert({ title: t("auth.page.verifyResentToken"), tone: "success" });
         return;
       }
       if (urlToken) {
         await platformApi.verifyEmail({ token: urlToken });
-        setMessage(t("auth.page.verifySuccess"));
+        showAlert({ title: t("auth.page.verifySuccess"), tone: "success" });
         return;
       }
       await platformApi.resendVerification({ email: email || queryEmail });
-      setMessage(t("auth.page.verifyResent"));
+      showAlert({ title: t("auth.page.verifyResent"), tone: "success" });
     } catch (error) {
       if (
         path === "/login" &&
@@ -302,7 +304,10 @@ export function AuthPage({
         onNavigate(`/verify-email?email=${encodeURIComponent(email)}`);
         return;
       }
-      setMessage(error instanceof Error ? error.message : t("auth.page.requestFailed"));
+      showAlert({
+        title: localizeCaughtFailure(error, t("auth.page.requestFailed")),
+        tone: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -541,7 +546,7 @@ export function AuthPage({
               )}
               {path === "/login" && mfaChallenge && (
                 <div className="grid gap-4" data-auth-layout="collectui-two-factor">
-                  <div className="flex items-center justify-between gap-1">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
                     <Label htmlFor="auth-mfa-code" className="text-base">{t("auth.page.mfaCode")}</Label>
                     <Button type="button" variant="link" className="h-auto p-0 text-base" onClick={() => { setUseRecoveryCode(!useRecoveryCode); setMfaCode(''); }}>
                       {t(useRecoveryCode ? 'auth.page.useAuthenticator' : 'auth.page.useRecoveryCode')}
@@ -549,8 +554,8 @@ export function AuthPage({
                   </div>
                   {useRecoveryCode ? <Input id="auth-mfa-code" autoComplete="one-time-code" value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} required className={authInputClass} /> :
                   <InputOTP id="auth-mfa-code" maxLength={6} pattern="[0-9]*" inputMode="numeric" autoComplete="one-time-code" value={mfaCode} onChange={setMfaCode} required>
-                    <InputOTPGroup className="w-full justify-center gap-4 *:data-[slot=input-otp-slot]:rounded-lg *:data-[slot=input-otp-slot]:border">
-                      {[0,1,2,3,4,5].map(index => <InputOTPSlot key={index} index={index} className="input-size-lg" />)}
+                    <InputOTPGroup className="w-full min-w-0 justify-center gap-1 *:data-[slot=input-otp-slot]:rounded-lg *:data-[slot=input-otp-slot]:border sm:gap-4">
+                      {[0,1,2,3,4,5].map(index => <InputOTPSlot key={index} index={index} className="size-9 sm:size-10" />)}
                     </InputOTPGroup>
                   </InputOTP>}
                   <span className="text-xs text-muted-foreground">
@@ -608,16 +613,28 @@ export function AuthPage({
                       className={authInputClass}
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="terms"
-                      checked={termsAccepted}
-                      onCheckedChange={setTermsAccepted}
-                      className="size-4 accent-primary"
-                    />
-                    <Label htmlFor="terms" className="text-sm text-muted-foreground">
-                      {t("auth.page.terms")}
-                    </Label>
+                  <div className="grid gap-1.5">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="terms"
+                        checked={termsAccepted}
+                        aria-invalid={Boolean(termsError)}
+                        aria-describedby={termsError ? "terms-error" : undefined}
+                        onCheckedChange={(checked) => {
+                          setTermsAccepted(checked);
+                          if (checked) setTermsError("");
+                        }}
+                        className="size-4 accent-primary"
+                      />
+                      <Label htmlFor="terms" className="text-sm text-muted-foreground">
+                        {t("auth.page.terms")}
+                      </Label>
+                    </div>
+                    {termsError && (
+                      <p id="terms-error" role="alert" className="text-xs text-destructive">
+                        {termsError}
+                      </p>
+                    )}
                   </div>
                 </>
               )}
@@ -651,7 +668,12 @@ export function AuthPage({
                   )}
                 </>
               )}
-              <Button type="submit" disabled={submitting} className={authPrimaryActionClass}>
+              {resetTokenMissing && (
+                <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  {t("auth.page.resetTokenMissing")}
+                </div>
+              )}
+              <Button type="submit" disabled={submitting || resetTokenMissing} className={authPrimaryActionClass}>
                 {submitting && <Loader2 className="size-4 animate-spin" />}
                 {submitLabel}
               </Button>
@@ -675,11 +697,6 @@ export function AuthPage({
                 <Button type="button" variant="ghost" className="w-fit px-0" onClick={() => onNavigate("/login")}>
                   {t("auth.page.backLogin")}
                 </Button>
-              )}
-              {message && (
-                <div className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">
-                  {message}
-                </div>
               )}
             </form>
             </div>

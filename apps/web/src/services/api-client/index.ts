@@ -1,6 +1,15 @@
 // Centralizes HTTP URL resolution, JSON requests, downloads, and error parsing.
-import { runErrorSchema, type RunError } from "@uml-platform/contracts";
-import { localizeApiFailure } from "../../shared/i18n/api-errors";
+import {
+  apiErrorSchema,
+  runErrorSchema,
+  type ApiError,
+  type RunError,
+} from "@uml-platform/contracts";
+import {
+  isRequestAbort,
+  localizeApiFailure,
+  localizeNetworkFailure,
+} from "../../shared/i18n/api-errors";
 import { i18n } from "../../shared/i18n/i18n";
 
 const APP_API_BASE_URL =
@@ -11,6 +20,7 @@ export class ApiClientError extends Error {
   readonly status: number;
   readonly payload: unknown;
   readonly error: RunError | null;
+  readonly apiError: ApiError | null;
 
   constructor(message: string, status: number, payload?: unknown) {
     super(message);
@@ -18,6 +28,7 @@ export class ApiClientError extends Error {
     this.status = status;
     this.payload = payload;
     this.error = parseRunErrorFromPayload(payload);
+    this.apiError = parseApiErrorFromPayload(payload);
   }
 }
 
@@ -66,12 +77,28 @@ function parseRunErrorFromPayload(payload: unknown) {
   return parsed.success ? parsed.data : null;
 }
 
+async function fetchApiResponse(input: RequestInfo | URL, init?: RequestInit) {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    if (isRequestAbort(error)) throw error;
+    throw new ApiClientError(localizeNetworkFailure(), 0);
+  }
+}
+
+function parseApiErrorFromPayload(payload: unknown) {
+  if (!payload || typeof payload !== "object") return null;
+  const maybeError = "error" in payload ? payload.error : payload;
+  const parsed = apiErrorSchema.safeParse(maybeError);
+  return parsed.success ? parsed.data : null;
+}
+
 export async function requestJson<T>(
   path: string,
   options: RequestInit & { errorKey?: string; errorMessage?: string } = {},
 ): Promise<T> {
   const { errorKey, errorMessage, ...requestOptions } = options;
-  const response = await fetch(buildApiUrl(path), {
+  const response = await fetchApiResponse(buildApiUrl(path), {
     credentials: "include",
     ...requestOptions,
   });
@@ -121,7 +148,7 @@ export async function downloadBlob(
     defaultFileName = "download",
     ...requestOptions
   } = options;
-  const response = await fetch(buildApiUrl(path), {
+  const response = await fetchApiResponse(buildApiUrl(path), {
     credentials: "include",
     ...requestOptions,
   });

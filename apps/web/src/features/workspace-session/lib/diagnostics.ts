@@ -1,6 +1,7 @@
 // Converts run events into bounded diagnostics state for the workspace shell.
 
 import type { RunEvent, RunStage } from "@uml-platform/contracts";
+import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 import type { DiagnosticEvent, RunDiagnostics } from "../model/session-state";
 import { isTerminalRunEvent } from "./run-events";
 import { appendTranscriptEvent } from "./run-transcript";
@@ -214,7 +215,9 @@ export function summarizeEvent(event: RunEvent): DiagnosticEvent {
         id: `${suffix}:failed`,
         at,
         label: "任务失败",
-        detail: sanitizeDiagnosticText(event.error.message),
+        detail: sanitizeDiagnosticText(
+          localizeRunFailure(event.error, "生成任务失败，请稍后重试。"),
+        ),
       };
     case "cancelled":
       return {

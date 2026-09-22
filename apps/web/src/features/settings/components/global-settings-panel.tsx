@@ -11,8 +11,8 @@ import type {
   ProviderModelCapabilityMap,
   ProviderModelDiscoveryProgressEvent,
 } from "@uml-platform/contracts";
-import { toast } from "sonner";
 import { Button } from "../../../shared/ui/button";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +50,10 @@ import {
   invalidateProviderConfigCache,
   loadProviderConfigs,
 } from "../../user-platform/services/provider-config-cache";
+import {
+  localizeApiFailure,
+  localizeCaughtFailure,
+} from "../../../shared/i18n/api-errors";
 
 type GlobalSettingsPanelProps = {
   active: boolean;
@@ -270,9 +274,7 @@ export function GlobalSettingsPanel({
         setProviderStatus(
           error instanceof PlatformApiError && error.status === 401
             ? t("providerSettings.loginRequired")
-            : error instanceof Error
-              ? error.message
-              : t("providerSettings.authCheckFailed"),
+            : localizeCaughtFailure(error, t("providerSettings.authCheckFailed")),
         );
       })
       .finally(() => {
@@ -443,7 +445,7 @@ export function GlobalSettingsPanel({
 
   const discoverModels = async () => {
     if (!canDiscoverModels) {
-      toast.error(t("providerSettings.baseKeyRequired"));
+      floatingAlert.error(t("providerSettings.baseKeyRequired"));
       return;
     }
     setDiscoveringModels(true);
@@ -454,7 +456,13 @@ export function GlobalSettingsPanel({
     setDiscoveryProgressValue(4);
     try {
       let models: ProviderDiscoveredModel[] = [];
-      let streamError = "";
+      const streamState: {
+        failure: {
+          code?: string;
+          retryable?: boolean;
+          status?: number;
+        } | null;
+      } = { failure: null };
       await platformApi.discoverProviderModelsStream(
         {
           baseUrl: providerForm.baseUrl.trim(),
@@ -467,12 +475,32 @@ export function GlobalSettingsPanel({
             models = event.result.models.filter((model) => model.id.trim());
           }
           if (event.type === "error") {
-            streamError = event.message;
+            streamState.failure = {
+              code: event.code,
+              retryable: event.retryable,
+              status: event.status,
+            };
           }
         },
       );
-      if (streamError) {
-        throw new Error(streamError);
+      const streamFailure = streamState.failure;
+      if (streamFailure) {
+        const status = streamFailure.status ?? 502;
+        const payload = streamFailure.code
+          ? {
+              error: {
+                code: streamFailure.code,
+                category: "provider",
+                retryable: streamFailure.retryable === true,
+              },
+            }
+          : null;
+        throw new PlatformApiError(
+          localizeApiFailure(payload, status, t("providerSettings.discoveryFailed")),
+          status,
+          streamFailure.code ?? null,
+          streamFailure.retryable === true,
+        );
       }
       setDiscoveredModels(models);
       setModelCatalogSource("discovered");
@@ -487,16 +515,17 @@ export function GlobalSettingsPanel({
         };
       });
       if (models.length === 0) {
-        toast.error(t("providerSettings.noModels"));
+        floatingAlert.error(t("providerSettings.noModels"));
         return;
       }
-      toast.success(t("providerSettings.discoveredModels", { count: models.length }));
+      floatingAlert.success(t("providerSettings.discoveredModels", { count: models.length }));
     } catch (error) {
       setDiscoveredModels([]);
       setModelCatalogSource("");
       setDiscoveryProgressValue(100);
-      setDiscoveryProgressText(error instanceof Error ? error.message : t("providerSettings.discoveryFailed"));
-      toast.error(t("providerSettings.discoveryFailed"));
+      const message = localizeCaughtFailure(error, t("providerSettings.discoveryFailed"));
+      setDiscoveryProgressText(message);
+      floatingAlert.error(message);
     } finally {
       setDiscoveringModels(false);
     }
@@ -504,7 +533,7 @@ export function GlobalSettingsPanel({
 
   const testTemporaryProvider = async () => {
     if (!canTestTemporaryProvider) {
-      toast.error(t("providerSettings.selectDefaultFirst"));
+      floatingAlert.error(t("providerSettings.selectDefaultFirst"));
       return;
     }
     setTestingTemporaryProvider(true);
@@ -516,13 +545,13 @@ export function GlobalSettingsPanel({
         model: providerForm.defaultModel.trim(),
       });
       if (result.ok === false) {
-        toast.error(t("providerSettings.testFailed"));
+        floatingAlert.error(t("providerSettings.testFailed"));
         return;
       }
       setTestedProviderSignature(currentProviderSignature);
-      toast.success(t("providerSettings.testSuccess"));
+      floatingAlert.success(t("providerSettings.testSuccess"));
     } catch (error) {
-      toast.error(t("providerSettings.testFailed"));
+      floatingAlert.error(localizeCaughtFailure(error, t("providerSettings.testFailed")));
     } finally {
       setTestingTemporaryProvider(false);
     }
@@ -531,7 +560,7 @@ export function GlobalSettingsPanel({
   const saveProviderConfig = async () => {
     // Keep save actionable so each missing prerequisite can explain the next required step.
     if (!providerForm.name.trim()) {
-      toast.error(t("providerSettings.nameRequired"));
+      floatingAlert.error(t("providerSettings.nameRequired"));
       return;
     }
     const baseUrlChanged = Boolean(
@@ -541,15 +570,15 @@ export function GlobalSettingsPanel({
     );
     const apiKeyRequired = providerDialogMode === "create" || baseUrlChanged;
     if (!providerForm.baseUrl.trim() || (apiKeyRequired && !providerForm.apiKey.trim())) {
-      toast.error(t("providerSettings.baseKeyRequired"));
+      floatingAlert.error(t("providerSettings.baseKeyRequired"));
       return;
     }
     if (!providerForm.defaultModel.trim() || discoveredModelIds.length === 0) {
-      toast.error(t("providerSettings.selectDefaultFirst"));
+      floatingAlert.error(t("providerSettings.selectDefaultFirst"));
       return;
     }
     if (providerDialogNeedsPassedTest && !temporaryProviderTestPassed) {
-      toast.error(t("providerSettings.testRequired"));
+      floatingAlert.error(t("providerSettings.testRequired"));
       return;
     }
     setSavingProvider(true);
@@ -575,7 +604,7 @@ export function GlobalSettingsPanel({
               apiKey: providerForm.apiKey.trim(),
             });
       await refreshProviderConfigs(saved.id);
-      toast.success(
+      floatingAlert.success(
         providerDialogMode === "edit"
           ? t("providerSettings.providerUpdated")
           : t("providerSettings.providerAdded"),
@@ -583,7 +612,7 @@ export function GlobalSettingsPanel({
       setProviderDialogOpen(false);
       resetProviderCreationForm();
     } catch (error) {
-      toast.error(t("providerSettings.saveProviderFailed"));
+      floatingAlert.error(t("providerSettings.saveProviderFailed"));
     } finally {
       setSavingProvider(false);
     }
@@ -596,9 +625,9 @@ export function GlobalSettingsPanel({
     try {
       await platformApi.revokeProviderConfig(selectedProvider.id);
       await refreshProviderConfigs();
-      toast.success(t("providerSettings.providerDeleted"));
+      floatingAlert.success(t("providerSettings.providerDeleted"));
     } catch (error) {
-      toast.error(t("providerSettings.deleteFailed"));
+      floatingAlert.error(t("providerSettings.deleteFailed"));
     } finally {
       setDeletingProvider(false);
     }
@@ -607,15 +636,15 @@ export function GlobalSettingsPanel({
   const save = () => {
     try {
       if (!settings.providerConfigId) {
-        toast.error(t("providerSettings.managedRequired"));
+        floatingAlert.error(t("providerSettings.managedRequired"));
         return;
       }
       if (!selectedProvider || selectedProviderModels.length === 0) {
-        toast.error(t("providerSettings.noModelsForProvider"));
+        floatingAlert.error(t("providerSettings.noModelsForProvider"));
         return;
       }
       if (!selectedProviderModels.includes(resolvedDefaultModel)) {
-        toast.error(t("providerSettings.modelMustBelong"));
+        floatingAlert.error(t("providerSettings.modelMustBelong"));
         return;
       }
       saveUserSettings({
@@ -625,16 +654,16 @@ export function GlobalSettingsPanel({
         providerLabel: getProviderLabel(selectedProvider),
         defaultModel: resolvedDefaultModel,
       });
-      toast.success(t("providerSettings.saved"));
+      floatingAlert.success(t("providerSettings.saved"));
       onSaved?.();
     } catch {
-      toast.error(t("providerSettings.saveFailed"));
+      floatingAlert.error(t("providerSettings.saveFailed"));
     }
   };
 
   const reset = () => {
     setSettings(DEFAULT_USER_SETTINGS);
-    toast.message(t("providerSettings.restored"));
+    floatingAlert.message(t("providerSettings.restored"));
   };
 
   if (authRequired) {

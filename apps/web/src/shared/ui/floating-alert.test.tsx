@@ -2,7 +2,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { FloatingAlertProvider, useFloatingAlert } from './floating-alert'
+import { FloatingAlertProvider, floatingAlert, showFloatingAlert, useFloatingAlert } from './floating-alert'
 
 function AlertTrigger({ tone = 'success' }: { tone?: 'success' | 'destructive' }) {
   const { showAlert } = useFloatingAlert()
@@ -41,5 +41,20 @@ describe('FloatingAlertProvider', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '关闭提示' }))
     expect(screen.queryByText('保存成功')).not.toBeInTheDocument()
+  })
+
+  it('accepts imperative alerts and replaces an existing alert with the same id', () => {
+    render(<FloatingAlertProvider><div>content</div></FloatingAlertProvider>)
+
+    act(() => {
+      showFloatingAlert({ id: 'network', title: '第一次', tone: 'destructive' })
+      showFloatingAlert({ id: 'network', title: '第二次', tone: 'destructive' })
+      floatingAlert.success('保存完成')
+    })
+
+    expect(screen.queryByText('第一次')).not.toBeInTheDocument()
+    expect(screen.getByText('第二次')).toBeInTheDocument()
+    expect(screen.getByText('保存完成')).toBeInTheDocument()
+    expect(screen.getAllByRole('alert')).toHaveLength(2)
   })
 })

@@ -32,10 +32,15 @@ import {
   type ProviderHostnameResolver,
 } from "../../provider-configs/provider-url-policy.js";
 import {
-  ProviderHttpError,
   runOpenAiCompatibleChatCompletionHealthcheck,
 } from "../../llm.js";
 import { discoverOpenAiCompatibleModelCapabilities } from "../../provider-configs/provider-model-discovery.js";
+import {
+  classifyProviderTestFailure,
+  providerTestError,
+  safeProviderHost,
+  type ProviderTestFailureKind,
+} from "../../provider-configs/provider-test-errors.js";
 import {
   DEFAULT_LOCAL_CORS_ORIGINS,
   readCorsOrigins,
@@ -206,14 +211,7 @@ function parseProviderTestInput(body: unknown, reply: FastifyReply) {
   const parsed = providerConfigTestRequestSchema.safeParse(body ?? {});
   if (!parsed.success) {
     reply.code(400);
-    return {
-      message: parsed.error.issues
-        .map((issue) => {
-          const path = issue.path.length > 0 ? issue.path.join(".") : "request";
-          return `${path}: ${issue.message}`;
-        })
-        .join("; "),
-    } as const;
+    return providerValidationFailure(parsed.error.issues);
   }
   return parsed.data;
 }
@@ -222,14 +220,7 @@ function parseProviderModelDiscoveryInput(body: unknown, reply: FastifyReply) {
   const parsed = providerModelDiscoveryRequestSchema.safeParse(body ?? {});
   if (!parsed.success) {
     reply.code(400);
-    return {
-      message: parsed.error.issues
-        .map((issue) => {
-          const path = issue.path.length > 0 ? issue.path.join(".") : "request";
-          return `${path}: ${issue.message}`;
-        })
-        .join("; "),
-    } as const;
+    return providerValidationFailure(parsed.error.issues);
   }
   return parsed.data;
 }
@@ -238,14 +229,7 @@ function parseTemporaryProviderTestInput(body: unknown, reply: FastifyReply) {
   const parsed = providerConfigTemporaryTestRequestSchema.safeParse(body ?? {});
   if (!parsed.success) {
     reply.code(400);
-    return {
-      message: parsed.error.issues
-        .map((issue) => {
-          const path = issue.path.length > 0 ? issue.path.join(".") : "request";
-          return `${path}: ${issue.message}`;
-        })
-        .join("; "),
-    } as const;
+    return providerValidationFailure(parsed.error.issues);
   }
   return parsed.data;
 }
@@ -254,7 +238,7 @@ function parseSelfServiceCreateInput(body: unknown, reply: FastifyReply) {
   const parsed = providerConfigSelfServiceCreateRequestSchema.safeParse(body ?? {});
   if (!parsed.success) {
     reply.code(400);
-    return { message: parsed.error.issues.map((issue) => `${issue.path.join(".") || "request"}: ${issue.message}`).join("; ") } as const;
+    return providerValidationFailure(parsed.error.issues);
   }
   return parsed.data;
 }
@@ -263,7 +247,7 @@ function parseSelfServiceUpdateInput(body: unknown, reply: FastifyReply) {
   const parsed = providerConfigSelfServiceUpdateRequestSchema.safeParse(body ?? {});
   if (!parsed.success) {
     reply.code(400);
-    return { message: parsed.error.issues.map((issue) => `${issue.path.join(".") || "request"}: ${issue.message}`).join("; ") } as const;
+    return providerValidationFailure(parsed.error.issues);
   }
   return parsed.data;
 }
@@ -272,7 +256,7 @@ function parseSelfServiceRotateInput(body: unknown, reply: FastifyReply) {
   const parsed = providerConfigSelfServiceRotateRequestSchema.safeParse(body ?? {});
   if (!parsed.success) {
     reply.code(400);
-    return { message: parsed.error.issues.map((issue) => `${issue.path.join(".") || "request"}: ${issue.message}`).join("; ") } as const;
+    return providerValidationFailure(parsed.error.issues);
   }
   return parsed.data;
 }
@@ -384,12 +368,45 @@ async function verifyTemporaryProviderConnection({
   return normalizedBaseUrl;
 }
 
-function providerConnectionFailureStatus(error: unknown) {
-  if (error instanceof ProviderConfigPolicyError) return 400;
-  if (error instanceof ProviderHttpError) {
-    return error.status >= 400 && error.status < 500 ? 400 : 502;
+function structuredProviderEndpointFailure(error: unknown) {
+  if (error instanceof ProviderConfigPolicyError) {
+    return {
+      body: providerTestError({
+        code: "PROVIDER_BASE_URL_NOT_ALLOWED",
+        category: "validation",
+      }),
+      failureKind: "connection" as const,
+      statusCode: 400,
+      upstreamStatus: null,
+    };
   }
-  return 502;
+  const failure = classifyProviderTestFailure(error);
+  return {
+    body: providerTestError({
+      code: failure.code,
+      retryable: failure.retryable,
+      details: {
+        failureKind: failure.failureKind,
+        upstreamStatus: failure.upstreamStatus,
+      },
+    }),
+    failureKind: failure.failureKind,
+    statusCode: failure.httpStatus,
+    upstreamStatus: failure.upstreamStatus,
+  };
+}
+
+function providerValidationFailure(issues: z.ZodIssue[]) {
+  return providerTestError({
+    code: "VALIDATION_FAILED",
+    category: "validation",
+    details: {
+      issues: issues.map((issue) => ({
+        code: issue.code,
+        path: issue.path.join(".") || "request",
+      })),
+    },
+  });
 }
 
 function createProviderModelDiscoveryStream(
@@ -483,15 +500,21 @@ async function runProviderModelDiscoveryStream({
     stream.send({ type: "completed", result });
   } catch (error) {
     if (!isAbortError(error)) {
-      const providerStatus =
-        error instanceof ProviderHttpError ? error.status : undefined;
+      const failure = structuredProviderEndpointFailure(error);
+      request.log.warn(
+        {
+          failureKind: failure.failureKind,
+          providerHost: safeProviderHost(apiBaseUrl),
+          upstreamStatus: failure.upstreamStatus,
+        },
+        "Provider model discovery failed",
+      );
       stream.send({
         type: "error",
-        message:
-          error instanceof Error
-            ? redactProviderSecret(error.message, apiKey)
-            : "Provider model discovery failed",
-        status: providerStatus ?? 502,
+        code: failure.body.error.code,
+        message: "Provider model discovery failed",
+        retryable: failure.body.error.retryable,
+        status: failure.statusCode,
       });
     }
   } finally {
@@ -521,51 +544,59 @@ async function testProviderConfig({
   model,
   reply,
   resolveHostname,
+  onFailureDiagnostic,
 }: {
   providerConfigs: ProviderConfigStore;
   providerConfig: ProviderConfigView;
   model: string | undefined;
   reply: FastifyReply;
   resolveHostname?: ProviderHostnameResolver;
+  onFailureDiagnostic?: (diagnostic: {
+    errorName: string;
+    failureKind: ProviderTestFailureKind;
+    providerConfigId: string;
+    providerHost: string;
+    upstreamStatus: number | null;
+  }) => void;
 }) {
   if (!providerConfig.allowlisted) {
     reply.code(400);
-    return providerConfigTestResponseSchema.parse({
-      ok: false,
-      message: "Provider Base URL is not allowlisted",
+    return providerTestError({
+      code: "PROVIDER_BASE_URL_NOT_ALLOWED",
+      category: "validation",
     });
   }
   if (providerConfig.status !== "active") {
     reply.code(400);
-    return providerConfigTestResponseSchema.parse({
-      ok: false,
-      message: "Provider config is revoked, disabled, or inactive",
+    return providerTestError({
+      code: "PROVIDER_CONFIG_INACTIVE",
+      category: "validation",
     });
   }
   if (providerConfig.breakerState === "open") {
     reply.code(503);
-    return providerConfigTestResponseSchema.parse({
-      ok: false,
-      message: "Provider circuit breaker is open",
-      breaker: breakerDto(providerConfig),
+    return providerTestError({
+      code: "PROVIDER_CIRCUIT_OPEN",
+      params: { failureCount: providerConfig.breakerFailureCount },
+      details: { breaker: breakerDto(providerConfig) },
     });
   }
 
   const testModel = model ?? providerConfig.defaultModel;
   if (!providerConfig.allowedModels.includes(testModel)) {
     reply.code(400);
-    return providerConfigTestResponseSchema.parse({
-      ok: false,
-      message: "Provider model is not allowed by this config",
+    return providerTestError({
+      code: "PROVIDER_MODEL_NOT_ALLOWED",
+      category: "validation",
     });
   }
 
   const apiKey = await providerConfigs.getSecret(providerConfig.id);
   if (!apiKey) {
     reply.code(400);
-    return providerConfigTestResponseSchema.parse({
-      ok: false,
-      message: "Provider config secret is revoked",
+    return providerTestError({
+      code: "PROVIDER_SECRET_REVOKED",
+      category: "validation",
     });
   }
 
@@ -581,18 +612,25 @@ async function testProviderConfig({
     });
   } catch (error) {
     const breaker = await providerConfigs.recordFailure?.(providerConfig.id);
-    const providerStatus =
-      error instanceof ProviderHttpError ? error.status : null;
-    reply.code(
-      providerStatus !== null && providerStatus >= 400 && providerStatus < 500
-        ? 400
-        : 502,
-    );
-    return providerConfigTestResponseSchema.parse({
-      ok: false,
-      message: error instanceof Error ? error.message : "Provider test failed",
-      capability,
-      breaker: breaker ? breakerDto(breaker) : undefined,
+    const failure = classifyProviderTestFailure(error);
+    onFailureDiagnostic?.({
+      errorName: error instanceof Error ? error.name : "UnknownProviderError",
+      failureKind: failure.failureKind,
+      providerConfigId: providerConfig.id,
+      providerHost: safeProviderHost(providerConfig.baseUrl),
+      upstreamStatus: failure.upstreamStatus,
+    });
+    reply.code(failure.httpStatus);
+    return providerTestError({
+      code: failure.code,
+      retryable: failure.retryable,
+      params: breaker ? { failureCount: breaker.breakerFailureCount } : undefined,
+      details: {
+        capability,
+        failureKind: failure.failureKind,
+        upstreamStatus: failure.upstreamStatus,
+        breaker: breaker ? breakerDto(breaker) : undefined,
+      },
     });
   }
 
@@ -665,7 +703,7 @@ export function registerProviderConfigRoutes({
     if (isAuthError(auth)) return auth;
 
     const input = parseProviderModelDiscoveryInput(request.body, reply);
-    if ("message" in input) return input;
+    if ("error" in input) return input;
 
     let sourceBaseUrl: string;
     try {
@@ -674,12 +712,9 @@ export function registerProviderConfigRoutes({
         resolveProviderHostname,
       );
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? redactProviderSecret(error.message, input.apiKey)
-          : "Provider Base URL policy check failed";
-      reply.code(providerConnectionFailureStatus(error));
-      return { message };
+      const failure = structuredProviderEndpointFailure(error);
+      reply.code(failure.statusCode);
+      return failure.body;
     }
 
     try {
@@ -694,12 +729,17 @@ export function registerProviderConfigRoutes({
         sourceBaseUrl,
       });
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? redactProviderSecret(error.message, input.apiKey)
-          : "Provider model discovery failed";
-      reply.code(providerConnectionFailureStatus(error));
-      return { message };
+      const failure = structuredProviderEndpointFailure(error);
+      request.log.warn(
+        {
+          failureKind: failure.failureKind,
+          providerHost: safeProviderHost(sourceBaseUrl),
+          upstreamStatus: failure.upstreamStatus,
+        },
+        "Provider model discovery failed",
+      );
+      reply.code(failure.statusCode);
+      return failure.body;
     }
   });
 
@@ -708,7 +748,7 @@ export function registerProviderConfigRoutes({
     if (isAuthError(auth)) return auth;
 
     const input = parseProviderModelDiscoveryInput(request.body, reply);
-    if ("message" in input) return input;
+    if ("error" in input) return input;
 
     let sourceBaseUrl: string;
     try {
@@ -717,12 +757,9 @@ export function registerProviderConfigRoutes({
         resolveProviderHostname,
       );
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? redactProviderSecret(error.message, input.apiKey)
-          : "Provider Base URL policy check failed";
-      reply.code(providerConnectionFailureStatus(error));
-      return { message };
+      const failure = structuredProviderEndpointFailure(error);
+      reply.code(failure.statusCode);
+      return failure.body;
     }
 
     return runProviderModelDiscoveryStream({
@@ -739,7 +776,7 @@ export function registerProviderConfigRoutes({
     if (isAuthError(auth)) return auth;
 
     const input = parseTemporaryProviderTestInput(request.body, reply);
-    if ("message" in input) return input;
+    if ("error" in input) return input;
 
     try {
       await verifyTemporaryProviderConnection({
@@ -754,16 +791,17 @@ export function registerProviderConfigRoutes({
         capability: getModelCapability(input.model),
       });
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? redactProviderSecret(error.message, input.apiKey)
-          : "Provider connection test failed";
-      reply.code(providerConnectionFailureStatus(error));
-      return providerConfigTestResponseSchema.parse({
-        ok: false,
-        message,
-        capability: getModelCapability(input.model),
-      });
+      const failure = structuredProviderEndpointFailure(error);
+      request.log.warn(
+        {
+          failureKind: failure.failureKind,
+          providerHost: safeProviderHost(input.baseUrl),
+          upstreamStatus: failure.upstreamStatus,
+        },
+        "Temporary provider connection test failed",
+      );
+      reply.code(failure.statusCode);
+      return failure.body;
     }
   });
 
@@ -772,7 +810,7 @@ export function registerProviderConfigRoutes({
     if (isAuthError(auth)) return auth;
 
     const input = parseSelfServiceCreateInput(request.body, reply);
-    if ("message" in input) return input;
+    if ("error" in input) return input;
 
     try {
       await verifyTemporaryProviderConnection({
@@ -803,11 +841,9 @@ export function registerProviderConfigRoutes({
         message,
         error,
       });
-      reply.code(providerConnectionFailureStatus(error));
-      return providerConfigTestResponseSchema.parse({
-        ok: false,
-        message,
-      });
+      const failure = structuredProviderEndpointFailure(error);
+      reply.code(failure.statusCode);
+      return failure.body;
     }
 
     const created = await providerConfigs.create({
@@ -835,20 +871,20 @@ export function registerProviderConfigRoutes({
 
     const { id } = request.params as { id: string };
     const input = parseSelfServiceUpdateInput(request.body, reply);
-    if ("message" in input) return input;
+    if ("error" in input) return input;
     const providerConfig = await findOwnedUserProvider(providerConfigs, id, auth.user.id);
     if (!providerConfig) {
       reply.code(404);
-      return { message: "Provider config not found" };
+      return providerTestError({ code: "PROVIDER_CONFIG_NOT_FOUND", category: "not_found" });
     }
     if (!providerConfigs.updateMetadata) {
       reply.code(501);
-      return { message: "Provider config update is unavailable" };
+      return providerTestError({ code: "INTERNAL_ERROR", category: "internal", retryable: true });
     }
 
     if (input.baseUrl && input.baseUrl.trim() !== providerConfig.baseUrl && !input.apiKey?.trim()) {
       reply.code(400);
-      return { message: "API Key is required when changing Provider Base URL" };
+      return providerTestError({ code: "PROVIDER_SECRET_REQUIRED", category: "validation" });
     }
 
     const nextBaseUrl = input.baseUrl ?? providerConfig.baseUrl;
@@ -856,13 +892,13 @@ export function registerProviderConfigRoutes({
     const nextAllowedModels = input.allowedModels ?? providerConfig.allowedModels;
     if (!nextAllowedModels.includes(nextModel)) {
       reply.code(400);
-      return { message: "Provider default model must be included in allowed models" };
+      return providerTestError({ code: "PROVIDER_MODEL_NOT_ALLOWED", category: "validation" });
     }
 
     const apiKey = input.apiKey?.trim() || (await providerConfigs.getSecret(id));
     if (!apiKey) {
       reply.code(400);
-      return { message: "Provider config secret is revoked" };
+      return providerTestError({ code: "PROVIDER_SECRET_REVOKED", category: "validation" });
     }
 
     let normalizedBaseUrl: string;
@@ -896,8 +932,9 @@ export function registerProviderConfigRoutes({
         message,
         error,
       });
-      reply.code(providerConnectionFailureStatus(error));
-      return { message };
+      const failure = structuredProviderEndpointFailure(error);
+      reply.code(failure.statusCode);
+      return failure.body;
     }
 
     try {
@@ -914,7 +951,7 @@ export function registerProviderConfigRoutes({
       );
       if (!updated) {
         reply.code(404);
-        return { message: "Provider config not found" };
+        return providerTestError({ code: "PROVIDER_CONFIG_NOT_FOUND", category: "not_found" });
       }
       await providerConfigs.markUsed(id);
       await providerConfigs.resetBreaker?.(id);
@@ -922,7 +959,7 @@ export function registerProviderConfigRoutes({
     } catch (error) {
       if (error instanceof ProviderConfigPolicyError) {
         reply.code(400);
-        return { message: error.message };
+        return providerTestError({ code: "PROVIDER_BASE_URL_NOT_ALLOWED", category: "validation" });
       }
       throw error;
     }
@@ -934,20 +971,17 @@ export function registerProviderConfigRoutes({
 
     const { id } = request.params as { id: string };
     const input = parseSelfServiceRotateInput(request.body, reply);
-    if ("message" in input) return input;
+    if ("error" in input) return input;
     const providerConfig = await findOwnedUserProvider(providerConfigs, id, auth.user.id);
     if (!providerConfig) {
       reply.code(404);
-      return { message: "Provider config not found" };
+      return providerTestError({ code: "PROVIDER_CONFIG_NOT_FOUND", category: "not_found" });
     }
 
     const testModel = input.model ?? providerConfig.defaultModel;
     if (!providerConfig.allowedModels.includes(testModel)) {
       reply.code(400);
-      return providerConfigTestResponseSchema.parse({
-        ok: false,
-        message: "Provider model is not allowed by this config",
-      });
+      return providerTestError({ code: "PROVIDER_MODEL_NOT_ALLOWED", category: "validation" });
     }
 
     try {
@@ -980,17 +1014,15 @@ export function registerProviderConfigRoutes({
         message,
         error,
       });
-      reply.code(providerConnectionFailureStatus(error));
-      return providerConfigTestResponseSchema.parse({
-        ok: false,
-        message,
-      });
+      const failure = structuredProviderEndpointFailure(error);
+      reply.code(failure.statusCode);
+      return failure.body;
     }
 
     const rotated = await providerConfigs.rotate(id, input.apiKey, auth.user.id);
     if (!rotated) {
       reply.code(404);
-      return { message: "Provider config not found" };
+      return providerTestError({ code: "PROVIDER_CONFIG_NOT_FOUND", category: "not_found" });
     }
     return toProviderConfigDto(rotated);
   });
@@ -1008,17 +1040,17 @@ export function registerProviderConfigRoutes({
     );
     if (!providerConfig) {
       reply.code(404);
-      return { message: "Provider config not found" };
+      return providerTestError({ code: "PROVIDER_CONFIG_NOT_FOUND", category: "not_found" });
     }
     const updater = action === "enable" ? providerConfigs.enable : providerConfigs.disable;
     if (!updater) {
       reply.code(501);
-      return { message: "Provider config status update is unavailable" };
+      return providerTestError({ code: "INTERNAL_ERROR", category: "internal", retryable: true });
     }
     const updated = await updater.call(providerConfigs, providerConfigId, actorUserId);
     if (!updated) {
       reply.code(404);
-      return { message: "Provider config not found" };
+      return providerTestError({ code: "PROVIDER_CONFIG_NOT_FOUND", category: "not_found" });
     }
     return toProviderConfigDto(updated);
   }
@@ -1044,12 +1076,12 @@ export function registerProviderConfigRoutes({
     const providerConfig = await findOwnedUserProvider(providerConfigs, id, auth.user.id);
     if (!providerConfig) {
       reply.code(404);
-      return { message: "Provider config not found" };
+      return providerTestError({ code: "PROVIDER_CONFIG_NOT_FOUND", category: "not_found" });
     }
     const revoked = await providerConfigs.revoke(id, auth.user.id);
     if (!revoked) {
       reply.code(404);
-      return { message: "Provider config not found" };
+      return providerTestError({ code: "PROVIDER_CONFIG_NOT_FOUND", category: "not_found" });
     }
     return toProviderConfigDto(revoked);
   });
@@ -1060,11 +1092,14 @@ export function registerProviderConfigRoutes({
 
     const { id } = request.params as { id: string };
     const input = parseProviderTestInput(request.body, reply);
-    if ("message" in input) return input;
+    if ("error" in input) return input;
     const providerConfig = await providerConfigs.get(id);
     if (!providerConfig || !isUserVisibleProvider(providerConfig, auth.user.id)) {
       reply.code(404);
-      return { message: "Provider config not found" };
+      return providerTestError({
+        code: "PROVIDER_CONFIG_NOT_FOUND",
+        category: "not_found",
+      });
     }
 
     return testProviderConfig({
@@ -1073,6 +1108,9 @@ export function registerProviderConfigRoutes({
       model: input.model,
       reply,
       resolveHostname: resolveProviderHostname,
+      onFailureDiagnostic: (diagnostic) => {
+        request.log.warn(diagnostic, "Provider connection test failed");
+      },
     });
   });
 
@@ -1092,14 +1130,17 @@ export function registerProviderConfigRoutes({
       if ("message" in context) return context;
 
       const input = parseProviderTestInput(request.body, reply);
-      if ("message" in input) return input;
+      if ("error" in input) return input;
       const providerConfig = await providerConfigs.get(id);
       if (
         !providerConfig ||
         !isProjectVisibleProvider(providerConfig, context.user.id, projectId)
       ) {
         reply.code(404);
-        return { message: "Provider config not found" };
+        return providerTestError({
+          code: "PROVIDER_CONFIG_NOT_FOUND",
+          category: "not_found",
+        });
       }
 
       return testProviderConfig({
@@ -1108,6 +1149,9 @@ export function registerProviderConfigRoutes({
         model: input.model,
         reply,
         resolveHostname: resolveProviderHostname,
+        onFailureDiagnostic: (diagnostic) => {
+          request.log.warn(diagnostic, "Provider connection test failed");
+        },
       });
     },
   );

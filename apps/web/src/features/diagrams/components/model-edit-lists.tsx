@@ -74,14 +74,14 @@ export function ModelElementListSection({
           className="mt-3 flex items-center justify-between gap-3 overflow-x-auto pb-1"
           aria-label={t("diagramLists.elements.toolbar")}
         >
-          <div className="flex min-w-max items-center gap-2">
-            <label className="relative">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:min-w-max sm:flex-nowrap">
+            <label className="relative min-w-0 flex-1 sm:flex-none">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label={t("diagramLists.elements.search")}
                 value={elementSearch}
                 onChange={(event) => onElementSearchChange(event.target.value)}
-                className="h-9 w-64 border pl-9 pr-3 text-xs"
+                className="h-9 w-full min-w-0 border pl-9 pr-3 text-xs sm:w-64"
                 placeholder={t("diagramLists.elements.searchPlaceholder")}
               />
             </label>
@@ -121,7 +121,7 @@ export function ModelElementListSection({
               </div>
             ) : null}
           </div>
-          <div className="ml-auto flex min-w-max items-center gap-2">
+          <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2 sm:min-w-max sm:flex-nowrap">
             {collections.filter((collection) => collection.allowCreate !== false).map((collection) => (
               <Button
                 key={`add:${collection.key}`}
@@ -279,14 +279,14 @@ export function ModelRelationshipListSection({
           className="mt-3 flex items-center justify-between gap-3 overflow-x-auto pb-1"
           aria-label={t("diagramLists.relations.toolbar")}
         >
-          <div className="flex min-w-max items-center gap-2">
-            <label className="relative">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:min-w-max sm:flex-nowrap">
+            <label className="relative min-w-0 flex-1 sm:flex-none">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label={t("diagramLists.relations.search")}
                 value={relationSearch}
                 onChange={(event) => onRelationSearchChange(event.target.value)}
-                className="h-9 w-64 border pl-9 pr-3 text-xs"
+                className="h-9 w-full min-w-0 border pl-9 pr-3 text-xs sm:w-64"
                 placeholder={t("diagramLists.relations.searchPlaceholder")}
               />
             </label>

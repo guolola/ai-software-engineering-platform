@@ -1,5 +1,6 @@
 // Derives session UI state from run event stream messages without touching React state.
 import type { RunEvent } from "@uml-platform/contracts";
+import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 
 export function shouldRefreshRunSnapshotFromEvent(event: RunEvent) {
   if (
@@ -33,12 +34,14 @@ export function statusFromRunEvent(event: RunEvent) {
   return "running";
 }
 
-export function runErrorMessage(snapshot?: { error?: { message?: string } | null }) {
-  return snapshot?.error?.message ?? null;
+export function runErrorMessage(snapshot?: { error?: unknown | null }) {
+  return snapshot?.error
+    ? localizeRunFailure(snapshot.error, "生成任务失败，请稍后重试。")
+    : null;
 }
 
 export function cancelledRunMessage(snapshot?: {
-  error?: { message?: string } | null;
+  error?: unknown | null;
 }) {
   return runErrorMessage(snapshot) ?? "任务已取消";
 }

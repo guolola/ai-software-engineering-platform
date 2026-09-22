@@ -436,7 +436,7 @@ export function TextRequirementView({
         "gap-0 py-0 relative",
         mode === "generated" && "block overflow-visible rounded-none bg-transparent shadow-none ring-0",
         mode === "empty" &&
-          "gap-0 py-0 overflow-hidden p-6",
+          "gap-0 overflow-hidden p-4 py-0 sm:p-6 sm:py-0",
       )}
     >
       <div className="relative flex items-center justify-between gap-4">
@@ -468,23 +468,23 @@ export function TextRequirementView({
           mode === "empty" ? "min-h-80" : "min-h-[240px]",
         )}
       />
-      <div className="relative mt-6 flex flex-wrap items-center justify-between gap-2">
+      <div data-testid="requirements-input-toolbar" className="relative mt-6 flex min-w-0 flex-nowrap items-center gap-2">
           <ModelPicker
             value={defaultModel}
             onValueChange={updateModel}
             disabled={!canRunGeneration}
           />
           {isRulesStale && (
-            <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
+            <Badge variant="secondary" className="hidden px-1.5 py-0 text-[11px] sm:inline-flex">
               {t("requirements.source.changed")}
             </Badge>
           )}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-10 px-6"
+              className="h-10 shrink-0 px-3 sm:px-6"
               onClick={() => setRequirementText("")}
               disabled={!requirementText || generating || !canEditRequirements}
               title={!canEditRequirements ? editBlockedReason : undefined}
@@ -502,14 +502,14 @@ export function TextRequirementView({
                     ? t("requirements.source.updateRules")
                     : t("requirements.source.generateRules")
               }
-              className="inline-flex h-10 items-center gap-2 px-6 text-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex h-10 min-w-0 flex-1 items-center gap-2 px-2 text-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-6"
             >
               {generating ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <ArrowUp className="size-4" />
               )}
-              {isRulesStale ? t("requirements.source.updateRules") : t("requirements.source.startAnalysis")}
+              <span className="min-w-0 truncate">{isRulesStale ? t("requirements.source.updateRules") : t("requirements.source.startAnalysis")}</span>
             </Button>
           </div>
       </div>
@@ -650,7 +650,7 @@ export function TextRequirementView({
           )}
 
           {view !== "system" && <section className="flex min-w-0 flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Network className="size-5 text-primary" />
                 <h2 className="text-xl font-semibold tracking-normal text-foreground">
@@ -663,7 +663,7 @@ export function TextRequirementView({
                   {selectedDiagrams.length}/{DIAGRAM_ORDER.length}
                 </Badge>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto pb-1 sm:shrink-0 sm:overflow-visible sm:pb-0">
                 {requirementModelRepairRecords.length > 0 && (
                   <Button
                     type="button"
@@ -674,8 +674,8 @@ export function TextRequirementView({
                     onClick={() => setTraceabilityDialogOpen(true)}
                   >
                     <Eye className="size-3.5" />
-                    {t("requirements.traceProof")}
-                    <span className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                    <span className="hidden sm:inline">{t("requirements.traceProof")}</span>
+                    <span className="hidden rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] sm:inline">
                       {t("requirements.itemCount", { count: requirementModelRepairRecords.length })}
                     </span>
                   </Button>
@@ -702,14 +702,14 @@ export function TextRequirementView({
                       ? generationBlockedByPermissionReason
                       : selectedTargetBlockReason ?? generationBlockedTitle
                   }
-                  className="inline-flex h-9 items-center gap-2 px-4 text-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex h-9 min-w-0 flex-1 items-center gap-2 px-3 text-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-4"
                 >
                   {generating ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
                     <Wand2 className="size-4" />
                   )}
-                  {generateDiagramsButtonLabel}
+                  <span className="min-w-0 truncate">{generateDiagramsButtonLabel}</span>
                 </Button>
               </div>
             </div>

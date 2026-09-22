@@ -326,7 +326,7 @@ describe("CodeGenerationPage", () => {
     expect(screen.queryByText("业务规则说明")).not.toBeInTheDocument();
   });
 
-  it("switches mobile files and editor while keeping the preview below them", async () => {
+  it("hides the mobile file tree and editor while keeping preview actions available", async () => {
     stubCompactViewport(true);
 
     render(
@@ -335,32 +335,17 @@ describe("CodeGenerationPage", () => {
 
     await screen.findByTestId("sandpack-provider");
 
-    expect(screen.getByRole("button", { name: "文件" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    expect(screen.getByRole("button", { name: "编辑" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.queryByRole("button", { name: "预览" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "文件" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
     expect(screen.getByTestId("code-preview-region")).toBeInTheDocument();
-    expect(screen.getByTestId("code-generation-toolbar")).toHaveClass(
-      "flex-wrap",
-    );
+    expect(screen.getByTestId("code-generation-toolbar")).toHaveClass("flex-col", "sm:flex-row");
     expect(screen.getByText("前端原型代码")).toBeInTheDocument();
-    expect(screen.getByText("文件")).toBeInTheDocument();
     expect(screen.queryByText(/设计模型\s*0/u)).not.toBeInTheDocument();
     expect(document.querySelector('[data-panel-group-direction="horizontal"]')).not.toBeInTheDocument();
-    const fileTabs = screen.getByTestId("code-file-tabs");
-    expect(fileTabs).toHaveClass("overflow-x-auto");
-    expect(fileTabs.querySelectorAll(".w-32").length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole("button", { name: "文件" }));
-    expect(screen.getByText("WorkspaceShell.tsx")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
-    expect(screen.getByTestId("monaco-editor")).toBeInTheDocument();
+    expect(screen.queryByTestId("code-file-tabs")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("code-editor-region")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("monaco-editor")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "全屏预览" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "运行预览" })).toBeInTheDocument();
   });
 

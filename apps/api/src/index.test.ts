@@ -4711,7 +4711,7 @@ test("api document run rejects exports before the required models exist", async 
     },
   });
   assert.equal(requirementsResponse.statusCode, 400);
-  assertApiErrorCode(requirementsResponse, "VALIDATION_FAILED");
+  assertApiErrorCode(requirementsResponse, "REQUIREMENT_MODELS_MISSING");
 
   const designResponse = await app.inject({
     method: "POST",
@@ -4726,7 +4726,7 @@ test("api document run rejects exports before the required models exist", async 
     },
   });
   assert.equal(designResponse.statusCode, 400);
-  assertApiErrorCode(designResponse, "VALIDATION_FAILED");
+  assertApiErrorCode(designResponse, "DESIGN_MODELS_MISSING");
 
   await app.close();
 });

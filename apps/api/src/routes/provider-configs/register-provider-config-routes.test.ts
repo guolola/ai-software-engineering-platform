@@ -549,7 +549,8 @@ test("self-service provider creation rejects unsafe or failing endpoints without
       unsafe.body + privateDns.body + failing.body + redirecting.body,
       /sk-unsafe-1111|sk-failing-2222|sk-private-dns-3333|sk-redirect-4444/,
     );
-    assert.match(redirecting.body, /redirected/i);
+    assert.equal(redirecting.json().error.code, "PROVIDER_BASE_URL_NOT_ALLOWED");
+    assert.equal(failing.json().error.code, "PROVIDER_CONNECTION_FAILED");
     assert.equal(riskEvents.length, 4);
     assert.deepEqual(
       riskEvents.map((event) => [event.eventType, event.severity, event.targetId]),
@@ -667,7 +668,7 @@ test("users cannot update or revoke system provider configs", async () => {
   await app.close();
 });
 
-test("provider config test includes provider error message without leaking secrets", async () => {
+test("provider config test returns a safe authentication code without upstream text", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () =>
     new Response(
@@ -692,10 +693,9 @@ test("provider config test includes provider error message without leaking secre
     });
 
     assert.equal(response.statusCode, 400);
-    assert.match(
-      response.json().message,
-      /Provider test failed with HTTP 403: Sorry, your account balance is insufficient/,
-    );
+    assert.equal(response.json().error.code, "PROVIDER_AUTH_FAILED");
+    assert.equal(response.json().error.details.upstreamStatus, 403);
+    assert.doesNotMatch(response.body, /account balance is insufficient/i);
     assert.doesNotMatch(response.body, /sk-provider-response-should-not-leak/);
   } finally {
     globalThis.fetch = originalFetch;

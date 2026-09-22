@@ -40,10 +40,6 @@ export type GenerationConfirmationDialogState =
 
 function sanitizeResultDialogCopy(text: string) {
   const cleaned = text
-    .replace(/\bREQ-\d+\b/giu, i18n.t("generation.dialog.thisRequirement"))
-    .replace(/\bR\d+\b/giu, i18n.t("generation.dialog.thisRule"))
-    .replace(/\brun[-_a-z0-9]+\b/giu, i18n.t("generation.dialog.thisRun"))
-    .replace(/\b(runId|requirementId|ruleId)\b/giu, "")
     .replace(/\.docx\b/giu, "")
     .replace(/\bAI\b/giu, i18n.t("generation.dialog.smartRepair"))
     .replace(/\s+/g, " ")
@@ -54,9 +50,6 @@ function sanitizeResultDialogCopy(text: string) {
 }
 
 function resultDialogMessage(result: GenerationResultDialogState) {
-  if (result.tone === "destructive" && /[A-Za-z]/u.test(result.message)) {
-    return i18n.t("generation.dialog.problem");
-  }
   return sanitizeResultDialogCopy(result.message);
 }
 

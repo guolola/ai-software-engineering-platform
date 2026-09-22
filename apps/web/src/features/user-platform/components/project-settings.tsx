@@ -30,6 +30,8 @@ import { Input } from "../../../shared/ui/input";
 import { SelectControl } from "../../../shared/ui/select";
 import { PageHeader } from "../../../shared/template/layout/page";
 import { cn } from "../../../shared/ui/utils";
+import { useFloatingAlert } from "../../../shared/ui/floating-alert";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 import {
   ACADEMIC_BINDING_OPTIONS,
   academicBindingFromValue,
@@ -52,6 +54,7 @@ export function ProjectSettings({
   onProjectDeleted?: (projectId: string) => void;
 }) {
   const { t } = useTranslation();
+  const { showAlert } = useFloatingAlert();
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
   const [visibility, setVisibility] = useState(project.visibility);
@@ -69,8 +72,7 @@ export function ProjectSettings({
   const [retentionPolicy, setRetentionPolicy] = useState(project.retentionPolicy ?? "manual");
   const [newOwnerUserId, setNewOwnerUserId] = useState("");
   const [currentProject, setCurrentProject] = useState(project);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [ownerError, setOwnerError] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
 
@@ -89,14 +91,13 @@ export function ProjectSettings({
     setBackgroundKey(project.backgroundKey ?? null);
     setRetentionPolicy(project.retentionPolicy ?? "manual");
     setNewOwnerUserId("");
+    setOwnerError("");
     setCurrentProject(project);
     setDeleteDialogOpen(false);
     setDeletingProject(false);
   }, [project]);
 
   const saveProject = async () => {
-    setMessage("");
-    setError("");
     try {
       const academicBinding = academicBindingFromValue(courseTeam);
       const response = await platformApi.updateProject(project.id, {
@@ -114,44 +115,39 @@ export function ProjectSettings({
         retentionPolicy,
       );
       setCurrentProject({ ...response.project, retentionPolicy: retentionResponse.project.retentionPolicy });
-      setMessage(t("projectSettings.messages.saved"));
+      showAlert({ title: t("projectSettings.messages.saved"), tone: "success" });
     } catch (saveError) {
-      setError(t("projectSettings.errors.save"));
+      showAlert({ title: localizeCaughtFailure(saveError, t("projectSettings.errors.save")), tone: "destructive" });
     }
   };
 
   const archiveProject = async () => {
-    setMessage("");
-    setError("");
     if (!window.confirm(t("projectSettings.confirm.archive"))) return;
     try {
       const response = await platformApi.archiveProject(project.id);
       setCurrentProject(response.project);
-      setMessage(t("projectSettings.messages.archived"));
+      showAlert({ title: t("projectSettings.messages.archived"), tone: "success" });
     } catch (archiveError) {
-      setError(t("projectSettings.errors.archive"));
+      showAlert({ title: localizeCaughtFailure(archiveError, t("projectSettings.errors.archive")), tone: "destructive" });
     }
   };
 
   const restoreProject = async () => {
-    setMessage("");
-    setError("");
     if (!window.confirm(t("projectSettings.confirm.restore"))) return;
     try {
       const response = await platformApi.restoreProject(project.id);
       setCurrentProject(response.project);
-      setMessage(t("projectSettings.messages.restored"));
+      showAlert({ title: t("projectSettings.messages.restored"), tone: "success" });
     } catch (restoreError) {
-      setError(t("projectSettings.errors.restore"));
+      showAlert({ title: localizeCaughtFailure(restoreError, t("projectSettings.errors.restore")), tone: "destructive" });
     }
   };
 
   const transferOwner = async () => {
-    setMessage("");
-    setError("");
+    setOwnerError("");
     const trimmedOwnerId = newOwnerUserId.trim();
     if (!trimmedOwnerId) {
-      setError(t("projectSettings.errors.ownerRequired"));
+      setOwnerError(t("projectSettings.errors.ownerRequired"));
       return;
     }
     if (!window.confirm(t("projectSettings.confirm.transfer"))) return;
@@ -159,25 +155,23 @@ export function ProjectSettings({
       const response = await platformApi.transferProjectOwner(project.id, trimmedOwnerId);
       setCurrentProject(response.project);
       setNewOwnerUserId("");
-      setMessage(t("projectSettings.messages.transferred"));
+      showAlert({ title: t("projectSettings.messages.transferred"), tone: "success" });
     } catch (transferError) {
-      setError(t("projectSettings.errors.transfer"));
+      showAlert({ title: localizeCaughtFailure(transferError, t("projectSettings.errors.transfer")), tone: "destructive" });
     }
   };
 
   const confirmDeleteProject = async () => {
     if (deletingProject) return;
-    setMessage("");
-    setError("");
     setDeletingProject(true);
     try {
       await platformApi.deleteProject(project.id);
       setCurrentProject((current) => ({ ...current, status: "deleted" }));
-      setMessage(t("projectSettings.messages.deleted"));
+      showAlert({ title: t("projectSettings.messages.deleted"), tone: "success" });
       setDeleteDialogOpen(false);
       onProjectDeleted?.(project.id);
     } catch (deleteError) {
-      setError(t("projectSettings.errors.delete"));
+      showAlert({ title: localizeCaughtFailure(deleteError, t("projectSettings.errors.delete")), tone: "destructive" });
     } finally {
       setDeletingProject(false);
     }
@@ -189,11 +183,6 @@ export function ProjectSettings({
   const canManageProjectSettings =
     !membershipRole || membershipRole === "owner";
   const settingsBlockedReason = t("projectSettings.permissionDenied");
-  // Inline the owner-required failure on its own field instead of the shared banner.
-  const ownerRequiredMessage = t("projectSettings.errors.ownerRequired");
-  const showOwnerFieldError = error === ownerRequiredMessage;
-  const feedback = message || (error && !showOwnerFieldError ? error : "");
-
   return (
     <>
     <div className={cn(layout === "page" && "grid min-w-0 gap-6")}>
@@ -336,12 +325,15 @@ export function ProjectSettings({
               <Input
                 id="settings-transfer-owner"
                 value={newOwnerUserId}
-                onChange={(event) => setNewOwnerUserId(event.target.value)}
+                onChange={(event) => {
+                  setNewOwnerUserId(event.target.value);
+                  if (event.target.value.trim()) setOwnerError("");
+                }}
                 placeholder={t("projectSettings.ownerPlaceholder")}
                 disabled={!canManageProjectSettings}
                 title={!canManageProjectSettings ? settingsBlockedReason : undefined}
               />
-              {showOwnerFieldError && <FieldError>{ownerRequiredMessage}</FieldError>}
+              {ownerError && <FieldError>{ownerError}</FieldError>}
               <Button
                 type="button"
                 variant="outline"
@@ -363,11 +355,6 @@ export function ProjectSettings({
               {deletingProject ? <Loader2 className="size-4 animate-spin" /> : null}
               {t("projectSettings.actions.delete")}
             </Button>
-            {feedback && (
-              <Alert variant={message ? "default" : "destructive"} className="text-sm">
-                {feedback}
-              </Alert>
-            )}
           </CardContent>
         </Card>
       </div>
@@ -380,11 +367,6 @@ export function ProjectSettings({
             {t("projectSettings.deleteDialog.description", { name: currentProject.name })}
           </DialogDescription>
         </DialogHeader>
-        {error && !showOwnerFieldError && (
-          <Alert variant="destructive" className="text-sm">
-            {error}
-          </Alert>
-        )}
         <DialogFooter className="gap-2 sm:gap-2">
           <Button
             type="button"

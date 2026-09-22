@@ -16,6 +16,7 @@ import {
 } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 import {
   Activity,
   BookOpen,
@@ -155,10 +156,7 @@ export function useProjectOverview(projectId: string) {
           authRequired: status === 401,
           forbidden: status === 403,
           notFound: status === 404,
-          error:
-            error instanceof Error
-              ? error.message
-              : t("projectShell.access.loadFailedFallback"),
+          error: localizeCaughtFailure(error, t("projectShell.access.loadFailedFallback")),
         });
       });
     return () => {

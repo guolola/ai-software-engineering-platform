@@ -9,8 +9,8 @@ import {
   useState,
 } from "react";
 import { useSandpack } from "@codesandbox/sandpack-react";
-import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
 import { cn } from "../../../shared/ui/utils";
 import { buildLocalPreviewDocument, previewErrorMessage } from "../lib/preview-runtime";
 
@@ -175,7 +175,7 @@ export const LocalPrototypePreview = forwardRef<LocalPrototypePreviewHandle, {
 
   const openPreviewWindow = useCallback(() => {
     if (!previewState.srcDoc) {
-      toast.error(t("codePage.preview.notReady"));
+      floatingAlert.error(t("codePage.preview.notReady"));
       return;
     }
 
@@ -185,7 +185,7 @@ export const LocalPrototypePreview = forwardRef<LocalPrototypePreviewHandle, {
     const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
     if (!opened) {
       URL.revokeObjectURL(blobUrl);
-      toast.error(t("codePage.preview.popupBlocked"));
+      floatingAlert.error(t("codePage.preview.popupBlocked"));
       return;
     }
     window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);

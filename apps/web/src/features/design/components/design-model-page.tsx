@@ -35,6 +35,7 @@ import {
   type FeedbackDialogState,
 } from "../../../shared/ui/feedback-dialog";
 import { cn } from "../../../shared/ui/utils";
+import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 import {
   DESIGN_DIAGRAM_META,
   DESIGN_DIAGRAM_ORDER,
@@ -597,6 +598,7 @@ export function DesignModelPage() {
     <div className="flex min-h-full flex-col bg-background">
       <PageContainer className="flex flex-col gap-5">
           <PageHeader
+            size="compact"
             title={t("designPage.title")}
             titleAccessory={
               <>
@@ -619,7 +621,7 @@ export function DesignModelPage() {
                 />
                 <Button
                   size="sm"
-                  className="h-9"
+                  className="h-9 min-w-0 flex-1 sm:flex-none"
                   onClick={runGenerate}
                   disabled={!canGenerate || generating}
                   title={designGenerationBlockedReason ?? selectedDesignBlockReason ?? undefined}
@@ -629,7 +631,7 @@ export function DesignModelPage() {
                   ) : (
                     <Wand2 className="size-4" />
                   )}
-                  {t("designPage.generate")}
+                  <span className="min-w-0 truncate">{t("designPage.generate")}</span>
                 </Button>
               </>
             }
@@ -749,7 +751,10 @@ export function DesignModelPage() {
                             )}
                             {error && (
                               <div className="text-destructive">
-                                {error.error.message}
+                                {localizeRunFailure(
+                                  error.error,
+                                  t("errors.codes.RUN_INTERNAL_ERROR"),
+                                )}
                               </div>
                             )}
                           </div>

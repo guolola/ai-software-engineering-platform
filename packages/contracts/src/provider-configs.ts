@@ -259,7 +259,9 @@ export const providerModelDiscoveryProgressEventSchema = z.discriminatedUnion(
     z
       .object({
         type: z.literal("error"),
+        code: z.string().regex(/^[A-Z][A-Z0-9_]*$/u).optional(),
         message: z.string().trim().min(1),
+        retryable: z.boolean().optional(),
         status: z.number().int().min(100).max(599).optional(),
       })
       .strict(),

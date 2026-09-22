@@ -18,6 +18,9 @@ export type FloatingAlertInput = {
   durationMs?: number
 }
 
+type FloatingAlertListener = (alert: FloatingAlertInput) => void
+type FloatingAlertOptions = Omit<FloatingAlertInput, 'title' | 'tone'>
+
 type FloatingAlertEntry = FloatingAlertInput & { id: string; tone: FloatingAlertTone; durationMs: number }
 type FloatingAlertContextValue = {
   showAlert: (alert: FloatingAlertInput) => string
@@ -30,9 +33,35 @@ const fallbackFloatingAlertContext: FloatingAlertContextValue = {
 }
 
 const FloatingAlertContext = React.createContext<FloatingAlertContextValue>(fallbackFloatingAlertContext)
+const floatingAlertListeners = new Set<FloatingAlertListener>()
+let pendingFloatingAlerts: FloatingAlertInput[] = []
 
 function makeId() {
   return globalThis.crypto?.randomUUID?.() ?? `alert-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+// Allows non-component workflows to publish through the same fixed alert viewport.
+export function showFloatingAlert(input: FloatingAlertInput) {
+  const id = input.id ?? makeId()
+  const alert = { ...input, id }
+  if (typeof window === 'undefined') return id
+  if (floatingAlertListeners.size === 0) {
+    pendingFloatingAlerts = [...pendingFloatingAlerts.filter(item => item.id !== id), alert].slice(-3)
+  } else {
+    floatingAlertListeners.forEach(listener => listener(alert))
+  }
+  return id
+}
+
+export const floatingAlert = {
+  message: (title: React.ReactNode, options: FloatingAlertOptions = {}) =>
+    showFloatingAlert({ ...options, title, tone: 'info' }),
+  success: (title: React.ReactNode, options: FloatingAlertOptions = {}) =>
+    showFloatingAlert({ ...options, title, tone: 'success' }),
+  warning: (title: React.ReactNode, options: FloatingAlertOptions = {}) =>
+    showFloatingAlert({ ...options, title, tone: 'warning' }),
+  error: (title: React.ReactNode, options: FloatingAlertOptions = {}) =>
+    showFloatingAlert({ ...options, title, tone: 'destructive' })
 }
 
 function FloatingAlertCard({ alert, onDismiss }: { alert: FloatingAlertEntry; onDismiss: () => void }) {
@@ -97,9 +126,17 @@ export function FloatingAlertProvider({ children }: { children: React.ReactNode 
     return id
   }, [])
   const value = React.useMemo(() => ({ showAlert, dismissAlert }), [dismissAlert, showAlert])
-  const drawerPortalTarget = typeof document === 'undefined'
+  React.useEffect(() => {
+    const listener: FloatingAlertListener = alert => showAlert(alert)
+    floatingAlertListeners.add(listener)
+    const pending = pendingFloatingAlerts
+    pendingFloatingAlerts = []
+    pending.forEach(listener)
+    return () => { floatingAlertListeners.delete(listener) }
+  }, [showAlert])
+  const overlayPortalTarget = typeof document === 'undefined'
     ? null
-    : document.querySelector<HTMLElement>('[data-slot="drawer-content"]')
+    : document.querySelector<HTMLElement>('[data-slot="dialog-content"][data-open], [data-slot="drawer-content"]')
   const viewport = (
     <div className='font-sans pointer-events-none fixed inset-x-4 top-4 z-[100] mx-auto flex max-w-xl flex-col gap-2 sm:top-20' aria-live='polite' aria-atomic='false'>
       {alerts.map(alert => (
@@ -113,7 +150,7 @@ export function FloatingAlertProvider({ children }: { children: React.ReactNode 
   return (
     <FloatingAlertContext.Provider value={value}>
       {children}
-      {drawerPortalTarget ? createPortal(viewport, drawerPortalTarget) : viewport}
+      {overlayPortalTarget ? createPortal(viewport, overlayPortalTarget) : viewport}
     </FloatingAlertContext.Provider>
   )
 }

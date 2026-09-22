@@ -1,7 +1,7 @@
 // Provides manual model save and rerender actions for workspace session state.
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
 import type {
   DesignDiagramModelSpec,
   DiagramModelSpec,
@@ -204,7 +204,7 @@ export function useManualModelEditActions({
         svgArtifact,
       });
       if (options?.toastMessage !== null) {
-        toast.message(options?.toastMessage ?? t("diagrams.detail.rerendered"));
+        floatingAlert.message(options?.toastMessage ?? t("diagrams.detail.rerendered"));
       }
     },
     [
@@ -267,7 +267,7 @@ export function useManualModelEditActions({
         svgArtifact,
       });
       if (options?.toastMessage !== null) {
-        toast.message(options?.toastMessage ?? t("diagrams.detail.rerendered"));
+        floatingAlert.message(options?.toastMessage ?? t("diagrams.detail.rerendered"));
       }
     },
     [

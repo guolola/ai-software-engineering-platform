@@ -38,6 +38,10 @@ describe("StudioDataTable", () => {
     expect(shell).toContainElement(screen.getByRole("button", { name: "新增" }));
     expect(shell).toContainElement(screen.getByRole("table"));
     expect(shell).toContainElement(screen.getByRole("navigation", { name: "pagination" }));
+    expect(screen.getByTestId("studio-data-table-filters")).toHaveClass("min-w-0", "flex-nowrap");
+    const pageControls = screen.getByTestId("studio-data-table-page-controls");
+    expect(pageControls).toHaveClass("shrink-0", "flex-nowrap");
+    expect(within(pageControls).getByLabelText("每页条数")).toBeInTheDocument();
 
     await userEvent.type(screen.getByPlaceholderText("搜索记录"), "A");
     expect(onSearch).toHaveBeenLastCalledWith("A");

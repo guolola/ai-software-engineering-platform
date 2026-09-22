@@ -38,7 +38,10 @@ import {
   type PlatformRunSummary,
 } from "../services/platform-api";
 import { useAppI18n } from "../../../shared/i18n/i18n-provider";
-import { localizeApiFailure } from "../../../shared/i18n/api-errors";
+import {
+  localizeApiFailure,
+  localizeCaughtFailure,
+} from "../../../shared/i18n/api-errors";
 import { useFloatingAlert } from "../../../shared/ui/floating-alert";
 
 function runActionLabel(action: string | null | undefined, t: TFunction) {
@@ -109,9 +112,7 @@ export function ProjectHistory({
       );
       notifySuccess(t("projectShell.historyUi.cancelled"));
     } catch (cancelError) {
-      notifyError(
-        cancelError instanceof Error ? cancelError.message : t("projectShell.historyUi.cancelFailed"),
-      );
+      notifyError(localizeCaughtFailure(cancelError, t("projectShell.historyUi.cancelFailed")));
     }
   };
 
@@ -167,11 +168,12 @@ export function ProjectHistory({
       notifySuccess(t("projectShell.historyUi.requeued"));
     } catch (actionError) {
       notifyError(
-        actionError instanceof Error
-          ? actionError.message
-          : action === "retry"
+        localizeCaughtFailure(
+          actionError,
+          action === "retry"
             ? t("projectShell.historyUi.retryFailed")
             : t("projectShell.historyUi.rerunFailed"),
+        ),
       );
     }
   };
@@ -181,11 +183,7 @@ export function ProjectHistory({
       await restoreRunHistory(runId);
       notifySuccess(t("projectShell.historyUi.restored"));
     } catch (restoreError) {
-      notifyError(
-        restoreError instanceof Error
-          ? restoreError.message
-          : t("projectShell.historyUi.restoreFailed"),
-      );
+      notifyError(localizeCaughtFailure(restoreError, t("projectShell.historyUi.restoreFailed")));
     }
   };
 
@@ -208,11 +206,7 @@ export function ProjectHistory({
       downloadBlobFile(downloaded.fileName, downloaded.blob);
       notifySuccess(t("projectShell.historyUi.downloaded", { file: downloaded.fileName }));
     } catch (downloadError) {
-      notifyError(
-        downloadError instanceof Error
-          ? downloadError.message
-          : t("projectShell.historyUi.downloadFailed"),
-      );
+      notifyError(localizeCaughtFailure(downloadError, t("projectShell.historyUi.downloadFailed")));
     }
   };
 
@@ -223,9 +217,7 @@ export function ProjectHistory({
       setRuns((current) => current.filter((run) => run.runId !== runId));
       notifySuccess(t("projectShell.historyUi.deleted"));
     } catch (deleteError) {
-      notifyError(
-        deleteError instanceof Error ? deleteError.message : t("projectShell.historyUi.deleteFailed"),
-      );
+      notifyError(localizeCaughtFailure(deleteError, t("projectShell.historyUi.deleteFailed")));
     }
   };
 
@@ -317,7 +309,7 @@ export function ProjectHistory({
             {t("projectShell.historyUi.cancel")}
           </Button>
         )}
-        {!running && run.errorMessage && (
+        {!running && (run.error || run.errorMessage) && (
           <Button
             type="button"
             variant="outline"
@@ -562,12 +554,7 @@ export function ProjectHistory({
         {selectedErrorRun && (
           <Alert variant="destructive" className="grid gap-2 text-xs">
             <div>{localizeApiFailure(selectedErrorRun.error ? { error: selectedErrorRun.error } : null, 500)}</div>
-            {selectedErrorRun.errorMessage ? (
-              <details className="text-muted-foreground">
-                <summary className="text-foreground cursor-pointer font-medium">{t("projectShell.historyUi.technicalDetails")}</summary>
-                <pre className="bg-muted text-foreground mt-2 whitespace-pre-wrap break-words rounded-md border border-border p-3 font-mono text-xs">{selectedErrorRun.errorMessage}</pre>
-              </details>
-            ) : null}
+            <div className="text-muted-foreground">任务编号：{selectedErrorRun.runId}</div>
           </Alert>
         )}
       </div>
@@ -582,12 +569,7 @@ export function ProjectHistory({
           <div>{selectedErrorRun.error || selectedErrorRun.errorMessage
             ? localizeApiFailure(selectedErrorRun.error ? { error: selectedErrorRun.error } : null, 500)
             : t("errors.http.unknown")}</div>
-          {selectedErrorRun.errorMessage ? (
-            <details className="text-muted-foreground text-xs">
-              <summary className="text-foreground cursor-pointer font-medium">{t("projectShell.historyUi.technicalDetails")}</summary>
-              <pre className="bg-muted text-foreground mt-2 whitespace-pre-wrap break-words rounded-md border border-border p-3 font-mono text-xs">{selectedErrorRun.errorMessage}</pre>
-            </details>
-          ) : null}
+          <div className="text-muted-foreground text-xs">任务编号：{selectedErrorRun.runId}</div>
         </Alert>
       )}
     </div>

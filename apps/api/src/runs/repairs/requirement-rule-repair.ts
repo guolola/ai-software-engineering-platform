@@ -467,11 +467,10 @@ export function applyBatchRequirementRepairSuggestions(
         suggestion,
       );
       candidates.push({ ruleId, ...result });
-    } catch (error) {
+    } catch {
       failures.push({
         ruleId,
-        errorMessage:
-          error instanceof Error ? error.message : "模型返回内容无法解析",
+        errorMessage: "模型返回的修复结果格式无效，请重新修复。",
       });
     }
   }

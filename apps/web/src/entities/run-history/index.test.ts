@@ -143,7 +143,7 @@ describe("getRunHistorySnapshotSummary", () => {
     };
 
     expect(getRunHistorySnapshotSummary(snapshot)).toBe(
-      "需求规则抽取失败：rules 必须是数组",
+      "需求规则抽取失败：模型返回的结构化结果不合法，请重试。",
     );
   });
 

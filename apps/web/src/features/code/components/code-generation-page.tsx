@@ -91,7 +91,6 @@ export function CodeGenerationPage() {
   } = useWorkspaceSession();
   const { openDesignHome, openSystemRequirements } = useWorkspaceShell();
   const compactViewport = useCompactViewport();
-  const [mobilePane, setMobilePane] = useState<"files" | "editor">("editor");
   const [defaultModel, setDefaultModel] = useState(
     () => loadUserSettings().defaultModel,
   );
@@ -338,8 +337,8 @@ export function CodeGenerationPage() {
     <PageContainer className="flex min-h-0 min-w-0 flex-col">
       <div data-testid="code-generation-page" className="flex min-h-0 min-w-0 flex-col">
         <div data-testid="code-workspace-frame" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-          <div data-testid="code-generation-toolbar" className="flex min-h-12 w-full flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
-            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <div data-testid="code-generation-toolbar" className="flex min-h-12 w-full min-w-0 flex-col items-stretch gap-2 border-b border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-1.5">
               <Code2 className="size-4 shrink-0 text-primary" />
               <span className="text-sm font-semibold">{t("code.title")}</span>
               <CodeStatusDialog status={codeStatus} diagnostics={codeDiagnostics} />
@@ -352,8 +351,8 @@ export function CodeGenerationPage() {
                 <span className="font-mono">{runProgress}%</span>
               </div>
             )}
-            <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
-              <ModelPicker value={defaultModel} onValueChange={updateModel} align="end" triggerClassName="h-8 max-w-[150px] bg-card px-2 text-xs" />
+            <div className="flex w-full min-w-0 flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:ml-auto sm:w-auto sm:overflow-visible sm:pb-0">
+              <ModelPicker value={defaultModel} onValueChange={updateModel} align="end" triggerClassName="h-8 w-24 bg-card px-2 text-xs sm:w-24" />
               <Button size="sm" className="h-8 px-2 text-xs" onClick={() => void generateCodePrototype(generatedFileCount > 0 ? "continue" : "regenerate")} disabled={!canGenerate || generating}>
                 {generating ? <Loader2 className="size-3.5 animate-spin" /> : generatedFileCount > 0 ? <RefreshCw className="size-3.5" /> : <Play className="size-3.5" />}
                 <span className="hidden min-[430px]:inline">{generatedFileCount > 0 ? t("code.actions.continue") : t("code.actions.start")}</span>
@@ -366,13 +365,13 @@ export function CodeGenerationPage() {
                   <span className="min-[430px]:hidden">{t("code.actions.redoShort")}</span>
                 </Button>
               )}
-              <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" aria-label={t("code.preview.openWindow")} onClick={() => previewRef.current?.openPreviewWindow()}>
+              <Button type="button" variant="outline" size="sm" className="size-8 shrink-0 px-0 text-xs sm:h-8 sm:w-auto sm:px-2" aria-label={t("code.preview.openWindow")} title={t("code.preview.openWindow")} onClick={() => previewRef.current?.openPreviewWindow()}>
                 <Play className="size-3.5" />
-                {t("code.preview.openWindow")}
+                <span className="hidden sm:inline">{t("code.preview.openWindow")}</span>
               </Button>
-              <Button type="button" size="sm" className="h-8 px-2 text-xs" onClick={runPreview} disabled={!previewReady || previewState === "building"}>
+              <Button type="button" size="sm" className="size-8 shrink-0 px-0 text-xs sm:h-8 sm:w-auto sm:px-2" aria-label={t("code.actions.runPreview")} title={t("code.actions.runPreview")} onClick={runPreview} disabled={!previewReady || previewState === "building"}>
                 {previewState === "building" ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
-                {t("code.actions.runPreview")}
+                <span className="hidden sm:inline">{t("code.actions.runPreview")}</span>
               </Button>
             </div>
           </div>
@@ -389,25 +388,16 @@ export function CodeGenerationPage() {
           >
             <MonacoFileModelSync files={files} />
             <SandpackFileSync files={previewFiles} />
-            {/* The editor and preview share the toolbar's full width; only the file tree splits horizontally. */}
-            <section data-testid="code-editor-region" aria-label={t("code.panes.editor")} className="flex h-[480px] w-full min-w-0 shrink-0 flex-col border-b border-border lg:h-[560px]">
-              {compactViewport && (
-                <div className="grid grid-cols-2 gap-1 border-b border-border px-2 py-1.5">
-                  {(["files", "editor"] as const).map(pane => (
-                    <Button key={pane} variant={mobilePane === pane ? "secondary" : "ghost"} type="button" aria-pressed={mobilePane === pane} className="h-8 min-w-0 text-[13px]" onClick={() => setMobilePane(pane)}>{t("code.panes." + pane)}</Button>
-                  ))}
-                </div>
-              )}
-              <div className={cn("grid min-h-0 min-w-0 flex-1", compactViewport ? "grid-cols-1" : "grid-cols-[210px_minmax(0,1fr)]")}>
-                {(!compactViewport || mobilePane === "files") && (
+            {/* Mobile keeps the runnable prototype visible while omitting the heavy editing workspace. */}
+            {!compactViewport && (
+              <section data-testid="code-editor-region" aria-label={t("code.panes.editor")} className="flex h-[560px] w-full min-w-0 shrink-0 flex-col border-b border-border">
+              <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[210px_minmax(0,1fr)]">
                   <aside className="flex min-h-0 min-w-0 flex-col border-r border-border bg-sidebar">
                     <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3 text-xs font-semibold text-muted-foreground"><FolderTree className="size-3.5" />{t("code.panes.files")}</div>
                     <div className="min-h-0 flex-1 overflow-auto py-2">
-                      <FileTree nodes={fileTree} activeFile={activeFile} expandedDirs={expandedDirs} onToggleDirectory={toggleDirectory} onSelectFile={path => { setActiveFile(path); if (compactViewport) setMobilePane("editor"); }} />
+                      <FileTree nodes={fileTree} activeFile={activeFile} expandedDirs={expandedDirs} onToggleDirectory={toggleDirectory} onSelectFile={setActiveFile} />
                     </div>
                   </aside>
-                )}
-                {(!compactViewport || mobilePane === "editor") && (
                   <div className="flex min-h-0 min-w-0 flex-col">
                     <div data-testid="code-file-tabs" className="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-border bg-card px-2 pt-1 [scrollbar-width:thin]">
                       {sortedFiles.map(path => (
@@ -431,9 +421,9 @@ export function CodeGenerationPage() {
                     </div>
                     <div className="min-h-0 flex-1 bg-muted"><EditorBridge activeFile={activeFile} files={files} onChange={handleFileChange} /></div>
                   </div>
-                )}
               </div>
             </section>
+            )}
             <section data-testid="code-preview-region" aria-label={t("code.panes.preview")} className="flex h-[560px] w-full min-w-0 shrink-0 flex-col bg-card lg:h-[680px]">
               <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3 text-xs">
                 <span className="font-semibold">{t("code.panes.preview")}</span>

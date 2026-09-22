@@ -23,8 +23,9 @@ import {
   User,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
 import { GlobalSettingsPanel } from "../../settings/components/global-settings-panel";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 import { Avatar, AvatarFallback } from "../../../shared/ui/avatar";
 import { Badge } from "../../../shared/ui/badge";
 import { Button } from "../../../shared/ui/button";
@@ -40,8 +41,10 @@ import { Input } from "../../../shared/ui/input";
 import { Label } from "../../../shared/ui/label";
 import { Separator } from "../../../shared/ui/separator";
 import { ScrollArea } from "../../../shared/ui/scroll-area";
+import { ExpandableTabs } from "../../../shared/ui/expandable-tabs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../shared/ui/tabs";
 import { cn } from "../../../shared/ui/utils";
+import { useIsMobile } from "../../../shared/hooks/use-mobile";
 import { formatSessionDevice, formatSessionRegion } from "../lib/session-device";
 import {
   ACCOUNT_SESSION_RECORD_LIMIT,
@@ -78,6 +81,7 @@ export function AccountDialog({
   onOpenChange,
 }: AccountDialogProps) {
   const { t, i18n } = useTranslation();
+  const isMobile = useIsMobile();
   const locale = i18n.resolvedLanguage === "en" ? "en-US" : "zh-CN";
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
@@ -170,7 +174,7 @@ export function AccountDialog({
           setUser(null);
           return;
         }
-        setStatus(error instanceof Error ? error.message : t("account.loadFailed"));
+        setStatus(localizeCaughtFailure(error, t("account.loadFailed")));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -297,15 +301,15 @@ export function AccountDialog({
         URL.revokeObjectURL(avatarPreviewUrl);
       }
       setAvatarPreviewUrl("");
-      toast.success(t("account.profileSaved"));
+      floatingAlert.success(t("account.profileSaved"));
     } catch (error) {
-      toast.error(t("account.profileSaveFailed"));
+      floatingAlert.error(t("account.profileSaveFailed"));
     }
   };
 
   const changePassword = async () => {
     if (!currentPassword || !newPassword) {
-      toast.error(t("account.passwordRequired"));
+      floatingAlert.error(t("account.passwordRequired"));
       return;
     }
 
@@ -321,9 +325,9 @@ export function AccountDialog({
       setNewPassword("");
       const refreshed = await platformApi.listAccountSessions().catch(() => null);
       if (refreshed) setSessions(refreshed.sessions);
-      toast.success(t("account.passwordChanged"));
+      floatingAlert.success(t("account.passwordChanged"));
     } catch (error) {
-      toast.error(t("account.passwordChangeFailed"));
+      floatingAlert.error(t("account.passwordChangeFailed"));
     } finally {
       setPasswordSubmitting(false);
     }
@@ -331,7 +335,7 @@ export function AccountDialog({
 
   const logout = async () => {
     await platformApi.logout().catch((error) => {
-      toast.error(t("account.logoutFailed"));
+      floatingAlert.error(t("account.logoutFailed"));
     });
     setUser(null);
     setSessions([]);
@@ -358,9 +362,9 @@ export function AccountDialog({
       const result = await platformApi.revokeOtherSessions();
       const refreshed = await platformApi.listAccountSessions();
       setSessions(refreshed.sessions);
-      toast.success(t("account.revokedOthers", { count: result.revokedCount }));
+      floatingAlert.success(t("account.revokedOthers", { count: result.revokedCount }));
     } catch (error) {
-      toast.error(t("account.revokeFailed"));
+      floatingAlert.error(t("account.revokeFailed"));
     }
   };
 
@@ -368,9 +372,9 @@ export function AccountDialog({
     try {
       const setup = await platformApi.setupMfa();
       setMfaSetup(setup);
-      toast.success(t("account.mfaSetupReady"));
+      floatingAlert.success(t("account.mfaSetupReady"));
     } catch (error) {
-      toast.error(t("account.mfaSetupFailed"));
+      floatingAlert.error(t("account.mfaSetupFailed"));
     }
   };
 
@@ -381,16 +385,16 @@ export function AccountDialog({
       setMfaEnabled(response.mfa.enabled);
       setMfaSetup(null);
       setMfaCode("");
-      toast.success(t("account.mfaEnabledSuccess"));
+      floatingAlert.success(t("account.mfaEnabledSuccess"));
     } catch (error) {
-      toast.error(t("account.mfaEnableFailed"));
+      floatingAlert.error(t("account.mfaEnableFailed"));
     }
   };
 
   const disableMfa = async () => {
     const trimmedCode = disableCode.trim();
     if (!trimmedCode) {
-      toast.error(t("account.disableCodeRequired"));
+      floatingAlert.error(t("account.disableCodeRequired"));
       return;
     }
 
@@ -399,9 +403,9 @@ export function AccountDialog({
       keepAccountDialogOpen();
       setMfaEnabled(response.mfa.enabled);
       setDisableCode("");
-      toast.success(t("account.mfaDisabledSuccess"));
+      floatingAlert.success(t("account.mfaDisabledSuccess"));
     } catch (error) {
-      toast.error(t("account.mfaDisableFailed"));
+      floatingAlert.error(t("account.mfaDisableFailed"));
     }
   };
 
@@ -440,7 +444,7 @@ export function AccountDialog({
         ref={dialogContentRef}
         showCloseButton={false}
         tabIndex={-1}
-        className="max-h-[88vh] overflow-hidden p-0 sm:max-w-[1100px]"
+        className="top-0 left-0 h-[100dvh] max-h-[100dvh] max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none p-0 md:top-1/2 md:left-1/2 md:h-auto md:max-h-[88vh] md:max-w-[1100px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl"
       >
         <Button variant="ghost"
           type="button"
@@ -472,8 +476,44 @@ export function AccountDialog({
           </div>
         ) : (
           <div className="w-full min-w-0">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex h-[min(85vh,700px)] min-h-0 flex-row gap-0 overflow-hidden">
-            <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-muted/30 p-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex h-full min-h-0 flex-col gap-0 overflow-hidden md:h-[min(85vh,700px)] md:flex-row">
+            {isMobile ? (
+              <div className="shrink-0 border-b border-border bg-muted/30 p-3 pr-12">
+              <DialogHeader className="mb-3 flex-row items-center gap-3 space-y-0 text-left">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-primary shadow-sm">
+                  <Settings className="size-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <DialogTitle className="text-base">{t("account.settings")}</DialogTitle>
+                  <DialogDescription className="truncate text-xs">{t("account.preferences")}</DialogDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="ml-auto shrink-0"
+                  aria-label={t("account.logout")}
+                  title={t("account.logout")}
+                  onClick={logout}
+                >
+                  <LogOut className="size-4" />
+                </Button>
+              </DialogHeader>
+              <ExpandableTabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                ariaLabel={t("account.settings")}
+                className="w-full justify-start"
+                items={[
+                  { value: "profile", label: t("account.profile"), icon: User },
+                  { value: "security", label: t("account.security"), icon: Shield },
+                  { value: "sessions", label: t("account.sessions"), icon: Monitor },
+                  { value: "global", label: t("account.globalSettings"), icon: Settings },
+                ]}
+              />
+              </div>
+            ) : (
+              <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-muted/30 p-4">
               <DialogHeader className="mb-4 flex-row items-center gap-3 space-y-0 text-left">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-primary shadow-sm">
                   <Settings className="size-5" aria-hidden="true" />
@@ -528,13 +568,14 @@ export function AccountDialog({
                   {t("account.logout")}
                 </Button>
               </div>
-            </aside>
+              </aside>
+            )}
 
             <ScrollArea
               className="min-h-0 min-w-0 flex-1 bg-background"
               viewportClassName="overflow-x-hidden"
             >
-            <main className="min-w-0 p-6">
+            <main className="min-w-0 p-4 sm:p-6">
               {loading && (
                 <div className="mb-4 flex items-center gap-2 rounded-md border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
@@ -549,7 +590,7 @@ export function AccountDialog({
                   <p className="mt-1 text-sm text-muted-foreground">{t("account.profileDescription")}</p>
                 </div>
 
-                <div className="flex flex-row gap-8">
+                <div className="flex flex-col items-center gap-6 md:flex-row md:items-start md:gap-8">
                   <div className="flex shrink-0 flex-col items-center gap-4">
                     <input
                       ref={avatarInputRef}
@@ -606,7 +647,7 @@ export function AccountDialog({
 
                     <div className="grid gap-1.5">
                       <Label htmlFor="account-email">{t("account.email")}</Label>
-                      <div className="flex flex-row items-center gap-2">
+                      <div className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
                         <Input
                           id="account-email"
                           value={user.email}
@@ -631,7 +672,7 @@ export function AccountDialog({
                         <Mail className="size-4 text-muted-foreground" />
                         {t("account.accountStatus")}
                       </div>
-                      <div className="flex flex-nowrap gap-2">
+                      <div className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto pb-1">
                         <Badge variant="outline">{accountStatus}</Badge>
                         <Badge variant="outline">{user.emailVerified ? t("account.emailVerified") : t("account.emailUnverified")}</Badge>
                         <Badge variant="outline">{mfaEnabled ? t("account.mfaEnabled") : t("account.mfaDisabled")}</Badge>
@@ -651,7 +692,7 @@ export function AccountDialog({
               </TabsContent>
 
               <TabsContent value="security" className="m-0 space-y-6">
-                <div className="flex flex-row items-end justify-between gap-3 border-b border-border pb-4">
+                <div className="flex flex-col items-start justify-between gap-3 border-b border-border pb-4 sm:flex-row sm:items-end">
                   <div>
                     <h3 className="text-lg font-semibold text-foreground">{t("account.security")}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">{t("account.securityDescription")}</p>
@@ -755,7 +796,7 @@ export function AccountDialog({
                 </div>
 
                 <Separator />
-                <div className="flex flex-nowrap justify-between gap-2">
+                <div className="flex min-w-0 flex-nowrap justify-between gap-2 overflow-x-auto pb-1">
                   <Button variant="outline" onClick={revokeOtherSessions}>
                     {t("account.otherDevices")}
                   </Button>
@@ -767,7 +808,7 @@ export function AccountDialog({
               </TabsContent>
 
               <TabsContent value="sessions" className="m-0 space-y-6">
-                <div className="flex flex-row items-end justify-between gap-3 border-b border-border pb-4">
+                <div className="flex flex-col items-start justify-between gap-3 border-b border-border pb-4 sm:flex-row sm:items-end">
                   <div>
                     <h3 className="text-lg font-semibold text-foreground">{t("account.activeSessions")}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">{t("account.activeSessionsDescription")}</p>
@@ -778,9 +819,9 @@ export function AccountDialog({
                   </Button>
                 </div>
 
-                <div className="overflow-hidden rounded-md border border-border">
+                <div className="max-w-full overflow-x-auto rounded-md border border-border">
                   <Table
-                    className="table-fixed border-collapse text-left text-sm"
+                    className="min-w-[720px] table-fixed border-collapse text-left text-sm"
                     aria-label={t("account.activeSessions")}
                   >
                     <TableHeader className="bg-muted/50 text-xs text-muted-foreground">

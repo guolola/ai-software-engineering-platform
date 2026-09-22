@@ -153,7 +153,7 @@ export function RequirementRulesTable({
               onValueChange={(value) =>
                 setRuleCategoryFilter(value as RequirementRuleCategoryFilter)
               }
-              className="w-36 shrink-0"
+              className="w-20 shrink-0 sm:w-36"
               aria-label={t("requirements.table.categoryFilter")}
               options={[
                 { value: ALL_RULE_CATEGORIES, label: t("requirements.table.allCategories") },
@@ -169,18 +169,18 @@ export function RequirementRulesTable({
               type="button"
               size="sm"
               variant="outline"
-              className="shrink-0"
+              className="size-9 shrink-0 px-0 sm:h-9 sm:w-auto sm:px-3"
               onClick={onAddRule}
               disabled={generating || !canEditRequirements}
               title={!canEditRequirements ? editBlockedReason : undefined}
             >
               <Plus className="size-3.5" />
-              {t("requirements.table.add")}
+              <span className="sr-only sm:not-sr-only">{t("requirements.table.add")}</span>
             </Button>
           }
         />
       </div>
-      <div className="w-full min-w-0 max-w-full overflow-hidden">
+      <div className="w-full min-w-0 max-w-full overflow-x-auto">
         <Table
           data-testid="requirement-rules-compact-table"
           className="w-full min-w-[900px] table-fixed border-collapse bg-card text-[12px] md:text-sm"

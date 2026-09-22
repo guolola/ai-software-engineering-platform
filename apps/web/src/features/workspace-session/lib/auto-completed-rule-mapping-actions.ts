@@ -10,6 +10,7 @@ import {
   mergeAutoCompletedRuleMappings,
 } from "./generation-planning";
 import { requirementInputFingerprintFor } from "./workspace-context";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 
 type LatestRuleInputRef = {
   current: {
@@ -73,8 +74,10 @@ export function useAutoCompletedRuleMappingActions({
             rulesVersion: nextRulesVersion,
           });
         } catch (error) {
-          const detail =
-            error instanceof Error ? error.message : "保存项目工作台失败";
+          const detail = localizeCaughtFailure(
+            error,
+            "保存项目工作台失败，请检查网络后重试。",
+          );
           throw new Error(
             `需求规则映射保存失败，已阻止下游生成。${detail}`,
           );

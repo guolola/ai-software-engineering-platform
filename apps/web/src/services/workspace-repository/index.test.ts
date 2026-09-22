@@ -296,7 +296,7 @@ describe("createHttpWorkspaceRepository", () => {
     const repository = createHttpWorkspaceRepository();
 
     await expect(repository.subscribeToRun("run-1", () => {})).rejects.toThrow(
-      "LLM request failed with HTTP 401",
+      "当前模型服务配置不可用，请联系管理员处理。",
     );
   });
 
@@ -351,7 +351,7 @@ describe("createHttpWorkspaceRepository", () => {
     const repository = createHttpWorkspaceRepository();
 
     await expect(repository.subscribeToRun("run-2", () => {})).rejects.toThrow(
-      "LLM request failed with HTTP 401",
+      "当前模型服务配置不可用，请联系管理员处理。",
     );
   });
 
@@ -2170,7 +2170,7 @@ describe("createHttpWorkspaceRepository", () => {
     expect(history[0]?.snapshot).toBeNull();
     expect(history[1]?.providerModel).toBe("默认模型");
     expect(history[1]).toMatchObject({
-      errorMessage: "部分图表渲染失败",
+      errorMessage: "任务遇到内部错误，请联系管理员。",
       diagramErrorCount: 1,
       partialFailure: true,
     });
@@ -2181,9 +2181,9 @@ describe("createHttpWorkspaceRepository", () => {
         message: "PlantUML 修复失败",
       },
     ]);
-    expect(history[1]?.summary).toContain("失败原因 部分图表渲染失败");
+    expect(history[1]?.summary).toContain("失败原因 任务遇到内部错误，请联系管理员。");
     expect(history[1]?.summary).toContain(
-      "图级失败 1 张图：总体业务流程（render_svg：PlantUML 修复失败）",
+      "图级失败 1 张图：总体业务流程（render_svg：图表生成失败，请稍后重试。）",
     );
     expect(history[2]).toMatchObject({
       status: "interrupted",
@@ -2212,7 +2212,7 @@ describe("createHttpWorkspaceRepository", () => {
       canRestore: false,
       documentDownloadAvailable: false,
     });
-    expect(history[4]?.summary).toContain("失败原因 证据包组装失败");
+    expect(history[4]?.summary).toContain("失败原因 任务遇到内部错误，请联系管理员。");
     expect(history[4]?.summary).not.toContain("文档可下载");
     expect(history[4]?.summary).not.toContain("快照可恢复");
     expect(history[5]).toMatchObject({

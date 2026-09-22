@@ -32,6 +32,7 @@ import type {
   WorkspaceSessionState,
 } from "../../workspace-session/model/session-state";
 import { DESIGN_REQUIREMENT_SOURCE_MAP } from "../../workspace-session/lib/generation-planning";
+import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 
 export type LineageStage =
   | "requirement-rules"
@@ -363,7 +364,9 @@ function failedRulesHistory(input: LineageGraphInput) {
 function failedRulesSummary(item: LineageGraphInput["historyItems"][number] | undefined) {
   const detail =
     item?.snapshot && "error" in item.snapshot
-      ? item.snapshot.error?.message
+      ? item.snapshot.error
+        ? localizeRunFailure(item.snapshot.error, "生成任务失败，请稍后重试。")
+        : null
       : item?.errorMessage ?? item?.summary ?? null;
   return detail
     ? `需求规则抽取失败，旧规则仍可查看。${detail}`
@@ -565,8 +568,8 @@ function designStaleReasonForDiagram(
 
 function errorMessage(error: unknown, fallback: string) {
   if (!error || typeof error !== "object") return fallback;
-  const record = error as { error?: { message?: string } };
-  return record.error?.message ?? fallback;
+  const record = error as { error?: unknown };
+  return record.error ? localizeRunFailure(record.error, fallback) : fallback;
 }
 
 function lastFinishedTaskEvent(
@@ -826,7 +829,9 @@ function codeReason(input: LineageGraphInput, status: LineageNodeStatus) {
     const failedHistory = failedRegenerateCodeHistory(input);
     const failedSnapshot = failedHistory ? historyCodeSnapshot(failedHistory) : null;
     const detail =
-      failedSnapshot?.error?.message ??
+      (failedSnapshot?.error
+        ? localizeRunFailure(failedSnapshot.error, "代码重新生成失败。")
+        : null) ??
       failedHistory?.errorMessage ??
       failedHistory?.summary ??
       "代码重新生成失败。";

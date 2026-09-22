@@ -1,6 +1,13 @@
 // Provides run UI status defaults and event-to-UI-state derivation.
 
 import type { RunEvent } from "@uml-platform/contracts";
+import { localizeRunFailure } from "../../../shared/i18n/api-errors";
+
+function failedEventMessage(event: RunEvent) {
+  return event.type === "failed"
+    ? localizeRunFailure(event.error, "生成任务失败，请稍后重试。")
+    : "生成任务失败，请稍后重试。";
+}
 import type { RunStatus } from "../../../entities/workspace/model";
 import { cancelledRunMessage, statusFromRunEvent } from "./run-events";
 
@@ -43,10 +50,10 @@ export function deriveRunUiStateFromEvent(
             : event.type === "cancelled"
               ? event.message
               : event.type === "failed"
-                ? event.error.message
+                ? failedEventMessage(event)
                 : current.runMessage,
     errorMessage:
-      event.type === "failed" ? event.error.message : current.errorMessage,
+      event.type === "failed" ? failedEventMessage(event) : current.errorMessage,
   } satisfies RunUiState;
 }
 
@@ -74,10 +81,10 @@ export function deriveCodeRunUiStateFromEvent(
               : event.type === "cancelled"
                 ? event.message
                 : event.type === "failed"
-                  ? event.error.message
+                  ? failedEventMessage(event)
                   : current.runMessage,
     errorMessage:
-      event.type === "failed" ? event.error.message : current.errorMessage,
+      event.type === "failed" ? failedEventMessage(event) : current.errorMessage,
   } satisfies RunUiState;
 }
 

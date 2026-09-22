@@ -6,10 +6,12 @@ import {
   postJson,
   requestJson,
 } from "./index";
+import { i18n } from "../../shared/i18n/i18n";
 
 describe("api-client", () => {
-  afterEach(() => {
+  afterEach(async () => {
     vi.unstubAllGlobals();
+    await i18n.changeLanguage("zh-CN");
   });
 
   it("builds api urls without duplicating the /api prefix", () => {
@@ -77,6 +79,36 @@ describe("api-client", () => {
     });
   });
 
+  it("exposes parsed structured api errors for contextual actions", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({
+          error: {
+            code: "REQUIREMENT_REVIEWS_PENDING",
+            category: "conflict",
+            retryable: false,
+            params: { count: 2 },
+            details: { ruleIds: ["r1", "r2"] },
+          },
+          requestId: "request-structured",
+        }), {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(requestJson("/api/runs")).rejects.toMatchObject({
+      name: "ApiClientError",
+      apiError: {
+        code: "REQUIREMENT_REVIEWS_PENDING",
+        params: { count: 2 },
+        details: { ruleIds: ["r1", "r2"] },
+      },
+    } satisfies Partial<ApiClientError>);
+  });
+
   it("uses the localized operation fallback when no stable code exists", async () => {
     vi.stubGlobal(
       "fetch",
@@ -122,5 +154,26 @@ describe("api-client", () => {
     const result = await downloadBlob("/api/document-runs/run/download");
     expect(result.fileName).toBe("说明书.docx");
     expect(await result.blob.text()).toBe("doc");
+  });
+
+  it.each([
+    ["zh-CN", "无法连接服务，请检查网络或确认服务已启动后重试。"],
+    ["en", "Unable to reach the service. Check your connection or confirm that the service is running, then try again."],
+  ])("localizes network failures for %s without exposing browser text", async (language, expected) => {
+    await i18n.changeLanguage(language);
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
+
+    await expect(requestJson("/api/auth/me")).rejects.toMatchObject({
+      name: "ApiClientError",
+      status: 0,
+      message: expected,
+    });
+  });
+
+  it("keeps AbortError as cancellation", async () => {
+    const abortError = new DOMException("cancelled", "AbortError");
+    vi.stubGlobal("fetch", vi.fn(async () => { throw abortError; }));
+
+    await expect(requestJson("/api/auth/me")).rejects.toBe(abortError);
   });
 });

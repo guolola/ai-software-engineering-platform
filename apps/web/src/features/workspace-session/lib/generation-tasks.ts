@@ -16,6 +16,13 @@ import {
   summarizeEvent,
 } from "./diagnostics";
 import { appendTranscriptEvent } from "./run-transcript";
+import { localizeRunFailure } from "../../../shared/i18n/api-errors";
+
+function runFailureMessage(event: RunEvent) {
+  return event.type === "failed"
+    ? localizeRunFailure(event.error, "生成任务失败，请稍后重试。")
+    : "生成任务失败，请稍后重试。";
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -32,13 +39,13 @@ function phaseSummaryFromEvent(event: RunEvent, fallback: string | null) {
     return "生成完成，可以查看或导出结果。";
   }
   if (event.type === "failed") {
-    return event.error.message;
+    return runFailureMessage(event);
   }
   return fallback;
 }
 
 function eventFailureMessage(event: RunEvent) {
-  return event.type === "failed" ? event.error.message : null;
+  return event.type === "failed" ? runFailureMessage(event) : null;
 }
 
 export function createClientTaskId(kind: GenerationTaskKind) {
@@ -437,7 +444,9 @@ function failDownstreamRenderSubtasksForModelFailure(
       ...subtask,
       status: "failed" as const,
       message: "前置模型生成失败，未执行",
-      errorMessage: event.error?.message ?? event.message ?? "前置模型生成失败",
+      errorMessage: event.error
+        ? localizeRunFailure(event.error, "前置模型生成失败")
+        : event.message ?? "前置模型生成失败",
     };
   });
 }
@@ -486,7 +495,7 @@ function collectCompletedSubtaskIds(snapshot: unknown) {
 }
 
 function errorForSubtask(
-  errors: Record<string, { error?: { message?: string }; stage?: string }>,
+  errors: Record<string, { error?: unknown; stage?: string }>,
   subtaskId: string,
 ) {
   const scoped = splitScopedSubtaskId(subtaskId);
@@ -519,7 +528,7 @@ function updateSubtasksFromCompletedSnapshot(
   if (!isRecord(snapshot) || !isRecord(snapshot.diagramErrors)) return subtasks;
   const errors = snapshot.diagramErrors as Record<
     string,
-    { error?: { message?: string }; stage?: string }
+    { error?: unknown; stage?: string }
   >;
   const completedIds = collectCompletedSubtaskIds(snapshot);
   const pendingReviewByDiagram = new Map<string, number>();
@@ -558,8 +567,12 @@ function updateSubtasksFromCompletedSnapshot(
       return {
         ...subtask,
         status: "failed" as const,
-        message: error.error?.message ?? subtask.message,
-        errorMessage: error.error?.message ?? subtask.errorMessage,
+        message: error.error
+          ? localizeRunFailure(error.error, "模型生成失败，请重试。")
+          : subtask.message,
+        errorMessage: error.error
+          ? localizeRunFailure(error.error, "模型生成失败，请重试。")
+          : subtask.errorMessage,
       };
     }
     if (completedIds.has(subtask.id) && subtask.status !== "failed") {
@@ -589,7 +602,9 @@ function updateSubtasksFromCompletedSnapshot(
       label: id,
       status: "failed",
       message: error.stage ? `阶段失败：${error.stage}` : null,
-      errorMessage: error.error?.message ?? null,
+      errorMessage: error.error
+        ? localizeRunFailure(error.error, "模型生成失败，请重试。")
+        : null,
     });
   }
   return next;
@@ -691,7 +706,7 @@ function taskMessageFromEvent(
   if (event.type === "cancelled") {
     return event.message;
   }
-  if (event.type === "failed") return event.error.message;
+  if (event.type === "failed") return runFailureMessage(event);
   return task.message;
 }
 
@@ -839,7 +854,7 @@ export function updateTaskFromEvent(
     messageParams: event.type === "failed" ? event.error.params : undefined,
     errorMessage:
       event.type === "failed"
-        ? event.error.message
+        ? runFailureMessage(event)
         : event.type === "completed" && nextStatus === "failed"
           ? nextMessage
           : task.errorMessage,

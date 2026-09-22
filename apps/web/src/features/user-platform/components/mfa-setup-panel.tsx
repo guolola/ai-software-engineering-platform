@@ -102,8 +102,8 @@ export function MfaSetupPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-[176px_1fr] gap-4">
-        <div className="grid place-items-center rounded-md border border-border bg-white p-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[176px_1fr]">
+        <div className="mx-auto grid w-full max-w-44 place-items-center rounded-md border border-border bg-white p-3 sm:mx-0">
           <QRCodeSVG
             value={setup.otpauthUri}
             size={152}

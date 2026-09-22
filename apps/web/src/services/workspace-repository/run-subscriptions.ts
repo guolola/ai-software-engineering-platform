@@ -13,6 +13,7 @@ import { ApiClientError, buildApiUrl, requestJson } from "../api-client";
 import { subscribeToRunEvents } from "../sse-client";
 import { projectHeaders, requireProjectScope } from "./project-scope";
 import { snapshotErrorMessage } from "./run-payload";
+import { localizeRunFailure } from "../../shared/i18n/api-errors";
 
 type RunSubscriptionInput = {
   runId: string;
@@ -49,9 +50,12 @@ const INITIAL_SNAPSHOT_POLL_MS = 1_500;
 const MAX_SNAPSHOT_POLL_MS = 10_000;
 
 class StreamedRunFailedError extends Error {
-  constructor(message: string) {
-    super(message);
+  readonly runError: RunError;
+
+  constructor(runError: RunError) {
+    super(localizeRunFailure(runError, "生成任务失败，请稍后重试。"));
     this.name = "StreamedRunFailedError";
+    this.runError = runError;
   }
 }
 
@@ -110,7 +114,7 @@ async function waitForTerminalSnapshot<TSnapshot extends RestorableRunSnapshot>(
           stage: snapshot.currentStage ?? undefined,
           error,
         });
-        throw new Error(message);
+        throw new StreamedRunFailedError(error);
       }
       if (snapshot.status === "cancelled") {
         onEvent({
@@ -270,7 +274,7 @@ export async function streamProjectRunEvents(
     }
     if (event.type === "failed") {
       terminalEventSeen = true;
-      throw new StreamedRunFailedError(event.error.message);
+      throw new StreamedRunFailedError(event.error);
     }
   };
 

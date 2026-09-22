@@ -2,7 +2,7 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { toast } from "sonner";
+import { floatingAlert as toast } from "../../../shared/ui/floating-alert";
 import { feasibilityImplementationPlanSchema } from "@uml-platform/contracts";
 import type { WorkspaceRepository } from "../../../services/workspace-repository";
 import {
@@ -32,13 +32,15 @@ const { toastMessage } = vi.hoisted(() => ({
   toastMessage: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("../../../shared/ui/floating-alert", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../shared/ui/floating-alert")>();
+  return { ...actual, floatingAlert: {
+    ...actual.floatingAlert,
     message: toastMessage,
     success: vi.fn(),
     error: vi.fn(),
-  },
-}));
+  } };
+});
 
 function SidebarDesignGenerationHarness() {
   const { generateDesignDiagrams } = useWorkspaceSession();

@@ -316,7 +316,7 @@ describe("run subscriptions", () => {
         projectId: "project-a",
         onEvent: (event) => events.push(event),
       }),
-    ).rejects.toThrow("模型输出解析失败");
+    ).rejects.toThrow("生成任务失败，请稍后重试。");
 
     expect(events.map((event) => event.type)).toEqual([
       "queued",
