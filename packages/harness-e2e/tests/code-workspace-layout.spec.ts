@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { projectId, mockProjectApi } from "./fixtures/project-workspace";
 
 for (const width of [390, 1440]) {
-  test(`${width}px code workspace keeps preview below the editor and details in a dialog`, async ({ page }, info) => {
+  test(`${width}px code workspace keeps the responsive preview and details in a dialog`, async ({ page }, info) => {
     await mockProjectApi(page, {
       codeFiles: {
         "/src/App.tsx": "export default function App() { return <main>Layout preview</main>; }",
@@ -21,13 +21,19 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     const editor = page.getByTestId("code-editor-region");
     const preview = page.getByTestId("code-preview-region");
-    const boxes = await Promise.all([toolbar, editor, preview].map(locator => locator.boundingBox()));
+    const regions = width < 768 ? [toolbar, preview] : [toolbar, editor, preview];
+    const boxes = await Promise.all(regions.map(locator => locator.boundingBox()));
     for (const box of boxes) {
       expect(box).not.toBeNull();
       expect(Math.abs(box!.width - boxes[0]!.width)).toBeLessThan(1);
       expect(Math.abs(box!.x - boxes[0]!.x)).toBeLessThan(1);
     }
-    expect(boxes[2]!.y).toBeGreaterThanOrEqual(boxes[1]!.y + boxes[1]!.height - 1);
+    if (width < 768) {
+      await expect(editor).toHaveCount(0);
+      await expect(page.getByTestId("code-file-tabs")).toHaveCount(0);
+    } else {
+      expect(boxes[2]!.y).toBeGreaterThanOrEqual(boxes[1]!.y + boxes[1]!.height - 1);
+    }
     const fullscreen = toolbar.getByRole("button", { name: "全屏预览" });
     const run = toolbar.getByRole("button", { name: "运行预览" });
     await expect(fullscreen).toHaveCount(1);
@@ -47,6 +53,7 @@ for (const width of [390, 1440]) {
     await expect(dialog.getByText(/界面规划诊断 18$/)).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     await page.screenshot({ path: info.outputPath("code-workspace.png"), fullPage: true });
   });
 }

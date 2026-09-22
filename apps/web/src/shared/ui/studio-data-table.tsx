@@ -254,11 +254,11 @@ export function StudioDataTable<TData, TValue = unknown>({
       data-slot='studio-data-table'
       className={cn('w-full min-w-0 overflow-hidden rounded-xl border bg-card shadow-xs', className)}
     >
-      <div className='flex flex-wrap items-center justify-between gap-3 border-b bg-muted/20 p-3'>
-        <div className='flex min-w-0 flex-wrap items-center gap-2'>
-          {toolbarLeading}
+      <div className='flex min-w-0 flex-wrap items-center gap-3 border-b bg-muted/20 p-3 sm:justify-between'>
+        {toolbarLeading ? <div className='w-full shrink-0 sm:w-auto'>{toolbarLeading}</div> : null}
+        <div data-testid='studio-data-table-filters' className='flex min-w-0 flex-1 flex-nowrap items-center gap-2'>
           {search ? (
-            <InputGroup className='w-full max-w-2xs'>
+            <InputGroup className='min-w-0 flex-1 sm:max-w-2xs'>
               <InputGroupAddon>
                 <SearchIcon />
               </InputGroupAddon>
@@ -273,9 +273,9 @@ export function StudioDataTable<TData, TValue = unknown>({
               />
             </InputGroup>
           ) : null}
-          {filters}
+          {filters ? <div className='flex min-w-0 flex-1 items-center'>{filters}</div> : null}
         </div>
-        <div className='flex shrink-0 flex-wrap items-center gap-2'>
+        <div data-testid='studio-data-table-page-controls' className='flex shrink-0 flex-nowrap items-center gap-2'>
           <StudioPageSizeSelect
             pageSize={pagination.pageSize}
             pageSizeOptions={pageSizeOptions}

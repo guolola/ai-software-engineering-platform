@@ -1,10 +1,7 @@
 // Runs admin provider config health checks outside the admin HTTP route registration layer.
 import { getModelCapability } from "../model-capabilities.js";
 import { getHealthcheckResponseFormat } from "../adapters/llm/response-formats/index.js";
-import {
-  ProviderHttpError,
-  runOpenAiCompatibleChatCompletionHealthcheck,
-} from "../llm.js";
+import { runOpenAiCompatibleChatCompletionHealthcheck } from "../llm.js";
 import type { AdminActor } from "../security/admin-guard.js";
 import type { ProviderConfigStore } from "./provider-config-store.js";
 import {
@@ -13,6 +10,12 @@ import {
   type ProviderRateLimitPolicyRecord,
   type ProviderUsageTracker,
 } from "./provider-usage-tracker.js";
+import {
+  classifyProviderTestFailure,
+  providerTestError,
+  safeProviderHost,
+  type ProviderTestFailureKind,
+} from "./provider-test-errors.js";
 
 export async function testAdminProviderConfigConnection({
   providerConfigs,
@@ -23,6 +26,7 @@ export async function testAdminProviderConfigConnection({
   actor,
   ipAddress,
   model,
+  onFailureDiagnostic,
 }: {
   providerConfigs: ProviderConfigStore;
   providerUsageTracker?: ProviderUsageTracker;
@@ -32,59 +36,86 @@ export async function testAdminProviderConfigConnection({
   actor: AdminActor;
   ipAddress: string;
   model?: string;
+  onFailureDiagnostic?: (diagnostic: {
+    errorName: string;
+    failureKind: ProviderTestFailureKind;
+    providerConfigId: string;
+    providerHost: string;
+    upstreamStatus: number | null;
+  }) => void;
 }): Promise<{ statusCode: number; body: unknown }> {
   const providerConfig = await providerConfigs.get(providerConfigId);
   if (!providerConfig) {
-    return { statusCode: 404, body: { message: "Provider config not found" } };
+    return {
+      statusCode: 404,
+      body: providerTestError({
+        code: "PROVIDER_CONFIG_NOT_FOUND",
+        category: "not_found",
+      }),
+    };
   }
   if (providerConfig.scopeType === "user") {
     return {
       statusCode: 403,
-      body: {
-        ok: false,
-        message: "User-owned provider configs cannot be tested by admins",
-      },
+      body: providerTestError({
+        code: "PROVIDER_CONFIG_ACCESS_DENIED",
+        category: "authorization",
+      }),
     };
   }
   if (!providerConfig.allowlisted) {
     return {
       statusCode: 400,
-      body: { ok: false, message: "Provider Base URL is not allowlisted" },
+      body: providerTestError({
+        code: "PROVIDER_BASE_URL_NOT_ALLOWED",
+        category: "validation",
+      }),
     };
   }
   if (providerConfig.status !== "active") {
     return {
       statusCode: 400,
-      body: { ok: false, message: "Provider config is revoked, disabled, or inactive" },
+      body: providerTestError({
+        code: "PROVIDER_CONFIG_INACTIVE",
+        category: "validation",
+      }),
     };
   }
   if (providerConfig.breakerState === "open") {
     return {
       statusCode: 503,
-      body: {
-        ok: false,
-        message: "Provider circuit breaker is open",
-        breaker: {
-          state: providerConfig.breakerState,
-          failureCount: providerConfig.breakerFailureCount,
-          openedAt: providerConfig.breakerOpenedAt,
-          lastFailureAt: providerConfig.breakerLastFailureAt,
+      body: providerTestError({
+        code: "PROVIDER_CIRCUIT_OPEN",
+        params: { failureCount: providerConfig.breakerFailureCount },
+        details: {
+          breaker: {
+            state: providerConfig.breakerState,
+            failureCount: providerConfig.breakerFailureCount,
+            openedAt: providerConfig.breakerOpenedAt,
+            lastFailureAt: providerConfig.breakerLastFailureAt,
+          },
         },
-      },
+      }),
     };
   }
   const testModel = model ?? providerConfig.defaultModel;
   if (!providerConfig.allowedModels.includes(testModel)) {
     return {
       statusCode: 400,
-      body: { ok: false, message: "Provider model is not allowed by this config" },
+      body: providerTestError({
+        code: "PROVIDER_MODEL_NOT_ALLOWED",
+        category: "validation",
+      }),
     };
   }
   const apiKey = await providerConfigs.getSecret(providerConfigId);
   if (!apiKey) {
     return {
       statusCode: 400,
-      body: { ok: false, message: "Provider config secret is revoked" },
+      body: providerTestError({
+        code: "PROVIDER_SECRET_REVOKED",
+        category: "validation",
+      }),
     };
   }
 
@@ -112,11 +143,12 @@ export async function testAdminProviderConfigConnection({
     if (!limitDecision.allowed) {
       return {
         statusCode: 429,
-        body: {
-          ok: false,
-          message: "Provider rate limit exceeded",
-          rateLimit: limitDecision,
-        },
+        body: providerTestError({
+          code: "PROVIDER_TEST_RATE_LIMITED",
+          category: "rate_limit",
+          retryable: true,
+          details: { rateLimit: limitDecision },
+        }),
       };
     }
   }
@@ -132,27 +164,36 @@ export async function testAdminProviderConfigConnection({
     });
   } catch (error) {
     const breaker = await providerConfigs.recordFailure?.(providerConfigId);
-    const providerStatus =
-      error instanceof ProviderHttpError ? error.status : null;
+    const failure = classifyProviderTestFailure(error);
+    onFailureDiagnostic?.({
+      errorName: error instanceof Error ? error.name : "UnknownProviderError",
+      failureKind: failure.failureKind,
+      providerConfigId,
+      providerHost: safeProviderHost(providerConfig.baseUrl),
+      upstreamStatus: failure.upstreamStatus,
+    });
     return {
-      statusCode:
-        providerStatus !== null && providerStatus >= 400 && providerStatus < 500
-          ? 400
-          : 502,
-      body: {
-        ok: false,
-        message:
-          error instanceof Error ? error.message : "Provider test failed",
-        capability,
-        breaker: breaker
-          ? {
-              state: breaker.breakerState,
-              failureCount: breaker.breakerFailureCount,
-              openedAt: breaker.breakerOpenedAt,
-              lastFailureAt: breaker.breakerLastFailureAt,
-            }
+      statusCode: failure.httpStatus,
+      body: providerTestError({
+        code: failure.code,
+        retryable: failure.retryable,
+        params: breaker
+          ? { failureCount: breaker.breakerFailureCount }
           : undefined,
-      },
+        details: {
+          capability,
+          failureKind: failure.failureKind,
+          upstreamStatus: failure.upstreamStatus,
+          breaker: breaker
+            ? {
+                state: breaker.breakerState,
+                failureCount: breaker.breakerFailureCount,
+                openedAt: breaker.breakerOpenedAt,
+                lastFailureAt: breaker.breakerLastFailureAt,
+              }
+            : undefined,
+        },
+      }),
     };
   }
 

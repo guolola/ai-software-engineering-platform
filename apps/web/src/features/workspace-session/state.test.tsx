@@ -38,11 +38,13 @@ const { toastMessage } = vi.hoisted(() => ({
   toastMessage: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("../../shared/ui/floating-alert", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../shared/ui/floating-alert")>();
+  return { ...actual, floatingAlert: {
+    ...actual.floatingAlert,
     message: toastMessage,
-  },
-}));
+  } };
+});
 
 function storeManagedUserSettings() {
   localStorage.setItem(
@@ -358,7 +360,7 @@ describe("WorkspaceSessionProvider", () => {
     );
 
     const failedDialog = await screen.findByRole("dialog", {
-      name: "生成失败",
+      name: "任务遇到内部错误",
     });
     expect(failedDialog).toHaveClass("sm:max-w-[448px]", "rounded-[12px]");
     expect(within(failedDialog).getByLabelText("操作失败")).toHaveClass(
@@ -366,7 +368,7 @@ describe("WorkspaceSessionProvider", () => {
     );
     expect(
       within(failedDialog).getByText(
-        "生成过程中出现问题，请在当前阶段的问题列表查看详情。",
+        "生成任务失败，请稍后重试。 任务或请求编号：run-failed-dialog。",
       ),
     ).toBeInTheDocument();
     expect(
@@ -377,12 +379,12 @@ describe("WorkspaceSessionProvider", () => {
     ).toBeInTheDocument();
     expect(within(failedDialog).queryByText("影响：")).not.toBeInTheDocument();
     expect(within(failedDialog).queryByText("技术详情")).not.toBeInTheDocument();
-    expect(failedDialog).not.toHaveTextContent("run-failed-dialog");
+    expect(failedDialog).toHaveTextContent("run-failed-dialog");
 
     await user.click(within(failedDialog).getByRole("button", { name: "我知道了" }));
     await user.click(screen.getByRole("button", { name: "生成需求规则" }));
     expect(
-      await screen.findByRole("dialog", { name: "生成失败" }),
+      await screen.findByRole("dialog", { name: "任务遇到内部错误" }),
     ).toBeInTheDocument();
   });
 
@@ -555,7 +557,7 @@ describe("WorkspaceSessionProvider", () => {
     );
 
     const failedDialog = await screen.findByRole("dialog", {
-      name: "生成失败",
+      name: "任务遇到内部错误",
     });
     expect(
       screen.queryByRole("dialog", { name: "需求规则已生成" }),
@@ -2434,45 +2436,10 @@ describe("WorkspaceSessionProvider", () => {
       ...existingRule,
       relatedDiagrams: ["usecase", "class"],
     };
-    const pendingRequirement = createAtomicRequirement({
-      id: "REQ-FR1",
-      sourceRuleId: "fr1",
-      actor: null,
-      confidence: 0.52,
-      status: "pending-review",
-      fieldProvenance: {
-        actor: {
-          source: "ai-suggested",
-          status: "pending-review",
-          value: null,
-          rationale: "原文缺少明确参与者。",
-        },
-      },
-    });
-    const pendingBaseline = createRequirementBaseline([pendingRequirement], {
-      qualityReport: {
-        runId: "run-rules",
-        status: "pending-review",
-        summary: "存在待确认字段。",
-        issues: [
-          {
-            id: "issue-fr1-actor",
-            requirementId: "REQ-FR1",
-            severity: "warning",
-            code: "missing-actor",
-            message: "缺少参与者。",
-            blocksDownstream: true,
-          },
-        ],
-        blockingIssueIds: ["issue-fr1-actor"],
-        reviewRequiredRequirementIds: ["REQ-FR1"],
-      },
-    });
     const ruleSnapshot = createRunSnapshot({
       runId: "run-rules",
       requirementText: "公开日历需求",
       rules: [mappedRule],
-      requirementBaseline: pendingBaseline,
     });
     const classSnapshot = createRunSnapshot({
       runId: "run-class",
@@ -2557,7 +2524,16 @@ describe("WorkspaceSessionProvider", () => {
       await generation;
     });
 
-    expect(startRun).toHaveBeenCalledTimes(2);
+    expect({
+      errorMessage: result.current.errorMessage,
+      startRunCalls: startRun.mock.calls.length,
+      task: result.current.visibleGenerationTask,
+    }).toEqual(
+      expect.objectContaining({
+        errorMessage: null,
+        startRunCalls: 2,
+      }),
+    );
     expect(repairRequirementRules).not.toHaveBeenCalled();
     expect(updateRequirementRules).toHaveBeenCalledWith(
       [mappedRule],
@@ -2654,25 +2630,25 @@ describe("WorkspaceSessionProvider", () => {
     );
     expect(result.current.rules).toEqual([existingRule]);
     expect(result.current.runStatus).toBe("failed");
-    expect(result.current.errorMessage).toContain("需求规则映射保存失败");
+    expect(result.current.errorMessage).toContain("需求复核结果未能保存");
     expect(result.current.visibleGenerationTask).toEqual(
       expect.objectContaining({
         runId: null,
         status: "failed",
-        errorMessage: expect.stringContaining("需求规则映射保存失败"),
+        errorMessage: expect.stringContaining("需求复核结果未能保存"),
       }),
     );
     expect(result.current.visibleGenerationTask?.subtasks).toContainEqual(
       expect.objectContaining({
         id: "persist_rule_mappings",
         status: "failed",
-        errorMessage: expect.stringContaining("保存项目工作台失败"),
+        errorMessage: expect.stringContaining("需求复核结果未能保存"),
       }),
     );
     const failedDialog = await screen.findByRole("dialog", {
-      name: "生成失败",
+      name: "暂时无法开始生成",
     });
-    expect(failedDialog).toHaveTextContent("需求规则映射保存失败");
+    expect(failedDialog).toHaveTextContent("需求复核结果未能保存");
   });
 
   it("blocks downstream design generation when auto-completed rule mappings cannot be saved", async () => {
@@ -2794,7 +2770,7 @@ describe("WorkspaceSessionProvider", () => {
       }),
     );
     expect(result.current.runStatus).toBe("failed");
-    expect(result.current.errorMessage).toContain("需求规则映射保存失败");
+    expect(result.current.errorMessage).toContain("需求复核结果未能保存");
     expect(result.current.visibleGenerationTask).toEqual(
       expect.objectContaining({
         kind: "design",
@@ -3018,7 +2994,7 @@ describe("WorkspaceSessionProvider", () => {
     expect(result.current.models.prototype).toBeUndefined();
     expect(saveRunHistory).not.toHaveBeenCalled();
     expect(
-      await screen.findByRole("dialog", { name: "生成失败" }),
+      await screen.findByRole("dialog", { name: "任务遇到内部错误" }),
     ).toBeInTheDocument();
   });
 
@@ -3119,7 +3095,7 @@ describe("WorkspaceSessionProvider", () => {
       expect.any(Object),
     );
     expect(
-      await screen.findByRole("dialog", { name: "生成失败" }),
+      await screen.findByRole("dialog", { name: "任务遇到内部错误" }),
       ).toBeInTheDocument();
   });
 
@@ -3185,9 +3161,9 @@ describe("WorkspaceSessionProvider", () => {
 
     expect(startCodeRun).not.toHaveBeenCalled();
     expect(result.current.runStatus).toBe("failed");
-    expect(result.current.errorMessage).toContain("设计模型存在失败项");
+    expect(result.current.errorMessage).toContain("设计模型依赖无效");
     expect(
-      await screen.findByRole("dialog", { name: "生成失败" }),
+      await screen.findByRole("dialog", { name: "暂时无法开始生成" }),
     ).toBeInTheDocument();
   });
 
@@ -3611,7 +3587,7 @@ describe("WorkspaceSessionProvider", () => {
       blockedGeneration = result.current.generateDiagrams(["usecase"]);
     });
     expect(
-      await screen.findByRole("dialog", { name: "需求规则待确认" }),
+      await screen.findByRole("dialog", { name: "生成前需要确认需求规则" }),
     ).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "我知道了" }));
     await act(async () => {
@@ -3619,7 +3595,9 @@ describe("WorkspaceSessionProvider", () => {
     });
 
     expect(startRun).not.toHaveBeenCalled();
-    expect(result.current.errorMessage).toBe("请先确认需求规则修复结果");
+    expect(result.current.errorMessage).toBe(
+      "有 1 条需求规则修复结果仍待确认，确认后再继续生成。",
+    );
 
     await act(async () => {
       await result.current.decideRequirementReviewCandidate("r1", "accepted");
@@ -4927,10 +4905,10 @@ describe("WorkspaceSessionProvider", () => {
     expect(startDocumentRun).not.toHaveBeenCalled();
     expect(result.current.runStatus).toBe("failed");
     expect(result.current.errorMessage).toBe(
-      "用例实现设计覆盖不足，请先回到设计页补齐用例实现设计",
+      "有 1 项设计模型依赖无效，请先更新设计模型。",
     );
     expect(
-      await screen.findByRole("dialog", { name: "生成失败" }),
+      await screen.findByRole("dialog", { name: "暂时无法开始生成" }),
     ).toBeInTheDocument();
   });
 

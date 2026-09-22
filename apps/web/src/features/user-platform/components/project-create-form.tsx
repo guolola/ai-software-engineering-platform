@@ -2,7 +2,8 @@
 import { Textarea } from '../../../shared/ui/textarea';
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 import type { ProjectBackgroundKey } from "@uml-platform/contracts";
 import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
@@ -71,7 +72,6 @@ export function ProjectCreateForm({ onNavigate }: { onNavigate: Navigate }) {
   const [visibility, setVisibility] = useState("team");
   const [backgroundKey, setBackgroundKey] = useState<ProjectBackgroundKey | null>(null);
   const [creating, setCreating] = useState(false);
-  const [status, setStatus] = useState("");
   const [step, setStep] = useState(0);
   const mounted = useRef(false);
   const navigationTimer = useRef<number | undefined>(undefined);
@@ -110,7 +110,6 @@ export function ProjectCreateForm({ onNavigate }: { onNavigate: Navigate }) {
 
   const createProject = async () => {
     setCreating(true);
-    setStatus("");
     try {
       const academicBinding = academicBindingFromValue(courseTeam, academicOptions);
       const response = await platformApi.createProject({
@@ -124,12 +123,14 @@ export function ProjectCreateForm({ onNavigate }: { onNavigate: Navigate }) {
         backgroundKey,
       });
       if (!mounted.current) return;
-      toast.success(t("projects.createForm.created"));
+      floatingAlert.success(t("projects.createForm.created"));
       navigationTimer.current = window.setTimeout(() => {
         if (mounted.current) onNavigate(`/projects/${response.project.id}`);
       }, 900);
-    } catch {
-      if (mounted.current) setStatus(t("projects.createForm.failed"));
+    } catch (error) {
+      if (mounted.current) {
+        floatingAlert.error(localizeCaughtFailure(error, t("projects.createForm.failed")));
+      }
     } finally {
       if (mounted.current) setCreating(false);
     }
@@ -246,7 +247,6 @@ export function ProjectCreateForm({ onNavigate }: { onNavigate: Navigate }) {
           </Button>
         )}
       </div>
-      {status ? <div className="rounded-md border border-border bg-muted p-3 text-sm">{status}</div> : null}
     </form>
   );
 }

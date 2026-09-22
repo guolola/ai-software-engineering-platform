@@ -1,18 +1,21 @@
 // Covers billing page responsive layout contracts for entitlement cards, orders, and payment dialogs.
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { toast } from "sonner";
+import { floatingAlert as toast } from "../../../shared/ui/floating-alert";
 import { AppI18nProvider } from "../../../shared/i18n";
 import { i18n, LOCALE_PREFERENCE_STORAGE_KEY } from "../../../shared/i18n";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccountBillingPage, AlipayReturnPage, PricingBillingPage } from "./billing-pages";
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("../../../shared/ui/floating-alert", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../shared/ui/floating-alert")>();
+  return { ...actual, floatingAlert: {
+    ...actual.floatingAlert,
     success: vi.fn(),
-  },
-}));
+    error: vi.fn(),
+  } };
+});
 
 const billingSkus = [
   {
@@ -276,7 +279,7 @@ describe("AccountBillingPage", () => {
     );
   });
 
-  it("keeps the selected pack and shows an inline error when direct order creation fails", async () => {
+  it("keeps the selected pack and shows a floating error when direct order creation fails", async () => {
     stubBillingFetch({ failOrderCreation: true });
     const user = userEvent.setup();
     const navigate = vi.fn();
@@ -286,7 +289,8 @@ describe("AccountBillingPage", () => {
     const buyButton = within(selector).getByRole("button", { name: "立即购买" });
     await user.click(buyButton);
 
-    expect(await within(selector).findByRole("alert")).toHaveTextContent("支付订单创建失败");
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("支付订单创建失败"));
+    expect(within(selector).queryByRole("alert")).not.toBeInTheDocument();
     expect(within(selector).getByRole("radio", { name: /100 次包/ })).toHaveAttribute(
       "aria-checked",
       "true",

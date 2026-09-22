@@ -1,6 +1,17 @@
 // Wraps EventSource so repositories can share completion and failure handling.
-import type { RunEvent } from "@uml-platform/contracts";
+import type { RunError, RunEvent } from "@uml-platform/contracts";
 import { buildApiUrl } from "../api-client";
+import { localizeRunFailure } from "../../shared/i18n/api-errors";
+
+export class RunEventFailedError extends Error {
+  readonly runError: RunError;
+
+  constructor(runError: RunError) {
+    super(localizeRunFailure(runError, "生成任务失败，请稍后重试。"));
+    this.name = "RunEventFailedError";
+    this.runError = runError;
+  }
+}
 
 export interface RunEventHandlers {
   onEvent: (event: RunEvent) => void;
@@ -44,7 +55,7 @@ export function subscribeToRunEvents(
           settleResolve();
         }
         if (event.type === "failed") {
-          settleReject(new Error(event.error.message));
+          settleReject(new RunEventFailedError(event.error));
         }
       } catch (error) {
         settleReject(error);

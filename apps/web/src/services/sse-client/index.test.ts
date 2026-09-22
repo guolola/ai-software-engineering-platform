@@ -49,7 +49,7 @@ describe("sse-client", () => {
     expect(events).toEqual(["completed"]);
   });
 
-  it("rejects with the streamed failure message", async () => {
+  it("rejects with a localized streamed failure and preserves its code", async () => {
     class MockEventSource {
       onmessage: ((event: MessageEvent<string>) => void) | null = null;
       onerror: (() => void) | null = null;
@@ -79,7 +79,10 @@ describe("sse-client", () => {
       onEvent: () => {},
     });
 
-    await expect(subscription.closed).rejects.toThrow("LLM request failed");
+    await expect(subscription.closed).rejects.toMatchObject({
+      message: "当前模型服务暂不可用，请稍后重试。",
+      runError: { code: "PLATFORM_PROVIDER_UNAVAILABLE" },
+    });
   });
 
   it("resolves when a cancelled event is received", async () => {

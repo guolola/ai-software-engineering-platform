@@ -7,6 +7,8 @@ import { Button } from "../../../shared/ui/button";
 import { Input } from "../../../shared/ui/input";
 import { Label } from "../../../shared/ui/label";
 import { Switch } from "../../../shared/ui/switch";
+import { useFloatingAlert } from "../../../shared/ui/floating-alert";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 import { formatSessionRegion } from "../lib/session-device";
 import { formatDateTime } from "../lib/project-workspace-presentation";
 import {
@@ -63,14 +65,14 @@ function AccountSection({
 
 export function AccountPage({ onNavigate }: { onNavigate: Navigate }) {
   const { t } = useTranslation();
+  const { showAlert } = useFloatingAlert();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [mfaLabel, setMfaLabel] = useState(() => t("account.notLoaded"));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const avatarUrlError = avatarUrlValidationMessage(avatarUrl, t("account.avatarHttps"));
 
   useEffect(() => {
@@ -87,7 +89,7 @@ export function AccountPage({ onNavigate }: { onNavigate: Navigate }) {
       })
       .catch((profileError) => {
         if (!active) return;
-        setError(profileError instanceof Error ? profileError.message : t("account.profileLoadFailed"));
+        setLoadError(localizeCaughtFailure(profileError, t("account.profileLoadFailed")));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -98,12 +100,7 @@ export function AccountPage({ onNavigate }: { onNavigate: Navigate }) {
   }, [t]);
 
   const saveProfile = async () => {
-    setMessage("");
-    setError("");
-    if (avatarUrlError) {
-      setError(avatarUrlError);
-      return;
-    }
+    if (avatarUrlError) return;
     setSaving(true);
     try {
       const response = await platformApi.updateAccountProfile({
@@ -113,9 +110,12 @@ export function AccountPage({ onNavigate }: { onNavigate: Navigate }) {
       setDisplayName(response.user.displayName);
       setAvatarUrl(response.user.avatarUrl ?? "");
       setMfaLabel(response.mfa?.enabled ? t("account.enabledState") : t("account.disabledState"));
-      setMessage(t("account.profileSavedMessage"));
+      showAlert({ title: t("account.profileSavedMessage"), tone: "success" });
     } catch (profileError) {
-      setError(profileError instanceof Error ? profileError.message : t("account.profileSaveFailedMessage"));
+      showAlert({
+        title: localizeCaughtFailure(profileError, t("account.profileSaveFailedMessage")),
+        tone: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -132,6 +132,11 @@ export function AccountPage({ onNavigate }: { onNavigate: Navigate }) {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <AccountSection>
           {loading && <div className="mb-4 text-sm text-muted-foreground">{t("account.profileLoading")}</div>}
+          {loadError && (
+            <div role="alert" className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              {loadError}
+            </div>
+          )}
           <div className="grid gap-4">
             <div className="grid gap-1.5">
               <Label htmlFor="profile-name">{t("account.displayName")}</Label>
@@ -177,11 +182,6 @@ export function AccountPage({ onNavigate }: { onNavigate: Navigate }) {
               {saving && <Loader2 className="size-4 animate-spin" />}
               {t("account.saveProfile")}
             </Button>
-            {(message || error) && (
-              <div className="rounded-md border border-border bg-muted p-3 text-sm">
-                {message || error}
-              </div>
-            )}
           </div>
         </AccountSection>
         <AccountSection>
@@ -203,6 +203,7 @@ export function AccountPage({ onNavigate }: { onNavigate: Navigate }) {
 
 export function AccountSecurityPage({ onNavigate }: { onNavigate: Navigate }) {
   const { t, i18n } = useTranslation();
+  const { showAlert } = useFloatingAlert();
   const locale = i18n.resolvedLanguage === "en" ? "en-US" : "zh-CN";
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaSetup, setMfaSetup] = useState<PlatformMfaSetup | null>(null);
@@ -212,8 +213,7 @@ export function AccountSecurityPage({ onNavigate }: { onNavigate: Navigate }) {
   const [loginEvents, setLoginEvents] = useState<PlatformLoginEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [mfaSubmitting, setMfaSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -230,17 +230,13 @@ export function AccountSecurityPage({ onNavigate }: { onNavigate: Navigate }) {
         setMfaEnabled(me.mfa?.enabled ?? me.user.mfaEnabled);
         setSessions(sessionResponse.sessions);
         setLoginEvents(eventResponse.events);
-        setError("");
+        setLoadError("");
       })
       .catch((loadError) => {
         if (!active) {
           return;
         }
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : t("account.securityLoadFailed"),
-        );
+        setLoadError(localizeCaughtFailure(loadError, t("account.securityLoadFailed")));
       })
       .finally(() => {
         if (active) {
@@ -253,41 +249,35 @@ export function AccountSecurityPage({ onNavigate }: { onNavigate: Navigate }) {
   }, [t]);
 
   const startMfaSetup = async () => {
-    setMessage("");
-    setError("");
     setMfaSubmitting(true);
     try {
       const setup = await platformApi.setupMfa();
       setMfaSetup(setup);
       setMfaCode("");
-      setMessage(t("account.mfaSecretReady"));
+      showAlert({ title: t("account.mfaSecretReady"), tone: "success" });
     } catch (setupError) {
-      setError(setupError instanceof Error ? setupError.message : t("account.mfaSetupError"));
+      showAlert({ title: localizeCaughtFailure(setupError, t("account.mfaSetupError")), tone: "destructive" });
     } finally {
       setMfaSubmitting(false);
     }
   };
 
   const confirmMfa = async () => {
-    setMessage("");
-    setError("");
     setMfaSubmitting(true);
     try {
       const response = await platformApi.confirmMfa({ code: mfaCode });
       setMfaEnabled(response.mfa.enabled);
       setMfaSetup(null);
       setMfaCode("");
-      setMessage(t("account.mfaEnabledSuccess"));
+      showAlert({ title: t("account.mfaEnabledSuccess"), tone: "success" });
     } catch (confirmError) {
-      setError(confirmError instanceof Error ? confirmError.message : t("account.mfaVerifyError"));
+      showAlert({ title: localizeCaughtFailure(confirmError, t("account.mfaVerifyError")), tone: "destructive" });
     } finally {
       setMfaSubmitting(false);
     }
   };
 
   const disableMfa = async () => {
-    setMessage("");
-    setError("");
     setMfaSubmitting(true);
     try {
       const code = mfaDisableCode.trim();
@@ -298,26 +288,22 @@ export function AccountSecurityPage({ onNavigate }: { onNavigate: Navigate }) {
       setMfaEnabled(response.mfa.enabled);
       setMfaDisableCode("");
       setMfaSetup(null);
-      setMessage(t("account.mfaDisabledSuccess"));
+      showAlert({ title: t("account.mfaDisabledSuccess"), tone: "success" });
     } catch (disableError) {
-      setError(disableError instanceof Error ? disableError.message : t("account.mfaDisableError"));
+      showAlert({ title: localizeCaughtFailure(disableError, t("account.mfaDisableError")), tone: "destructive" });
     } finally {
       setMfaSubmitting(false);
     }
   };
 
   const revokeOtherSessions = async () => {
-    setMessage("");
-    setError("");
     try {
       const response = await platformApi.revokeOtherSessions();
-      setMessage(t("account.revokedMessage", { count: response.revokedCount }));
+      showAlert({ title: t("account.revokedMessage", { count: response.revokedCount }), tone: "success" });
       const refreshed = await platformApi.listAccountSessions();
       setSessions(refreshed.sessions);
     } catch (revokeError) {
-      setError(
-        revokeError instanceof Error ? revokeError.message : t("account.revokeSessionError"),
-      );
+      showAlert({ title: localizeCaughtFailure(revokeError, t("account.revokeSessionError")), tone: "destructive" });
     }
   };
 
@@ -425,9 +411,9 @@ export function AccountSecurityPage({ onNavigate }: { onNavigate: Navigate }) {
           <Switch defaultChecked aria-label={t("account.unusualLoginAria")} className="mt-4" />
         </AccountSection>
       </div>
-      {(message || error) && (
-        <div className="rounded-md border border-border bg-muted p-3 text-sm">
-          {message || error}
+      {loadError && (
+        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {loadError}
         </div>
       )}
       <AccountSection>

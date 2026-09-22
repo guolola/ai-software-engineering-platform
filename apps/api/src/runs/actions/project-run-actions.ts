@@ -1,7 +1,11 @@
 // Recreates queued project runs for retry/rerun after route-level access is resolved.
 import { randomUUID } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import type { ProviderSettings, RunAction } from "@uml-platform/contracts";
+import {
+  apiErrorResponseSchema,
+  type ProviderSettings,
+  type RunAction,
+} from "@uml-platform/contracts";
 import type { BillingService } from "../../billing/billing-service.js";
 import type { GenerationUsageService } from "../../generation/generation-usage.js";
 import type { ProviderConfigStore } from "../../provider-configs/provider-config-store.js";
@@ -88,15 +92,21 @@ export async function createProjectRunAction({
   const source = runs.get(runId);
   if (!source || source.metadata?.projectId !== projectId) {
     reply.code(404);
-    return { message: "Run not found" };
+    return apiErrorResponseSchema.parse({
+      error: { code: "RUN_NOT_FOUND", category: "not_found", retryable: false },
+    });
   }
   if (action === "retry" && !isRetryableRun(source)) {
     reply.code(409);
-    return { message: "Only failed, cancelled, or interrupted runs can be retried" };
+    return apiErrorResponseSchema.parse({
+      error: { code: "RUN_NOT_RETRYABLE", category: "conflict", retryable: false },
+    });
   }
   if (isActiveRun(source)) {
     reply.code(409);
-    return { message: "Running or queued runs cannot be rerun" };
+    return apiErrorResponseSchema.parse({
+      error: { code: "RUN_ACTIVE_CONFLICT", category: "conflict", retryable: false },
+    });
   }
 
   const metadata: RunRecordMetadata = {

@@ -1,6 +1,10 @@
 // Verifies generation result dialog copy for document completion edge cases.
 import { describe, expect, it } from "vitest";
-import { documentRunCompletionDialog } from "./generation-dialog-actions";
+import {
+  documentRunCompletionDialog,
+  failedRunResultDialog,
+} from "./generation-dialog-actions";
+import { operationFailureForCode } from "./operation-failure";
 
 describe("documentRunCompletionDialog", () => {
   it("surfaces missing diagram warnings for completed documents", () => {
@@ -16,5 +20,31 @@ describe("documentRunCompletionDialog", () => {
     );
     expect(dialog.runId).toBe("doc-warning");
     expect(dialog.stageLabel).toBe("说明书");
+  });
+
+  it("routes pending review failures to rules without inventing task details", () => {
+    const dialog = failedRunResultDialog({
+      failure: operationFailureForCode("REQUIREMENT_REVIEWS_PENDING", {
+        params: { count: 2 },
+        details: { ruleIds: ["r1", "r2"] },
+      }),
+      runId: null,
+      stageLabel: "需求模型",
+    });
+
+    expect(dialog.title).toBe("生成前需要确认需求规则");
+    expect(dialog.message).toContain("2 条需求规则修复结果仍待确认");
+    expect(dialog.primaryAction?.label).toBe("查看待确认规则");
+    expect(dialog.primaryAction?.label).not.toBe("查看任务详情");
+  });
+
+  it("does not show task details for an unknown failure before a task exists", () => {
+    const dialog = failedRunResultDialog({
+      failure: operationFailureForCode("RUN_INTERNAL_ERROR"),
+      runId: null,
+      stageLabel: "启动校验",
+    });
+
+    expect(dialog.primaryAction).toBeUndefined();
   });
 });

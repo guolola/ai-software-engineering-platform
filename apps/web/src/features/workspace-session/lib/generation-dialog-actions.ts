@@ -10,7 +10,11 @@ import { useFeedbackDialog } from "../../../shared/ui/feedback-dialog";
 import type { GenerationConfirmationSummary } from "./generation-planning";
 import { cancelledRunMessage } from "./run-events";
 import { i18n } from "../../../shared/i18n/i18n";
-import { requestOpenGenerationTask } from "../../../shared/lib/app-navigation";
+import {
+  requestOpenGenerationTask,
+  requestOpenProjectWorkspaceTarget,
+} from "../../../shared/lib/app-navigation";
+import type { OperationFailurePresentation } from "./operation-failure";
 
 type CancelledRunDialogSnapshot = {
   error?: { message?: string } | null;
@@ -22,40 +26,87 @@ export function cancelledRunResultDialog(
   stageLabel: string,
   clientTaskId?: string | null,
 ): GenerationResultDialogState {
+  const taskDetailsAvailable = Boolean(snapshot.runId || clientTaskId);
   return {
     title: i18n.t("generation.dialog.titles.cancelled"),
     tone: "warning",
     message: cancelledRunMessage(snapshot),
     runId: snapshot.runId ?? null,
     stageLabel,
-    primaryAction: {
-      label: i18n.t("feedback.actions.taskDetails"),
-      onSelect: () =>
-        requestOpenGenerationTask({ clientTaskId, runId: snapshot.runId }),
-    },
+    primaryAction: taskDetailsAvailable
+      ? {
+          label: i18n.t("feedback.actions.taskDetails"),
+          onSelect: () =>
+            requestOpenGenerationTask({ clientTaskId, runId: snapshot.runId }),
+        }
+      : undefined,
   };
 }
 
 export function failedRunResultDialog(input: {
   clientTaskId?: string | null;
-  message: string;
+  failure?: OperationFailurePresentation;
+  message?: string;
   runId: string | null;
   stageLabel: string;
 }): GenerationResultDialogState {
+  const taskDetailsAvailable = Boolean(input.runId || input.clientTaskId);
+  const diagnosticId = input.runId ?? input.clientTaskId ?? null;
+  const target = input.failure?.actionTarget;
+  const primaryAction = target === "pending-rules"
+    ? {
+        label: i18n.t("feedback.actions.pendingRules"),
+        onSelect: () => requestOpenProjectWorkspaceTarget("system-requirements"),
+      }
+    : target === "system-requirements"
+      ? {
+          label: i18n.t("feedback.actions.systemRequirements"),
+          onSelect: () => requestOpenProjectWorkspaceTarget("system-requirements"),
+        }
+      : target === "requirement-models"
+        ? {
+            label: i18n.t("feedback.actions.requirementModels"),
+            onSelect: () => requestOpenProjectWorkspaceTarget("requirement-models"),
+          }
+        : target === "design-models"
+          ? {
+              label: i18n.t("feedback.actions.designModels"),
+              onSelect: () => requestOpenProjectWorkspaceTarget("design-models"),
+            }
+          : target === "feasibility"
+            ? {
+                label: i18n.t("feedback.actions.feasibility"),
+                onSelect: () => requestOpenProjectWorkspaceTarget("feasibility"),
+              }
+            : target === "provider-settings"
+              ? {
+                  label: i18n.t("feedback.actions.providerSettings"),
+                  onSelect: () => requestOpenProjectWorkspaceTarget("provider-settings"),
+                }
+              : taskDetailsAvailable
+                ? {
+                    label: i18n.t("feedback.actions.taskDetails"),
+                    onSelect: () =>
+                      requestOpenGenerationTask({
+                        clientTaskId: input.clientTaskId,
+                        runId: input.runId,
+                      }),
+                  }
+                : undefined;
   return {
-    title: i18n.t("generation.dialog.titles.failed"),
+    title: input.failure?.title ?? i18n.t("generation.dialog.titles.failed"),
     tone: "destructive",
-    message: input.message,
+    message: [
+      input.failure?.message ?? input.message ?? i18n.t("errors.codes.RUN_INTERNAL_ERROR"),
+      diagnosticId &&
+      (input.failure?.code === "INTERNAL_ERROR" ||
+        input.failure?.code === "RUN_INTERNAL_ERROR")
+        ? i18n.t("errors.diagnosticId", { id: diagnosticId })
+        : null,
+    ].filter(Boolean).join(" "),
     runId: input.runId,
     stageLabel: input.stageLabel,
-    primaryAction: {
-      label: i18n.t("feedback.actions.taskDetails"),
-      onSelect: () =>
-        requestOpenGenerationTask({
-          clientTaskId: input.clientTaskId,
-          runId: input.runId,
-        }),
-    },
+    primaryAction,
   };
 }
 

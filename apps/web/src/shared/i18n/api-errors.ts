@@ -3,6 +3,7 @@ import { i18n } from "./i18n";
 
 type LocalizableError = {
   code: string;
+  details?: Record<string, unknown>;
   params?: Record<string, string | number | boolean | null>;
 };
 
@@ -17,7 +18,10 @@ function localizableError(value: unknown): LocalizableError | null {
         ([, item]) => item === null || ["string", "number", "boolean"].includes(typeof item),
       )) as Record<string, string | number | boolean | null>
     : undefined;
-  return { code: candidate.code, params };
+  const details = candidate.details && typeof candidate.details === "object"
+    ? candidate.details as Record<string, unknown>
+    : undefined;
+  return { code: candidate.code, details, params };
 }
 
 function httpFallbackKey(status: number) {
@@ -42,8 +46,58 @@ export function localizeApiFailure(
   const error = localizableError(nested);
   const fallback = operationFallback?.trim() || i18n.t(httpFallbackKey(status));
   if (!error) return fallback;
+  if (error.code === "PROVIDER_CIRCUIT_OPEN") {
+    const breaker = error.details?.breaker;
+    const breakerRecord = breaker && typeof breaker === "object"
+      ? breaker as Record<string, unknown>
+      : null;
+    const failureCount = error.params?.failureCount;
+    const lastFailureAt = typeof breakerRecord?.lastFailureAt === "string"
+      ? new Date(breakerRecord.lastFailureAt).toLocaleString(i18n.language)
+      : null;
+    if (failureCount === undefined || !lastFailureAt) {
+      return i18n.t("errors.providerCircuitGeneric");
+    }
+    return i18n.t("errors.codes.PROVIDER_CIRCUIT_OPEN", {
+      ...error.params,
+      lastFailureAt,
+      defaultValue: fallback,
+    });
+  }
   return i18n.t(`errors.codes.${error.code}`, {
     ...error.params,
+    defaultValue: fallback,
+  });
+}
+
+export function isRequestAbort(error: unknown) {
+  return typeof DOMException !== "undefined" && error instanceof DOMException
+    ? error.name === "AbortError"
+    : error instanceof Error && error.name === "AbortError";
+}
+
+export function localizeNetworkFailure() {
+  return i18n.t("errors.http.network");
+}
+
+export function localizeCaughtFailure(error: unknown, fallback: string) {
+  if (error instanceof Error && ["ApiClientError", "PlatformApiError"].includes(error.name)) {
+    return error.message || fallback;
+  }
+  if (error instanceof TypeError) {
+    return localizeNetworkFailure();
+  }
+  return fallback;
+}
+
+export function localizeRunFailure(
+  error: unknown,
+  fallback: string,
+) {
+  const parsed = localizableError(error);
+  if (!parsed) return fallback;
+  return i18n.t(`errors.codes.${parsed.code}`, {
+    ...parsed.params,
     defaultValue: fallback,
   });
 }

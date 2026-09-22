@@ -170,8 +170,12 @@ import {
 } from "../../provider-configs/provider-usage-tracker.js";
 import { createRateLimitPolicyStoreWithFallback } from "../../provider-configs/fallback-rate-limit-policy-store.js";
 import { testAdminProviderConfigConnection } from "../../provider-configs/admin-provider-config-test.js";
+import {
+  classifyProviderTestFailure,
+  providerTestError,
+  safeProviderHost,
+} from "../../provider-configs/provider-test-errors.js";
 import type { LlmScheduler } from "../../adapters/llm/llm-scheduler.js";
-import { ProviderHttpError } from "../../llm.js";
 import { discoverOpenAiCompatibleModelCapabilities } from "../../provider-configs/provider-model-discovery.js";
 import {
   normalizeManagedProviderBaseUrl,
@@ -1523,15 +1527,21 @@ export function registerAdminRoutes({
     } catch (error) {
       if (!isAbortError(error)) {
         await onFailure?.();
-        const providerStatus =
-          error instanceof ProviderHttpError ? error.status : undefined;
+        const failure = classifyProviderTestFailure(error);
+        request.log.warn(
+          {
+            failureKind: failure.failureKind,
+            providerHost: safeProviderHost(apiBaseUrl),
+            upstreamStatus: failure.upstreamStatus,
+          },
+          "Provider model discovery failed",
+        );
         stream.send({
           type: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Provider model discovery failed",
-          status: providerStatus ?? 502,
+          code: failure.code,
+          message: "Provider model discovery failed",
+          retryable: failure.retryable,
+          status: failure.httpStatus,
         });
       }
     } finally {
@@ -1566,7 +1576,10 @@ export function registerAdminRoutes({
     } catch (error) {
       if (error instanceof ProviderConfigPolicyError) {
         reply.code(400);
-        return { message: error.message };
+        return providerTestError({
+          code: "PROVIDER_BASE_URL_NOT_ALLOWED",
+          category: "validation",
+        });
       }
       throw error;
     }
@@ -1582,15 +1595,24 @@ export function registerAdminRoutes({
         sourceBaseUrl,
       });
     } catch (error) {
-      const providerStatus =
-        error instanceof ProviderHttpError ? error.status : null;
-      reply.code(providerStatus ?? 502);
-      return {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Provider model discovery failed",
-      };
+      const failure = classifyProviderTestFailure(error);
+      request.log.warn(
+        {
+          failureKind: failure.failureKind,
+          providerHost: safeProviderHost(sourceBaseUrl),
+          upstreamStatus: failure.upstreamStatus,
+        },
+        "Provider model discovery failed",
+      );
+      reply.code(failure.httpStatus);
+      return providerTestError({
+        code: failure.code,
+        retryable: failure.retryable,
+        details: {
+          failureKind: failure.failureKind,
+          upstreamStatus: failure.upstreamStatus,
+        },
+      });
     }
   });
 
@@ -1610,7 +1632,10 @@ export function registerAdminRoutes({
     } catch (error) {
       if (error instanceof ProviderConfigPolicyError) {
         reply.code(400);
-        return { message: error.message };
+        return providerTestError({
+          code: "PROVIDER_BASE_URL_NOT_ALLOWED",
+          category: "validation",
+        });
       }
       throw error;
     }
@@ -1789,29 +1814,55 @@ export function registerAdminRoutes({
     const providerConfig = await providerConfigs.get(id);
     if (!providerConfig) {
       reply.code(404);
-      return { message: "Provider config not found" };
+      return providerTestError({
+        code: "PROVIDER_CONFIG_NOT_FOUND",
+        category: "not_found",
+      });
     }
     if (providerConfig.scopeType === "user") {
       reply.code(403);
-      return { message: "User-owned provider configs cannot be tested by admins" };
+      return providerTestError({
+        code: "PROVIDER_CONFIG_ACCESS_DENIED",
+        category: "authorization",
+      });
     }
     if (!providerConfig.allowlisted) {
       reply.code(400);
-      return { message: "Provider Base URL is not allowlisted" };
+      return providerTestError({
+        code: "PROVIDER_BASE_URL_NOT_ALLOWED",
+        category: "validation",
+      });
     }
     if (providerConfig.status !== "active") {
       reply.code(400);
-      return { message: "Provider config is revoked, disabled, or inactive" };
+      return providerTestError({
+        code: "PROVIDER_CONFIG_INACTIVE",
+        category: "validation",
+      });
     }
     if (providerConfig.breakerState === "open") {
       reply.code(503);
-      return { message: "Provider circuit breaker is open" };
+      return providerTestError({
+        code: "PROVIDER_CIRCUIT_OPEN",
+        params: { failureCount: providerConfig.breakerFailureCount },
+        details: {
+          breaker: {
+            state: providerConfig.breakerState,
+            failureCount: providerConfig.breakerFailureCount,
+            openedAt: providerConfig.breakerOpenedAt,
+            lastFailureAt: providerConfig.breakerLastFailureAt,
+          },
+        },
+      });
     }
 
     const apiKey = await providerConfigs.getSecret(id);
     if (!apiKey) {
       reply.code(400);
-      return { message: "Provider config secret is revoked" };
+      return providerTestError({
+        code: "PROVIDER_SECRET_REVOKED",
+        category: "validation",
+      });
     }
 
     try {
@@ -1828,23 +1879,34 @@ export function registerAdminRoutes({
       });
     } catch (error) {
       const breaker = await providerConfigs.recordFailure?.(id);
-      const providerStatus =
-        error instanceof ProviderHttpError ? error.status : null;
-      reply.code(providerStatus ?? 502);
-      return {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Provider model discovery failed",
-        breaker: breaker
-          ? {
-              state: breaker.breakerState,
-              failureCount: breaker.breakerFailureCount,
-              openedAt: breaker.breakerOpenedAt,
-              lastFailureAt: breaker.breakerLastFailureAt,
-            }
-          : undefined,
-      };
+      const failure = classifyProviderTestFailure(error);
+      request.log.warn(
+        {
+          failureKind: failure.failureKind,
+          providerConfigId: id,
+          providerHost: safeProviderHost(providerConfig.baseUrl),
+          upstreamStatus: failure.upstreamStatus,
+        },
+        "Provider model discovery failed",
+      );
+      reply.code(failure.httpStatus);
+      return providerTestError({
+        code: failure.code,
+        retryable: failure.retryable,
+        params: breaker ? { failureCount: breaker.breakerFailureCount } : undefined,
+        details: {
+          failureKind: failure.failureKind,
+          upstreamStatus: failure.upstreamStatus,
+          breaker: breaker
+            ? {
+                state: breaker.breakerState,
+                failureCount: breaker.breakerFailureCount,
+                openedAt: breaker.breakerOpenedAt,
+                lastFailureAt: breaker.breakerLastFailureAt,
+              }
+            : undefined,
+        },
+      });
     }
   });
 
@@ -1861,29 +1923,55 @@ export function registerAdminRoutes({
     const providerConfig = await providerConfigs.get(id);
     if (!providerConfig) {
       reply.code(404);
-      return { message: "Provider config not found" };
+      return providerTestError({
+        code: "PROVIDER_CONFIG_NOT_FOUND",
+        category: "not_found",
+      });
     }
     if (providerConfig.scopeType === "user") {
       reply.code(403);
-      return { message: "User-owned provider configs cannot be tested by admins" };
+      return providerTestError({
+        code: "PROVIDER_CONFIG_ACCESS_DENIED",
+        category: "authorization",
+      });
     }
     if (!providerConfig.allowlisted) {
       reply.code(400);
-      return { message: "Provider Base URL is not allowlisted" };
+      return providerTestError({
+        code: "PROVIDER_BASE_URL_NOT_ALLOWED",
+        category: "validation",
+      });
     }
     if (providerConfig.status !== "active") {
       reply.code(400);
-      return { message: "Provider config is revoked, disabled, or inactive" };
+      return providerTestError({
+        code: "PROVIDER_CONFIG_INACTIVE",
+        category: "validation",
+      });
     }
     if (providerConfig.breakerState === "open") {
       reply.code(503);
-      return { message: "Provider circuit breaker is open" };
+      return providerTestError({
+        code: "PROVIDER_CIRCUIT_OPEN",
+        params: { failureCount: providerConfig.breakerFailureCount },
+        details: {
+          breaker: {
+            state: providerConfig.breakerState,
+            failureCount: providerConfig.breakerFailureCount,
+            openedAt: providerConfig.breakerOpenedAt,
+            lastFailureAt: providerConfig.breakerLastFailureAt,
+          },
+        },
+      });
     }
 
     const apiKey = await providerConfigs.getSecret(id);
     if (!apiKey) {
       reply.code(400);
-      return { message: "Provider config secret is revoked" };
+      return providerTestError({
+        code: "PROVIDER_SECRET_REVOKED",
+        category: "validation",
+      });
     }
 
     return runProviderModelDiscoveryStream({
@@ -1920,6 +2008,9 @@ export function registerAdminRoutes({
       actor,
       ipAddress: request.ip,
       model: input.model,
+      onFailureDiagnostic: (diagnostic) => {
+        request.log.warn(diagnostic, "Provider connection test failed");
+      },
     });
     reply.code(result.statusCode);
     return result.body;

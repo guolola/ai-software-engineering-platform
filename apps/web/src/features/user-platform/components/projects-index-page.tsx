@@ -31,6 +31,7 @@ import { SelectControl } from "../../../shared/ui/select";
 import { EmptyState, PageContainer, PageHeader } from "../../../shared/template/layout/page";
 import { cn } from "../../../shared/ui/utils";
 import { i18n as appI18n } from "../../../shared/i18n";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 import {
   PROJECT_SCOPE_OPTIONS,
   projectFromApi,
@@ -102,7 +103,7 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
           setStatusErrorMessage("");
         } else {
           setStatusKind("loadFailed");
-          setStatusErrorMessage(error instanceof Error ? error.message : "");
+          setStatusErrorMessage(localizeCaughtFailure(error, t("projects.status.loadFailed")));
         }
       })
       .finally(() => {
@@ -247,9 +248,9 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
             data-testid="projects-filter-panel"
             className="gap-0 py-0 p-3 md:p-[17px]"
           >
-            <div className="flex min-w-0 items-center justify-between gap-2 md:gap-8">
+            <div className="flex min-w-0 flex-col items-stretch gap-2 md:flex-row md:items-center md:justify-between md:gap-8">
               <div
-                className="grid shrink-0 grid-cols-4 gap-1.5 md:flex md:gap-2"
+                className="grid w-full min-w-0 grid-cols-4 gap-1.5 md:w-auto md:shrink-0 md:flex md:gap-2"
                 role="group"
                 aria-label={t("projects.scopeAria")}
               >
@@ -261,7 +262,7 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
                       type="button"
                       aria-label={t(option.labelKey)}
                       aria-pressed={selected}
-                      className="h-8 shrink-0 px-3 text-sm"
+                      className="h-8 min-w-0 px-2 text-sm md:shrink-0 md:px-3"
                       onClick={() => setScope(option.value)}
                     >
                       <span className="md:hidden">{t(option.shortLabelKey)}</span>
@@ -270,8 +271,8 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
                   );
                 })}
               </div>
-              <div className="flex min-w-0 flex-1 items-center justify-end gap-2 md:shrink-0 md:gap-4">
-                <InputGroup className="w-full max-w-2xs">
+              <div className="flex w-full min-w-0 items-center gap-2 md:w-auto md:flex-1 md:justify-end md:gap-4">
+                <InputGroup className="min-w-0 flex-1 md:max-w-2xs">
                   <InputGroupAddon>
                     <Search />
                   </InputGroupAddon>
@@ -289,7 +290,7 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
                   aria-label={t("projects.sortAria")}
                   value={sort}
                   onValueChange={setSort}
-                  className="w-fit shrink-0"
+                  className="w-28 shrink-0 md:w-fit"
                   options={[
                     { value: "recent", label: t("projects.sort.recent") },
                     { value: "generated", label: t("projects.sort.generated") },

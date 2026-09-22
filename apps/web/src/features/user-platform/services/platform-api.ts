@@ -11,7 +11,11 @@ import type {
 import type { RunError } from "@uml-platform/contracts";
 import type { ProjectBackgroundKey } from "@uml-platform/contracts";
 import type { RunHistorySnapshot } from "../../../entities/run-history";
-import { localizeApiFailure } from "../../../shared/i18n/api-errors";
+import {
+  isRequestAbort,
+  localizeApiFailure,
+  localizeNetworkFailure,
+} from "../../../shared/i18n/api-errors";
 
 export const AUTH_SESSION_CHANGED_EVENT = "uml-auth-session-changed";
 
@@ -308,6 +312,20 @@ export class PlatformApiError extends Error {
   }
 }
 
+async function fetchPlatformResponse(input: RequestInfo | URL, init?: RequestInit) {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    if (isRequestAbort(error)) throw error;
+    throw new PlatformApiError(
+      localizeNetworkFailure(),
+      0,
+      "NETWORK_FAILURE",
+      true,
+    );
+  }
+}
+
 async function requestJson<T>(
   path: string,
   init: RequestInit = {},
@@ -317,7 +335,7 @@ async function requestJson<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(buildApiUrl(path), {
+  const response = await fetchPlatformResponse(buildApiUrl(path), {
     ...init,
     credentials: "include",
     headers,
@@ -364,7 +382,7 @@ async function requestJson<T>(
 }
 
 async function requestBlob(path: string, init: RequestInit = {}) {
-  const response = await fetch(buildApiUrl(path), {
+  const response = await fetchPlatformResponse(buildApiUrl(path), {
     ...init,
     credentials: "include",
   });
@@ -391,7 +409,7 @@ async function requestBlob(path: string, init: RequestInit = {}) {
 }
 
 async function requestFormJson<T>(path: string, body: FormData): Promise<T> {
-  const response = await fetch(buildApiUrl(path), {
+  const response = await fetchPlatformResponse(buildApiUrl(path), {
     method: "POST",
     credentials: "include",
     body,
@@ -431,7 +449,7 @@ async function requestProviderModelDiscoveryStream(
   input: { baseUrl: string; apiKey: string },
   onEvent: (event: ProviderModelDiscoveryProgressEvent) => void,
 ) {
-  const response = await fetch(buildApiUrl("/api/provider-configs/discover-models/stream"), {
+  const response = await fetchPlatformResponse(buildApiUrl("/api/provider-configs/discover-models/stream"), {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },

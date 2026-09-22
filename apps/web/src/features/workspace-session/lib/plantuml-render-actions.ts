@@ -3,6 +3,7 @@ import { useCallback, type Dispatch, type SetStateAction } from "react";
 import type { DiagramType } from "../../../entities/diagram/model";
 import type { WorkspaceRecord } from "../../../entities/workspace/model";
 import type { WorkspaceRepository } from "../../../services/workspace-repository";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
@@ -47,7 +48,10 @@ export function usePlantUmlRenderActions({
           ...current,
           [diagram]: {
             stage: "render_svg",
-            message: error instanceof Error ? error.message : "图源码渲染失败",
+            message: localizeCaughtFailure(
+              error,
+              "图形绘制失败，请检查模型后重试。",
+            ),
           },
         }));
         throw error;

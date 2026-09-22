@@ -20,6 +20,7 @@ import {
 } from '@/shared/ui/dropdown-menu'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip'
+import { cn } from '@/shared/ui/utils'
 
 const listItems = ['Share', 'Update', 'Refresh']
 
@@ -93,7 +94,7 @@ const PerformanceCard = ({ className, title = 'Performance', members, area, bar 
   const barChartConfig = { value: { label: bar.chartLabel } } satisfies ChartConfig
 
   return (
-    <Card className={className}>
+    <Card className={cn('min-w-0 overflow-hidden', className)}>
       <CardHeader className='flex justify-between'>
         <div className='flex items-center gap-2'>
           <ChartColumnBigIcon className='size-6' />
@@ -115,8 +116,8 @@ const PerformanceCard = ({ className, title = 'Performance', members, area, bar 
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>
-      <Tabs defaultValue='members' className='flex-1 gap-6'>
-        <TabsList variant='line' className='w-full justify-start gap-0 border-b p-0'>
+      <Tabs defaultValue='members' className='min-w-0 flex-1 gap-4 sm:gap-6'>
+        <TabsList variant='line' className='w-full min-w-0 justify-start gap-0 overflow-x-auto border-b p-0'>
           <TabsTrigger
             value='members'
             className='rounded-none border-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-0.5px]'
@@ -137,33 +138,33 @@ const PerformanceCard = ({ className, title = 'Performance', members, area, bar 
           </TabsTrigger>
         </TabsList>
 
-        <CardContent>
+        <CardContent className='min-w-0 px-3 sm:px-6'>
           <TabsContent value='members' className='flex flex-col justify-between gap-4 text-base'>
-            <div className='flex items-center gap-4 rounded-xl border px-4 py-2'>
+            <div className='flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2 sm:gap-4 sm:px-4'>
               <Avatar className='size-10.5'>
                 {members.person.src ? <AvatarImage src={members.person.src} alt={members.person.name} /> : null}
                 <AvatarFallback className='text-xs'>{members.person.initials}</AvatarFallback>
               </Avatar>
-              <div className='flex flex-col'>
+              <div className='flex min-w-0 flex-col'>
                 <span className='text-muted-foreground'>{members.person.role}</span>
-                <span className='text-lg font-medium'>{members.person.name}</span>
+                <span className='truncate text-lg font-medium'>{members.person.name}</span>
               </div>
             </div>
 
-            <div className='flex items-center justify-between rounded-xl border px-4 py-3'>
+            <div className='flex min-w-0 items-center justify-between gap-2 rounded-xl border px-3 py-3 sm:px-4'>
               <Badge className='bg-primary/10 [a&]:hover:bg-primary/5 focus-visible:ring-primary/20 dark:focus-visible:ring-primary/40 text-primary h-6 border-none px-3 py-1 focus-visible:outline-none'>
                 {members.badgeLabel}
               </Badge>
               <span className='text-xl font-medium'>{members.badgeValue}</span>
             </div>
 
-            <div className='flex flex-col gap-4 rounded-xl border px-5 py-3.5'>
-              <div className='flex items-center justify-between'>
+            <div className='flex min-w-0 flex-col gap-4 rounded-xl border px-3 py-3.5 sm:px-5'>
+              <div className='flex min-w-0 items-center justify-between gap-2'>
                 <div className='flex flex-col gap-1'>
                   <span className='text-muted-foreground'>{members.highlightLabel}</span>
                   <span className='text-xl font-semibold'>{members.highlightValue}</span>
                 </div>
-                <div className='flex items-center gap-2.5'>
+                <div className='flex shrink-0 items-center gap-2'>
                   <Avatar className='size-6.5 after:border-0'>
                     <AvatarFallback className='bg-primary/10 text-primary shrink-0'>
                       {members.highlightTrend === 'up' ? (
@@ -176,7 +177,7 @@ const PerformanceCard = ({ className, title = 'Performance', members, area, bar 
                   <span className='text-xl font-semibold'>{members.highlightPct}</span>
                 </div>
               </div>
-              <div className='flex items-center justify-between'>
+              <div className='flex min-w-0 items-center justify-between gap-2'>
                 <AvatarGroup>
                   {members.members.map((avatar, index) => (
                     <Tooltip key={index}>

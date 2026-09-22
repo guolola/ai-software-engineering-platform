@@ -6,6 +6,7 @@ import type { WorkspaceRepository } from "../../../services/workspace-repository
 import { createWorkspaceRecord, withWorkspaceProviders } from "../../../test/workspace-test-utils";
 import { ProjectWorkspaceDrawer } from "./user-platform-pages";
 import { ProjectWorkspaceActions } from "../../workspace-shell/components/top-bar";
+import { FloatingAlertProvider } from "../../../shared/ui/floating-alert";
 
 function createRepository(): WorkspaceRepository {
   return {
@@ -214,14 +215,14 @@ describe("ProjectWorkspaceDrawer", () => {
     const projectId = stubProjectWorkspaceFetch();
 
     render(
-      withWorkspaceProviders(
+      <FloatingAlertProvider>{withWorkspaceProviders(
         <ProjectWorkspaceDrawer
           projectId={projectId}
           activeDrawer="settings"
           onClose={() => {}}
         />,
         projectDrawerRepository(),
-      ),
+      )}</FloatingAlertProvider>,
     );
 
     const drawer = await screen.findByTestId("project-workspace-drawer");
@@ -244,14 +245,14 @@ describe("ProjectWorkspaceDrawer", () => {
     const projectId = stubProjectWorkspaceFetch();
 
     render(
-      withWorkspaceProviders(
+      <FloatingAlertProvider>{withWorkspaceProviders(
         <ProjectWorkspaceDrawer
           projectId={projectId}
           activeDrawer="settings"
           onClose={() => {}}
         />,
         projectDrawerRepository(),
-      ),
+      )}</FloatingAlertProvider>,
     );
 
     expect(await screen.findByLabelText("项目信息")).toBeInTheDocument();
@@ -277,7 +278,7 @@ describe("ProjectWorkspaceDrawer", () => {
     vi.stubGlobal("confirm", confirmSpy);
 
     render(
-      withWorkspaceProviders(
+      <FloatingAlertProvider>{withWorkspaceProviders(
         <ProjectWorkspaceDrawer
           projectId={projectId}
           activeDrawer="settings"
@@ -285,7 +286,7 @@ describe("ProjectWorkspaceDrawer", () => {
           onNavigate={onNavigate}
         />,
         projectDrawerRepository(),
-      ),
+      )}</FloatingAlertProvider>,
     );
 
     await screen.findByLabelText("项目信息");
@@ -322,14 +323,14 @@ describe("ProjectWorkspaceDrawer", () => {
     const projectId = stubProjectWorkspaceFetch();
 
     render(
-      withWorkspaceProviders(
+      <FloatingAlertProvider>{withWorkspaceProviders(
         <ProjectWorkspaceDrawer
           projectId={projectId}
           activeDrawer="settings"
           onClose={() => {}}
         />,
         projectDrawerRepository(),
-      ),
+      )}</FloatingAlertProvider>,
     );
 
     expect(screen.queryByRole("button", { name: /质量追溯系统/u })).not.toBeInTheDocument();
@@ -398,14 +399,14 @@ describe("ProjectWorkspaceDrawer", () => {
     });
 
     render(
-      withWorkspaceProviders(
+      <FloatingAlertProvider>{withWorkspaceProviders(
         <ProjectWorkspaceDrawer
           projectId={projectId}
           activeDrawer="settings"
           onClose={() => {}}
         />,
         projectDrawerRepository(),
-      ),
+      )}</FloatingAlertProvider>,
     );
 
     expect(await screen.findByLabelText("项目信息")).toBeInTheDocument();

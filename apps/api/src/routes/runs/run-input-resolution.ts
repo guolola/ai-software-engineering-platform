@@ -27,6 +27,9 @@ import {
   type StartRunCommand,
   type StartRunRequest,
   type RequirementBaseline,
+  apiErrorResponseSchema,
+  type ApiErrorCategory,
+  type ApiErrorResponse,
 } from "@uml-platform/contracts";
 
 type RunInputMetadata = {
@@ -43,7 +46,7 @@ export type LoadProjectWorkspaceForRun = (
 
 type InputResolution<T> =
   | { ok: true; input: T }
-  | { ok: false; statusCode: number; body: { message: string } };
+  | { ok: false; statusCode: number; body: ApiErrorResponse };
 
 type ProjectGenerationPreflightKind =
   | "requirements"
@@ -53,8 +56,29 @@ type ProjectGenerationPreflightKind =
   | "softwareDesignSpec"
   | "feasibilityStudy";
 
-function runInputResolutionError(statusCode: number, message: string): InputResolution<never> {
-  return { ok: false, statusCode, body: { message } };
+function runInputResolutionError(
+  statusCode: number,
+  code: string,
+  options: {
+    category?: ApiErrorCategory;
+    details?: Record<string, unknown>;
+    params?: Record<string, string | number | boolean | null>;
+    retryable?: boolean;
+  } = {},
+): InputResolution<never> {
+  return {
+    ok: false,
+    statusCode,
+    body: apiErrorResponseSchema.parse({
+      error: {
+        code,
+        category: options.category ?? (statusCode >= 500 ? "internal" : "conflict"),
+        retryable: options.retryable ?? statusCode >= 500,
+        params: options.params,
+        details: options.details,
+      },
+    }),
+  };
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -374,7 +398,11 @@ function rejectStaleRequirementModelsForDesignCommand(input: {
   if (staleSources.length === 0) return null;
   return runInputResolutionError(
     409,
-    `Requirement models are stale for design generation: ${staleSources.join(", ")}. Update requirement models before starting design generation.`,
+    "REQUIREMENT_MODELS_STALE",
+    {
+      params: { count: staleSources.length },
+      details: { diagramKinds: staleSources },
+    },
   );
 }
 
@@ -479,7 +507,6 @@ function rejectIncompleteDesignChain(input: {
   state: Record<string, unknown>;
   includeAllWhenUngenerated: boolean;
   requireTraceability: boolean;
-  messagePrefix: string;
 }): InputResolution<never> | null {
   const issues = designChainIssues(input);
   if (issues.checkedModelCount === 0) return null;
@@ -492,21 +519,24 @@ function rejectIncompleteDesignChain(input: {
     return null;
   }
 
-  const details = [
-    issues.missingFingerprints.length > 0
-      ? `缺少设计输入指纹：${issues.missingFingerprints.join("、")}`
-      : null,
-    issues.staleFingerprints.length > 0
-      ? `设计输入指纹已过期：${issues.staleFingerprints.join("、")}`
-      : null,
-    issues.missingPlantUml.length > 0
-      ? `缺少设计 PlantUML：${issues.missingPlantUml.join("、")}`
-      : null,
-    issues.missingTraceability ? "缺少设计到需求的元素级映射" : null,
-  ].filter(Boolean);
   return runInputResolutionError(
     409,
-    `${input.messagePrefix}${details.join("；")}`,
+    "DESIGN_MODELS_INVALID",
+    {
+      params: {
+        count:
+          issues.missingFingerprints.length +
+          issues.staleFingerprints.length +
+          issues.missingPlantUml.length +
+          (issues.missingTraceability ? 1 : 0),
+      },
+      details: {
+        missingFingerprints: issues.missingFingerprints,
+        staleFingerprints: issues.staleFingerprints,
+        missingPlantUml: issues.missingPlantUml,
+        missingTraceability: issues.missingTraceability,
+      },
+    },
   );
 }
 
@@ -524,7 +554,7 @@ function rejectProjectGenerationPreflight(input: {
   if (requirementSourceMissing && input.kind !== "feasibilityStudy") {
     return runInputResolutionError(
       409,
-      "需求源为空，请先填写需求文本后再启动生成。",
+      "REQUIREMENT_SOURCE_MISSING",
     );
   }
 
@@ -543,7 +573,7 @@ function rejectProjectGenerationPreflight(input: {
     ) {
       return runInputResolutionError(
         409,
-        "可行性研究报告需要已完成的系统上下文图（系统环境图）和实现方案。",
+        "FEASIBILITY_CONTEXT_MISSING",
       );
     }
     const contextFingerprint = snapshotInputFingerprint({
@@ -554,7 +584,7 @@ function rejectProjectGenerationPreflight(input: {
       normalizeSnapshotFingerprint(stringValue(input.state.feasibilityContextFingerprint)) !==
       contextFingerprint
     ) {
-      return runInputResolutionError(409, "系统上下文图（系统环境图）已过期，请先重新生成。");
+      return runInputResolutionError(409, "FEASIBILITY_CONTEXT_STALE");
     }
     const implementationFingerprint = snapshotInputFingerprint({
       rules: acceptedFeasibilityRules(input.state),
@@ -565,7 +595,7 @@ function rejectProjectGenerationPreflight(input: {
       normalizeSnapshotFingerprint(stringValue(input.state.feasibilityImplementationFingerprint)) !==
       implementationFingerprint
     ) {
-      return runInputResolutionError(409, "实现方案已过期，请先重新生成。");
+      return runInputResolutionError(409, "FEASIBILITY_IMPLEMENTATION_STALE");
     }
     return null;
   }
@@ -574,7 +604,7 @@ function rejectProjectGenerationPreflight(input: {
   if (requirementModelEntries.length === 0) {
     return runInputResolutionError(
       409,
-      "缺少需求模型，请先生成需求模型后再启动下游生成。",
+      "REQUIREMENT_MODELS_MISSING",
     );
   }
 
@@ -593,7 +623,11 @@ function rejectProjectGenerationPreflight(input: {
     if (staleDiagrams.length > 0) {
       return runInputResolutionError(
         409,
-        `需求模型已过期，请先重新生成需求模型：${staleDiagrams.join("、")}`,
+        "REQUIREMENT_MODELS_STALE",
+        {
+          params: { count: staleDiagrams.length },
+          details: { diagramKinds: staleDiagrams },
+        },
       );
     }
   }
@@ -606,7 +640,7 @@ function rejectProjectGenerationPreflight(input: {
   ) {
     return runInputResolutionError(
       409,
-      "需求模型缺少元素级映射，请先重新生成需求模型。",
+      "REQUIREMENT_TRACEABILITY_MISSING",
     );
   }
 
@@ -621,7 +655,11 @@ function rejectProjectGenerationPreflight(input: {
     if (missingPlantUml.length > 0) {
       return runInputResolutionError(
         409,
-        `需求模型缺少 PlantUML，请先重新生成需求模型：${missingPlantUml.join("、")}`,
+        "REQUIREMENT_PLANTUML_MISSING",
+        {
+          params: { count: missingPlantUml.length },
+          details: { modelIds: missingPlantUml },
+        },
       );
     }
   }
@@ -631,7 +669,7 @@ function rejectProjectGenerationPreflight(input: {
     if (designModelEntries.length === 0) {
       return runInputResolutionError(
         409,
-        "缺少设计模型，请先生成设计模型后再启动下游生成。",
+        "DESIGN_MODELS_MISSING",
       );
     }
 
@@ -639,7 +677,11 @@ function rejectProjectGenerationPreflight(input: {
     if (designDiagramErrorKeys.length > 0) {
       return runInputResolutionError(
         409,
-        `设计图仍有渲染错误，请先重新生成设计模型：${designDiagramErrorKeys.join("、")}`,
+        "DESIGN_MODELS_INVALID",
+        {
+          params: { count: designDiagramErrorKeys.length },
+          details: { diagramKinds: designDiagramErrorKeys },
+        },
       );
     }
   }
@@ -649,8 +691,6 @@ function rejectProjectGenerationPreflight(input: {
       state: input.state,
       includeAllWhenUngenerated: false,
       requireTraceability: false,
-      messagePrefix:
-        "设计模型已生成但链路元数据不完整，请先重新生成设计模型。",
     });
   }
 
@@ -659,8 +699,6 @@ function rejectProjectGenerationPreflight(input: {
       state: input.state,
       includeAllWhenUngenerated: true,
       requireTraceability: true,
-      messagePrefix:
-        "软件设计说明书需要完整且新鲜的设计链路，请先重新生成设计模型。",
     });
   }
 
@@ -718,7 +756,11 @@ function rejectBlockingRequirementReviewsForProjectCommand(
   if (blockedRuleIds.length === 0) return null;
   return runInputResolutionError(
     409,
-    `请先确认需求规则修复结果后再启动生成：${blockedRuleIds.join(", ")}`,
+    "REQUIREMENT_REVIEWS_PENDING",
+    {
+      params: { count: blockedRuleIds.length },
+      details: { ruleIds: blockedRuleIds },
+    },
   );
 }
 
@@ -787,22 +829,28 @@ async function loadWorkspaceStateForCommand({
   if (!projectId) {
     return runInputResolutionError(
       400,
-      "Project-scoped generation commands require a project id.",
+      "PROJECT_ID_REQUIRED",
+      { category: "validation" },
     );
   }
   if (!loadProjectWorkspace) {
     return runInputResolutionError(
       500,
-      "Project workspace loading is not configured for generation commands.",
+      "GENERATION_WORKSPACE_UNAVAILABLE",
+      { category: "internal", retryable: true },
     );
   }
   const workspace = await loadProjectWorkspace(projectId);
   if (!workspace) {
-    return runInputResolutionError(404, "Project workspace not found.");
+    return runInputResolutionError(404, "PROJECT_WORKSPACE_NOT_FOUND", {
+      category: "not_found",
+    });
   }
   const state = isPlainRecord(workspace.state) ? workspace.state : workspace;
   if (!isPlainRecord(state)) {
-    return runInputResolutionError(400, "Project workspace state is invalid.");
+    return runInputResolutionError(400, "PROJECT_WORKSPACE_INVALID", {
+      category: "validation",
+    });
   }
   return { ok: true, input: { projectId, state } };
 }

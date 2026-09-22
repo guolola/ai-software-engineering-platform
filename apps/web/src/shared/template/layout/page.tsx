@@ -55,8 +55,8 @@ export function PageHeader({
   className?: string
 }) {
   return (
-    <div className={cn('flex items-start justify-between gap-4', className)}>
-      <div className='min-w-0'>
+    <div className={cn('flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4', className)}>
+      <div className='min-w-0 flex-1'>
         <div className='flex flex-wrap items-center gap-2'>
           <h1
             className={cn(
@@ -70,7 +70,11 @@ export function PageHeader({
         </div>
         {description ? <p className='text-muted-foreground mt-2 max-w-3xl text-sm leading-6'>{description}</p> : null}
       </div>
-      {actions ? <div className='flex shrink-0 flex-wrap items-center gap-2'>{actions}</div> : null}
+      {actions ? (
+        <div className='flex w-full min-w-0 flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:w-auto sm:shrink-0 sm:flex-wrap sm:overflow-visible sm:pb-0'>
+          {actions}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -158,11 +162,11 @@ export function TableToolbar({
   const searchId = useId()
 
   return (
-    <div className={cn('flex items-center justify-between gap-2 border-b bg-muted/20 p-3 max-lg:flex-wrap', className)}>
-      <div className='flex min-w-0 items-center gap-2 max-lg:flex-wrap'>
+    <div className={cn('flex min-w-0 items-center justify-between gap-2 overflow-hidden border-b bg-muted/20 p-3', className)}>
+      <div className='flex min-w-0 flex-1 flex-nowrap items-center gap-2'>
         {leading}
         {onSearchChange ? (
-          <InputGroup className='w-full max-w-2xs'>
+          <InputGroup className='min-w-0 flex-1 sm:max-w-2xs'>
             <InputGroupAddon>
               <SearchIcon />
             </InputGroupAddon>
@@ -179,11 +183,11 @@ export function TableToolbar({
         ) : null}
         {filters}
       </div>
-      <div className='flex shrink-0 items-center gap-2 max-lg:flex-wrap'>
+      <div className='flex shrink-0 flex-nowrap items-center gap-2'>
         {onRowsPerPageChange ? (
           <SelectControl
             aria-label='每页条数'
-            className='w-fit'
+            className='w-14 sm:w-fit'
             value={String(rowsPerPage ?? 10)}
             onValueChange={value => onRowsPerPageChange(Number(value))}
             options={rowsPerPageOptions.map(option => ({ value: option, label: option }))}

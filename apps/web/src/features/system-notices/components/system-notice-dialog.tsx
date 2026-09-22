@@ -17,6 +17,8 @@ import { Badge } from "../../../shared/ui/badge";
 import { cn } from "../../../shared/ui/utils";
 import { systemNoticeApi } from "../system-notice-api";
 import type { badgeVariants } from "../../../shared/ui/badge";
+import { useFloatingAlert } from "../../../shared/ui/floating-alert";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 
 type NoticeBadgeVariant = NonNullable<
   Parameters<typeof badgeVariants>[0]
@@ -280,6 +282,7 @@ export function SystemNoticeButton({
   className?: string;
 }) {
   const { t } = useTranslation();
+  const { showAlert } = useFloatingAlert();
   const [open, setOpen] = useState(false);
   const [notices, setNotices] = useState<SystemNoticeDto[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -296,7 +299,7 @@ export function SystemNoticeButton({
       setNotices(response.notices);
       setUnreadCount(response.unreadCount);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("notices.loadFailed"));
+      setError(localizeCaughtFailure(loadError, t("notices.loadFailed")));
     } finally {
       setLoading(false);
     }
@@ -319,7 +322,10 @@ export function SystemNoticeButton({
       fireSystemNoticeConfetti();
       setOpen(false);
     } catch (readError) {
-      setError(readError instanceof Error ? readError.message : t("notices.markReadFailed"));
+      showAlert({
+        title: localizeCaughtFailure(readError, t("notices.markReadFailed")),
+        tone: "destructive",
+      });
     }
   };
 

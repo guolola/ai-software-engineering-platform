@@ -8,6 +8,7 @@ import {
   markRequirementReviewed,
   mergeReviewedRequirement,
   rebuildRequirementReviewQualityReport,
+  resolveSafeRequirementReviewCandidates,
 } from "./requirement-review";
 
 function notificationRequirement(): AtomicRequirement {
@@ -75,5 +76,88 @@ describe("requirement semantic review gates", () => {
     expect(
       rebuildRequirementReviewQualityReport(merged).issues[0]?.code,
     ).toBe("semantic-loss");
+  });
+
+  it("automatically accepts a fact-preserving candidate after quality checks pass", () => {
+    const before = notificationRequirement();
+    const source: RequirementBaseline = {
+      ...baseline(),
+      requirements: [before],
+      qualityReport: {
+        runId: "run-auto-review",
+        status: "pending-review",
+        summary: "置信度需要复核。",
+        issues: [{
+          id: "LOW-REQ-007",
+          requirementId: before.id,
+          severity: "warning",
+          code: "low-confidence",
+          message: "置信度较低。",
+          blocksDownstream: false,
+        }],
+        blockingIssueIds: [],
+        reviewRequiredRequirementIds: [before.id],
+      },
+    };
+    const after: AtomicRequirement = {
+      ...structuredClone(before),
+      confidence: 0.92,
+      fieldProvenance: {
+        action: {
+          source: "source-text",
+          status: "accepted",
+          value: before.action,
+          originalValue: before.action,
+          rationale: "来自原始需求。",
+        },
+      },
+    };
+
+    const result = resolveSafeRequirementReviewCandidates(source, {
+      r7: {
+        ruleId: "r7",
+        beforeRequirement: before,
+        afterRequirement: after,
+        repairRationale: "整理原始表述。",
+        blockingReasons: [],
+        status: "pending",
+        errorMessage: null,
+        createdAt: "2026-09-22T00:00:00.000Z",
+      },
+    });
+
+    expect(result.acceptedRuleIds).toEqual(["r7"]);
+    expect(result.blockingRuleIds).toEqual([]);
+    expect(result.baseline.qualityReport.status).toBe("passed");
+    expect(result.candidates.r7?.status).toBe("accepted");
+    expect(
+      result.candidates.r7?.afterRequirement?.fieldProvenance.action?.rationale,
+    ).toContain("质量检查自动通过");
+  });
+
+  it("keeps candidates with unsupported facts pending for manual review", () => {
+    const before = notificationRequirement();
+    const after: AtomicRequirement = {
+      ...structuredClone(before),
+      actor: "不存在于原文的超级管理员",
+      confidence: 0.95,
+    };
+
+    const result = resolveSafeRequirementReviewCandidates(baseline(), {
+      r7: {
+        ruleId: "r7",
+        beforeRequirement: before,
+        afterRequirement: after,
+        repairRationale: "补充参与者。",
+        blockingReasons: [],
+        status: "pending",
+        errorMessage: null,
+        createdAt: "2026-09-22T00:00:00.000Z",
+      },
+    });
+
+    expect(result.acceptedRuleIds).toEqual([]);
+    expect(result.candidates.r7?.status).toBe("pending");
+    expect(result.blockingRuleIds).toEqual(["r7"]);
   });
 });

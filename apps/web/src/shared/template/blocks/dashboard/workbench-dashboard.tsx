@@ -35,10 +35,10 @@ export function WorkbenchDashboard({
   className?: string
 }) {
   return (
-    <div className={cn('flex w-full flex-col gap-4', className)}>
+    <div className={cn('flex w-full min-w-0 flex-col gap-4', className)}>
       {/* KPI row */}
       {revealStage >= 1 ? (
-        <div className='grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4'>
+        <div className='grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4'>
           {data.kpis.map((kpi) => {
             const Icon = KPI_ICONS[kpi.kind]
 
@@ -56,7 +56,7 @@ export function WorkbenchDashboard({
           })}
         </div>
       ) : (
-        <div className='grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4'>
+        <div className='grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4'>
           {Array.from({ length: 4 }).map((_, index) => (
             <Skeleton key={index} className='h-44 w-full rounded-xl' />
           ))}
@@ -65,9 +65,9 @@ export function WorkbenchDashboard({
 
       {/* Timeline + weekly overview */}
       {revealStage >= 2 ? (
-        <div className='grid gap-4 xl:grid-cols-5'>
+        <div className='grid min-w-0 gap-4 xl:grid-cols-5'>
           <ProjectTimelineCard
-            className='xl:col-span-3'
+            className='min-w-0 xl:col-span-3'
             title={data.timeline.title}
             description={data.timeline.description}
             timeline={data.timeline.entries}
@@ -76,7 +76,7 @@ export function WorkbenchDashboard({
             projects={data.timeline.projects}
           />
           <WeeklyOverviewCard
-            className='xl:col-span-2'
+            className='min-w-0 xl:col-span-2'
             title={data.weekly.title}
             data={data.weekly.data}
             barLabel={data.weekly.barLabel}
@@ -86,7 +86,7 @@ export function WorkbenchDashboard({
           />
         </div>
       ) : (
-        <div className='grid gap-4 xl:grid-cols-5'>
+        <div className='grid min-w-0 gap-4 xl:grid-cols-5'>
           <Skeleton className='h-80 w-full rounded-xl xl:col-span-3' />
           <Skeleton className='h-80 w-full rounded-xl xl:col-span-2' />
         </div>
@@ -94,9 +94,9 @@ export function WorkbenchDashboard({
 
       {/* Conversion + performance */}
       {revealStage >= 3 ? (
-        <div className='grid gap-4 xl:grid-cols-5'>
+        <div className='grid min-w-0 gap-4 xl:grid-cols-5'>
           <ConversionRateCard
-            className='xl:col-span-2'
+            className='min-w-0 xl:col-span-2'
             title={data.conversion.title}
             subTitle={data.conversion.subTitle}
             totalConversion={data.conversion.totalConversion}
@@ -106,7 +106,7 @@ export function WorkbenchDashboard({
             chartData={data.conversion.chartData}
           />
           <PerformanceCard
-            className='xl:col-span-3'
+            className='min-w-0 xl:col-span-3'
             title={data.performance.title}
             members={data.performance.members}
             area={data.performance.area}
@@ -114,7 +114,7 @@ export function WorkbenchDashboard({
           />
         </div>
       ) : (
-        <div className='grid gap-4 xl:grid-cols-5'>
+        <div className='grid min-w-0 gap-4 xl:grid-cols-5'>
           <Skeleton className='h-96 w-full rounded-xl xl:col-span-2' />
           <Skeleton className='h-96 w-full rounded-xl xl:col-span-3' />
         </div>
@@ -122,7 +122,7 @@ export function WorkbenchDashboard({
 
       {/* Bottom datatable */}
       {revealStage >= 4 ? (
-        <Card className='py-0 shadow-none'>
+        <Card className='min-w-0 overflow-hidden py-0 shadow-none'>
           <UserDatatable data={data.tableRows} />
         </Card>
       ) : (

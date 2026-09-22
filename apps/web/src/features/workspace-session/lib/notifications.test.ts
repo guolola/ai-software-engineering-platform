@@ -11,11 +11,13 @@ const { toastMessage } = vi.hoisted(() => ({
   toastMessage: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("../../../shared/ui/floating-alert", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../shared/ui/floating-alert")>();
+  return { ...actual, floatingAlert: {
+    ...actual.floatingAlert,
     message: toastMessage,
-  },
-}));
+  } };
+});
 
 describe("workspace generation notifications", () => {
   it("keeps generation start silent for all stages", () => {

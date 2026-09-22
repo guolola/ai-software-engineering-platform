@@ -532,7 +532,7 @@ export function TestModelPage() {
               </div>
             }
             filters={
-              <label className="inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+              <label className="inline-flex min-w-0 flex-1 items-center gap-1 text-xs text-muted-foreground sm:gap-2">
                 <Filter className="size-3.5" />
                 <SelectControl
                   aria-label={t("testingPage.filterAria")}
@@ -541,7 +541,7 @@ export function TestModelPage() {
                     setScenarioFilter(value as TestScenarioType | "all");
                     setPagination((current) => ({ ...current, pageIndex: 0 }));
                   }}
-                  className="h-8 min-w-32 text-sm"
+                  className="h-8 min-w-0 flex-1 text-sm sm:min-w-32"
                   size="sm"
                   options={SCENARIO_TYPES.map((value) => ({ value, label: t(`testingPage.scenarios.${value.replace("-", "_")}`) }))}
                 />

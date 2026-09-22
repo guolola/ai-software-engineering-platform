@@ -178,6 +178,7 @@ describe("AccountDialog generation usage", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
     invalidateProviderConfigCache();
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
   });
 
   it("resolves every session table header in both supported locales", () => {
@@ -196,6 +197,41 @@ describe("AccountDialog generation usage", () => {
     expect(trigger).toHaveClass("inline-flex", "size-9", "md:w-auto");
     expect(trigger).not.toHaveClass("hidden");
     expect(within(trigger).getByText("Student")).toHaveClass("hidden", "md:inline");
+  });
+
+  it("uses expandable top tabs and keyboard navigation on mobile", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 360 });
+    const user = userEvent.setup();
+    stubAccountFetch(
+      profileResponse({
+        usedToday: 0,
+        limit: null,
+        remaining: null,
+        windowSeconds: 86400,
+        limited: false,
+        scope: "user",
+      }),
+    );
+
+    renderAccountDialog({ onNavigate: () => {}, initialUser: baseUser });
+    await user.click(screen.getByRole("button", { name: "账号" }));
+
+    const accountDialog = await screen.findByRole("dialog", { name: "设置" });
+    expect(accountDialog).toHaveClass("h-[100dvh]", "max-w-none", "md:max-w-[1100px]");
+    const tabList = within(accountDialog).getByRole("tablist", { name: "设置" });
+    const tabs = within(tabList).getAllByRole("tab");
+    expect(tabs).toHaveLength(4);
+
+    const profileTab = within(tabList).getByRole("tab", { name: "个人资料" });
+    const securityTab = within(tabList).getByRole("tab", { name: "安全设置" });
+    await waitFor(() => expect(profileTab).toHaveStyle({ width: "116px" }));
+    expect(securityTab).toHaveStyle({ width: "40px" });
+
+    profileTab.focus();
+    fireEvent.keyDown(profileTab, { key: "ArrowRight" });
+    expect(securityTab).toHaveFocus();
+    expect(securityTab).toHaveAttribute("aria-selected", "true");
+    expect((await within(accountDialog).findAllByText("修改密码")).length).toBeGreaterThan(0);
   });
 
   it("shows the complete session table and preloads provider settings when the dialog opens", async () => {
@@ -237,7 +273,7 @@ describe("AccountDialog generation usage", () => {
     expect(sessionsTable.querySelector('[data-slot="avatar"]')).toBeInTheDocument();
     expect(within(sessionsTable).getByText("当前设备")).toBeInTheDocument();
     expect(within(accountDialog).queryByText("登录历史")).not.toBeInTheDocument();
-    expect(accountDialog).toHaveClass("sm:max-w-[1100px]");
+    expect(accountDialog).toHaveClass("md:max-w-[1100px]");
     expect(sessionsTable).toHaveClass("table-fixed");
     expect(within(sessionsTable).getByText("Windows • Chrome").closest("td")).toHaveClass("overflow-hidden");
 
@@ -279,7 +315,7 @@ describe("AccountDialog generation usage", () => {
     const scrollArea = accountDialog.querySelector('[data-slot="scroll-area"]');
     expect(scrollArea).toBeInTheDocument();
     expect(scrollArea?.querySelector('[data-slot="scroll-area-viewport"]')).toHaveClass("overflow-x-hidden");
-    expect(scrollArea?.querySelector("main")).toHaveClass("p-6");
+    expect(scrollArea?.querySelector("main")).toHaveClass("p-4", "sm:p-6");
     expect(scrollArea?.querySelector("main")).not.toHaveClass("overflow-y-auto");
     expect(screen.queryByText("今日生成次数")).not.toBeInTheDocument();
     expect(screen.queryByText("今日 3 次")).not.toBeInTheDocument();

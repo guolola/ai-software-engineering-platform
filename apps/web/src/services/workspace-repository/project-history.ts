@@ -1,4 +1,5 @@
 // Maps project run API summaries into the shared run history item contract.
+import type { RunError } from "@uml-platform/contracts";
 import {
   createRunHistoryTitle,
   formatDocumentMissingArtifactSummary,
@@ -10,6 +11,7 @@ import {
   type RunHistorySnapshot,
 } from "../../entities/run-history";
 import { formatCodeDiagnosticSummary } from "../../shared/lib/code-diagnostics";
+import { localizeRunFailure } from "../../shared/i18n/api-errors";
 
 export type ProjectRunDetailResponse = {
   projectId?: string;
@@ -20,6 +22,7 @@ export type ProjectRunDetailResponse = {
     stage?: string | null;
     runKind?: string | null;
     documentKind?: string | null;
+    error?: RunError | null;
     errorMessage?: string | null;
     diagramErrorCount?: number | null;
     diagramErrorSummary?: RunHistoryDiagramErrorSummary[] | null;
@@ -60,6 +63,7 @@ export type ProjectRunsResponse = {
     stage?: string | null;
     runKind?: string | null;
     documentKind?: string | null;
+    error?: RunError | null;
     createdAt?: string | null;
     startedAt?: string | null;
     updatedAt?: string | null;
@@ -185,7 +189,12 @@ export function projectRunSummaryToHistoryItem(
     latestAction: run.latestAction ?? null,
     latestActionRunId: run.latestActionRunId ?? null,
     latestActionAt: run.latestActionAt ?? null,
-    errorMessage: run.errorMessage ?? null,
+    errorMessage:
+      run.error
+        ? localizeRunFailure(run.error, "任务遇到内部错误，请联系管理员。")
+        : run.errorMessage
+          ? "任务遇到内部错误，请联系管理员。"
+          : null,
     documentKind:
       run?.documentKind === "requirementsSpec" ||
       run?.documentKind === "softwareDesignSpec" ||
@@ -285,7 +294,11 @@ function projectRunSummary(run: ProjectRunDetailResponse["run"]) {
       : null,
     run?.status === "interrupted" ? "服务中断，可重试" : null,
     run?.stage ? `阶段 ${run.stage}` : null,
-    run?.errorMessage ? `失败原因 ${run.errorMessage}` : null,
+    run?.error
+      ? `失败原因 ${localizeRunFailure(run.error, "任务遇到内部错误，请联系管理员。")}`
+      : run?.errorMessage
+        ? "失败原因 任务遇到内部错误，请联系管理员。"
+        : null,
     diagramErrors,
     codeDiagnostics,
     formatDocumentMissingArtifactSummary(

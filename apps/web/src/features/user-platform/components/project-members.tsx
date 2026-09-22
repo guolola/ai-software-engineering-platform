@@ -70,8 +70,7 @@ export function ProjectMembers({
   const [searchFilter, setSearchFilter] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [inviteFieldError, setInviteFieldError] = useState("");
   const inviteEmailRef = useRef<HTMLInputElement | null>(null);
   const canManageMembers = !membershipRole || membershipRole === "owner" || membershipRole === "editor";
 
@@ -82,16 +81,15 @@ export function ProjectMembers({
 
   const inviteMember = async () => {
     if (!canManageMembers) {
-      setError(t("projectShell.membersUi.errors.inviteReadonly"));
+      showAlert({ title: t("projectShell.membersUi.errors.inviteReadonly"), tone: "warning" });
       return;
     }
     const email = (inviteEmailRef.current?.value ?? inviteEmail).trim();
     if (!email) {
-      setError(t("projectShell.membersUi.errors.emailRequired"));
+      setInviteFieldError(t("projectShell.membersUi.errors.emailRequired"));
       return;
     }
-    setMessage("");
-    setError("");
+    setInviteFieldError("");
     const optimisticMember: PlatformProjectMember = {
       id: `pending-${email}`,
       projectId: project.id,
@@ -128,23 +126,19 @@ export function ProjectMembers({
       }
       setInviteOpen(false);
       const success = t("projectShell.membersUi.messages.invited", { email: nextMember.email });
-      setMessage(success);
       showAlert({ title: success, tone: "success" });
     } catch {
       setCurrentMembers((current) => current.filter((member) => member.id !== optimisticMember.id));
       const failure = t("projectShell.membersUi.errors.invite");
-      setError(failure);
       showAlert({ title: failure, tone: "destructive" });
     }
   };
 
   const updateRole = async (memberId: string, role: string) => {
     if (!canManageMembers) {
-      setError(t("projectShell.membersUi.errors.roleReadonly"));
+      showAlert({ title: t("projectShell.membersUi.errors.roleReadonly"), tone: "warning" });
       return;
     }
-    setMessage("");
-    setError("");
     try {
       const response = await platformApi.updateProjectMemberRole(project.id, memberId, role);
       setCurrentMembers((current) =>
@@ -156,42 +150,34 @@ export function ProjectMembers({
         email: response.member.email,
         role: memberRoleLabel(response.member.role, t),
       });
-      setMessage(success);
       showAlert({ title: success, tone: "success" });
     } catch {
       const failure = t("projectShell.membersUi.errors.role");
-      setError(failure);
       showAlert({ title: failure, tone: "destructive" });
     }
   };
 
   const removeMember = async (member: PlatformProjectMember) => {
     if (!canManageMembers) {
-      setError(t("projectShell.membersUi.errors.removeReadonly"));
+      showAlert({ title: t("projectShell.membersUi.errors.removeReadonly"), tone: "warning" });
       return;
     }
-    setMessage("");
-    setError("");
     try {
       await platformApi.removeProjectMember(project.id, member.id);
       setCurrentMembers((current) => current.filter((item) => item.id !== member.id));
       const success = t("projectShell.membersUi.messages.removed", { email: member.email });
-      setMessage(success);
       showAlert({ title: success, tone: "success" });
     } catch {
       const failure = t("projectShell.membersUi.errors.remove");
-      setError(failure);
       showAlert({ title: failure, tone: "destructive" });
     }
   };
 
   const resendInvitation = async (member: PlatformProjectMember) => {
     if (!canManageMembers) {
-      setError(t("projectShell.membersUi.errors.resendReadonly"));
+      showAlert({ title: t("projectShell.membersUi.errors.resendReadonly"), tone: "warning" });
       return;
     }
-    setMessage("");
-    setError("");
     try {
       const response = await platformApi.resendProjectInvitation(project.id, member.id);
       const nextMember =
@@ -203,22 +189,18 @@ export function ProjectMembers({
         current.map((item) => (item.id === member.id ? { ...item, ...nextMember } : item)),
       );
       const success = t("projectShell.membersUi.messages.resent", { email: member.email });
-      setMessage(success);
       showAlert({ title: success, tone: "success" });
     } catch {
       const failure = t("projectShell.membersUi.errors.resend");
-      setError(failure);
       showAlert({ title: failure, tone: "destructive" });
     }
   };
 
   const revokeInvitation = async (member: PlatformProjectMember) => {
     if (!canManageMembers) {
-      setError(t("projectShell.membersUi.errors.revokeReadonly"));
+      showAlert({ title: t("projectShell.membersUi.errors.revokeReadonly"), tone: "warning" });
       return;
     }
-    setMessage("");
-    setError("");
     try {
       await platformApi.revokeProjectInvitation(project.id, member.id);
       setCurrentMembers((current) =>
@@ -227,11 +209,9 @@ export function ProjectMembers({
         ),
       );
       const success = t("projectShell.membersUi.messages.revoked", { email: member.email });
-      setMessage(success);
       showAlert({ title: success, tone: "success" });
     } catch {
       const failure = t("projectShell.membersUi.errors.revoke");
-      setError(failure);
       showAlert({ title: failure, tone: "destructive" });
     }
   };
@@ -275,9 +255,6 @@ export function ProjectMembers({
       : "grid gap-5";
   const pageCount = Math.max(1, Math.ceil(filteredMembers.length / pageSize));
   const pagedMembers = filteredMembers.slice((page - 1) * pageSize, page * pageSize);
-  // Invite failures surface inline inside the dialog while it is open.
-  const inviteDialogError = inviteOpen ? error : "";
-
   return (
     <div className={containerClass}>
       {!canManageMembers && (
@@ -336,7 +313,7 @@ export function ProjectMembers({
             <Button
               type="button"
               onClick={() => {
-                setError("");
+                setInviteFieldError("");
                 setInviteOpen(true);
               }}
               disabled={!canManageMembers}
@@ -553,7 +530,7 @@ export function ProjectMembers({
         open={inviteOpen}
         onOpenChange={(next) => {
           setInviteOpen(next);
-          if (!next) setError("");
+          if (!next) setInviteFieldError("");
         }}
       >
         <DialogContent data-form-layout="4" className="sm:max-w-lg">
@@ -570,11 +547,14 @@ export function ProjectMembers({
                 type="email"
                 ref={inviteEmailRef}
                 defaultValue={inviteEmail}
-                onChange={(event) => setInviteEmail(event.target.value)}
+                onChange={(event) => {
+                  setInviteEmail(event.target.value);
+                  if (event.target.value.trim()) setInviteFieldError("");
+                }}
                 placeholder={t("projectShell.membersUi.emailPlaceholder")}
                 disabled={!canManageMembers}
               />
-              {inviteDialogError && <FieldError>{inviteDialogError}</FieldError>}
+              {inviteFieldError && <FieldError>{inviteFieldError}</FieldError>}
             </Field>
             <Field>
               <FieldLabel htmlFor="member-invite-role">

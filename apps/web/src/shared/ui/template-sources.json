@@ -67,12 +67,6 @@
   },
   {
     "template": "admincn",
-    "source": "src/components/ui/sonner.tsx",
-    "target": "src/shared/ui/sonner.tsx",
-    "sha256": "1c6f5eb102af02b7c37f774e3c4fac0c19b525a59b0f2090d17a82e53e2d6f70"
-  },
-  {
-    "template": "admincn",
     "source": "src/components/ui/resizable.tsx",
     "target": "src/shared/ui/resizable.tsx",
     "sha256": "e2bd69b3df8ffa1ba678a509ba5431485f02e6c3423c1ccc2f752fdca7aef893"

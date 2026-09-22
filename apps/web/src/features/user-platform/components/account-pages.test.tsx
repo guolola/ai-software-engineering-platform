@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountPage } from "./account-pages";
+import { FloatingAlertProvider } from "../../../shared/ui/floating-alert";
 
 const profileResponse = {
   user: {
@@ -66,7 +67,7 @@ describe("AccountPage avatar URL security", () => {
     const fetchMock = stubProfileFetch();
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
-    render(<AccountPage onNavigate={vi.fn()} />);
+    render(<FloatingAlertProvider><AccountPage onNavigate={vi.fn()} /></FloatingAlertProvider>);
 
     const avatarInput = await screen.findByLabelText("头像 URL");
     await user.type(avatarInput, "http://cdn.example.com/avatar.png");
@@ -80,7 +81,7 @@ describe("AccountPage avatar URL security", () => {
     const fetchMock = stubProfileFetch();
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
-    render(<AccountPage onNavigate={vi.fn()} />);
+    render(<FloatingAlertProvider><AccountPage onNavigate={vi.fn()} /></FloatingAlertProvider>);
 
     await user.type(await screen.findByLabelText("头像 URL"), "https://cdn.example.com/avatar.png");
     await user.click(screen.getByRole("button", { name: "保存资料" }));

@@ -4,6 +4,7 @@
 // projects, with project-derived fallbacks when that fan-out is skipped or fails (runsLoaded=false).
 import { useEffect, useMemo, useState } from "react";
 import type { TFunction } from "i18next";
+import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 
 import {
   platformApi,
@@ -448,7 +449,7 @@ export function usePlatformWorkbench(
         setProjects([]);
         setRunsByProject([]);
         setRunsLoaded(false);
-        setError(err instanceof Error ? err.message : String(err));
+        setError(localizeCaughtFailure(err, t("errors.http.unknown")));
       })
       .finally(() => {
         if (active) setLoading(false);

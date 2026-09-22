@@ -3,7 +3,6 @@ import { SidebarBrand } from "../shared/template/layout/sidebar-brand";
 import { PageContainer } from "../shared/template/layout/page";
 import { PlatformSidebar } from '../features/workspace-shell/components/platform-sidebar';
 import React, { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Toaster } from "../shared/ui/sonner";
 import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, useSidebar } from '../shared/ui/sidebar';
 import { ScrollArea } from '../shared/ui/scroll-area';
 import { TooltipProvider } from '../shared/ui/tooltip';
@@ -63,7 +62,9 @@ import {
 } from "../features/user-platform/components/billing-pages";
 import {
   PROJECT_TASK_DRAWER_REQUEST_EVENT,
+  PROJECT_WORKSPACE_TARGET_REQUEST_EVENT,
   type ProjectTaskDrawerRequest,
+  type ProjectWorkspaceTarget,
 } from "../shared/lib/app-navigation";
 
 function StandaloneRoutePage({ route }: { route: Exclude<ShellRoutePath, "/workspace"> }) {
@@ -121,7 +122,13 @@ function ProjectWorkspaceShell({
   preferredTaskRunId?: string | null;
 }) {
   const { t } = useTranslation();
-  const { selection } = useWorkspaceShell();
+  const {
+    openDesignHome,
+    openFeasibilityHome,
+    openRequirementsText,
+    openSystemRequirements,
+    selection,
+  } = useWorkspaceShell();
   const { setOpenMobile } = useSidebar();
   const projectOverview = useProjectOverview(projectId);
   const projectRuns = projectOverview.runs;
@@ -135,6 +142,27 @@ function ProjectWorkspaceShell({
       onNavigate(`/projects/${encodeURIComponent(projectId)}`);
     }
   };
+
+  useEffect(() => {
+    const openRequestedTarget = (event: Event) => {
+      const target = (event as CustomEvent<ProjectWorkspaceTarget>).detail;
+      if (target === "system-requirements") openSystemRequirements();
+      if (target === "requirement-models") openRequirementsText();
+      if (target === "design-models") openDesignHome();
+      if (target === "feasibility") openFeasibilityHome();
+      if (target === "provider-settings") onActiveProjectDrawerChange("settings");
+    };
+    window.addEventListener(PROJECT_WORKSPACE_TARGET_REQUEST_EVENT, openRequestedTarget);
+    return () => {
+      window.removeEventListener(PROJECT_WORKSPACE_TARGET_REQUEST_EVENT, openRequestedTarget);
+    };
+  }, [
+    onActiveProjectDrawerChange,
+    openDesignHome,
+    openFeasibilityHome,
+    openRequirementsText,
+    openSystemRequirements,
+  ]);
 
   let body: ReactNode;
   switch (selection.kind) {
@@ -509,7 +537,6 @@ export function Shell({ initialPath }: { initialPath?: string }) {
         guardedRouteContent
       )}
       </PageErrorBoundary>
-      <Toaster position="bottom-right" />
     </SidebarProvider>
     </FloatingAlertProvider>
   );

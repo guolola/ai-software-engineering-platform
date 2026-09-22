@@ -16,6 +16,8 @@ import { projectGenerationTranscript, readableTaskText } from "../lib/generation
 import { useRunTranscript } from "../lib/use-run-transcript";
 import { GenerationTranscript } from "./generation-transcript";
 import { useOptionalWorkspaceShell } from "../state";
+import { operationFailurePresentation } from "../../workspace-session/lib/operation-failure";
+import { useFloatingAlert } from "../../../shared/ui/floating-alert";
 
 const emptyRuns: PlatformRunSummary[] = [];
 const emptyEvents: RunEvent[] = [];
@@ -36,22 +38,28 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
   onViewResult?: () => void;
 } = {}) {
   const { t } = useTranslation();
+  const { showAlert } = useFloatingAlert();
   const session = useWorkspaceSession();
   const repository = useWorkspaceRepository();
   const shell = useOptionalWorkspaceShell();
   const [actionBusy, setActionBusy] = useState(false);
-  const [actionError, setActionError] = useState("");
   const [previewRunId, setPreviewRunId] = useState<string | null>(null);
   const [actionRun, setActionRun] = useState<PlatformRunSummary | null>(null);
+  const explicitlySelectedLocal = session.selectedGenerationTaskId
+    ? session.generationTasks.find(
+        (task) => task.clientTaskId === session.selectedGenerationTaskId,
+      )
+    : undefined;
   const candidateLocal = preferredRunId
     ? session.generationTasks.find((task) => task.runId === preferredRunId)
-    : session.generationTasks.find((task) => task.clientTaskId === session.selectedGenerationTaskId) ?? session.generationTasks.find((task) => ["queued", "running"].includes(task.status)) ?? session.generationTasks[0];
+    : explicitlySelectedLocal ?? session.generationTasks.find((task) => ["queued", "running"].includes(task.status)) ?? session.generationTasks[0];
+  const hasExplicitLocalSelection = !preferredRunId && Boolean(explicitlySelectedLocal);
   const activeRemote = projectRuns.find((run) => ["queued", "running"].includes(run.status));
-  const local = !preferredRunId && activeRemote && candidateLocal && !["queued", "running"].includes(candidateLocal.status) ? undefined : candidateLocal;
+  const local = !hasExplicitLocalSelection && !preferredRunId && activeRemote && candidateLocal && !["queued", "running"].includes(candidateLocal.status) ? undefined : candidateLocal;
   const remote = projectRuns.find((run) => run.runId === (preferredRunId ?? local?.runId))
-    ?? (preferredRunId ? undefined : activeRemote ?? [...projectRuns].sort((a, b) => (b.updatedAt ?? b.completedAt ?? b.createdAt ?? "").localeCompare(a.updatedAt ?? a.completedAt ?? a.createdAt ?? ""))[0]);
+    ?? (preferredRunId || hasExplicitLocalSelection ? undefined : activeRemote ?? [...projectRuns].sort((a, b) => (b.updatedAt ?? b.completedAt ?? b.createdAt ?? "").localeCompare(a.updatedAt ?? a.completedAt ?? a.createdAt ?? ""))[0]);
   const relevantAction = actionRun && (!preferredRunId || preferredRunId === actionRun.runId || preferredRunId === actionRun.sourceRunId) ? actionRun : null;
-  const runId = relevantAction?.runId ?? preferredRunId ?? local?.runId ?? remote?.runId ?? session.currentRunDiagnostics.runId;
+  const runId = relevantAction?.runId ?? preferredRunId ?? local?.runId ?? (hasExplicitLocalSelection ? null : remote?.runId ?? session.currentRunDiagnostics.runId);
   const selectedLocal = local?.runId === runId || !runId ? local : undefined;
   const selectedRemote = relevantAction?.runId === runId ? relevantAction : remote?.runId === runId ? remote : undefined;
   const kind = selectedLocal?.kind ?? selectedRemote?.runKind ?? session.currentRunDiagnostics.runKind;
@@ -70,8 +78,15 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
 
   const perform = async (action: () => Promise<void>) => {
     if (actionBusy) return;
-    setActionBusy(true); setActionError("");
-    try { await action(); } catch { setActionError("操作未完成，请稍后重试，或在任务历史中查看详情。"); }
+    setActionBusy(true);
+    try { await action(); } catch (error) {
+      showAlert({
+        title: operationFailurePresentation(error, {
+          fallbackMessage: t("errors.operations.taskAction"),
+        }).message,
+        tone: "destructive",
+      });
+    }
     finally { setActionBusy(false); }
   };
   const retrySubtask = (id: string) => {
@@ -91,7 +106,6 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
     {!restored.loading && runId && !events.some((event) => event.type === "run_activity") && <p className="text-xs text-muted-foreground">此任务未保存完整回复，当前仅展示可用的执行记录。</p>}
     {diagnostics?.uiMockup?.imageUrl && <a className="text-sm underline underline-offset-4" href={diagnostics.uiMockup.imageUrl} target="_blank" rel="noreferrer">查看界面设计图</a>}
     {diagnostics?.uiFidelityReport && <p>{readableTaskText(diagnostics.uiFidelityReport.summary)}</p>}
-    {actionError && <p role="alert" className="text-xs text-destructive">{actionError}</p>}
     <div className="flex flex-wrap items-center gap-3">
       {active && scopedProjectId && runId && <Button size="sm" variant="ghost" disabled={actionBusy} onClick={() => void perform(async () => {
         if (!active) return;

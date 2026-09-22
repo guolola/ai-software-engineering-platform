@@ -43,8 +43,8 @@ import {
   Wrench,
   TableProperties,
 } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "../../../shared/ui/utils";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
 import type { PlatformRunSummary } from "../../user-platform/services/platform-api";
 import {
   getDesignDiagramLabel,
@@ -140,7 +140,7 @@ function TraceBadge({
 function FlyoutItems({ node, onSelect }: { node: Node; onSelect?: () => void }) {
   const select = () => {
     if (node.selectable !== false && node.onSelect) { node.onSelect(); onSelect?.(); }
-    else if (node.unavailableReason) toast.message(node.unavailableReason);
+    else if (node.unavailableReason) floatingAlert.message(node.unavailableReason);
   };
   return <DropdownMenuGroup>
     <DropdownMenuItem onClick={select} title={node.unavailableReason}>{node.icon}<span className="truncate">{node.label}</span></DropdownMenuItem>
@@ -150,7 +150,7 @@ function FlyoutItems({ node, onSelect }: { node: Node; onSelect?: () => void }) 
       <DropdownMenuSubContent className="max-h-[80vh] w-72 overflow-auto"><FlyoutItems node={child} onSelect={onSelect} /></DropdownMenuSubContent>
     </DropdownMenuSub> : <DropdownMenuItem key={child.key} title={child.unavailableReason} onClick={() => {
       if (child.selectable !== false && child.onSelect) { child.onSelect(); onSelect?.(); }
-      else if(child.unavailableReason) toast.message(child.unavailableReason);
+      else if(child.unavailableReason) floatingAlert.message(child.unavailableReason);
     }}>{child.icon}<span className="truncate">{child.label}</span></DropdownMenuItem>)}
   </DropdownMenuGroup>;
 }
@@ -241,7 +241,7 @@ function TreeItem({
       return;
     }
     if (node.unavailableReason) {
-      toast.message(node.unavailableReason);
+      floatingAlert.message(node.unavailableReason);
       return;
     }
   };

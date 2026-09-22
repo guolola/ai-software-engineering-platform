@@ -41,7 +41,7 @@ export function DiagramDetailHeader({
 }: DiagramDetailHeaderProps) {
   const { t } = useTranslation();
   return (
-    <header className="px-1">
+    <header className="min-w-0 px-1">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -87,7 +87,7 @@ export function DiagramDetailHeader({
           ) : null}
         </div>
         <div className="flex min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-          {actions ? <div className="flex flex-wrap justify-end gap-2">{actions}</div> : null}
+          {actions ? <div className="flex min-w-0 flex-nowrap justify-end gap-2 overflow-x-auto pb-1">{actions}</div> : null}
           {compactViewport ? (
             <MobileStatusRail>
               <MobileStatusPill>

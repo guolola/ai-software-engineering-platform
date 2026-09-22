@@ -1,9 +1,11 @@
 // Builds run history summaries and filters from run records without mutating lifecycle state.
+import type { RunError } from "@uml-platform/contracts";
 import type { RunRecord } from "./run-record-store.js";
 
 type SnapshotDiagramErrorSummary = {
   diagramId: string;
   stage: string | null;
+  error: RunError;
   message: string;
 };
 
@@ -50,14 +52,16 @@ function readDiagramErrorSummary(
     if (!value || typeof value !== "object") return [];
     const diagramError = value as {
       stage?: unknown;
-      error?: { message?: unknown };
+      error?: RunError;
     };
-    const message = diagramError.error?.message;
-    if (typeof message !== "string" || !message.trim()) return [];
+    const runError = diagramError.error;
+    const message = runError?.message;
+    if (!runError || typeof message !== "string" || !message.trim()) return [];
     return [
       {
         diagramId,
         stage: typeof diagramError.stage === "string" ? diagramError.stage : null,
+        error: runError,
         message,
       },
     ];

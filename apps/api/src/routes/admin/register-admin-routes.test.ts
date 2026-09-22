@@ -2741,7 +2741,7 @@ test("provider configs accept SiliconFlow v1 endpoint with a fixed reviewed mode
     assert.equal(allowedTest.json().ok, true);
     assert.equal(testedUrl, "https://api.siliconflow.cn/v1/chat/completions");
     assert.equal(rejectedTest.statusCode, 400);
-    assertApiErrorCode(rejectedTest, "VALIDATION_FAILED");
+    assertApiErrorCode(rejectedTest, "PROVIDER_MODEL_NOT_ALLOWED");
 
     await app.close();
   } finally {
@@ -3046,7 +3046,7 @@ test("admin temporary provider model discovery rejects private endpoints before 
     });
 
     assert.equal(response.statusCode, 400);
-    assert.match(response.body, /public HTTPS host/i);
+    assert.equal(response.json().error.code, "PROVIDER_BASE_URL_NOT_ALLOWED");
     assert.equal(fetchCalls, 0);
 
     await app.close();
@@ -3373,7 +3373,7 @@ test("provider configs can rotate, revoke, and test allowlisted connections", as
     assert.equal(revoked.statusCode, 200);
     assert.equal(revoked.json().status, "revoked");
     assert.equal(retested.statusCode, 400);
-    assertApiErrorCode(retested, "VALIDATION_FAILED");
+    assertApiErrorCode(retested, "PROVIDER_CONFIG_INACTIVE");
 
     await app.close();
   } finally {
@@ -3463,11 +3463,11 @@ test("admin cannot rotate, test, or discover models for user-owned provider conf
     assert.equal(update.statusCode, 403);
     assert.match(update.body, /owning user/i);
     assert.equal(testConnection.statusCode, 403);
-    assert.match(testConnection.body, /cannot be tested by admins/i);
+    assertApiErrorCode(testConnection, "PROVIDER_CONFIG_ACCESS_DENIED");
     assert.equal(models.statusCode, 403);
-    assert.match(models.body, /cannot be tested by admins/i);
+    assertApiErrorCode(models, "PROVIDER_CONFIG_ACCESS_DENIED");
     assert.equal(streamModels.statusCode, 403);
-    assert.match(streamModels.body, /cannot be tested by admins/i);
+    assertApiErrorCode(streamModels, "PROVIDER_CONFIG_ACCESS_DENIED");
     assert.equal(resetBreaker.statusCode, 403);
     assert.match(resetBreaker.body, /disabled or revoked by admins/i);
     assert.equal(disabled.statusCode, 200);
@@ -3531,7 +3531,7 @@ test("provider configs can be disabled and re-enabled with audit records", async
     assert.equal(disabled.statusCode, 200);
     assert.equal(disabled.json().status, "disabled");
     assert.equal(disabledTest.statusCode, 400);
-    assertApiErrorCode(disabledTest, "VALIDATION_FAILED");
+    assertApiErrorCode(disabledTest, "PROVIDER_CONFIG_INACTIVE");
     assert.equal(fetchCalls, 0);
 
     const enabled = await app.inject({
@@ -3626,7 +3626,7 @@ test("provider config test returns 429 and does not call provider when quota is 
     });
 
     assert.equal(tested.statusCode, 429);
-    assert.match(tested.body, /rate limit/i);
+    assertApiErrorCode(tested, "PROVIDER_TEST_RATE_LIMITED");
     assert.equal(fetchCalls, 0);
 
     await app.close();
@@ -3672,9 +3672,9 @@ test("provider config test rejects disabled configs and unapproved models before
     });
 
     assert.equal(disabledTest.statusCode, 400);
-    assert.match(disabledTest.body, /disabled|inactive/i);
+    assertApiErrorCode(disabledTest, "PROVIDER_CONFIG_INACTIVE");
     assert.equal(modelTest.statusCode, 400);
-    assert.match(modelTest.body, /model/i);
+    assertApiErrorCode(modelTest, "PROVIDER_MODEL_NOT_ALLOWED");
     assert.equal(fetchCalls, 0);
 
     await app.close();
@@ -3725,8 +3725,12 @@ test("provider config test opens the breaker after repeated provider failures", 
     });
 
     assert.equal(thirdFailure.statusCode, 502);
+    assertApiErrorCode(thirdFailure, "PROVIDER_CONNECTION_FAILED");
+    assert.equal(thirdFailure.json().error.params.failureCount, 3);
+    assert.equal(thirdFailure.json().error.details.breaker.state, "open");
     assert.equal(breakerBlocked.statusCode, 503);
-    assert.match(breakerBlocked.body, /breaker|circuit/i);
+    assertApiErrorCode(breakerBlocked, "PROVIDER_CIRCUIT_OPEN");
+    assert.equal(breakerBlocked.json().error.details.breaker.failureCount, 3);
     assert.equal(fetchCalls, 3);
     assert.equal((await providerConfigs.get(provider.id))?.breakerState, "open");
 

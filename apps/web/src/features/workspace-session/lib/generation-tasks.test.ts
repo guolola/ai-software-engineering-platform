@@ -119,7 +119,7 @@ describe("workspace-session generation task helpers", () => {
       expect.objectContaining({
         id: "activity",
         status: "failed",
-        errorMessage: "activity JSON 修复失败",
+        errorMessage: "模型返回的结构化结果不合法，请重试。",
       }),
     ]);
   });
@@ -581,7 +581,7 @@ describe("workspace-session generation task helpers", () => {
       expect.objectContaining({
         id: "sequence:uc_filter_date",
         status: "failed",
-        errorMessage: "日期筛选顺序图生成结果为空",
+        errorMessage: "模型未生成有效结果，请重试或检查模型输出。",
       }),
     ]);
   });
@@ -919,7 +919,7 @@ describe("workspace-session generation task helpers", () => {
       expect.objectContaining({
         id: "render_svg:deployment",
         status: "failed",
-        errorMessage: "PlantUML repair failed",
+        errorMessage: "图形渲染失败，请检查模型结果后重试。",
       }),
     ]);
   });

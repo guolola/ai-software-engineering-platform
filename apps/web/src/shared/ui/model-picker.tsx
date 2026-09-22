@@ -142,15 +142,15 @@ export function ModelPicker({
       <DropdownMenuTrigger render={<Button variant="outline"
           type="button"
           className={cn(
-            "h-9 gap-1.5 px-3 py-2",
-            fullWidth && "w-full justify-between rounded-md text-left",
+            "h-9 w-28 min-w-0 justify-start gap-1.5 overflow-hidden px-3 py-2 sm:w-40",
+            fullWidth && "w-full justify-between rounded-md text-left sm:w-full",
             disabled && "cursor-not-allowed opacity-50 hover:bg-background",
             triggerClassName,
           )}
-          title={t("modelPicker.switch")}
+          title={value.trim() || t("modelPicker.switch")}
           disabled={disabled}
         />} >
-          <span className="inline-flex min-w-0 items-center gap-1.5">
+          <span className="inline-flex min-w-0 flex-1 items-center gap-1.5">
             <ProviderIcon providerId={selectedProvider?.id ?? ""} className="size-3.5" />
             <span className="truncate">{display.triggerLabel}</span>
           </span>

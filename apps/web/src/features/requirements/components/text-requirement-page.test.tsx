@@ -144,6 +144,10 @@ describe("TextRequirementView", () => {
       "用一段话描述你的系统：做什么、给谁用、有哪些角色和关键流程，越具体越能抽出准确的需求规则",
     );
     expect(screen.getByText("需求分析提取")).toBeInTheDocument();
+    expect(screen.getByTestId("requirements-input-toolbar")).toHaveClass(
+      "min-w-0",
+      "flex-nowrap",
+    );
     expect(screen.queryByText("AI 需求助手")).not.toBeInTheDocument();
     expect(screen.queryByText("AI 智能辅助")).not.toBeInTheDocument();
     expect(screen.queryByText("探索与灵感")).not.toBeInTheDocument();
@@ -2702,6 +2706,11 @@ describe("TextRequirementView", () => {
     expect(await screen.findByRole("heading", { name: "系统需求" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "需求描述" })).toBeInTheDocument();
     const rulesToolbar = screen.getByTestId("requirement-rules-toolbar");
+    expect(rulesToolbar).toHaveClass("min-w-0", "overflow-hidden");
+    expect(rulesToolbar.firstElementChild?.firstElementChild).toHaveClass(
+      "min-w-0",
+      "flex-nowrap",
+    );
     expect(within(rulesToolbar).queryByRole("heading", { name: /需求规则/u })).not.toBeInTheDocument();
     expect(within(rulesToolbar).getByPlaceholderText("搜索规则...")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "目标模型" })).not.toBeInTheDocument();

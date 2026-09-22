@@ -2441,7 +2441,12 @@ describe("App shell routes", () => {
     window.history.pushState({}, "", "/projects");
     render(withWorkspaceProviders(<Shell />, createRepository()));
 
-    expect(await screen.findByText("项目加载失败：Failed to fetch")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "项目加载失败：无法连接服务，请检查网络或确认服务已启动后重试。",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Failed to fetch/u)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "项目服务不可用" })).toBeInTheDocument();
     expect(screen.queryByText("匿名工作台")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("搜索项目")).not.toBeInTheDocument();
@@ -2496,10 +2501,10 @@ describe("App shell routes", () => {
     expect(screen.getByRole("button", { name: "归档项目" })).toBeInTheDocument();
     const searchInput = screen.getByPlaceholderText("搜索项目、成员...");
     expect(searchInput).toBeInTheDocument();
-    expect(searchInput.parentElement).toHaveClass("max-w-2xs");
+    expect(searchInput.parentElement).toHaveClass("min-w-0", "flex-1", "md:max-w-2xs");
     const sortTrigger = getSelectTrigger("排序方式");
     expect(sortTrigger).toHaveTextContent("最近打开");
-    expect(sortTrigger).toHaveClass("w-fit");
+    expect(sortTrigger).toHaveClass("w-28", "shrink-0", "md:w-fit");
     expect(screen.queryByRole("navigation", { name: "项目导航" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "生成任务" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "导出" })).not.toBeInTheDocument();
@@ -2903,7 +2908,7 @@ describe("App shell routes", () => {
     expect(failedDesignCard).toBeTruthy();
     const failedDesignControls = within(failedDesignCard as HTMLElement);
     await user.click(failedDesignControls.getByRole("button", { name: "查看错误" }));
-    expect(screen.getByText("PlantUML render failed")).toBeInTheDocument();
+    expect(screen.getByText("服务暂时不可用，请稍后重试。")).toBeInTheDocument();
     await user.click(failedDesignControls.getByRole("button", { name: "重试" }));
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/api/projects/library-booking/runs/run-failed/retry"),

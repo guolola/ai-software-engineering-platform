@@ -79,6 +79,16 @@ describe("ProjectsIndexPage", () => {
     );
 
     const card = await screen.findByRole("article");
+    const filterPanel = screen.getByTestId("projects-filter-panel");
+    expect(within(filterPanel).getByRole("group", { name: "项目范围" })).toHaveClass(
+      "grid-cols-4",
+      "min-w-0",
+    );
+    expect(within(filterPanel).getByPlaceholderText("搜索项目、成员...").closest('[data-slot="input-group"]')).toHaveClass(
+      "min-w-0",
+      "flex-1",
+    );
+    expect(within(filterPanel).getByLabelText("排序方式")).toHaveClass("w-28", "shrink-0");
     expect(card).toHaveAttribute("data-slot", "perspective-card");
     expect(card).toHaveAttribute("data-background-key", "booking");
     expect(within(card).getByRole("button", { name: /进入项目/u })).toBeInTheDocument();

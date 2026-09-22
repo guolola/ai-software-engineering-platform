@@ -33,3 +33,25 @@ test("does not expose unexpected exception text", async () => {
   assert.doesNotMatch(JSON.stringify(body), /secret provider/u);
   await app.close();
 });
+
+test("preserves structured business errors and adds a request id", async () => {
+  const app = await createConfiguredFastifyApp();
+  app.get("/structured-error", (_request, reply) => reply.code(409).send({
+    error: {
+      code: "REQUIREMENT_REVIEWS_PENDING",
+      category: "conflict",
+      retryable: false,
+      params: { count: 2 },
+      details: { ruleIds: ["r1", "r2"] },
+    },
+  }));
+
+  const response = await app.inject({ method: "GET", url: "/structured-error" });
+  const body = apiErrorResponseSchema.parse(response.json());
+  assert.equal(response.statusCode, 409);
+  assert.equal(body.error.code, "REQUIREMENT_REVIEWS_PENDING");
+  assert.deepEqual(body.error.params, { count: 2 });
+  assert.deepEqual(body.error.details?.ruleIds, ["r1", "r2"]);
+  assert.ok(body.requestId);
+  await app.close();
+});

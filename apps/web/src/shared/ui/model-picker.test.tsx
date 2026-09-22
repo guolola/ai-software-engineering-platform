@@ -86,7 +86,9 @@ describe("ModelPicker", () => {
     );
 
     const providerTrigger = screen.getByRole("button", { name: "DeepSeek-V4-Pro" });
-    expect(providerTrigger).toHaveClass("h-9");
+    expect(providerTrigger).toHaveClass("h-9", "w-28", "sm:w-40", "overflow-hidden");
+    expect(providerTrigger).toHaveAttribute("title", "deepseek-ai/DeepSeek-V4-Pro");
+    expect(providerTrigger.querySelector(".truncate")).toHaveTextContent("DeepSeek-V4-Pro");
     expect(providerTrigger).not.toHaveTextContent("托管");
     await user.click(providerTrigger);
 
@@ -100,9 +102,11 @@ describe("ModelPicker", () => {
     expect(screen.queryByTitle("Qwen/Qwen3.6-35B-A3B")).not.toBeInTheDocument();
 
     await user.hover((await screen.findByText("DeepSeek")));
-    const deepseekPro = await screen.findByTitle("deepseek-ai/DeepSeek-V4-Pro");
-    const deepseekFlash = await screen.findByTitle("deepseek-ai/DeepSeek-V4-Flash");
-    expect(deepseekPro.closest("[data-slot='dropdown-menu-sub-content']")).toHaveClass(
+    const deepseekSubContent = (await screen.findByText("严格 JSON"))
+      .closest("[data-slot='dropdown-menu-sub-content']")!;
+    const deepseekPro = within(deepseekSubContent as HTMLElement).getByTitle("deepseek-ai/DeepSeek-V4-Pro");
+    const deepseekFlash = within(deepseekSubContent as HTMLElement).getByTitle("deepseek-ai/DeepSeek-V4-Flash");
+    expect(deepseekSubContent).toHaveClass(
       "max-h-72",
       "overflow-y-auto",
     );

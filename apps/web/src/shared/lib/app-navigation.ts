@@ -6,6 +6,14 @@ export function navigateAppPath(path: string) {
 }
 
 export const PROJECT_TASK_DRAWER_REQUEST_EVENT = "uml-open-project-task-drawer";
+export const PROJECT_WORKSPACE_TARGET_REQUEST_EVENT = "uml-open-project-workspace-target";
+
+export type ProjectWorkspaceTarget =
+  | "system-requirements"
+  | "requirement-models"
+  | "design-models"
+  | "feasibility"
+  | "provider-settings";
 
 export interface ProjectTaskDrawerRequest {
   clientTaskId?: string | null;
@@ -16,6 +24,14 @@ export function requestOpenGenerationTask(detail: ProjectTaskDrawerRequest = {})
   window.dispatchEvent(
     new CustomEvent<ProjectTaskDrawerRequest>(PROJECT_TASK_DRAWER_REQUEST_EVENT, {
       detail,
+    }),
+  );
+}
+
+export function requestOpenProjectWorkspaceTarget(target: ProjectWorkspaceTarget) {
+  window.dispatchEvent(
+    new CustomEvent<ProjectWorkspaceTarget>(PROJECT_WORKSPACE_TARGET_REQUEST_EVENT, {
+      detail: target,
     }),
   );
 }

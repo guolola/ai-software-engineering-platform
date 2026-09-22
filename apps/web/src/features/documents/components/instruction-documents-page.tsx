@@ -29,8 +29,8 @@ import {
   SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Badge } from "../../../shared/ui/badge";
+import { floatingAlert } from "../../../shared/ui/floating-alert";
 import { Button } from "../../../shared/ui/button";
 import { Input } from "../../../shared/ui/input";
 import { SelectControl } from "../../../shared/ui/select";
@@ -578,7 +578,7 @@ export function InstructionDocumentsPage({
   const downloadDocument = useCallback(
     async (document: DocumentLibraryItem) => {
       if (!repository.downloadDocument) {
-        toast.error(t("documentsPage.errors.downloadUnsupported"));
+        floatingAlert.error(t("documentsPage.errors.downloadUnsupported"));
         return;
       }
       try {
@@ -587,9 +587,9 @@ export function InstructionDocumentsPage({
           document.fileName,
         );
         downloadBlobFile(downloaded.fileName, downloaded.blob);
-        toast.success(t("documentsPage.downloaded", { fileName: downloaded.fileName }));
+        floatingAlert.success(t("documentsPage.downloaded", { fileName: downloaded.fileName }));
       } catch {
-        toast.error(t("documentsPage.errors.downloadFailed"));
+        floatingAlert.error(t("documentsPage.errors.downloadFailed"));
       }
     },
     [repository, t],
