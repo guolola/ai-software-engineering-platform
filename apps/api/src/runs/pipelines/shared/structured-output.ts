@@ -12,6 +12,11 @@ const RAW_OUTPUT_LOG_LIMIT = 8000;
 
 export interface LlmChunkHandlers {
   onChunk: (chunk: string) => void;
+  onStart?: () => void;
+  onComplete?: () => void;
+  onError?: () => void;
+  onReasoningChunk?: () => void;
+  onReasoningSummary?: (chunk: string) => void;
   onBlankChunk?: (chunk: string) => void;
   startNoVisibleChunkHeartbeat?: () => () => void;
 }
@@ -148,6 +153,8 @@ export async function collectStructuredResult<T>(
   abortSignal?: AbortSignal,
 ) {
   let content = "";
+  const observer = typeof onChunk === "function" ? undefined : onChunk;
+  observer?.onStart?.();
   const stopNoVisibleChunkHeartbeat =
     typeof onChunk === "function"
       ? undefined
@@ -158,16 +165,24 @@ export async function collectStructuredResult<T>(
       messages,
       responseFormat,
       abortSignal,
+      onReasoningChunk: observer?.onReasoningChunk,
+      onReasoningSummary: observer?.onReasoningSummary,
     })) {
       content += chunk;
       emitCollectedChunk(onChunk, chunk);
     }
+  } catch (error) {
+    observer?.onError?.();
+    throw error;
   } finally {
     stopNoVisibleChunkHeartbeat?.();
   }
   try {
-    return parse(content);
+    const result = parse(content);
+    observer?.onComplete?.();
+    return result;
   } catch (error) {
+    observer?.onError?.();
     logFailedStructuredOutput(
       stage,
       providerSettings.model,
@@ -189,6 +204,8 @@ export async function collectTextResult(
   onResponseFormatFallback?: StreamChatCompletionInput["onResponseFormatFallback"],
 ) {
   let content = "";
+  const observer = typeof onChunk === "function" ? undefined : onChunk;
+  observer?.onStart?.();
   const stopNoVisibleChunkHeartbeat =
     typeof onChunk === "function"
       ? undefined
@@ -200,10 +217,16 @@ export async function collectTextResult(
       responseFormat,
       abortSignal,
       onResponseFormatFallback,
+      onReasoningChunk: observer?.onReasoningChunk,
+      onReasoningSummary: observer?.onReasoningSummary,
     })) {
       content += chunk;
       emitCollectedChunk(onChunk, chunk);
     }
+    observer?.onComplete?.();
+  } catch (error) {
+    observer?.onError?.();
+    throw error;
   } finally {
     stopNoVisibleChunkHeartbeat?.();
   }

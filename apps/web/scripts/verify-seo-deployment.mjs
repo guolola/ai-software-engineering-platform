@@ -1,6 +1,6 @@
 // Runs post-release HTTP assertions for canonical pages, crawler files, private routes, and real 404s.
 const baseUrl = new URL(process.env.PUBLIC_WEB_BASE_URL?.trim() || "https://jianglisoftware.com");
-const publicRoutes = ["/", "/features", "/workflow", "/cases", "/pricing"];
+const publicRoutes = ["/"];
 
 async function request(pathname, init) {
   const response = await fetch(new URL(pathname, baseUrl), init);
@@ -38,14 +38,9 @@ if (sitemap.response.status !== 200 || !sitemap.response.headers.get("content-ty
 const missing = await request("/__seo_missing_page_check__");
 if (missing.response.status !== 404) throw new Error(`Expected a real 404, received HTTP ${missing.response.status}.`);
 
-const trailingSlash = await request("/features/", { redirect: "manual" });
-const redirectLocation = trailingSlash.response.headers.get("location");
-if (
-  trailingSlash.response.status !== 301 ||
-  !redirectLocation ||
-  new URL(redirectLocation, baseUrl).toString() !== new URL("/features", baseUrl).toString()
-) {
-  throw new Error("Trailing-slash canonical redirect verification failed.");
+for (const route of ['/features', '/workflow', '/cases', '/pricing', '/features/']) {
+  const result = await request(route, { redirect: 'manual' });
+  if (result.response.status !== 404) throw new Error(`Retired route ${route} must return 404.`);
 }
 
 console.log(`SEO deployment verification passed for ${baseUrl.origin}.`);

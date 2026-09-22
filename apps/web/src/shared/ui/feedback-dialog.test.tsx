@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AppI18nProvider } from "../../app/providers/i18n-provider";
+import { AppI18nProvider } from "../i18n";
 import {
   FeedbackDialog,
   FeedbackDialogProvider,

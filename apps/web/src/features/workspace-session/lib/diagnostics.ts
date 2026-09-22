@@ -3,6 +3,7 @@
 import type { RunEvent, RunStage } from "@uml-platform/contracts";
 import type { DiagnosticEvent, RunDiagnostics } from "../model/session-state";
 import { isTerminalRunEvent } from "./run-events";
+import { appendTranscriptEvent } from "./run-transcript";
 
 export const MAX_DIAGNOSTIC_STREAM_CHARS = 30_000;
 
@@ -136,13 +137,17 @@ export function isMeaningfulLlmChunkEvent(
 }
 
 export function shouldDisplayDiagnosticEvent(event: RunEvent) {
-  return event.type !== "llm_chunk";
+  return event.type !== "llm_chunk" && event.type !== "run_activity";
 }
 
 export function summarizeEvent(event: RunEvent): DiagnosticEvent {
   const at = new Date().toISOString();
   const suffix = `${at}:${Math.random().toString(36).slice(2, 8)}`;
   switch (event.type) {
+    case "run_activity":
+      return { id: event.eventId, at: event.createdAt, label: formatStageForDiagnostics(event.stage), detail: null };
+    case "run_action":
+      return { id: event.eventId ?? suffix, at, label: "任务操作", detail: null };
     case "queued":
       return { id: `${suffix}:queued`, at, label: "已排队", detail: "任务已进入队列" };
     case "stage_started":
@@ -311,6 +316,7 @@ export function deriveRunDiagnosticsFromEvent(
   const meaningfulChunk = isMeaningfulLlmChunkEvent(event);
   return {
     ...current,
+    transcript: appendTranscriptEvent(current.transcript ?? [], event),
     finishedAt: isTerminalRunEvent(event)
       ? diagnosticEvent.at
       : current.finishedAt,

@@ -1,4 +1,5 @@
 // Renders class/interface operation and parameter edit fields for the model element editor.
+import { Card } from "../../../shared/ui/card";
 import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../shared/ui/button";
@@ -84,9 +85,9 @@ export function OperationEditors({
           ? (operation.parameters as Array<Record<string, unknown>>)
           : [];
         return (
-          <div
+          <Card
             key={`${ownerLabel}:operation:${operationIndex}`}
-            className="space-y-2 rounded-md border border-border bg-card p-3"
+            className="gap-0 py-0 space-y-2 p-3"
           >
             <div className="grid gap-2 md:grid-cols-3">
               <LabelTextInput
@@ -144,7 +145,7 @@ export function OperationEditors({
               parameters={parameters}
               updateOperation={updateOperation}
             />
-          </div>
+          </Card>
         );
       })}
     </div>

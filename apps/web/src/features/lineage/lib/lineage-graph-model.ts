@@ -16,7 +16,6 @@ import {
   type DiagramType,
 } from "../../../entities/diagram/model";
 import type { RequirementRule } from "../../../entities/requirement-rule/model";
-import type { WorkspaceRecord } from "../../../entities/workspace/model";
 import {
   formatCodeDiagnosticSummary,
   hasCodeDiagnostics,

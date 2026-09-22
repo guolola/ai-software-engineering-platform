@@ -75,7 +75,10 @@ export function registerRunEventsRoute({
     reply.hijack();
     reply.raw.writeHead(200, headers);
 
+    const delivered = new Set<string>();
     const send = (event: RunEvent) => {
+      if (event.eventId && delivered.has(event.eventId)) return;
+      if (event.eventId) delivered.add(event.eventId);
       reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
     };
     let listener: ((event: RunEvent) => void) | null = null;
@@ -109,9 +112,19 @@ export function registerRunEventsRoute({
       }
     };
 
+    // Buffer live publications until persisted replay finishes. A terminal publication
+    // must not close the response before its earlier messages have been replayed.
+    let replaying = true;
+    const pending: RunEvent[] = [];
+    const receive = (event: RunEvent) => {
+      if (replaying) pending.push(event);
+      else sendAndMaybeClose(event);
+    };
+    request.raw.on("close", cleanup);
+
     if (!record.terminal && subscribeRunEvents) {
       try {
-        redisSubscription = await subscribeRunEvents(runId, sendAndMaybeClose, () => {
+        redisSubscription = await subscribeRunEvents(runId, receive, () => {
           close();
         });
         const refreshedRecord = await refreshRunRecordIfAvailable(runs, runId);
@@ -125,19 +138,17 @@ export function registerRunEventsRoute({
       }
     }
 
-    for (const event of record.events) {
-      send(event);
+    listener = receive;
+    record.listeners.add(listener);
+    for (const [index, event] of record.events.entries()) {
+      send({ ...event, eventId: event.eventId ?? `${runId}:legacy:${index}`, ...(event.createdAt || record.eventCreatedAt?.[index] ? { createdAt: event.createdAt ?? record.eventCreatedAt![index]! } : {}) });
     }
     if (record.terminal) {
       close();
       return;
     }
 
-    listener = sendAndMaybeClose;
-
-    record.listeners.add(listener);
-    request.raw.on("close", () => {
-      cleanup();
-    });
+    replaying = false;
+    for (const event of pending) sendAndMaybeClose(event);
   });
 }

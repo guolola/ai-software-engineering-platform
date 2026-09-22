@@ -70,7 +70,7 @@ function collectSourceFiles(directory, files = []) {
     const relativePath = relativeToRoot(absolutePath);
     if (isIgnoredPath(relativePath)) continue;
     if (entry.isDirectory()) {
-      if (ignoredDirectoryNames.has(entry.name)) continue;
+      if (ignoredDirectoryNames.has(entry.name) || /^\.next(?:-|$)/.test(entry.name)) continue;
       collectSourceFiles(absolutePath, files);
       continue;
     }

@@ -1,8 +1,7 @@
 // Renders the editable diagram model panel, including element, relation, and delete workflows.
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../../../shared/ui/button";
-import { SelectControl } from "../../../shared/ui/select";
+import { StudioPagination } from "../../../shared/ui/studio-data-table";
 import {
   buildDiagramDetailModel,
   type DiagramDetailItem,
@@ -57,28 +56,18 @@ function ModelListPagination({
   const { t } = useTranslation();
   if (total === 0) return null;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const start = (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, total);
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-      <span className="font-mono">{start}-{end} / {total}</span>
-      <div className="flex items-center gap-2">
-        <label className="flex items-center gap-2">
-          {t("diagramLists.pagination.perPage")}
-          <SelectControl
-            aria-label={t("diagramLists.pagination.pageSize")}
-            value={String(pageSize)}
-            onValueChange={(value) => onPageSizeChange(Number(value) as (typeof EDITOR_PAGE_SIZE_OPTIONS)[number])}
-            options={EDITOR_PAGE_SIZE_OPTIONS.map((option) => ({ value: String(option), label: String(option) }))}
-            className="h-8 min-w-20"
-            size="sm"
-          />
-        </label>
-        <Button type="button" size="sm" variant="outline" aria-label={t("diagramLists.pagination.previous")} disabled={page <= 1} onClick={() => onPageChange(page - 1)}>{t("diagramLists.pagination.previous")}</Button>
-        <span className="min-w-16 text-center font-mono">{page} / {totalPages}</span>
-        <Button type="button" size="sm" variant="outline" aria-label={t("diagramLists.pagination.next")} disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>{t("diagramLists.pagination.next")}</Button>
-      </div>
-    </div>
+    <StudioPagination
+      total={total}
+      page={page}
+      pageCount={totalPages}
+      pageSize={pageSize}
+      onPageChange={onPageChange}
+      onPageSizeChange={(value) => onPageSizeChange(value as (typeof EDITOR_PAGE_SIZE_OPTIONS)[number])}
+      pageSizeOptions={[...EDITOR_PAGE_SIZE_OPTIONS]}
+      itemLabel={t("diagramLists.pagination.items", { defaultValue: "个项目" })}
+      className="rounded-xl border bg-card"
+    />
   );
 }
 
@@ -132,6 +121,9 @@ export function ModelEditPanel({
     | { kind: "relation"; id: string; label: string }
     | null
   >(null);
+  const [elementDialogOpen, setElementDialogOpen] = useState(false);
+  const [relationDialogOpen, setRelationDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const detailModel = useMemo(() => buildDiagramDetailModel(draft), [draft]);
 
   useEffect(() => {
@@ -340,14 +332,14 @@ export function ModelEditPanel({
   const commitElementEdit = async () => {
     if (!elementEditor) return;
     const nextDraft = elementEditor.draft;
-    setElementEditor(null);
+    setElementDialogOpen(false);
     await onCommitDraft(nextDraft);
   };
 
   const commitRelationEdit = async () => {
     if (!relationEditor) return;
     const nextDraft = relationEditor.draft;
-    setRelationEditor(null);
+    setRelationDialogOpen(false);
     await onCommitDraft(nextDraft);
   };
 
@@ -369,7 +361,7 @@ export function ModelEditPanel({
           ? { ...draft, messages: nextRelationships }
           : { ...draft, relationships: nextRelationships };
     }
-    setDeleteTarget(null);
+    setDeleteDialogOpen(false);
     await onCommitDraft(nextDraft);
   };
 
@@ -387,6 +379,7 @@ export function ModelEditPanel({
       draft: nextDraft,
       mode: "create",
     });
+    setElementDialogOpen(true);
   };
 
   const editElement = (
@@ -399,6 +392,7 @@ export function ModelEditPanel({
       draft: cloneDraftModel(draft),
       mode: "edit",
     });
+    setElementDialogOpen(true);
   };
 
   const deleteElement = (
@@ -415,6 +409,7 @@ export function ModelEditPanel({
         `未命名${editable.collection.label}`
       }`,
     });
+    setDeleteDialogOpen(true);
   };
 
   const createRelation = () => {
@@ -429,6 +424,7 @@ export function ModelEditPanel({
       draft: nextDraft,
       mode: "create",
     });
+    setRelationDialogOpen(true);
   };
 
   const editRelation = (relationId: string) => {
@@ -437,6 +433,7 @@ export function ModelEditPanel({
       draft: cloneDraftModel(draft),
       mode: "edit",
     });
+    setRelationDialogOpen(true);
   };
 
   const deleteRelation = (relationId: string, displayLabel: string) => {
@@ -445,6 +442,7 @@ export function ModelEditPanel({
       id: relationId,
       label: `关系 ${displayLabel || "未命名关系"}`,
     });
+    setDeleteDialogOpen(true);
   };
 
   const relationshipOrderIds = detailModel.relationships.map(
@@ -524,12 +522,18 @@ export function ModelEditPanel({
         elementEditor={elementEditor}
         relationEditor={relationEditor}
         deleteTarget={deleteTarget}
+        elementOpen={elementDialogOpen}
+        relationOpen={relationDialogOpen}
+        deleteOpen={deleteDialogOpen}
         hasEditingElement={Boolean(elementEditor && editingElement)}
         hasEditingRelation={Boolean(relationEditor && editingRelation)}
         saving={saving}
-        onCloseElement={() => setElementEditor(null)}
-        onCloseRelation={() => setRelationEditor(null)}
-        onCloseDelete={() => setDeleteTarget(null)}
+        onElementOpenChange={setElementDialogOpen}
+        onRelationOpenChange={setRelationDialogOpen}
+        onDeleteOpenChange={setDeleteDialogOpen}
+        onElementCloseComplete={() => setElementEditor(null)}
+        onRelationCloseComplete={() => setRelationEditor(null)}
+        onDeleteCloseComplete={() => setDeleteTarget(null)}
         onCommitElement={commitElementEdit}
         onCommitRelation={commitRelationEdit}
         onConfirmDelete={confirmDelete}
@@ -552,7 +556,7 @@ export function ModelEditPanel({
         }
         renderRelationFields={() =>
           relationEditor && editingRelation ? (
-            <div className="[&_.grid]:!grid-cols-1">
+            <div>
               <ModelRelationEditor
                 editorDraft={editorDraft}
                 relation={editingRelation}

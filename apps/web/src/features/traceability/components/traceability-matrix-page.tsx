@@ -1,4 +1,13 @@
 // Renders element-level traceability from persisted generation mappings.
+import { Alert } from '../../../shared/ui/alert';
+import { Progress } from '../../../shared/ui/progress';
+import { Card } from "../../../shared/ui/card";
+import { TableCell } from '../../../shared/ui/table';
+import { TableBody } from '../../../shared/ui/table';
+import { TableHead } from '../../../shared/ui/table';
+import { TableRow } from '../../../shared/ui/table';
+import { TableHeader } from '../../../shared/ui/table';
+import { Table } from '../../../shared/ui/table';
 import { useEffect, useMemo, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -7,12 +16,17 @@ import {
   CheckCircle2,
   GitBranch,
   Network,
-  Search,
 } from "lucide-react";
 import { Badge } from "../../../shared/ui/badge";
-import { Input } from "../../../shared/ui/input";
-import { ScaledToolbar } from "../../../shared/ui/scale-to-fit";
 import { SelectControl } from "../../../shared/ui/select";
+import {
+  PageContainer,
+  PageHeader,
+  StatCard,
+  StatGrid,
+  TablePagination,
+  TableToolbar,
+} from "../../../shared/template/layout/page";
 import { cn } from "../../../shared/ui/utils";
 import { useWorkspaceSession } from "../../workspace-session/state";
 import {
@@ -168,17 +182,13 @@ function requirementRefLabel(
 function StatusBadge({ status, t }: { status: RowStatus; t: TFunction }) {
   const Icon = status === "mapped" ? CheckCircle2 : AlertTriangle;
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
-        status === "mapped"
-          ? "bg-primary/10 text-primary"
-          : "bg-destructive/10 text-destructive",
-      )}
+    <Badge
+      variant={status === "mapped" ? "secondary" : "destructive"}
+      className={cn("gap-1", status === "mapped" && "bg-success/10 text-success")}
     >
       <Icon className="size-3.5" />
       {status === "mapped" ? t("traceability.status.mapped") : t("traceability.status.unmapped")}
-    </span>
+    </Badge>
   );
 }
 
@@ -204,7 +214,7 @@ export function TraceabilityMatrixPage({
   } = useWorkspaceSession();
   const [query, setQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState(ALL_GROUPS);
-  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(8);
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
@@ -365,47 +375,28 @@ export function TraceabilityMatrixPage({
       ? t("traceability.filters.designModelType")
       : t("traceability.filters.requirementModelType");
   const sourceColumnLabel = isAnalysisRequirementScope ? t("traceability.columns.sourceUseCaseFlow") : t("traceability.columns.sourceRequirementRule");
-  const pageRangeStart = filteredRows.length === 0 ? 0 : pageStart + 1;
-  const pageRangeEnd = Math.min(pageStart + pageSize, filteredRows.length);
-
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-auto bg-background">
-      <div className="w-full p-4 lg:p-5">
-        <div className="mx-auto flex w-full max-w-none flex-col gap-5">
-          <header>
-            <ScaledToolbar minWidth={720} contentClassName="w-full items-end justify-between gap-6">
-              <div className="min-w-0">
-                <div className="flex flex-nowrap items-center gap-2">
-                  <h2 className="text-2xl font-semibold tracking-normal text-foreground lg:text-3xl">
-                    {title}
-                  </h2>
-                  <Badge variant="secondary" className="rounded-full font-mono">
-                    {t("traceability.count.items", { count: rows.length })}
-                  </Badge>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-              </div>
-              <div className="relative w-72 shrink-0">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={t("traceability.searchPlaceholder")}
-                  className="h-9 rounded-full bg-card pl-9"
-                />
-              </div>
-            </ScaledToolbar>
-          </header>
+    <div className="flex min-h-full flex-col bg-background">
+      <PageContainer className="flex flex-col gap-5">
+          <PageHeader
+            title={title}
+            description={description}
+            titleAccessory={
+              <Badge variant="secondary" className="font-mono">
+                {t("traceability.count.items", { count: rows.length })}
+              </Badge>
+            }
+          />
 
           {!hasTraceability && rows.length > 0 && (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <Alert variant="destructive" className="border px-4 py-3 text-sm">
               <div className="font-semibold">{missingTraceabilityTitle}</div>
               <p className="mt-1 leading-6">{missingTraceabilityMessage}</p>
-            </div>
+            </Alert>
           )}
 
           {hasTraceability && (isTraceabilityStale || hasIncompleteCoverage) && (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <Alert variant="destructive" className="border px-4 py-3 text-sm">
               <div className="font-semibold">
                 {isTraceabilityStale ? t("traceability.stale.title") : t("traceability.incomplete.title")}
               </div>
@@ -416,13 +407,13 @@ export function TraceabilityMatrixPage({
                   ? t("traceability.stale.designMessage")
                   : t("traceability.stale.requirementMessage")}
               </p>
-            </div>
+            </Alert>
           )}
 
           <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
-            <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-              <div className="border-b border-border bg-muted/30 px-4 py-3">
-                <ScaledToolbar minWidth={560} contentClassName="w-full justify-between gap-4">
+            <Card as="section" className="min-w-0 gap-0 overflow-hidden border py-0 ring-0">
+              <TableToolbar
+                leading={
                   <div className="flex shrink-0 items-center gap-2">
                     {isDesign ? (
                       <GitBranch className="size-4 text-primary" />
@@ -436,17 +427,29 @@ export function TraceabilityMatrixPage({
                           ? t("traceability.mapping.design")
                           : t("traceability.mapping.requirements")}
                     </h3>
-                    <Badge variant="secondary" className="rounded-full font-mono text-[11px]">
+                    <Badge variant="secondary" className="font-mono text-[11px]">
                       {filteredRows.length}/{rows.length}
                     </Badge>
                   </div>
-                  {!scope && (
+                }
+                search={query}
+                onSearchChange={(value) => {
+                  setQuery(value);
+                  setCurrentPage(1);
+                }}
+                searchPlaceholder={t("traceability.searchPlaceholder")}
+                searchLabel={t("traceability.searchPlaceholder")}
+                filters={
+                  !scope ? (
                     <label className="inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                      {t("traceability.filters.category")}
+                      <span>{t("traceability.filters.category")}</span>
                       <SelectControl
                         aria-label={groupFilterLabel}
                         value={groupFilter}
-                        onValueChange={setGroupFilter}
+                        onValueChange={(value) => {
+                          setGroupFilter(value);
+                          setCurrentPage(1);
+                        }}
                         className="h-8 min-w-32 text-sm"
                         size="sm"
                         options={[
@@ -458,9 +461,15 @@ export function TraceabilityMatrixPage({
                         ]}
                       />
                     </label>
-                  )}
-                </ScaledToolbar>
-              </div>
+                  ) : null
+                }
+                rowsPerPage={pageSize}
+                onRowsPerPageChange={(value) => {
+                  setPageSize(value as typeof pageSize);
+                  setCurrentPage(1);
+                }}
+                rowsPerPageOptions={PAGE_SIZE_OPTIONS.map(String)}
+              />
 
               {rows.length === 0 ? (
                 <div className="flex min-h-72 items-center justify-center px-6 text-center">
@@ -478,46 +487,46 @@ export function TraceabilityMatrixPage({
                   </div>
                 </div>
               ) : (
-                <div className="max-w-full overflow-x-auto">
-                  <table className="w-full min-w-[900px] border-collapse text-sm">
-                    <thead className="bg-muted/20 text-xs text-muted-foreground">
-                      <tr>
-                        <th className="w-[34%] border-b border-r border-border px-4 py-4 text-left font-medium">
+                <div className="max-w-full">
+                  <Table className="w-full min-w-[1200px] border-collapse text-sm">
+                    <TableHeader className="bg-muted/20 text-xs text-muted-foreground">
+                      <TableRow>
+                        <TableHead className="sticky left-0 z-10 w-[34%] border-b border-r border-border bg-card px-4 py-4 text-left font-medium">
                           {isContext
                             ? t("traceability.context.elementColumn")
                             : isDesign
                               ? t("traceability.columns.designElement")
                               : t("traceability.columns.requirementElement")}
-                        </th>
-                        <th className="w-[14%] border-b border-r border-border px-4 py-4 text-left font-medium">
+                        </TableHead>
+                        <TableHead className="w-[14%] border-b border-r border-border px-4 py-4 text-left font-medium">
                           {t("traceability.columns.type")}
-                        </th>
+                        </TableHead>
                         {isDesign && (
-                          <th className="w-[22%] border-b border-r border-border px-4 py-4 text-left font-medium">
+                          <TableHead className="w-[22%] border-b border-r border-border px-4 py-4 text-left font-medium">
                             {t("traceability.columns.sourceDesignElement")}
-                          </th>
+                          </TableHead>
                         )}
-                        <th className="w-[20%] border-b border-r border-border px-4 py-4 text-left font-medium">
+                        <TableHead className="w-[20%] border-b border-r border-border px-4 py-4 text-left font-medium">
                           {isDesign ? t("traceability.columns.sourceRequirementDiagram") : sourceColumnLabel}
-                        </th>
-                        <th className="w-[10%] border-b border-border px-4 py-4 text-center font-medium">
+                        </TableHead>
+                        <TableHead className="w-[10%] border-b border-border px-4 py-4 text-center font-medium">
                           {t("traceability.columns.mappingStatus")}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {filteredRows.length === 0 ? (
-                        <tr>
-                          <td
+                        <TableRow>
+                          <TableCell
                             colSpan={isDesign ? 5 : 4}
                             className="px-4 py-10 text-center text-sm text-muted-foreground"
                           >
                             {t("traceability.empty.noMatches")}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ) : (
                         paginatedRows.map((row) => (
-                          <tr
+                          <TableRow
                             key={row.id}
                             className={cn(
                               "cursor-pointer border-b border-border last:border-b-0 hover:bg-muted/20",
@@ -525,7 +534,7 @@ export function TraceabilityMatrixPage({
                             )}
                             onClick={() => setSelectedRowId(row.id)}
                           >
-                            <td className="border-r border-border px-4 py-3 align-middle">
+                            <TableCell className="sticky left-0 z-10 border-r border-border bg-card px-4 py-3 align-middle">
                               <div className="flex min-w-0 flex-col gap-1">
                                 <span className="truncate font-semibold text-foreground">
                                   {row.label}
@@ -534,8 +543,8 @@ export function TraceabilityMatrixPage({
                                   {row.subtitle}
                                 </span>
                               </div>
-                            </td>
-                            <td className="border-r border-border px-4 py-3 align-middle">
+                            </TableCell>
+                            <TableCell className="border-r border-border px-4 py-3 align-middle">
                               <div className="flex flex-col gap-1">
                                 <Badge variant="secondary" className="w-fit text-[10px]">
                                   {row.groupLabel}
@@ -544,18 +553,18 @@ export function TraceabilityMatrixPage({
                                   {row.typeLabel}
                                 </span>
                               </div>
-                            </td>
+                            </TableCell>
                             {isDesign && (
-                              <td className="border-r border-border px-4 py-3 align-middle">
+                              <TableCell className="border-r border-border px-4 py-3 align-middle">
                                 <div className="flex flex-col gap-2">
                                   <ChipList
                                     items={row.upstreamDesignElements.map((ref) => designRefLabel(ref, traceabilityCopy, t, refSeparator))}
                                     emptyText={t("traceability.empty.noSourceDesignElement")}
                                   />
                                 </div>
-                              </td>
+                              </TableCell>
                             )}
-                            <td className="border-r border-border px-4 py-3 align-middle">
+                            <TableCell className="border-r border-border px-4 py-3 align-middle">
                               <ChipList
                                 items={
                                   isDesign
@@ -572,102 +581,52 @@ export function TraceabilityMatrixPage({
                                       : t("traceability.empty.noRequirementRule")
                                 }
                               />
-                            </td>
-                            <td className="px-4 py-3 text-center align-middle">
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-center align-middle">
                               <StatusBadge status={row.status} t={t} />
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         ))
                       )}
-                    </tbody>
-                  </table>
-                  <ScaledToolbar
-                    minWidth={560}
-                    className="border-t border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
-                    contentClassName="w-full justify-between gap-3"
-                  >
-                    <div className="flex shrink-0 items-center gap-3">
-                      <span className="font-mono text-xs">
-                        {pageRangeStart}-{pageRangeEnd} / {filteredRows.length}
-                      </span>
-                      <label className="inline-flex items-center gap-2">
-                        {t("traceability.pagination.perPage")}
-                        <SelectControl
-                          aria-label={t("traceability.pagination.pageSizeAria")}
-                          value={String(pageSize)}
-                          onValueChange={(value) =>
-                            setPageSize(Number(value) as typeof pageSize)
-                          }
-                          className="h-8 w-20 text-sm"
-                          size="sm"
-                          options={PAGE_SIZE_OPTIONS.map((option) => ({
-                            value: String(option),
-                            label: option,
-                          }))}
-                        />
-                        {t("traceability.pagination.itemsSuffix")}
-                      </label>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <button
-                        type="button"
-                        aria-label={t("traceability.pagination.previous")}
-                        disabled={effectivePage <= 1}
-                        onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                        className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-card text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        ‹
-                      </button>
-                      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-md bg-primary px-2 text-sm font-semibold text-primary-foreground">
-                        {effectivePage}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={t("traceability.pagination.next")}
-                        disabled={effectivePage >= totalPages}
-                        onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                        className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-card text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        ›
-                      </button>
-                    </div>
-                  </ScaledToolbar>
-                </div>
-              )}
-            </section>
-
-            <aside className="flex min-w-0 flex-col gap-4">
-              <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="size-5 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground">{t("traceability.coverage.title")}</h3>
-                </div>
-                <div className="mt-5 flex items-end gap-2">
-                  <span className="text-4xl font-bold tracking-normal text-foreground">
-                    {coverage}%
-                  </span>
-                  <span className="pb-1 text-xs text-muted-foreground">
-                    {t("traceability.status.mapped")}
-                  </span>
-                </div>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${coverage}%` }}
+                    </TableBody>
+                  </Table>
+                  <TablePagination
+                    total={filteredRows.length}
+                    page={effectivePage}
+                    pageCount={totalPages}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    itemLabel={t("traceability.pagination.itemsSuffix")}
+                    className="border-t border-border bg-muted/20"
                   />
                 </div>
-                <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                  {t("traceability.coverage.mappedCount", { mapped: mappedCount, total: filteredRows.length })}
-                </p>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  {t("traceability.coverage.integrityLabel")}
-                  {hasTraceability && !isTraceabilityStale && !hasIncompleteCoverage
-                    ? t("traceability.coverage.complete")
-                    : t("traceability.coverage.needsRegeneration")}
-                </p>
-              </section>
+              )}
+            </Card>
 
-              <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <aside className="flex min-w-0 flex-col gap-4">
+              <StatGrid className="grid-cols-1 gap-4 sm:grid-cols-1 xl:grid-cols-1">
+                <StatCard
+                  icon={<CheckCircle2 />}
+                  iconClassName="bg-success/10 text-success"
+                  value={`${coverage}%`}
+                  label={t("traceability.coverage.title")}
+                  badge={t("traceability.status.mapped")}
+                />
+                <Card as="section" className="gap-3 p-4">
+                  <Progress value={coverage} aria-label={t("traceability.status.mapped")} className="**:data-[slot=progress-track]:h-2" />
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {t("traceability.coverage.mappedCount", { mapped: mappedCount, total: filteredRows.length })}
+                  </p>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    {t("traceability.coverage.integrityLabel")}
+                    {hasTraceability && !isTraceabilityStale && !hasIncompleteCoverage
+                      ? t("traceability.coverage.complete")
+                      : t("traceability.coverage.needsRegeneration")}
+                  </p>
+                </Card>
+              </StatGrid>
+
+              <Card as="section" className="gap-0 py-0 p-4">
                 <h3 className="text-sm font-semibold text-foreground">{t("traceability.details.title")}</h3>
                 {selectedRow ? (
                   <div className="mt-4 space-y-3">
@@ -704,11 +663,10 @@ export function TraceabilityMatrixPage({
                     {t("traceability.details.selectRow")}
                   </p>
                 )}
-              </section>
+              </Card>
             </aside>
           </div>
-        </div>
-      </div>
+      </PageContainer>
     </div>
   );
 }

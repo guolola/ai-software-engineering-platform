@@ -1,4 +1,6 @@
 // Renders the requirement quality hint and repair confirmation dialog.
+import { Alert } from '../../../shared/ui/alert';
+import { Card } from "../../../shared/ui/card";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
@@ -18,7 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../shared/ui/dialog";
-import { ScaleToFitFrame } from "../../../shared/ui/scale-to-fit";
 import { cn } from "../../../shared/ui/utils";
 import {
   REVIEWABLE_REQUIREMENT_FIELDS,
@@ -119,7 +120,7 @@ export function RequirementReviewDialog({
         </DialogHeader>
         {visibleHintDetail && (
           <div className="max-h-[60vh] overflow-auto pr-1">
-            <ScaleToFitFrame minWidth={640} contentClassName="w-[640px]">
+            <div className="w-full min-w-0">
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs uppercase text-muted-foreground">
@@ -128,7 +129,7 @@ export function RequirementReviewDialog({
                 <Badge
                   variant="outline"
                   className={cn(
-                    "rounded-md px-2 py-1 text-xs",
+                    "px-2 py-1 text-xs",
                     requirementStateTone(visibleHintDetail.rowState),
                   )}
                 >
@@ -150,9 +151,9 @@ export function RequirementReviewDialog({
                 </h3>
                 {visibleHintDetail.candidate.status === "failed" ? (
                   <div className="mt-2 grid gap-2">
-                    <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-5 text-destructive">
+                    <Alert variant="destructive" className="border px-3 py-2 text-xs leading-5">
                       {t("requirements.review.repairFailed")}
-                    </div>
+                    </Alert>
                     {visibleHintDetail.candidate.errorMessage ? (
                       <details className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                         <summary className="cursor-pointer font-medium text-foreground">{t("requirements.review.technicalDetails")}</summary>
@@ -209,12 +210,12 @@ export function RequirementReviewDialog({
                 {visibleHintDetail.candidate.blockingReasons.length > 0 && (
                   <div className="mt-2 grid gap-1">
                     {visibleHintDetail.candidate.blockingReasons.map((reason) => (
-                      <div
+                      <Alert
                         key={reason}
-                        className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-5 text-warning"
+                        className="border px-3 py-2 text-xs leading-5"
                       >
                         {reason}
-                      </div>
+                      </Alert>
                     ))}
                   </div>
                 )}
@@ -228,9 +229,9 @@ export function RequirementReviewDialog({
               <div className="mt-2 grid gap-2">
                 {visibleHintDetail.fieldEntries.length > 0 ? (
                   visibleHintDetail.fieldEntries.map(([field, provenance]) => (
-                    <div
+                    <Card
                       key={field}
-                      className="rounded-lg border border-border bg-card px-3 py-2 text-xs leading-5"
+                      className="gap-0 py-0 px-3 py-2 text-xs leading-5"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium text-foreground">
@@ -238,7 +239,7 @@ export function RequirementReviewDialog({
                         </span>
                         <Badge
                           variant="outline"
-                          className="rounded-md px-1.5 py-0 text-[10px]"
+                          className="px-1.5 py-0 text-[10px]"
                         >
                           {requirementSourceLabel(provenance.source, t)}
                         </Badge>
@@ -257,7 +258,7 @@ export function RequirementReviewDialog({
                           {provenance.rationale}
                         </div>
                       )}
-                    </div>
+                    </Card>
                   ))
                 ) : (
                   <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -272,12 +273,12 @@ export function RequirementReviewDialog({
               <div className="mt-2 grid gap-2">
                 {visibleHintDetail.qualityIssues.length > 0 ? (
                   visibleHintDetail.qualityIssues.map((issue) => (
-                    <div
+                    <Alert
                       key={issue.id}
-                      className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-5 text-warning"
+                      className="border px-3 py-2 text-xs leading-5"
                     >
                       {issue.message}
-                    </div>
+                    </Alert>
                   ))
                 ) : (
                   <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -286,7 +287,7 @@ export function RequirementReviewDialog({
                 )}
               </div>
             </div>
-            </ScaleToFitFrame>
+            </div>
           </div>
         )}
         <DialogFooter>

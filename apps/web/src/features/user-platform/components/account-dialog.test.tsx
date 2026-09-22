@@ -1,9 +1,13 @@
 // Covers account modal profile usage telemetry and security workflows displayed to the current user.
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode, type ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { i18n } from "../../../shared/i18n/i18n";
+import { ThemeProvider } from "../../../shared/ui/theme-provider";
 import { AccountDialog } from "./account-dialog";
 import type { PlatformAccountProfileResponse } from "../services/platform-api";
+import { invalidateProviderConfigCache } from "../services/provider-config-cache";
 
 const baseUser = {
   id: "user-1",
@@ -28,7 +32,7 @@ function profileResponse(
       expiresAt: "2026-06-01T08:00:00.000Z",
       lastSeenAt: "2026-05-25T08:00:00.000Z",
       ipAddress: "203.0.113.40",
-      userAgent: "Playwright",
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36",
     },
     mfa: { enabled: false, enforcement: "totp" },
     generationUsage,
@@ -73,8 +77,39 @@ function stubAccountFetch(profile: PlatformAccountProfileResponse) {
         headers: { "Content-Type": "application/json" },
       });
     }
-    if (url.pathname === "/api/account/login-events") {
-      return new Response(JSON.stringify({ events: [] }), {
+    if (url.pathname === "/api/provider-configs") {
+      return new Response(JSON.stringify({
+        providerConfigs: [{
+          id: "provider-1",
+          name: "课程 OpenAI",
+          provider: "openai",
+          baseUrl: "https://api.example.com/v1",
+          defaultModel: "gpt-5.6",
+          allowedModels: ["gpt-5.6", "gpt-5.5"],
+          maskedKey: "sk-***",
+          keyPurpose: "course",
+          status: "active",
+          riskState: "approved",
+          quota: "managed",
+          createdBy: "admin-1",
+          createdAt: "2026-05-01T00:00:00.000Z",
+          updatedAt: "2026-05-01T00:00:00.000Z",
+          lastUsedAt: null,
+          allowlisted: true,
+          scopeType: "system",
+          scopeId: null,
+        }],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.pathname === "/api/billing/summary") {
+      return new Response(JSON.stringify({
+        creditBalance: 0,
+        signupBonus: { granted: false, creditAmount: 0, validUntil: null },
+        recentOrders: [],
+      }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
@@ -125,18 +160,102 @@ function stubAccountFetch(profile: PlatformAccountProfileResponse) {
   return fetchMock;
 }
 
+function renderAccountDialog(
+  props: ComponentProps<typeof AccountDialog>,
+  options: { strict?: boolean } = {},
+) {
+  const dialog = (
+    <ThemeProvider>
+      <AccountDialog {...props} />
+    </ThemeProvider>
+  );
+  return render(
+    options.strict ? <StrictMode>{dialog}</StrictMode> : dialog,
+  );
+}
+
 describe("AccountDialog generation usage", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
+    invalidateProviderConfigCache();
+  });
+
+  it("resolves every session table header in both supported locales", () => {
+    expect(i18n.t("account.deviceHeader", { lng: "zh-CN" })).toBe("设备");
+    expect(i18n.t("account.lastActiveHeader", { lng: "zh-CN" })).toBe("最近活动");
+    expect(i18n.t("account.expiresHeader", { lng: "zh-CN" })).toBe("过期时间");
+    expect(i18n.t("account.deviceHeader", { lng: "en" })).toBe("Device");
+    expect(i18n.t("account.lastActiveHeader", { lng: "en" })).toBe("Last active");
+    expect(i18n.t("account.expiresHeader", { lng: "en" })).toBe("Expires");
   });
 
   it("keeps the account trigger visible as a compact mobile avatar button", () => {
-    render(<AccountDialog onNavigate={() => {}} initialUser={baseUser} />);
+    renderAccountDialog({ onNavigate: () => {}, initialUser: baseUser });
 
     const trigger = screen.getByRole("button", { name: "账号" });
-    expect(trigger).toHaveClass("inline-flex", "size-10", "md:w-auto");
+    expect(trigger).toHaveClass("inline-flex", "size-9", "md:w-auto");
     expect(trigger).not.toHaveClass("hidden");
     expect(within(trigger).getByText("Student")).toHaveClass("hidden", "md:inline");
+  });
+
+  it("shows the complete session table and preloads provider settings when the dialog opens", async () => {
+    const user = userEvent.setup();
+    const fetchMock = stubAccountFetch(
+      profileResponse({
+        usedToday: 0,
+        limit: null,
+        remaining: null,
+        windowSeconds: 86400,
+        limited: false,
+        scope: "user",
+      }),
+    );
+
+    renderAccountDialog(
+      { onNavigate: () => {}, initialUser: baseUser },
+      { strict: true },
+    );
+    await user.click(screen.getByRole("button", { name: "账号" }));
+    const accountDialog = await screen.findByRole("dialog", { name: "设置" });
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/account/sessions"))).toBe(true);
+      expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/provider-configs"))).toBe(true);
+      expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/billing/summary"))).toBe(true);
+    });
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/api/provider-configs"))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/api/billing/summary"))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/api/auth/me"))).toHaveLength(0);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/account/login-events"))).toBe(false);
+
+    await user.click(within(accountDialog).getByRole("tab", { name: "登录会话" }));
+    const sessionsTable = await within(accountDialog).findByRole("table", { name: "活跃会话" });
+    expect(within(sessionsTable).getByRole("columnheader", { name: "设备" })).toBeInTheDocument();
+    expect(within(sessionsTable).getByRole("columnheader", { name: "地区" })).toBeInTheDocument();
+    expect(within(sessionsTable).getByRole("columnheader", { name: "最近活动" })).toBeInTheDocument();
+    expect(within(sessionsTable).getByRole("columnheader", { name: "过期时间" })).toBeInTheDocument();
+    expect(sessionsTable.querySelector('[data-slot="avatar"]')).toBeInTheDocument();
+    expect(within(sessionsTable).getByText("当前设备")).toBeInTheDocument();
+    expect(within(accountDialog).queryByText("登录历史")).not.toBeInTheDocument();
+    expect(accountDialog).toHaveClass("sm:max-w-[1100px]");
+    expect(sessionsTable).toHaveClass("table-fixed");
+    expect(within(sessionsTable).getByText("Windows • Chrome").closest("td")).toHaveClass("overflow-hidden");
+
+    const providerRequestCount = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes("/api/provider-configs"),
+    ).length;
+    const billingRequestCount = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes("/api/billing/summary"),
+    ).length;
+    await user.click(within(accountDialog).getByRole("tab", { name: "全局设置" }));
+    expect(await within(accountDialog).findByLabelText("托管 Provider 配置")).not.toBeDisabled();
+    expect(within(accountDialog).getByLabelText("默认模型")).not.toBeDisabled();
+    expect(within(accountDialog).getByLabelText("托管 Provider 配置")).toHaveTextContent("课程 OpenAI");
+    expect(within(accountDialog).getByLabelText("默认模型")).toHaveTextContent("gpt-5.6");
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/api/provider-configs"))).toHaveLength(providerRequestCount);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/api/billing/summary"))).toHaveLength(billingRequestCount);
+    expect(within(accountDialog).queryByText("暂无可用托管 Provider 配置。")).not.toBeInTheDocument();
+    expect(within(accountDialog).queryByText("选择托管 Provider 后才能选择默认模型。")).not.toBeInTheDocument();
   });
 
   it("does not show today's generation count for regular users", async () => {
@@ -152,10 +271,16 @@ describe("AccountDialog generation usage", () => {
       }),
     );
 
-    render(<AccountDialog onNavigate={() => {}} initialUser={baseUser} />);
+    renderAccountDialog({ onNavigate: () => {}, initialUser: baseUser });
     await user.click(screen.getByRole("button", { name: "账号" }));
 
     await screen.findByText("个人资料信息");
+    const accountDialog = screen.getByRole("dialog", { name: "设置" });
+    const scrollArea = accountDialog.querySelector('[data-slot="scroll-area"]');
+    expect(scrollArea).toBeInTheDocument();
+    expect(scrollArea?.querySelector('[data-slot="scroll-area-viewport"]')).toHaveClass("overflow-x-hidden");
+    expect(scrollArea?.querySelector("main")).toHaveClass("p-6");
+    expect(scrollArea?.querySelector("main")).not.toHaveClass("overflow-y-auto");
     expect(screen.queryByText("今日生成次数")).not.toBeInTheDocument();
     expect(screen.queryByText("今日 3 次")).not.toBeInTheDocument();
     expect(screen.queryByText("不限额")).not.toBeInTheDocument();
@@ -182,17 +307,15 @@ describe("AccountDialog generation usage", () => {
       ),
     );
 
-    render(
-      <AccountDialog
-        onNavigate={() => {}}
-        initialUser={{
-          ...baseUser,
-          id: "guest-user",
-          email: "guest@example.edu",
-          displayName: "Guest",
-        }}
-      />,
-    );
+    renderAccountDialog({
+      onNavigate: () => {},
+      initialUser: {
+        ...baseUser,
+        id: "guest-user",
+        email: "guest@example.edu",
+        displayName: "Guest",
+      },
+    });
     await user.click(screen.getByRole("button", { name: "账号" }));
 
     await screen.findByText("个人资料信息");
@@ -216,7 +339,7 @@ describe("AccountDialog generation usage", () => {
       }),
     );
 
-    render(<AccountDialog onNavigate={() => {}} initialUser={baseUser} />);
+    renderAccountDialog({ onNavigate: () => {}, initialUser: baseUser });
     await user.click(screen.getByRole("button", { name: "账号" }));
     const accountDialog = await screen.findByRole("dialog", { name: "设置" });
     const displayNameInput = await within(accountDialog).findByLabelText("昵称");
@@ -252,7 +375,7 @@ describe("AccountDialog generation usage", () => {
       }),
     );
 
-    render(<AccountDialog onNavigate={() => {}} initialUser={baseUser} />);
+    renderAccountDialog({ onNavigate: () => {}, initialUser: baseUser });
     await user.click(screen.getByRole("button", { name: "账号" }));
     const accountDialog = await screen.findByRole("dialog", { name: "设置" });
     await user.click(await within(accountDialog).findByRole("tab", { name: "安全设置" }));
@@ -320,7 +443,7 @@ describe("AccountDialog generation usage", () => {
       }),
     );
 
-    render(<AccountDialog onNavigate={onNavigate} initialUser={baseUser} />);
+    renderAccountDialog({ onNavigate, initialUser: baseUser });
     await user.click(screen.getByRole("button", { name: "账号" }));
     const accountDialog = await screen.findByRole("dialog", { name: "设置" });
     await within(accountDialog).findByText("个人资料信息");

@@ -1,4 +1,8 @@
 // Owns the authenticated projects index, filters, and create-project dialog composition.
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "../../../shared/ui/alert";
+import { Card } from "../../../shared/ui/card";
+import { PerspectiveCard } from "../../../shared/ui/interactive-card";
+import { AnimatedTooltip } from "../../../shared/ui/motion-tooltip";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
@@ -21,9 +25,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../shared/ui/dialog";
-import { Input } from "../../../shared/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "../../../shared/ui/input-group";
+import { Label } from "../../../shared/ui/label";
 import { SelectControl } from "../../../shared/ui/select";
-import { ScaledToolbar } from "../../../shared/ui/scale-to-fit";
+import { EmptyState, PageContainer, PageHeader } from "../../../shared/template/layout/page";
 import { cn } from "../../../shared/ui/utils";
 import { i18n as appI18n } from "../../../shared/i18n";
 import {
@@ -42,21 +47,7 @@ import { ProjectCreateForm } from "./project-create-form";
 type Navigate = (path: string) => void;
 
 const STABLE_PLATFORM_SCROLL_CLASS =
-  "min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-scroll bg-background [scrollbar-gutter:stable]";
-
-function ProjectsIndexSectionCard({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={`rounded-md border border-border bg-card p-5 ${className}`}>
-      {children}
-    </section>
-  );
-}
+  "min-h-0 min-w-0 w-full overflow-x-clip bg-background";
 
 export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
   const { t: translate, i18n: activeI18n } = useTranslation();
@@ -213,54 +204,48 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
       data-testid="projects-index-shell"
       className={cn("relative", STABLE_PLATFORM_SCROLL_CLASS)}
     >
-      <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-10 px-6 py-16 md:px-10 xl:px-12">
-        <ScaledToolbar minWidth={720} contentClassName="w-full items-center justify-between gap-8">
-          <div className="grid min-w-0 gap-2">
-            <h1 className="text-[32px] font-semibold leading-10 tracking-normal text-foreground">
-              {t("projects.indexTitle")}
-            </h1>
-            <p className="text-base leading-6 text-muted-foreground">
-              {t("projects.indexDescription")}
-            </p>
-          </div>
-          <Button
-            type="button"
-            className="h-12 shrink-0 rounded-lg px-6 text-base shadow-sm"
-            onClick={openCreateProject}
-          >
-            <Plus className="size-4" />
-            {authRequired || listError ? t("projects.newProjectAfterLogin") : t("projects.newProject")}
-          </Button>
-        </ScaledToolbar>
+      <PageContainer className="flex flex-col gap-6">
+        <PageHeader
+          title={t("projects.indexTitle")}
+          description={t("projects.indexDescription")}
+          actions={
+            <Button type="button" size="lg" onClick={openCreateProject}>
+              <Plus className="size-4" />
+              {authRequired || listError ? t("projects.newProjectAfterLogin") : t("projects.newProject")}
+            </Button>
+          }
+        />
 
         {(authRequired || forbidden || listError) && (
-          <ProjectsIndexSectionCard className="grid gap-4 rounded-xl md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-            <div>
-              <h2 className="text-base">
+          <Alert variant="destructive">
+            <AlertTitle>
+              <h2 className="text-base font-medium">
                 {authRequired
                   ? t("projects.access.loginTitle")
                   : forbidden
                     ? t("projects.access.forbiddenTitle")
                     : t("projects.access.unavailableTitle")}
               </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {authRequired
-                  ? t("projects.access.loginDescription")
-                  : forbidden
-                    ? t("projects.access.forbiddenDescription")
-                    : status || t("projects.access.unavailableDescription")}
-              </p>
-            </div>
-            <Button type="button" variant="outline" onClick={() => onNavigate("/login")}>
-              {authRequired ? t("projects.access.loginAction") : t("projects.access.goLoginAction")}
-            </Button>
-          </ProjectsIndexSectionCard>
+            </AlertTitle>
+            <AlertDescription>
+              {authRequired
+                ? t("projects.access.loginDescription")
+                : forbidden
+                  ? t("projects.access.forbiddenDescription")
+                  : status || t("projects.access.unavailableDescription")}
+            </AlertDescription>
+            <AlertAction>
+              <Button type="button" variant="outline" onClick={() => onNavigate("/login")}>
+                {authRequired ? t("projects.access.loginAction") : t("projects.access.goLoginAction")}
+              </Button>
+            </AlertAction>
+          </Alert>
         )}
 
         {!authRequired && !forbidden && !listError && (
-          <section
+          <Card as="section"
             data-testid="projects-filter-panel"
-            className="rounded-xl border border-border/60 bg-card p-3 shadow-sm md:p-[17px]"
+            className="gap-0 py-0 p-3 md:p-[17px]"
           >
             <div className="flex min-w-0 items-center justify-between gap-2 md:gap-8">
               <div
@@ -271,40 +256,40 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
                 {PROJECT_SCOPE_OPTIONS.map((option) => {
                   const selected = scope === option.value;
                   return (
-                    <button
+                    <Button variant={selected ? "secondary" : "ghost"}
                       key={option.value}
                       type="button"
                       aria-label={t(option.labelKey)}
                       aria-pressed={selected}
-                      className={
-                        selected
-                          ? "h-8 shrink-0 rounded-md bg-accent px-2 text-[12px] font-medium leading-4 text-accent-foreground md:h-auto md:rounded-lg md:px-4 md:py-2 md:text-base md:leading-6"
-                          : "h-8 shrink-0 rounded-md px-2 text-[12px] font-medium leading-4 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:h-auto md:rounded-lg md:px-4 md:py-2 md:text-base md:leading-6"
-                      }
+                      className="h-8 shrink-0 px-3 text-sm"
                       onClick={() => setScope(option.value)}
                     >
                       <span className="md:hidden">{t(option.shortLabelKey)}</span>
                       <span className="hidden md:inline">{t(option.labelKey)}</span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
               <div className="flex min-w-0 flex-1 items-center justify-end gap-2 md:shrink-0 md:gap-4">
-                <div className="relative min-w-[108px] flex-1 md:w-96 md:flex-none">
-                  <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground md:left-3 md:size-4" />
-                  <Input
-                    className="h-8 rounded-lg border-input bg-input-background pl-8 text-[12px] md:h-[38px] md:pl-10 md:text-sm"
+                <InputGroup className="w-full max-w-2xs">
+                  <InputGroupAddon>
+                    <Search />
+                  </InputGroupAddon>
+                  <Label className="sr-only" htmlFor="projects-search">
+                    {t("projects.searchAria")}
+                  </Label>
+                  <InputGroupInput
+                    id="projects-search"
                     placeholder={t("projects.searchPlaceholder")}
-                    aria-label={t("projects.searchAria")}
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                   />
-                </div>
+                </InputGroup>
                 <SelectControl
                   aria-label={t("projects.sortAria")}
                   value={sort}
                   onValueChange={setSort}
-                  className="h-8 w-[82px] shrink-0 rounded-lg border border-input bg-input-background px-2 text-[12px] text-foreground md:h-[38px] md:w-28 md:px-3 md:text-sm"
+                  className="w-fit shrink-0"
                   options={[
                     { value: "recent", label: t("projects.sort.recent") },
                     { value: "generated", label: t("projects.sort.generated") },
@@ -313,16 +298,16 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
                 />
               </div>
             </div>
-          </section>
+          </Card>
         )}
 
         {!authRequired && !forbidden && !listError && projects.length > 0 && visibleProjects.length === 0 && (
-          <section className="rounded-xl border border-dashed border-border/60 bg-card p-10 text-center">
-            <h2 className="text-xl font-semibold">{t("projects.noMatchesTitle")}</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("projects.noMatchesDescription")}
-            </p>
-          </section>
+          <EmptyState
+            icon={Search}
+            title={t("projects.noMatchesTitle")}
+            description={t("projects.noMatchesDescription")}
+            className="mx-auto"
+          />
         )}
 
         {!authRequired && !forbidden && !listError && projects.length > 0 && visibleProjects.length > 0 && (
@@ -332,24 +317,25 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
             className="grid grid-cols-2 gap-3 md:gap-5 xl:grid-cols-3 xl:gap-6"
           >
             {visibleProjects.map((project) => (
-              <article
+              <PerspectiveCard
                 key={project.id}
                 data-background-key={project.background.key}
                 className={
                   project.status === "archived"
-                    ? "group relative flex min-h-[174px] min-w-0 flex-col overflow-hidden rounded-lg border border-border/60 bg-card opacity-75 shadow-sm md:min-h-[271px] md:rounded-xl"
-                    : "group relative flex min-h-[182px] min-w-0 flex-col overflow-hidden rounded-lg border border-border/60 bg-card shadow-sm md:min-h-[287px] md:rounded-xl"
+                    ? "group flex min-h-[174px] flex-col opacity-75 md:min-h-[287px]"
+                    : "group flex min-h-[182px] flex-col md:min-h-[303px]"
                 }
               >
-                <img
-                  src={project.background.imageUrl}
-                  alt=""
-                  className="absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/82 to-background/38" />
-                <div className="absolute inset-x-0 top-0 z-10 h-1 bg-gradient-to-r from-primary to-info opacity-0 transition-opacity group-hover:opacity-100" />
-                <div className="relative z-10 flex flex-1 flex-col gap-2 border-b border-border/40 px-3 pb-3 pt-3 md:gap-4 md:px-6 md:pb-10 md:pt-6">
+                <div className="relative aspect-video w-full overflow-hidden border-b border-border/60 bg-muted">
+                  <img
+                    src={project.background.imageUrl}
+                    alt=""
+                    className="size-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.02] motion-reduce:transform-none motion-reduce:transition-none"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/35 to-transparent" />
+                </div>
+                <div className="relative z-10 flex flex-1 flex-col gap-2 p-4 md:p-5">
                   <div className="flex min-w-0 items-start justify-between gap-2 md:gap-3">
                     <h2 className="line-clamp-2 min-w-0 text-[15px] font-semibold leading-5 text-foreground md:text-xl md:leading-7">
                       {project.name}
@@ -358,8 +344,8 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
                       variant={project.status === "archived" ? "outline" : "secondary"}
                       className={
                         project.status === "archived"
-                          ? "shrink-0 rounded bg-secondary px-1.5 py-0.5 text-[10px] leading-4 text-muted-foreground md:px-2 md:py-1 md:text-xs"
-                          : "shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] leading-4 text-accent-foreground md:px-2 md:py-1 md:text-xs"
+                          ? "shrink-0 px-1.5 py-0.5 text-[10px] leading-4 md:px-2 md:py-1 md:text-xs"
+                          : "shrink-0 px-1.5 py-0.5 text-[10px] leading-4 md:px-2 md:py-1 md:text-xs"
                       }
                     >
                       {project.statusLabel}
@@ -393,7 +379,7 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
                     </span>
                   </div>
                 </div>
-                <div className="relative z-10 mt-auto flex items-center justify-between gap-2 bg-background/72 px-3 py-2 backdrop-blur-[2px] md:gap-3 md:px-6 md:py-4">
+                <div className="relative z-10 mt-auto flex items-center justify-between gap-2 border-t border-border/60 bg-muted/20 px-4 py-3">
                   <div className="flex items-start">
                     {project.status === "archived" ? (
                       <span className="line-clamp-2 font-mono text-[10px] font-medium leading-4 text-muted-foreground md:text-xs">
@@ -401,24 +387,18 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
                       </span>
                     ) : (
                       <>
-                        {project.members.map((member) => (
-                          <span
-                            key={`${project.id}:${member.id}`}
-                            aria-label={t("projects.memberAvatar", { name: member.label })}
-                            title={member.label}
-                            className="mr-[-8px] inline-flex size-7 items-center justify-center overflow-hidden rounded-full border-2 border-card bg-accent text-[11px] font-semibold text-primary md:size-8 md:text-xs"
-                          >
-                            {member.avatarUrl ? (
-                              <img
-                                src={member.avatarUrl}
-                                alt=""
-                                className="size-full object-cover"
-                              />
-                            ) : (
-                              member.initial
-                            )}
-                          </span>
-                        ))}
+                        <AnimatedTooltip
+                          items={project.members.map((member) => ({
+                            id: `${project.id}:${member.id}`,
+                            image: member.avatarUrl,
+                            fallback: member.initial,
+                            name: member.label,
+                            designation: String(t(`projectShell.membersUi.roles.${member.role}`, {
+                              defaultValue: member.role,
+                            })),
+                            ariaLabel: String(t("projects.memberAvatar", { name: member.label })),
+                          }))}
+                        />
                         {project.memberCount > project.members.length && (
                           <span
                             aria-label={t("projects.otherMembers", {
@@ -435,7 +415,7 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-7 shrink-0 px-0 text-sm leading-5 text-primary hover:bg-transparent hover:text-primary/80 md:text-base"
+                    className="h-7 shrink-0 px-0 text-sm leading-5 md:text-base"
                     onClick={() => onNavigate(`/projects/${project.id}`)}
                   >
                     {t("projects.openProject")}
@@ -443,34 +423,27 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
                     <ArrowRight className="size-4" />
                   </Button>
                 </div>
-              </article>
+              </PerspectiveCard>
             ))}
           </div>
         )}
 
         {!authRequired && !forbidden && !listError && projects.length === 0 && (
-          <section className="mx-auto flex w-full max-w-[672px] flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-card px-8 py-12 text-center md:px-[49px]">
-            <div className="mb-6 inline-flex size-16 items-center justify-center rounded-2xl bg-accent text-primary">
-              <FileText className="size-6" />
-            </div>
-            <h2 className="text-xl font-semibold leading-7 text-foreground">
-              {t("projects.emptyTitle")}
-            </h2>
-            <p className="mt-3 max-w-md text-base leading-6 text-muted-foreground">
-              {t("projects.emptyDescription")}
-            </p>
-            <Button
-              type="button"
-              className="mt-8 h-12 rounded-lg px-6 text-base shadow-sm"
-              onClick={openCreateProject}
-            >
-              <Plus className="size-4" />
-              {t("projects.createFirstProject")}
-            </Button>
-          </section>
+          <EmptyState
+            icon={FileText}
+            title={t("projects.emptyTitle")}
+            description={t("projects.emptyDescription")}
+            className="mx-auto"
+            action={
+              <Button type="button" size="lg" onClick={openCreateProject}>
+                <Plus className="size-4" />
+                {t("projects.createFirstProject")}
+              </Button>
+            }
+          />
         )}
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogContent className="max-h-[88vh] overflow-auto sm:max-w-lg">
+          <DialogContent className="max-h-[88vh] overflow-auto sm:max-w-3xl">
             <DialogHeader>
               <DialogTitle>{t("projects.createProject")}</DialogTitle>
               <DialogDescription>
@@ -480,7 +453,7 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
             <ProjectCreateForm onNavigate={onNavigate} />
           </DialogContent>
         </Dialog>
-      </div>
+      </PageContainer>
     </main>
   );
 }

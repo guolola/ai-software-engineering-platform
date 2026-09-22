@@ -61,7 +61,7 @@ export function RequirementTraceabilityDialogs({
               </div>
               <Badge
                 variant="outline"
-                className="border-success/35 bg-success/10 text-success"
+                className="border-success/35 text-success"
               >
                 {t("requirements.traceDialogs.complete")}
               </Badge>

@@ -1,4 +1,15 @@
 // Provides reusable labeled form controls for diagram model editing dialogs.
+import { useId } from "react";
+import { Checkbox } from "../../../shared/ui/checkbox";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "../../../shared/ui/field";
+import { Input } from '../../../shared/ui/input';
+import { Textarea } from '../../../shared/ui/textarea';
 import { SelectControl } from "../../../shared/ui/select";
 import { useTranslation } from "react-i18next";
 import { i18n } from "../../../shared/i18n/i18n";
@@ -14,17 +25,19 @@ export function LabelTextInput({
   onChange: (value: string) => void;
   placeholder?: string;
 }) {
+  const id = useId();
   return (
-    <label className="min-w-0 space-y-1 text-xs text-muted-foreground">
-      <span>{label}</span>
-      <input
+    <Field className="min-w-0 gap-2">
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <Input
+        id={id}
         aria-label={label}
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="h-9 w-full border px-4 text-sm"
       />
-    </label>
+    </Field>
   );
 }
 
@@ -39,17 +52,19 @@ export function LabelTextarea({
   onChange: (value: string) => void;
   rows?: number;
 }) {
+  const id = useId();
   return (
-    <label className="min-w-0 space-y-1 text-xs text-muted-foreground">
-      <span>{label}</span>
-      <textarea
+    <Field className="min-w-0 gap-2">
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <Textarea
+        id={id}
         aria-label={label}
         value={value}
         rows={rows}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="w-full border px-4 py-2 text-sm"
       />
-    </label>
+    </Field>
   );
 }
 
@@ -67,22 +82,24 @@ export function LabelSelect({
   allowEmpty?: boolean;
 }) {
   const { t } = useTranslation();
+  const id = useId();
   const normalizedOptions = allowEmpty
     ? [{ value: "", label: t("diagramEditor.none") }, ...options]
     : options;
 
   return (
-    <div className="min-w-0 space-y-1 text-xs text-muted-foreground">
-      <span>{label}</span>
+    <Field className="min-w-0 gap-2">
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <SelectControl
+        id={id}
         aria-label={label}
         value={value}
         onValueChange={onChange}
         options={normalizedOptions}
         placeholder={t("diagramEditor.selectPlaceholder")}
-        className="h-9 rounded-md text-sm"
+        className="h-9 text-sm"
       />
-    </div>
+    </Field>
   );
 }
 
@@ -95,16 +112,16 @@ export function LabelCheckbox({
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
+  const id = useId();
   return (
-    <label className="flex min-h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs text-foreground">
-      <input
-        aria-label={label}
-        type="checkbox"
+    <Field orientation="horizontal" className="min-h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-foreground">
+      <Checkbox
+        id={id}
         checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
+        onCheckedChange={onChange}
       />
-      <span>{label}</span>
-    </label>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+    </Field>
   );
 }
 
@@ -119,12 +136,12 @@ export function SourceRuleChecklist({
 }) {
   const { t } = useTranslation();
   return (
-    <fieldset className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
-      <legend className="px-1 text-xs font-medium text-foreground">{t("diagramEditor.sourceRules")}</legend>
+    <FieldSet className="gap-3 rounded-md border border-border bg-muted/20 p-3">
+      <FieldLegend className="mb-0 px-1 text-sm">{t("diagramEditor.sourceRules")}</FieldLegend>
       {options.length === 0 ? (
         <p className="text-xs text-destructive">{t("diagramEditor.noSourceRules")}</p>
       ) : (
-        <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+        <FieldGroup className="grid gap-2 sm:grid-cols-2">
           {options.map((option) => {
             const checked = selectedIds.includes(option.id);
             return (
@@ -142,9 +159,9 @@ export function SourceRuleChecklist({
               />
             );
           })}
-        </div>
+        </FieldGroup>
       )}
-    </fieldset>
+    </FieldSet>
   );
 }
 

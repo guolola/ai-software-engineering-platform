@@ -1,6 +1,6 @@
 // Owns PlantUML SVG rendering with LLM-assisted source repair.
+import { createRunLlmChunkHandlers } from "../shared/llm-chunk-events.js";
 import {
-  llmChunkRunEventSchema,
   repairPlantUmlResultSchema,
   renderSvgResponseSchema,
   stageProgressRunEventSchema,
@@ -148,16 +148,7 @@ export async function renderArtifactWithRepair(
             lastErrorMessage,
           ),
         ),
-        (chunk) => {
-          emitEvent(
-            record,
-            llmChunkRunEventSchema.parse({
-              type: "llm_chunk",
-              stage: "render_svg",
-              chunk,
-            }),
-          );
-        },
+        createRunLlmChunkHandlers({ record, stage: "render_svg", subtaskId: "modelId" in currentArtifact ? currentArtifact.modelId : currentArtifact.diagramKind, subtaskLabel: "修复图形预览" }),
         responseFormat,
       );
       appendDesignTrace(record, {

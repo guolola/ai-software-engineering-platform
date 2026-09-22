@@ -4,10 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceRepository } from "../../../services/workspace-repository";
 import { createWorkspaceRecord, withWorkspaceProviders } from "../../../test/workspace-test-utils";
-import {
-  ProjectWorkspaceBanner,
-  ProjectWorkspaceDrawer,
-} from "./user-platform-pages";
+import { ProjectWorkspaceDrawer } from "./user-platform-pages";
+import { ProjectWorkspaceActions } from "../../workspace-shell/components/top-bar";
 
 function createRepository(): WorkspaceRepository {
   return {
@@ -197,11 +195,7 @@ describe("ProjectWorkspaceDrawer", () => {
 
     render(
       withWorkspaceProviders(
-        <ProjectWorkspaceBanner
-          projectId={projectId}
-          activeGenerationTaskCount={2}
-          onOpenDrawer={() => {}}
-        />,
+        <ProjectWorkspaceActions projectId={projectId} onOpenDrawer={() => {}} />,
         projectDrawerRepository(),
       ),
     );
@@ -338,9 +332,9 @@ describe("ProjectWorkspaceDrawer", () => {
       ),
     );
 
-    expect(screen.queryByRole("option", { name: /质量追溯系统/u })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /质量追溯系统/u })).not.toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: /选择背景图/u }));
-    await user.click(await screen.findByRole("option", { name: /质量追溯系统/u }));
+    await user.click(await screen.findByRole("button", { name: /质量追溯系统/u }));
     await user.click(screen.getByRole("button", { name: "保存项目设置" }));
     await screen.findByText("项目设置已保存。");
 

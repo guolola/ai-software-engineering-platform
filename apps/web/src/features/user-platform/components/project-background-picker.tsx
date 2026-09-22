@@ -1,4 +1,5 @@
 // Renders the reusable automatic/manual project background selector.
+import { Card } from "../../../shared/ui/card";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ProjectBackgroundKey } from "@uml-platform/contracts";
@@ -45,7 +46,7 @@ export function ProjectBackgroundPicker({
 
   return (
     <div className="grid gap-3">
-      <div className="overflow-hidden rounded-lg border border-border/70 bg-card">
+      <Card className="gap-0 py-0 overflow-hidden">
         <div className="relative aspect-[16/7] min-h-28 overflow-hidden">
           <img
             data-testid="project-background-preview-image"
@@ -53,7 +54,7 @@ export function ProjectBackgroundPicker({
             alt=""
             className="absolute inset-0 size-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-background/92 via-background/58 to-background/16" />
+          <div className="absolute inset-0 bg-background/60" />
           <div className="absolute inset-x-4 bottom-4">
             <span className="text-sm font-semibold text-foreground">
               {backgroundLabel(selectedBackground.key, selectedBackground.label)}
@@ -64,14 +65,14 @@ export function ProjectBackgroundPicker({
             size="default"
             variant="default"
             disabled={disabled}
-            className="absolute left-1/2 top-1/2 border border-primary/20 shadow-lg shadow-primary/30 -translate-x-1/2 -translate-y-1/2"
+            className="absolute left-1/2 top-1/2 border -translate-x-1/2 -translate-y-1/2"
             onClick={() => setGalleryOpen(true)}
           >
             <Images className="size-3.5" />
             {t("projectBackground.select")}
           </Button>
         </div>
-      </div>
+      </Card>
       <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
         <DialogContent className="max-h-[86vh] overflow-hidden sm:max-w-2xl">
           <DialogHeader>
@@ -97,21 +98,19 @@ export function ProjectBackgroundPicker({
             </div>
             <div
               data-testid="project-background-gallery"
-              role="listbox"
               aria-label={t("projectBackground.gallery")}
               className="grid max-h-[56vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3"
             >
               {PROJECT_BACKGROUND_OPTIONS.map((background) => {
                 const selected = value === background.key;
                 return (
-                  <button
+                  <Button variant="outline"
                     key={background.key}
                     type="button"
-                    role="option"
-                    aria-selected={selected}
+                    aria-pressed={selected}
                     className={cn(
-                      "group relative min-h-24 overflow-hidden rounded-md border text-left outline-none transition-[border-color,box-shadow,opacity] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/35",
-                      selected ? "border-primary shadow-sm" : "border-border/70 hover:border-primary/50",
+                      "group relative h-auto min-h-24 overflow-hidden p-0 text-left whitespace-normal focus-visible:border-ring",
+                      selected && "border-primary bg-primary/10 text-primary ring-2 ring-primary/30",
                     )}
                     onClick={() => selectBackground(background.key)}
                   >
@@ -121,7 +120,7 @@ export function ProjectBackgroundPicker({
                       className="absolute inset-0 size-full object-cover transition-transform group-hover:scale-[1.03]"
                       loading="lazy"
                     />
-                    <span className="absolute inset-0 bg-gradient-to-t from-background/92 via-background/35 to-transparent" />
+                    <span className="absolute inset-0 bg-background/60" />
                     <span className="relative flex h-full min-h-24 items-end justify-between gap-2 p-2">
                       <span className="line-clamp-2 min-w-0 text-[11px] font-medium leading-4 text-foreground">
                         {backgroundLabel(background.key, background.label)}
@@ -132,7 +131,7 @@ export function ProjectBackgroundPicker({
                         </span>
                       )}
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>

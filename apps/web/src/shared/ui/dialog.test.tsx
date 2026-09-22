@@ -1,38 +1,19 @@
-// Verifies dialog side-effect cleanup does not remove React-owned portal nodes.
-import { act, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { Dialog } from "./dialog";
-
-afterEach(() => {
-  vi.useRealTimers();
-  document.body.innerHTML = "";
-  document.body.style.removeProperty("pointer-events");
-  document.body.removeAttribute("data-scroll-locked");
-});
-
-describe("Dialog side-effect cleanup", () => {
-  it("clears global locks without removing overlay nodes owned by Radix Portal", () => {
-    vi.useFakeTimers();
-    const overlay = document.createElement("div");
-    overlay.setAttribute("data-slot", "dialog-overlay");
-    document.body.appendChild(overlay);
-    const hidden = document.createElement("main");
-    hidden.setAttribute("aria-hidden", "true");
-    hidden.setAttribute("data-aria-hidden", "true");
-    document.body.appendChild(hidden);
-    document.body.style.pointerEvents = "none";
-    document.body.setAttribute("data-scroll-locked", "1");
-
-    render(<Dialog open={false} />);
-
-    act(() => {
-      vi.advanceTimersByTime(300);
-    });
-
-    expect(overlay.isConnected).toBe(true);
-    expect(document.body.style.pointerEvents).toBe("");
-    expect(document.body).not.toHaveAttribute("data-scroll-locked");
-    expect(hidden).not.toHaveAttribute("aria-hidden");
-    expect(hidden).not.toHaveAttribute("data-aria-hidden");
-  });
+// Verifies the template dialog restores focus and leaves the page usable after closing.
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { expect, it } from 'vitest';
+import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogDescription } from './dialog';
+it('closes with Escape, restores focus, and permits reopening', async () => {
+  const user = userEvent.setup();
+  render(<Dialog><DialogTrigger>Open</DialogTrigger><DialogContent><DialogTitle>Details</DialogTitle><DialogDescription>Project information</DialogDescription></DialogContent></Dialog>);
+  const trigger = screen.getByRole('button', { name: 'Open' });
+  await user.click(trigger);
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog).toBeVisible();
+  expect(dialog).toHaveClass('data-open:zoom-in-0!', 'data-open:duration-600', 'motion-reduce:animate-none');
+  await user.keyboard('{Escape}');
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(trigger).toHaveFocus();
+  await user.click(trigger);
+  expect(await screen.findByRole('dialog')).toBeVisible();
 });

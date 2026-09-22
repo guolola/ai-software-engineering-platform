@@ -7,8 +7,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../ui/dropdown-menu";
 import { cn } from "../../ui/utils";
@@ -37,20 +35,19 @@ export function LanguagePreferenceMenu({ className }: LanguagePreferenceMenuProp
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(className, (open || preference !== "system") && "text-primary")}
-          title={t("language.title")}
-          aria-label={t("language.title")}
-        >
-          <Languages className="size-5" />
-        </Button>
+      <DropdownMenuTrigger
+        render={<Button
+            variant="ghost"
+            size="icon"
+            className={cn(className, (open || preference !== "system") && "text-primary")}
+            title={t("language.title")}
+            aria-label={t("language.title")}
+          />}
+        nativeButton={true}
+      >
+        <Languages className="size-5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44">
-        <DropdownMenuLabel>{t("language.menuLabel")}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
         {preferenceItems.map((item) => (
           <DropdownMenuItem
             key={item.value}
@@ -59,7 +56,7 @@ export function LanguagePreferenceMenu({ className }: LanguagePreferenceMenuProp
                 (item.value !== "system" && locale === item.value)) &&
                 "text-primary",
             )}
-            onSelect={() => setPreference(item.value)}
+            onClick={() => setPreference(item.value)}
           >
             <span>{item.label}</span>
             {item.value === "system" && preference === "system" && (

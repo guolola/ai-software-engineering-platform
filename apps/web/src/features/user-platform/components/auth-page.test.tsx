@@ -1,9 +1,10 @@
-// Verifies public authentication page submissions navigate to the expected next route.
+// Verifies public authentication page navigation and non-blocking feedback.
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
-import { AppI18nProvider } from "../../../app/providers/i18n-provider";
+import { AppI18nProvider } from "../../../shared/i18n";
 import { i18n } from "../../../shared/i18n";
+import { FloatingAlertProvider } from "../../../shared/ui/floating-alert";
 import { AuthPage } from "./auth-page";
 
 afterEach(async () => {
@@ -44,4 +45,21 @@ it("redirects to login after resetting a password from a reset link", async () =
     );
     expect(onNavigate).toHaveBeenCalledWith("/login");
   });
+});
+
+it("shows login-required feedback in the floating alert layer", async () => {
+  await i18n.changeLanguage("zh-CN");
+  window.history.pushState({}, "", "/login?redirect=%2Fprojects&reason=login-required");
+
+  render(
+    <AppI18nProvider>
+      <FloatingAlertProvider>
+        <AuthPage path="/login" onNavigate={vi.fn()} />
+      </FloatingAlertProvider>
+    </AppI18nProvider>,
+  );
+
+  const notice = await screen.findByText("此页面需要登录，请登录后继续。");
+  expect(notice.closest('[aria-live="polite"]')).toHaveClass("fixed");
+  expect(screen.getByTestId("auth-form-panel")).not.toContainElement(notice);
 });

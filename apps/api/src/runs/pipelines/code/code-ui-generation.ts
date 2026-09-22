@@ -1,12 +1,12 @@
 // Coordinates code UI mockup, visual reference, UI IR, and fidelity verification stages.
 
+import { createRunLlmChunkHandlers } from "../shared/llm-chunk-events.js";
 import {
   artifactReadyRunEventSchema,
   codeUiFidelityReportResultSchema,
   codeUiIrResultSchema,
   codeUiMockupSchema,
   codeUiReferenceSpecResultSchema,
-  llmChunkRunEventSchema,
   type CodeAppBlueprint,
   type CodeRunSnapshot,
   type CodeUiBlueprint,
@@ -357,16 +357,7 @@ export async function analyzeCodeUiMockup(
         imageUrl,
       ),
       "analyze_code_ui_mockup",
-      (chunk) => {
-        emitEvent(
-          record,
-          llmChunkRunEventSchema.parse({
-            type: "llm_chunk",
-            stage: "analyze_code_ui_mockup",
-            chunk,
-          }),
-        );
-      },
+      createRunLlmChunkHandlers({ record, stage: "analyze_code_ui_mockup" }),
       (text) => codeUiReferenceSpecResultSchema.parse(parseJson(text)),
       getGenerateCodeUiReferenceResponseFormat(providerSettings),
     );
@@ -549,16 +540,7 @@ export async function generateCodeUiIr(
         ),
       ),
       "generate_code_ui_ir",
-      (chunk) => {
-        emitEvent(
-          record,
-          llmChunkRunEventSchema.parse({
-            type: "llm_chunk",
-            stage: "generate_code_ui_ir",
-            chunk,
-          }),
-        );
-      },
+      createRunLlmChunkHandlers({ record, stage: "generate_code_ui_ir" }),
       (text) => codeUiIrResultSchema.parse(parseJson(text)),
       getGenerateCodeUiIrResponseFormat(providerSettings),
     );
@@ -823,16 +805,7 @@ export async function verifyCodeUiFidelity(
         ),
       ),
       "verify_code_ui_fidelity",
-      (chunk) => {
-        emitEvent(
-          record,
-          llmChunkRunEventSchema.parse({
-            type: "llm_chunk",
-            stage: "verify_code_ui_fidelity",
-            chunk,
-          }),
-        );
-      },
+      createRunLlmChunkHandlers({ record, stage: "verify_code_ui_fidelity" }),
       (text) => codeUiFidelityReportResultSchema.parse(parseJson(text)),
       getGenerateCodeUiFidelityResponseFormat(providerSettings),
     );

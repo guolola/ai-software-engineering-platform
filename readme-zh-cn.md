@@ -25,6 +25,7 @@
 </p>
 
 <p>
+  <img src="https://img.shields.io/badge/当前版本-v2.0.0-2563eb?style=flat-square" alt="当前版本 v2.0.0" />
   <img src="https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61dafb?style=flat-square" alt="React and Vite" />
   <img src="https://img.shields.io/badge/API-Fastify%20%2B%20Zod-111827?style=flat-square" alt="Fastify and Zod" />
   <img src="https://img.shields.io/badge/UML-PlantUML-f59e0b?style=flat-square" alt="PlantUML" />
@@ -49,6 +50,13 @@
 - **让失败可定位**：生成阶段、事件、错误、修复记录和渲染结果都能在任务历史中追踪。
 - **让成果可交付**：模型、原型、测试和说明书位于同一项目上下文中，减少人工搬运。
 - **让模型可替换**：支持经过安全校验的 OpenAI 兼容 Provider，不把业务流程绑定到单一模型。
+
+### v2.0 亮点
+
+- **重建产品外壳**：响应式 AdminCN 工作区、项目仪表盘、导航、账号页面与认证流程统一使用可访问的组件和主题系统。
+- **生成过程可见**：持久化运行活动事件驱动可恢复的任务对话，支持流式输出、公开思考摘要、并行调用归属与终态重放。
+- **工程流程更清晰**：模型卡、编辑器、追踪关系、代码预览、项目管理和文档指引统一围绕项目状态与操作守卫组织。
+- **公开体验焕新**：Flow 首页、本地化内容、明暗主题、定价入口和应用内教程均使用当前产品视觉。
 
 ## 在线访问
 
@@ -79,31 +87,31 @@
 
 ## 界面预览
 
-<p align="center"><strong>从公开首页到项目交付，六个关键界面</strong></p>
+<p align="center"><strong>当前 v2 工作区亮色界面</strong></p>
 
-### 🌐 平台首页
+### 📊 项目仪表盘
 
-![平台首页](docs/images/readme-homepage.png)
+![项目仪表盘](apps/web/public/marketing/generated/workbench-dashboard-light.png)
 
-### 📂 项目首页
+### 🧭 工作区导航
 
-![项目首页](docs/images/readme-project-home.png)
+![工作区导航](apps/web/public/help/images/workbench-sidebar.png)
 
-### 📝 需求分析工作台
+### 📋 工程数据表格
 
-![需求分析工作台](docs/images/readme-requirements-workbench.png)
+![工程数据表格](apps/web/public/help/images/workbench-table.png)
 
-### 🧭 可行性分析工作台
+### 🗓️ 项目时间线
 
-![可行性分析工作台](docs/images/readme-feasibility.png)
+![项目时间线](apps/web/public/help/images/workbench-timeline.png)
 
-### 💻 前端原型与预览
+### 📈 转化概览
 
-![前端原型与预览](docs/images/readme-code-prototype.png)
+![转化概览](apps/web/public/help/images/workbench-conversion.png)
 
-### 📄 三类说明书
+### ⚡ 性能概览
 
-![三类说明书](docs/images/readme-documents.png)
+![性能概览](apps/web/public/help/images/workbench-performance.png)
 
 ## 技术架构
 
@@ -216,12 +224,16 @@ npm run dev
 | `npm run test:api` | 运行 API 测试 |
 | `npm run test:render` | 运行渲染服务测试 |
 | `npm run test:web` | 运行完整 Web 测试 |
-| `npm run test:harness-e2e` | 运行端到端验收 |
+| `npm run test:harness-e2e` | 构建生产 Web 产物并运行本地浏览器验收 |
 | `npm run typecheck:web` | 检查 Web 类型 |
 | `npm run audit:architecture` | 检查架构边界 |
 | `npm run audit:docs` | 检查文档命名、结构、链接和杂物 |
 
 > `apps/web/public/sandpack/` 由 Web 预开发和预构建脚本自动生成并保持 Git 忽略，无需手工提交。
+
+## 版本与部署
+
+产品版本维护在根 package 中，并使用匹配的语义化标签发布。合并到 `main` 会触发生产 GitHub Actions：先测试并构建 Monorepo，再创建原子 PM2 release。生产健康检查和 SEO 检查通过后，在已部署的合并提交上创建 `v2.0.0` 标签并发布 GitHub Release；可重复构建的压缩包不作为 Release 附件上传。
 
 ## 文档导航
 

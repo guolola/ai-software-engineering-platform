@@ -147,7 +147,7 @@ export function MfaSetupPanel({
                 aria-label={t("account.mfaPanel.copySecret")}
               >
                 {copyState === "copied" ? (
-                  <Check className="size-4" aria-hidden="true" />
+                  <Check className="size-4 text-success" aria-hidden="true" />
                 ) : (
                   <Copy className="size-4" aria-hidden="true" />
                 )}

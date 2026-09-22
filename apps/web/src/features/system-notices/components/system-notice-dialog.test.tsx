@@ -88,6 +88,14 @@ describe("SystemNoticeButton", () => {
         screen.getByRole("button", { name: "系统通知，2 条未读" }),
       ).toBeInTheDocument();
     });
+    const unreadDot = screen.getByRole("button", { name: "系统通知，2 条未读" })
+      .querySelector("[data-slot='notification-unread-dot']");
+    expect(unreadDot).toHaveClass(
+      "animate-bounce",
+      "bg-sky-600",
+      "dark:bg-sky-400",
+      "motion-reduce:animate-none",
+    );
     expect(screen.queryByRole("button", { name: "后台通知配置" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "系统通知，2 条未读" }));
@@ -95,8 +103,8 @@ describe("SystemNoticeButton", () => {
     expect(await screen.findByRole("dialog", { name: "系统通知" })).toBeInTheDocument();
     expect(screen.getByText("MiniMax M3 模型上线")).toBeInTheDocument();
     expect(screen.getByText("确认新主体信息。")).toBeInTheDocument();
-    expect(screen.getByText("重要")).toHaveClass("bg-destructive");
-    expect(screen.getByText("模型")).toHaveClass("bg-info/10", "text-info");
+    expect(screen.getByText("重要")).toHaveAttribute("data-variant", "destructive");
+    expect(screen.getByText("模型")).toHaveAttribute("data-variant", "secondary");
     const dots = screen.getAllByTestId("system-notice-dot");
     expect(dots.find((dot) => dot.dataset.noticeType === "important")).toHaveClass("bg-destructive");
     expect(dots.find((dot) => dot.dataset.noticeType === "model_update")).toHaveClass("bg-info");

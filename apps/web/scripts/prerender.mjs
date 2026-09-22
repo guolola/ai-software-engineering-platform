@@ -85,20 +85,6 @@ function sitemapXml(siteUrl, paths) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries}\n</urlset>\n`;
 }
 
-function notFoundHtml() {
-  return `<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="robots" content="noindex, nofollow" />
-    <title>页面未找到｜软件工程实践平台</title>
-    <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f8fafc;color:#0f172a;font-family:system-ui,sans-serif;text-align:center}main{padding:2rem}strong{display:block;color:#2563eb;font-size:5rem}a{display:inline-block;margin-top:1rem;padding:.75rem 1.25rem;border-radius:999px;background:#2563eb;color:#fff;text-decoration:none}</style>
-  </head>
-  <body><main><strong>404</strong><h1>页面未找到</h1><p>这个地址不存在，或页面已经移动。</p><a href="/">返回官网首页</a></main></body>
-</html>\n`;
-}
-
 const siteUrl = resolveSiteUrl();
 const template = await readFile(path.join(distDir, "index.html"), "utf8");
 await writeFile(path.join(distDir, "app.html"), privateAppShell(template), "utf8");
@@ -142,7 +128,7 @@ try {
       "utf8",
     ),
     writeFile(path.join(distDir, "sitemap.xml"), sitemapXml(siteUrl, routes), "utf8"),
-    writeFile(path.join(distDir, "404.html"), notFoundHtml(), "utf8"),
+    writeFile(path.join(distDir, "404.html"), privateAppShell(template).replace('<div id="root"></div>', `<div id="root" data-prerendered="true">${renderToString(React.createElement(App, { initialPath: "/404" }))}</div>`), "utf8"),
     writeFile(path.join(distDir, "seo-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8"),
   ]);
 } finally {

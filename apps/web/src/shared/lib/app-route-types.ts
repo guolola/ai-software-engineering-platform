@@ -8,7 +8,7 @@ export type AuthRoutePath =
   | "/forgot-password"
   | "/reset-password";
 
-export type MarketingRoutePath = "/" | "/features" | "/workflow" | "/cases" | "/pricing";
+export type MarketingRoutePath = "/";
 export type ProjectRouteDrawer = "settings" | "members" | "history" | "documents";
 
 export type AppRoute =
@@ -21,6 +21,7 @@ export type AppRoute =
   | { kind: "account-billing"; path: "/account/billing" }
   | { kind: "alipay-return"; path: "/billing/alipay/return" }
   | { kind: "legacy-redirect"; path: "/settings/models"; to: "/projects" }
+  | { kind: "dashboard"; path: "/dashboard" }
   | { kind: "projects-index"; path: "/projects" }
   | { kind: "projects-new"; path: "/projects/new" }
   | {

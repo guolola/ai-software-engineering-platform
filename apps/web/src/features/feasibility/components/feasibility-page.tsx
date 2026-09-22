@@ -1,10 +1,11 @@
 // Composes feasibility overview, context subviews, and the persisted implementation-plan editor.
+import {
+  PageContainer,
+  PageHeader,
+} from "../../../shared/template/layout/page";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  AlertTriangle,
-  CheckCircle2,
-  CircleDashed,
   Loader2,
   Network,
   RefreshCw,
@@ -33,6 +34,8 @@ import { buildContextTraceability } from "../lib/context-traceability";
 import { useWorkspaceSession } from "../../workspace-session/state";
 import { ImplementationPlanDashboard } from "./implementation-plan-dashboard";
 import { ModelBentoCard } from "../../workspace-shell/components/model-bento-card";
+import { MobileCompactGrid } from "../../workspace-shell/components/mobile-density";
+import { generationCardStatus } from "../../workspace-shell/lib/model-card-status";
 import { ModelPicker } from "../../../shared/ui/model-picker";
 import {
   USER_SETTINGS_CHANGED_EVENT,
@@ -64,15 +67,6 @@ function sleep(ms: number) {
 }
 
 type ArtifactKind = FeasibilityArtifactKind;
-
-function StatusBadge({ exists, stale, generating, failed }: { exists: boolean; stale: boolean; generating: boolean; failed: boolean }) {
-  const { t } = useTranslation();
-  if (generating) return <Badge variant="secondary" className="gap-1"><Loader2 className="size-3 animate-spin" />{t("feasibility.status.generating")}</Badge>;
-  if (failed) return <Badge variant="destructive" className="gap-1"><AlertTriangle className="size-3" />{t("feasibility.status.failed")}</Badge>;
-  if (stale) return <Badge variant="warning">{t("feasibility.status.stale")}</Badge>;
-  if (exists) return <Badge className="gap-1"><CheckCircle2 className="size-3" />{t("feasibility.status.completed")}</Badge>;
-  return <Badge variant="secondary" className="gap-1"><CircleDashed className="size-3" />{t("feasibility.status.missing")}</Badge>;
-}
 
 export function FeasibilityPage({
   view,
@@ -343,6 +337,42 @@ export function FeasibilityPage({
             keepReopenEntry: true,
           }
         : null;
+  const consistencyFeedback: FeedbackDialogState | null = crossStageCoverage.sourceConsistent
+    ? null
+    : {
+        dedupeKey: "feasibility:source-consistency",
+        revision: `${workspace.rulesVersion}:${crossStageCoverage.unknownReferences.join(",")}:${crossStageCoverage.explicitAssumptions}`,
+        tone: "warning",
+        title: t("feasibility.sourceConsistency.title"),
+        message: [
+          t("feasibility.sourceConsistency.coverage", {
+            covered: crossStageCoverage.rows.filter((row) =>
+              row.context || row.implementation || row.requirementModel || row.designModel).length,
+            total: crossStageCoverage.rows.length,
+          }),
+          t("feasibility.sourceConsistency.assumptions", {
+            count: crossStageCoverage.explicitAssumptions,
+          }),
+          t("feasibility.sourceConsistency.disclaimer"),
+        ].join("；"),
+        keepReopenEntry: true,
+      };
+  const pageFeedbackItems = [
+    prerequisiteFeedback,
+    error ? lastFailureFeedback : null,
+    consistencyFeedback,
+  ].filter((feedback): feedback is FeedbackDialogState => Boolean(feedback));
+  const pageFeedback: FeedbackDialogState | null = pageFeedbackItems.length > 0
+    ? {
+        ...pageFeedbackItems[0],
+        dedupeKey: `feasibility:page:${pageFeedbackItems.map((item) => item.dedupeKey).join("|")}`,
+        message: pageFeedbackItems.map((item) => item.message).join("；"),
+        tone: pageFeedbackItems.some((item) => item.tone === "destructive")
+          ? "destructive"
+          : "warning",
+        keepReopenEntry: true,
+      }
+    : null;
   const toggleArtifact = (artifact: ArtifactKind, selected: boolean) => {
     if (generating) return;
     setSelectedArtifacts((current) => {
@@ -415,7 +445,7 @@ export function FeasibilityPage({
 
   if (view === "implementation") {
     return (
-      <div className="h-full overflow-y-auto bg-background">
+      <div className="min-h-full bg-background">
         <ImplementationPlanDashboard
           workspace={workspace}
           states={states}
@@ -434,22 +464,24 @@ export function FeasibilityPage({
   const pageTitle = t("feasibility.title");
 
   return (
-    <div className="h-full overflow-y-auto bg-background">
-      <div className="mx-auto flex w-[calc(100%-2rem)] max-w-7xl flex-col gap-5 py-5 lg:w-[calc(100%-3rem)]">
-        <header>
-          <div>
-            <h1 className="text-2xl font-semibold lg:text-3xl">{pageTitle}</h1>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              {t("feasibility.overviewDescription")}
-            </p>
-          </div>
-        </header>
+    <div className="min-h-full bg-background">
+      <PageContainer className="flex flex-col gap-5">
+        <PageHeader
+          title={pageTitle}
+          titleAccessory={pageFeedback ? (
+            <FeedbackReopenButton
+              feedback={pageFeedback}
+              label={t("feedback.needsAttentionCount", { count: pageFeedbackItems.length })}
+            />
+          ) : null}
+          description={t("feasibility.overviewDescription")}
+        />
 
-        <section className="flex flex-wrap items-end justify-between gap-4">
+        <section className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold">{t("feasibility.targetArtifacts")}</h2>
-              <Badge variant="secondary" className="rounded-full font-mono">
+              <Badge variant="secondary" className="font-mono">
                 {selectedArtifacts.length}/2
               </Badge>
             </div>
@@ -475,45 +507,7 @@ export function FeasibilityPage({
           </div>
         </section>
 
-        {prerequisiteFeedback ? (
-          <div className="flex justify-end">
-            <FeedbackReopenButton feedback={prerequisiteFeedback} />
-          </div>
-        ) : null}
-
-        {error && lastFailureFeedback ? (
-          <div role="alert" className="flex items-center gap-2">
-            <FeedbackReopenButton feedback={lastFailureFeedback} />
-          </div>
-        ) : null}
-
-        <section className="rounded-xl border bg-card p-4" aria-label={t("feasibility.sourceConsistency.title")}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-semibold">{t("feasibility.sourceConsistency.title")}</h2>
-            <Badge variant={crossStageCoverage.sourceConsistent ? "secondary" : "destructive"}>
-              {t(crossStageCoverage.sourceConsistent
-                ? "feasibility.sourceConsistency.consistent"
-                : "feasibility.sourceConsistency.needsUpdate")}
-            </Badge>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("feasibility.sourceConsistency.coverage", {
-              covered: crossStageCoverage.rows.filter((row) =>
-                row.context || row.implementation || row.requirementModel || row.designModel).length,
-              total: crossStageCoverage.rows.length,
-            })}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t("feasibility.sourceConsistency.assumptions", {
-              count: crossStageCoverage.explicitAssumptions,
-            })}
-          </p>
-          <p className="mt-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            {t("feasibility.sourceConsistency.disclaimer")}
-          </p>
-        </section>
-
-        <div className="grid gap-4 md:grid-cols-2">
+        <MobileCompactGrid variant="model-targets">
           <ModelBentoCard
             label={t("feasibility.artifact.context")}
             english="System Context Diagram (System Environment Diagram)"
@@ -525,7 +519,7 @@ export function FeasibilityPage({
             ariaLabel={t(selectedArtifacts.includes("context") ? "feasibility.selection.deselectContext" : "feasibility.selection.selectContext")}
             checkboxLabel={t("feasibility.selection.selectContext")}
             onSelectedChange={(selected) => toggleArtifact("context", selected)}
-            status={<StatusBadge exists={contextExists} stale={states.contextStale} generating={activeArtifacts.includes("context")} failed={failedArtifacts.includes("context")} />}
+            status={generationCardStatus({ exists: contextExists, stale: states.contextStale, active: activeArtifacts.includes("context") ? "running" : undefined, failed: failedArtifacts.includes("context") })}
           />
           <ModelBentoCard
             label={t("feasibility.artifact.implementation")}
@@ -538,10 +532,10 @@ export function FeasibilityPage({
             ariaLabel={t(selectedArtifacts.includes("implementation") ? "feasibility.selection.deselectImplementation" : "feasibility.selection.selectImplementation")}
             checkboxLabel={t("feasibility.selection.selectImplementation")}
             onSelectedChange={(selected) => toggleArtifact("implementation", selected)}
-            status={<StatusBadge exists={implementationExists} stale={states.implementationStale} generating={activeArtifacts.includes("implementation")} failed={failedArtifacts.includes("implementation")} />}
+            status={generationCardStatus({ exists: implementationExists, stale: states.implementationStale, active: activeArtifacts.includes("implementation") ? "running" : undefined, failed: failedArtifacts.includes("implementation") })}
           />
-        </div>
-      </div>
+        </MobileCompactGrid>
+      </PageContainer>
     </div>
   );
 }

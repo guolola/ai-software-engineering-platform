@@ -194,7 +194,10 @@ test("postgres run store persists records and emitted events", async () => {
   assert.deepEqual(db.eventRows[1]?.payload, {
     type: "completed",
     snapshotRef: "run-1",
+    eventId: record.events[1]?.eventId,
+    createdAt: record.events[1]?.createdAt,
   });
+  assert.deepEqual(db.eventRows.map((event) => event.sequence), [1, 2]);
   assert.equal("snapshot" in (record.events[1] ?? {}), true);
 
   const restored = await createPostgresRunRecordStore(db);

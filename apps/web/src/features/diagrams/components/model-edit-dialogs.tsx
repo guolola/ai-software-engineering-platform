@@ -3,6 +3,11 @@ import type { ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
 import {
+  FieldError,
+  FieldGroup,
+  FieldSet,
+} from "../../../shared/ui/field";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -29,12 +34,18 @@ export function ModelEditDialogs({
   elementEditor,
   relationEditor,
   deleteTarget,
+  elementOpen,
+  relationOpen,
+  deleteOpen,
   hasEditingElement,
   hasEditingRelation,
   saving,
-  onCloseElement,
-  onCloseRelation,
-  onCloseDelete,
+  onElementOpenChange,
+  onRelationOpenChange,
+  onDeleteOpenChange,
+  onElementCloseComplete,
+  onRelationCloseComplete,
+  onDeleteCloseComplete,
   onCommitElement,
   onCommitRelation,
   onConfirmDelete,
@@ -46,12 +57,18 @@ export function ModelEditDialogs({
   elementEditor: ElementEditorDialogState;
   relationEditor: RelationEditorDialogState;
   deleteTarget: DeleteTargetDialogState;
+  elementOpen: boolean;
+  relationOpen: boolean;
+  deleteOpen: boolean;
   hasEditingElement: boolean;
   hasEditingRelation: boolean;
   saving: boolean;
-  onCloseElement: () => void;
-  onCloseRelation: () => void;
-  onCloseDelete: () => void;
+  onElementOpenChange: (open: boolean) => void;
+  onRelationOpenChange: (open: boolean) => void;
+  onDeleteOpenChange: (open: boolean) => void;
+  onElementCloseComplete: () => void;
+  onRelationCloseComplete: () => void;
+  onDeleteCloseComplete: () => void;
   onCommitElement: () => void;
   onCommitRelation: () => void;
   onConfirmDelete: () => void;
@@ -62,8 +79,12 @@ export function ModelEditDialogs({
 }) {
   return (
     <>
-      <Dialog open={Boolean(elementEditor)} onOpenChange={(open) => !open && onCloseElement()}>
-        <DialogContent className="max-h-[88vh] overflow-auto sm:max-w-lg">
+      <Dialog
+        open={elementOpen}
+        onOpenChange={onElementOpenChange}
+        onOpenChangeComplete={(open) => !open && onElementCloseComplete()}
+      >
+        <DialogContent data-form-layout="4" className="max-h-[88vh] overflow-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {elementEditor
@@ -75,22 +96,26 @@ export function ModelEditDialogs({
             </DialogDescription>
           </DialogHeader>
           {hasEditingElement ? (
-            renderElementFields()
+            <FieldSet className="rounded-xl border border-border bg-muted/10 p-4 sm:p-5">
+              <FieldGroup className="gap-5">
+                {renderElementFields()}
+              </FieldGroup>
+            </FieldSet>
           ) : (
             <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 text-sm text-muted-foreground">
               未找到可编辑元素。
             </div>
           )}
           {elementValidationMessage ? (
-            <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <FieldError className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
               {elementValidationMessage}
-            </p>
+            </FieldError>
           ) : null}
           <DialogFooter className="gap-2 sm:gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={onCloseElement}
+              onClick={() => onElementOpenChange(false)}
               disabled={saving}
             >
               取消
@@ -107,8 +132,12 @@ export function ModelEditDialogs({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(relationEditor)} onOpenChange={(open) => !open && onCloseRelation()}>
-        <DialogContent className="max-h-[88vh] overflow-auto sm:max-w-lg">
+      <Dialog
+        open={relationOpen}
+        onOpenChange={onRelationOpenChange}
+        onOpenChangeComplete={(open) => !open && onRelationCloseComplete()}
+      >
+        <DialogContent data-form-layout="6" className="max-h-[88vh] overflow-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {relationEditor?.mode === "create" ? "添加关系" : "编辑关系"}
@@ -118,22 +147,26 @@ export function ModelEditDialogs({
             </DialogDescription>
           </DialogHeader>
           {hasEditingRelation ? (
-            renderRelationFields()
+            <FieldSet className="rounded-xl border border-border bg-muted/10 p-4 sm:p-5">
+              <FieldGroup className="gap-5">
+                {renderRelationFields()}
+              </FieldGroup>
+            </FieldSet>
           ) : (
             <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 text-sm text-muted-foreground">
               未找到可编辑关系。
             </div>
           )}
           {relationValidationMessage ? (
-            <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <FieldError className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
               {relationValidationMessage}
-            </p>
+            </FieldError>
           ) : null}
           <DialogFooter className="gap-2 sm:gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={onCloseRelation}
+              onClick={() => onRelationOpenChange(false)}
               disabled={saving}
             >
               取消
@@ -150,7 +183,11 @@ export function ModelEditDialogs({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && onCloseDelete()}>
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={onDeleteOpenChange}
+        onOpenChangeComplete={(open) => !open && onDeleteCloseComplete()}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -166,7 +203,7 @@ export function ModelEditDialogs({
             <Button
               type="button"
               variant="outline"
-              onClick={onCloseDelete}
+              onClick={() => onDeleteOpenChange(false)}
               disabled={saving}
             >
               取消

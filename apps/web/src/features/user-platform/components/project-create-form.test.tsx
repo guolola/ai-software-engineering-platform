@@ -1,13 +1,21 @@
 // Covers project creation background auto matching and manual selection payloads.
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 import { ProjectCreateForm } from "./project-create-form";
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn() },
+}));
 
 describe("ProjectCreateForm", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
+
+  afterEach(() => vi.restoreAllMocks());
 
   function stubCreateProjectFetch() {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -74,9 +82,11 @@ describe("ProjectCreateForm", () => {
 
     render(<ProjectCreateForm onNavigate={() => {}} />);
 
-    expect(screen.queryByRole("option", { name: /预约预订系统/u })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /预约预订系统/u })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /选择背景图/u }));
-    await user.click(await screen.findByRole("option", { name: /预约预订系统/u }));
+    await user.click(await screen.findByRole("button", { name: /预约预订系统/u }));
+    await user.click(screen.getByRole("button", { name: "下一步" }));
+    await user.click(screen.getByRole("button", { name: "下一步" }));
     await user.click(screen.getByRole("button", { name: /创建并进入项目/u }));
 
     await waitFor(() => {
@@ -89,5 +99,39 @@ describe("ProjectCreateForm", () => {
         backgroundKey: "booking",
       });
     });
+  });
+
+  it("shows a success toast before navigating to the created project", async () => {
+    const user = userEvent.setup();
+    stubCreateProjectFetch();
+    const onNavigate = vi.fn();
+    const setTimeoutSpy = vi.spyOn(window, "setTimeout");
+
+    render(<ProjectCreateForm onNavigate={onNavigate} />);
+
+    await user.click(screen.getByRole("button", { name: "下一步" }));
+    await user.click(screen.getByRole("button", { name: "下一步" }));
+    await user.click(screen.getByRole("button", { name: "创建并进入项目" }));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith("项目已创建，正在进入项目。");
+    });
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 900);
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(screen.queryByText("项目已创建，正在进入项目。")).not.toBeInTheDocument();
+  });
+
+  it("does not redirect after the user leaves the creation form", async () => {
+    const user = userEvent.setup();
+    stubCreateProjectFetch();
+    const onNavigate = vi.fn();
+    const { unmount } = render(<ProjectCreateForm onNavigate={onNavigate} />);
+    await user.click(screen.getByRole("button", { name: "下一步" }));
+    await user.click(screen.getByRole("button", { name: "下一步" }));
+    await user.click(screen.getByRole("button", { name: "创建并进入项目" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    unmount();
+    await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 });

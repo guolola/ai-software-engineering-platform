@@ -30,7 +30,9 @@
 
 ### Nginx
 
-站点根目录指向 `current/apps/web/dist`。`/api/` 原样反向代理到 API，其他路径使用 SPA 回退到 `index.html`；SSE 路径需要关闭代理缓冲并设置足够长的读取超时。
+站点根目录指向 `current/apps/web/dist`。`/api/` 原样反向代理到 API，业务页面使用不索引的 `app.html`，首页使用预渲染的 `index.html`；SSE 路径需要关闭代理缓冲并设置足够长的读取超时。
+
+v2 只保留单页营销首页，旧的 `/features`、`/workflow`、`/cases` 和 `/pricing` 返回 404。部署脚本通过 `nginx -T` 定位唯一匹配当前 Web 根目录的站点，只迁移已知的旧营销路由块，保留 TLS 与代理配置。原配置备份到 release 目录的 `nginx-routing-backup.json`，通过 `nginx -t` 后才重载；健康或 SEO 检查失败时同时恢复应用和路由配置。非标准配置会停止部署，需人工核对；可用 `NGINX_BIN` 指定 Nginx 可执行文件。
 
 ## 操作与维护
 
@@ -52,6 +54,8 @@ curl http://127.0.0.1:4002/health
 ```
 
 `/api/version` 的 `releaseSha` 应与部署提交一致。公网还应检查首页、`/tutorial`、登录流程和一次完整生成。
+
+路由迁移的本地回归检查为 `node --test scripts/deploy/nginx-marketing-routes.test.mjs`。
 
 ## 相关文档
 

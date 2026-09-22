@@ -658,6 +658,8 @@ async function generateRequirementTraceabilityWithRepair(
         stage: "generate_models",
         onActivity,
         onBlankActivity,
+        subtaskId: models.length === 1 ? (models[0] && "modelId" in models[0] ? models[0].modelId : models[0]?.diagramKind) : undefined,
+        subtaskLabel: "补全模型与需求的对应关系",
       }),
       responseFormat,
       abortSignal,
@@ -1217,6 +1219,7 @@ export async function runStagePipeline(
           createMessages(buildExtractRulesPrompt(snapshot.requirementText)),
           "extract_rules",
           {
+            ...chunkHandlers,
             onChunk: (chunk) => {
               markActivity();
               chunkHandlers.onChunk(chunk);

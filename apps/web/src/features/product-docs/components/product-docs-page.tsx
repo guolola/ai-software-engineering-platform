@@ -1,10 +1,10 @@
 // Composes the in-app documentation center from modular docs data, search, and article panels.
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, BookOpenCheck, FolderOpen } from "lucide-react";
-import { Badge } from "../../../shared/ui/badge";
+import { ArrowRight, BookOpenCheck, Menu, ChevronDown } from "lucide-react";
+import { cn } from "../../../shared/ui/utils";
 import { Button } from "../../../shared/ui/button";
-import { ScaleToFitFrame } from "../../../shared/ui/scale-to-fit";
+import { PageContainer } from "../../../shared/template/layout/page";
 import { i18n as appI18n } from "../../../shared/i18n";
 import { getProductDocArticles, getProductDocCategories } from "../model/docs-content";
 import {
@@ -25,10 +25,25 @@ export function ProductDocsPage({ onNavigate }: ProductDocsPageProps) {
   const locale = i18n.resolvedLanguage === "en" || i18n.language === "en" ? "en" : "zh-CN";
   const articles = useMemo(() => getProductDocArticles(locale), [locale]);
   const categories = useMemo(() => getProductDocCategories(locale), [locale]);
-  const [selectedArticleId, setSelectedArticleId] = useState(articles[0]?.id ?? "");
+  const [selection, setSelection] = useState({ id: articles[0]?.id ?? "", revision: 0 });
+  const [directoryOpen, setDirectoryOpen] = useState(false);
+  const pageRef = useRef<HTMLElement>(null);
+  const selectArticle = (id: string) => {
+    setSelection((current) => ({ id, revision: current.revision + 1 }));
+    setDirectoryOpen(false);
+    // A heading hash belongs to the previous article, not the next selection.
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  };
+  useLayoutEffect(() => {
+    if (selection.revision === 0) return;
+    // Wait for the new article and collapsed mobile directory to commit together.
+    const title = pageRef.current?.querySelector<HTMLElement>("article h1");
+    title?.focus({ preventScroll: true });
+    title?.scrollIntoView({ block: "start" });
+  }, [selection]);
   const [searchQuery, setSearchQuery] = useState("");
   const selectedArticle =
-    articles.find((article) => article.id === selectedArticleId) ??
+    articles.find((article) => article.id === selection.id) ??
     articles[0];
   const searchResults = useMemo(
     () => searchProductDocs(articles, searchQuery),
@@ -40,45 +55,33 @@ export function ProductDocsPage({ onNavigate }: ProductDocsPageProps) {
   );
 
   return (
-    <main className="min-h-0 flex-1 overflow-auto bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <section className="flex flex-wrap items-start justify-between gap-5">
-          <div className="min-w-0 max-w-4xl">
-            <Badge variant="info" className="mb-3">
-              {t("docs.badge")}
-            </Badge>
-            <h1 className="break-words font-display text-3xl font-semibold leading-tight tracking-normal md:text-5xl">
-              {t("docs.title")}
-            </h1>
-            <p className="mt-3 max-w-3xl break-words text-sm leading-6 text-muted-foreground md:text-base">
-              {t("docs.description")}
-            </p>
-          </div>
-          <div className="flex min-w-0 flex-wrap gap-2">
-            <Button
-              type="button"
-              className="h-10"
-              onClick={() => onNavigate?.("/projects")}
-            >
-              <FolderOpen className="size-4" />
-              {t("docs.openProjects")}
-            </Button>
-          </div>
-        </section>
-
-        <ScaleToFitFrame
-          minWidth={980}
-          contentClassName="grid min-h-0 w-full grid-cols-[292px_minmax(0,1fr)] gap-5 xl:grid-cols-[292px_minmax(0,1fr)_250px]"
+    <main ref={pageRef} data-testid="product-docs-page" className="@container/docs h-full min-h-0 min-w-0 w-full overflow-y-auto overflow-x-clip overscroll-contain bg-background text-foreground">
+      <div className="sticky top-0 z-40 border-b border-border bg-background px-4 py-2 @[720px]/docs:hidden">
+        <Button
+          variant="ghost"
+          className="w-full justify-start"
+          aria-expanded={directoryOpen}
+          aria-controls="product-docs-directory"
+          onClick={() => setDirectoryOpen((open) => !open)}
         >
-          <DocsSidebar
-            articles={articles}
-            categories={categories}
-            searchQuery={searchQuery}
-            searchResults={searchResults}
-            selectedArticleId={selectedArticle.id}
-            onSearchQueryChange={setSearchQuery}
-            onSelectArticle={setSelectedArticleId}
-          />
+          <Menu className="size-4" />
+          {t("docs.directory")}
+          <ChevronDown className="ml-auto size-4" />
+        </Button>
+      </div>
+      <PageContainer className="h-auto flex-none py-8 @[720px]/docs:py-10">
+        <div className="grid w-full grid-cols-1 items-start gap-8 @[720px]/docs:grid-cols-[256px_minmax(0,1fr)] @[1200px]/docs:grid-cols-[256px_minmax(0,800px)_200px]">
+          <div id="product-docs-directory" className={cn("min-w-0 @[720px]/docs:block", !directoryOpen && "hidden")}>
+            <DocsSidebar
+              articles={articles}
+              categories={categories}
+              searchQuery={searchQuery}
+              searchResults={searchResults}
+              selectedArticleId={selectedArticle.id}
+              onSearchQueryChange={setSearchQuery}
+              onSelectArticle={selectArticle}
+            />
+          </div>
 
           <DocsArticleView
             article={selectedArticle}
@@ -87,23 +90,23 @@ export function ProductDocsPage({ onNavigate }: ProductDocsPageProps) {
           />
 
           <DocsOnThisPage headings={headings} />
-        </ScaleToFitFrame>
+        </div>
 
-        <section className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
+        <footer data-testid="docs-footer" className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-2">
             <BookOpenCheck className="size-4 text-primary" />
             {t("docs.maintainedNotice")}
           </span>
-          <button
+          <Button variant="ghost"
             type="button"
-            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-            onClick={() => setSelectedArticleId(articles[0]?.id ?? selectedArticle.id)}
+            className="inline-flex items-center gap-1 hover:underline"
+            onClick={() => selectArticle(articles[0]?.id ?? selectedArticle.id)}
           >
             {t("docs.backToQuickStart")}
             <ArrowRight className="size-4" />
-          </button>
-        </section>
-      </div>
+          </Button>
+        </footer>
+      </PageContainer>
     </main>
   );
 }

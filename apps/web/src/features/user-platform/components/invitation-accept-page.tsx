@@ -1,4 +1,5 @@
 // Handles project invitation token inspection and acceptance from public auth routes.
+import { Card } from "../../../shared/ui/card";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
@@ -75,7 +76,7 @@ export function InvitationAcceptPage({ onNavigate }: { onNavigate: Navigate }) {
 
   return (
     <main className="min-h-0 flex-1 overflow-auto bg-background px-4 py-10 text-foreground md:px-12">
-      <section className="mx-auto max-w-xl rounded-xl border border-border/60 bg-card p-8 shadow-lg">
+      <Card as="section" className="gap-0 py-0 mx-auto max-w-xl p-8">
         <div className="mb-6">
           <h1 className="font-display text-2xl font-semibold leading-8">{t("auth.invitationAccept.title")}</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -117,10 +118,10 @@ export function InvitationAcceptPage({ onNavigate }: { onNavigate: Navigate }) {
             {t("auth.invitationAccept.register")}
           </Button>
         </div>
-        <button type="button" className="mt-4 text-sm font-medium text-primary hover:underline" onClick={() => onNavigate("/login")}>
+        <Button variant="ghost" type="button" className="mt-4 text-sm hover:underline" onClick={() => onNavigate("/login")}>
           {t("auth.invitationAccept.backToLogin")}
-        </button>
-      </section>
+        </Button>
+      </Card>
     </main>
   );
 }

@@ -15,15 +15,12 @@ import {
 } from "../../../test/workspace-test-utils";
 import { buildLineageStepPath } from "../../lineage/components/lineage-graph-dialog";
 import { snapshotInputFingerprint } from "../../../shared/lib/fingerprint";
-import { HistoryDrawer } from "../../history/components/history-drawer";
 import { useWorkspaceSession } from "../../workspace-session/state";
-import { useWorkspaceShell } from "../state";
 import {
   ProjectGenerationTasksDrawerContent,
   ProjectWorkspaceActions,
   TopBar,
 } from "./top-bar";
-import { WorkspaceTabsBar } from "./workspace-tabs-bar";
 
 const { toastMessage, toastSuccess, toastError } = vi.hoisted(() => ({
   toastMessage: vi.fn(),
@@ -68,12 +65,10 @@ function TopBarHarness({
   currentRoute?: string;
   onNavigate?: (route: string) => void;
 }) {
-  const { historyDrawerOpen, closeHistoryDrawer } = useWorkspaceShell();
   return (
     <>
       <TopBar currentRoute={currentRoute} onNavigate={onNavigate} />
       <main>主内容保持不变</main>
-      <HistoryDrawer open={historyDrawerOpen} onClose={closeHistoryDrawer} />
     </>
   );
 }
@@ -83,12 +78,9 @@ function TopBarWithTabsHarness({
 }: {
   onNavigate: (route: string) => void;
 }) {
-  const { historyDrawerOpen, closeHistoryDrawer } = useWorkspaceShell();
   return (
     <>
       <TopBar currentRoute="/projects/library-booking" onNavigate={onNavigate} />
-      <WorkspaceTabsBar />
-      <HistoryDrawer open={historyDrawerOpen} onClose={closeHistoryDrawer} />
     </>
   );
 }
@@ -161,7 +153,6 @@ function LineageRerunArtifactHarness() {
   return (
     <>
       <ProjectWorkspaceActions projectId="library-booking" onOpenDrawer={() => {}} />
-      <WorkspaceTabsBar />
       <button type="button" onClick={() => void generateDiagrams(["usecase"])}>
         重新生成用例模型
       </button>
@@ -174,7 +165,6 @@ function LineageGraphOnlyHarness() {
 }
 
 function TopBarRestoreHarness() {
-  const { historyDrawerOpen, closeHistoryDrawer } = useWorkspaceShell();
   const { restoreRunHistory } = useWorkspaceSession();
   return (
     <>
@@ -183,13 +173,11 @@ function TopBarRestoreHarness() {
       <button type="button" onClick={() => void restoreRunHistory("history-design-trace")}>
         恢复设计追踪
       </button>
-      <HistoryDrawer open={historyDrawerOpen} onClose={closeHistoryDrawer} />
     </>
   );
 }
 
 function TopBarRestoreCodeSkillHarness() {
-  const { historyDrawerOpen, closeHistoryDrawer } = useWorkspaceShell();
   const { restoreRunHistory } = useWorkspaceSession();
   return (
     <>
@@ -198,7 +186,6 @@ function TopBarRestoreCodeSkillHarness() {
       <button type="button" onClick={() => void restoreRunHistory("history-code-skill")}>
         恢复代码资源
       </button>
-      <HistoryDrawer open={historyDrawerOpen} onClose={closeHistoryDrawer} />
     </>
   );
 }
@@ -236,7 +223,7 @@ describe("TopBar", () => {
     expect(path).not.toContain(" C ");
   });
 
-  it("keeps the logged-in navigation bar at font weight 600", () => {
+  it("uses the template header and button primitives", () => {
     const repository: WorkspaceRepository = {
       loadWorkspace: vi.fn(async () => createWorkspaceRecord()),
       updateRequirementText: vi.fn(async () => {}),
@@ -254,13 +241,57 @@ describe("TopBar", () => {
 
     render(withWorkspaceProviders(<TopBarHarness />, repository));
 
-    expect(screen.getByRole("banner")).toHaveClass("font-semibold");
-    expect(screen.getByRole("button", { name: "项目" })).toHaveClass(
-      "relative",
-      "text-[15px]",
-      "font-semibold",
-      "hover:after:opacity-100",
+    const banner = screen.getByRole("banner");
+    expect(banner).toHaveClass("fixed", "top-0", "right-0", "z-50", "h-[53px]", "px-4", "pt-2", "sm:px-6");
+    expect(banner).not.toHaveClass("isolate");
+    expect(banner.className).not.toContain("before:");
+    expect(banner.nextElementSibling).toHaveTextContent("主内容保持不变");
+    expect(banner.parentElement?.querySelector('[aria-hidden="true"].h-19')).not.toBeInTheDocument();
+    expect(banner.firstElementChild).toHaveClass(
+      "rounded-xl",
+      "bg-card/82",
+      "backdrop-blur-xl",
+      "h-full",
+      "px-4",
+      "shadow-sm",
+      "sm:px-6",
     );
+    expect(screen.getByRole("button", { name: "主页" }).tagName).toBe("BUTTON");
+    expect(screen.getByRole("button", { name: "主题色板" })).toBeInTheDocument();
+  });
+
+  it("offers the default theme and all twelve color presets without a visible heading", async () => {
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<TopBarHarness />));
+
+    await user.click(screen.getByRole("button", { name: "主题色板" }));
+    expect(await screen.findAllByRole("menuitemradio")).toHaveLength(13);
+    expect(screen.queryByText("主题色板")).not.toBeInTheDocument();
+    expect(screen.queryByText("选择工作台配色")).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: "默认" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: "Classic Indigo" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: "Caffeine" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: "Pastel Dreams" })).toBeInTheDocument();
+  });
+
+  it("animates the current theme icon while preserving the theme provider state", async () => {
+    localStorage.setItem("admincn-ui-theme", "light");
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<TopBarHarness />));
+
+    const lightToggle = screen.getByRole("button", { name: "切换到深色" });
+    expect(lightToggle).toHaveAttribute("aria-pressed", "false");
+    expect(lightToggle.querySelector("[data-slot='theme-toggle-icon'] .lucide-sun"))
+      .toBeInTheDocument();
+
+    await user.click(lightToggle);
+
+    const darkToggle = await screen.findByRole("button", { name: "切换到浅色" });
+    expect(darkToggle).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => {
+      expect(darkToggle.querySelector("[data-slot='theme-toggle-icon'] .lucide-moon"))
+        .toBeInTheDocument();
+    });
   });
 
   it("switches top bar navigation between explicit English and browser-matched Chinese", async () => {
@@ -283,19 +314,20 @@ describe("TopBar", () => {
     render(withWorkspaceProviders(<TopBarHarness />, repository));
 
     await user.click(screen.getByRole("button", { name: "切换界面语言" }));
-    expect(screen.getByRole("menuitem", { name: /跟随浏览器/u })).toBeInTheDocument();
-    await user.click(screen.getByRole("menuitem", { name: /English/u }));
+    expect((await screen.findByRole("menuitem", { name: /跟随浏览器/u }))).toBeInTheDocument();
+    expect(screen.queryByText("界面语言")).not.toBeInTheDocument();
+    await user.click((await screen.findByRole("menuitem", { name: /English/u })));
 
-    expect(await screen.findByRole("button", { name: "Projects" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Home" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Change interface language" })).toHaveClass(
       "text-primary",
     );
     expect(document.documentElement.lang).toBe("en");
 
     await user.click(screen.getByRole("button", { name: "Change interface language" }));
-    await user.click(screen.getByRole("menuitem", { name: /System/u }));
+    await user.click((await screen.findByRole("menuitem", { name: /System/u })));
 
-    expect(await screen.findByRole("button", { name: "项目" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "主页" })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("zh-CN");
   });
 
@@ -384,10 +416,10 @@ describe("TopBar", () => {
     expect(lineageIndex).toBeLessThan(taskIndex);
     const lineageButton = buttons[lineageIndex] as HTMLElement;
     const taskButton = buttons[taskIndex] as HTMLElement;
-    expect(lineageButton).toHaveClass("bg-transparent", "hover:bg-secondary");
+    expect(lineageButton).toHaveClass("hover:bg-muted");
     expect(lineageButton).not.toHaveClass("bg-secondary");
     expect(taskButton).toHaveTextContent("暂无任务");
-    expect(taskButton).toHaveClass("bg-transparent", "hover:bg-secondary");
+    expect(taskButton).toHaveClass("hover:bg-muted");
     expect(taskButton).not.toHaveClass("bg-secondary", "text-secondary-foreground");
 
     await user.click(screen.getByRole("button", { name: "链路图" }));
@@ -401,6 +433,15 @@ describe("TopBar", () => {
       maxWidth: "min(1580px, calc(100vw - 4rem))",
       height: "min(920px, calc(100vh - 4rem))",
     });
+    const canvasScrollArea = within(dialog).getByTestId("lineage-canvas-scroll-area");
+    expect(canvasScrollArea.querySelectorAll('[data-slot="scroll-area-scrollbar"]')).toHaveLength(2);
+    const canvasViewport = canvasScrollArea.querySelector<HTMLElement>(
+      '[data-slot="scroll-area-viewport"]',
+    );
+    const scrollTo = vi.fn();
+    Object.defineProperty(canvasViewport, "scrollTo", { configurable: true, value: scrollTo });
+    await user.click(within(dialog).getByRole("button", { name: "重置视图" }));
+    expect(scrollTo).toHaveBeenCalledWith({ left: 0, top: 0, behavior: "smooth" });
     expect(within(dialog).getByRole("region", { name: "需求规则" })).toBeInTheDocument();
     expect(within(dialog).getByRole("region", { name: "需求模型" })).toBeInTheDocument();
     expect(within(dialog).getByRole("region", { name: "设计模型" })).toBeInTheDocument();
@@ -433,6 +474,8 @@ describe("TopBar", () => {
       "lineage-node-requirement-model:class",
     );
     await user.click(usecaseNode);
+    const detailScrollArea = within(dialog).getByTestId("lineage-detail-scroll-area");
+    expect(detailScrollArea.querySelectorAll('[data-slot="scroll-area-scrollbar"]')).toHaveLength(1);
     expect(classNode).toHaveClass("opacity-25");
 
     await user.click(within(dialog).getByRole("button", { name: "全部链路" }));
@@ -538,7 +581,7 @@ describe("TopBar", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "全局链路图" })).not.toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: "用例模型" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "全局链路图" })).not.toBeInTheDocument();
   });
 
   it("does not mark structured-only requirement models as current in the lineage graph", async () => {
@@ -624,26 +667,14 @@ describe("TopBar", () => {
     const banner = screen.getByRole("banner");
 
     const navButtons = within(within(banner).getByRole("navigation")).getAllByRole("button");
-    expect(navButtons.map((button) => button.textContent)).toEqual([
-      "项目",
-      "考试",
-      "使用文档",
-      "支付",
-    ]);
+    expect(navButtons.map((button) => button.textContent)).toEqual(["主页"]);
     expect(within(banner).queryByRole("button", { name: "工作台" })).not.toBeInTheDocument();
     expect(within(banner).queryByRole("button", { name: "需求" })).not.toBeInTheDocument();
     expect(within(banner).queryByRole("button", { name: "设计" })).not.toBeInTheDocument();
     expect(within(banner).queryByRole("button", { name: "代码" })).not.toBeInTheDocument();
 
-    await user.click(within(banner).getByRole("button", { name: "项目" }));
-    await user.click(within(banner).getByRole("button", { name: "考试" }));
-    await user.click(within(banner).getByRole("button", { name: "使用文档" }));
-    await user.click(within(banner).getByRole("button", { name: "支付" }));
-
+    await user.click(navButtons[0]);
     expect(onNavigate).toHaveBeenCalledWith("/projects");
-    expect(onNavigate).toHaveBeenCalledWith("/exam");
-    expect(onNavigate).toHaveBeenCalledWith("/tutorial");
-    expect(onNavigate).toHaveBeenCalledWith("/account/billing");
     expect(within(banner).queryByRole("button", { name: "购买" })).not.toBeInTheDocument();
     expect(within(banner).queryByRole("button", { name: "关于" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "关闭 工作台" })).not.toBeInTheDocument();
@@ -672,11 +703,11 @@ describe("TopBar", () => {
     render(withWorkspaceProviders(<TopBarHarness onNavigate={onNavigate} />, repository));
 
     const banner = screen.getByRole("banner");
-    expect(within(banner).getByRole("navigation")).toHaveClass("hidden", "md:flex");
-    expect(screen.getByRole("button", { name: "打开主导航" })).toHaveClass("md:hidden");
+    expect(within(banner).getByRole("navigation")).toHaveClass("hidden", "xl:flex");
+    expect(screen.getByRole("button", { name: "打开主导航" })).toHaveClass("xl:hidden");
 
     await user.click(screen.getByRole("button", { name: "打开主导航" }));
-    await user.click(screen.getByRole("menuitem", { name: "支付" }));
+    await user.click((await screen.findByRole("menuitem", { name: "支付" })));
 
     expect(onNavigate).toHaveBeenCalledWith("/account/billing");
   });
@@ -707,7 +738,8 @@ describe("TopBar", () => {
 
     expect(screen.queryByRole("button", { name: "购买" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "登录" }));
+    await user.click(screen.getByRole("button", { name: "账号" }));
+    await user.click(await screen.findByRole("menuitem", { name: "账号" }));
     expect(await screen.findByRole("dialog", { name: "登录账号" })).toBeInTheDocument();
     expect(document.querySelector('[data-slot="dialog-overlay"]')).not.toBeNull();
 
@@ -746,13 +778,13 @@ describe("TopBar", () => {
     expect(screen.queryByRole("button", { name: "导出" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "历史快照" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "设计规范" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /切换到(深色|浅色)/ })).toHaveClass("size-10");
+    expect(screen.getByRole("button", { name: /切换到(深色|浅色)/ })).toHaveClass("size-9");
     expect(screen.queryByRole("button", { name: "全局设置" })).not.toBeInTheDocument();
     const accountTrigger = screen.getByRole("button", { name: /登录|账号/ });
-    expect(accountTrigger).toHaveClass("inline-flex", "size-10", "justify-center", "md:h-10", "md:w-auto", "md:justify-start");
+    expect(accountTrigger).toHaveClass("size-9", "rounded-full");
     expect(accountTrigger).not.toHaveClass("hidden");
-    expect(accountTrigger).not.toHaveClass("whitespace-nowrap");
-    expect(accountTrigger).not.toHaveClass("transition-all");
+    expect(accountTrigger.querySelector('[data-slot="avatar"]')).not.toBeNull();
+    expect(accountTrigger).toHaveAttribute("aria-haspopup", "menu");
     expect(accountTrigger).not.toHaveTextContent(/justify-center|whitespace-nowrap|transition-all/u);
   });
 
@@ -834,6 +866,7 @@ describe("TopBar", () => {
     render(withWorkspaceProviders(<TopBarHarness />, repository));
 
     await user.click(await screen.findByRole("button", { name: "账号" }));
+    await user.click(await screen.findByRole("menuitem", { name: "账号" }));
     expect(await screen.findByLabelText("头像图片")).toBeInTheDocument();
     expect(screen.queryByLabelText("头像 URL")).not.toBeInTheDocument();
 
@@ -915,6 +948,7 @@ describe("TopBar", () => {
     render(withWorkspaceProviders(<TopBarHarness />, repository));
 
     await user.click(await screen.findByRole("button", { name: "账号" }));
+    await user.click(await screen.findByRole("menuitem", { name: "账号" }));
     await user.upload(await screen.findByLabelText("头像图片"), new File(["avatar"], "avatar.png", { type: "image/png" }));
     await user.click(screen.getByRole("button", { name: "保存资料" }));
 
@@ -1135,6 +1169,7 @@ describe("TopBar", () => {
     render(withWorkspaceProviders(<TopBarHarness />, repository));
 
     await user.click(await screen.findByRole("button", { name: "账号" }));
+    await user.click(await screen.findByRole("menuitem", { name: "账号" }));
 
     expect(await screen.findByRole("tab", { name: "个人资料" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "安全设置" })).toBeInTheDocument();
@@ -1154,18 +1189,16 @@ describe("TopBar", () => {
 
     await user.click(screen.getByRole("tab", { name: "登录会话" }));
 
-    expect(screen.getByText("macOS • Chrome")).toBeInTheDocument();
-    expect(screen.getByText("当前设备")).toBeInTheDocument();
-    expect(screen.getByText(/地区：中国 北京/u)).toBeInTheDocument();
+    const sessionsTable = screen.getByRole("table", { name: "活跃会话" });
+    expect(within(sessionsTable).getByRole("columnheader", { name: "设备" })).toBeInTheDocument();
+    expect(within(sessionsTable).getByRole("columnheader", { name: "地区" })).toBeInTheDocument();
+    expect(within(sessionsTable).getByRole("columnheader", { name: "最近活动" })).toBeInTheDocument();
+    expect(within(sessionsTable).getByRole("columnheader", { name: "过期时间" })).toBeInTheDocument();
+    expect(within(sessionsTable).getByText("macOS • Chrome")).toBeInTheDocument();
+    expect(within(sessionsTable).getByText("当前设备")).toBeInTheDocument();
+    expect(within(sessionsTable).getByText("中国 北京")).toBeInTheDocument();
     expect(screen.queryByText(/203\.0\.113\.10/u)).not.toBeInTheDocument();
-    expect(screen.queryByText(/中国 广州/u)).not.toBeInTheDocument();
-    const historyTable = screen.getByRole("table", { name: "登录历史" });
-    expect(within(historyTable).getAllByRole("row")).toHaveLength(6);
-    expect(within(historyTable).getAllByText("成功").length).toBeGreaterThan(0);
-    expect(within(historyTable).getByText("失败")).toBeInTheDocument();
-    expect(within(historyTable).getByText("密码登录")).toBeInTheDocument();
-    expect(within(historyTable).getByText("凭据无效")).toBeInTheDocument();
-    expect(within(historyTable).queryByText("第六条登录记录")).not.toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "登录历史" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "全局设置" }));
 
@@ -1239,6 +1272,7 @@ describe("TopBar", () => {
     render(withWorkspaceProviders(<TopBarHarness />, repository));
 
     await user.click(await screen.findByRole("button", { name: "账号" }));
+    await user.click(await screen.findByRole("menuitem", { name: "账号" }));
     await user.click(screen.getByRole("tab", { name: "安全设置" }));
     await user.type(await screen.findByLabelText("当前密码"), "Goal-e2e-old!Aa1");
     await user.type(screen.getByLabelText("新密码"), "Goal-e2e-new!Aa1");
@@ -1377,10 +1411,9 @@ describe("TopBar", () => {
     );
 
     expect(screen.getByText("生成中 50%")).toBeInTheDocument();
-    expect(screen.getByText("需求模型生成")).toBeInTheDocument();
     expect(screen.getAllByText("生成需求模型").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/模型 gpt-5\.5/).length).toBeGreaterThan(0);
-    expect(screen.getByText("server-run-active")).toBeInTheDocument();
+    expect(screen.queryByText("server-run-active")).not.toBeInTheDocument();
+    expect(screen.queryByText(/模型 gpt-5\.5/)).not.toBeInTheDocument();
   });
 
   it("keeps active server runs visible when local terminal tasks remain in the drawer", async () => {
@@ -1443,14 +1476,11 @@ describe("TopBar", () => {
       );
     });
 
-    expect(screen.getByText("服务端运行中")).toBeInTheDocument();
-    expect(screen.getByText("任务列表")).toBeInTheDocument();
-    expect(screen.getByText("server-run-active-with-local-terminal")).toBeInTheDocument();
     expect(screen.getAllByText("生成需求模型").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("50%").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("已完成").length).toBeGreaterThan(0);
+    expect(within(screen.getByTestId("generation-transcript")).queryByText("已完成")).not.toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "我知道了" }));
-    expect(screen.getByRole("button", { name: "清理已完成" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "清理已完成" })).not.toBeInTheDocument();
+    expect(screen.queryByText("任务列表")).not.toBeInTheDocument();
   });
 
   it("shows the latest terminal server run when there is no active task", async () => {
@@ -1534,9 +1564,9 @@ describe("TopBar", () => {
       ),
     );
 
-    expect(screen.getAllByText(/代码诊断 1 项/u).length).toBeGreaterThan(0);
-    expect(screen.getByText("代码诊断")).toBeInTheDocument();
-    expect(screen.getAllByText(/检测到真实网络请求痕迹/u).length).toBeGreaterThan(0);
+    const statusCard = screen.getByTestId("generation-transcript");
+    expect(within(statusCard).queryByText(/代码诊断/u)).not.toBeInTheDocument();
+    expect(within(statusCard).queryByText(/检测到真实网络请求痕迹/u)).not.toBeInTheDocument();
   });
 
   it("shows interrupted server runs instead of falling back to idle", async () => {
@@ -1573,8 +1603,8 @@ describe("TopBar", () => {
     expect(screen.getAllByText("服务中断，可重试").length).toBeGreaterThan(0);
     expect(screen.queryByText("暂无任务")).not.toBeInTheDocument();
     expect(screen.getByText("服务中断，可从运行历史重试或重新运行")).toBeInTheDocument();
-    expect(screen.getByText("server-run-interrupted")).toBeInTheDocument();
-    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.queryByText("server-run-interrupted")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
   it("shows retry source relationships for server runs in the task drawer", async () => {
@@ -1612,11 +1642,9 @@ describe("TopBar", () => {
     );
 
     expect(screen.getAllByText("排队中 0%").length).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText("重试自 server-run-failed · 排队中").length,
-    ).toBeGreaterThan(0);
-    expect(screen.getByText("运行关系")).toBeInTheDocument();
-    expect(screen.getByText("重试自 server-run-failed")).toBeInTheDocument();
+    const statusCard = screen.getByTestId("generation-transcript");
+    expect(within(statusCard).queryByText("运行关系")).not.toBeInTheDocument();
+    expect(within(statusCard).queryByText("重试自 server-run-failed")).not.toBeInTheDocument();
   });
 
   it("shows Chinese task stages and streamed details in the task drawer", async () => {
@@ -1683,17 +1711,17 @@ describe("TopBar", () => {
     await user.click(await screen.findByRole("button", { name: "开始测试任务" }));
 
     expect((await screen.findAllByText("抽取需求规则")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("修复需求规则").length).toBeGreaterThan(0);
-    const stageSection = screen.getByText("链路阶段").parentElement?.parentElement;
+    expect(screen.queryByText("修复需求规则")).not.toBeInTheDocument();
+    const stageSection = document.querySelector('[data-slot="ai-conversation"]');
     expect(stageSection).toBeTruthy();
     expect(within(stageSection as HTMLElement).getAllByText("抽取需求规则").length).toBeGreaterThan(
       0,
     );
-    expect(within(stageSection as HTMLElement).getByText("修复需求规则")).toBeInTheDocument();
+    expect(within(stageSection as HTMLElement).queryByText("修复需求规则")).not.toBeInTheDocument();
     expect(within(stageSection as HTMLElement).queryByText("生成需求模型")).not.toBeInTheDocument();
     expect(within(stageSection as HTMLElement).queryByText("生成图源码")).not.toBeInTheDocument();
     expect(within(stageSection as HTMLElement).queryByText("渲染图像")).not.toBeInTheDocument();
-    expect(screen.getByText("执行详情")).toBeInTheDocument();
+    expect(screen.queryByText("执行详情")).not.toBeInTheDocument();
     expect(screen.queryByText("用户摘要")).not.toBeInTheDocument();
     expect(screen.getByText("正在分析需求文本")).toBeInTheDocument();
     expect(screen.queryByText("收到模型输出")).not.toBeInTheDocument();
@@ -1705,7 +1733,7 @@ describe("TopBar", () => {
     await waitFor(() => {
       expect(screen.getAllByText("已完成").length).toBeGreaterThan(0);
     });
-    const completedStageSection = screen.getByText("链路阶段").parentElement?.parentElement;
+    const completedStageSection = document.querySelector('[data-slot="ai-conversation"]');
     expect(completedStageSection).toBeTruthy();
     expect(
       within(completedStageSection as HTMLElement).queryByText("生成需求模型"),
@@ -1768,13 +1796,9 @@ describe("TopBar", () => {
     });
     await user.click(await screen.findByRole("button", { name: "开始测试任务" }));
 
-    const executionBox = await screen.findByTestId("generation-task-execution-box");
-    expect(
-      within(executionBox).getByText("正在执行"),
-    ).toBeInTheDocument();
-    expect(
-      within(executionBox).queryByText("模型正在生成，当前供应商暂未返回可见流式内容"),
-    ).not.toBeInTheDocument();
+    const transcript = screen.getByTestId("generation-transcript");
+    expect(within(transcript).getByText("模型正在生成，当前供应商暂未返回可见流式内容")).toBeInTheDocument();
+    expect(screen.queryByTestId("generation-task-execution-box")).not.toBeInTheDocument();
 
     completeRun();
     await waitFor(() => {
@@ -1782,7 +1806,7 @@ describe("TopBar", () => {
     });
   });
 
-  it("renders model subtasks inside the pipeline stage todo list", async () => {
+  it("renders only executed model steps as compact conversation rows", async () => {
     let completeRun!: () => void;
     const snapshot = createRunSnapshot({
       runId: "run-model-stage-todo",
@@ -1893,28 +1917,20 @@ describe("TopBar", () => {
     await user.click(await screen.findByRole("button", { name: "开始模型任务" }));
     await user.click(await screen.findByRole("button", { name: "确认生成" }));
 
-    const stageSection = screen.getByText("链路阶段").parentElement?.parentElement;
+    const stageSection = document.querySelector('[data-slot="ai-conversation"]');
     expect(stageSection).toBeTruthy();
     expect(within(stageSection as HTMLElement).getByText("生成需求模型")).toBeInTheDocument();
-    expect(within(stageSection as HTMLElement).getByText("生成图源码")).toBeInTheDocument();
-    expect(within(stageSection as HTMLElement).getByText("渲染图像")).toBeInTheDocument();
-    expect(within(stageSection as HTMLElement).getAllByText("用例模型")).toHaveLength(3);
-    expect(within(stageSection as HTMLElement).getAllByText("领域概念模型")).toHaveLength(3);
-    expect(within(stageSection as HTMLElement).getAllByText("界面关系")).toHaveLength(1);
-    expect(within(stageSection as HTMLElement).getAllByText("总体业务流程")).toHaveLength(2);
-    expect(
-      within(stageSection as HTMLElement).getByText("有 1 条追踪关系需复核"),
-    ).toBeInTheDocument();
-    expect(
-      within(stageSection as HTMLElement).getByText(
-        "项目并发已满，前方 0 个模型调用 · 已等待 12 秒 · 预计还需 约 1 分钟",
-      ),
-    ).toBeInTheDocument();
+    expect(within(stageSection as HTMLElement).queryByText("生成图形描述")).not.toBeInTheDocument();
+    expect(within(stageSection as HTMLElement).queryByText("生成图形预览")).not.toBeInTheDocument();
+    expect(within(stageSection as HTMLElement).getAllByText("用例模型")).toHaveLength(1);
+    expect(within(stageSection as HTMLElement).getAllByText("领域概念模型")).toHaveLength(1);
+    expect(within(stageSection as HTMLElement).getByText("有 1 条追踪关系需复核")).toBeInTheDocument();
     expect(screen.queryByText("模型子任务")).not.toBeInTheDocument();
-    expect(screen.getAllByText("用例模型")).toHaveLength(3);
+    await user.click(within(stageSection as HTMLElement).getByRole("button", { name: /界面关系/ }));
+    expect(within(stageSection as HTMLElement).getByText("正在排队：界面关系")).toBeInTheDocument();
 
     completeRun();
-    const updatedStageSection = screen.getByText("链路阶段").parentElement?.parentElement;
+    const updatedStageSection = document.querySelector('[data-slot="ai-conversation"]');
     expect(updatedStageSection).toBeTruthy();
     const retryButton = (
       await within(updatedStageSection as HTMLElement).findByText("重试此模型")
@@ -1924,7 +1940,7 @@ describe("TopBar", () => {
       within(updatedStageSection as HTMLElement).queryByText("界面关系 traceability 缺失"),
     ).not.toBeInTheDocument();
     expect(
-      within(updatedStageSection as HTMLElement).getAllByText("失败").length,
+      within(updatedStageSection as HTMLElement).getAllByText("未完成").length,
     ).toBeGreaterThan(0);
   });
 
@@ -2036,6 +2052,7 @@ describe("TopBar", () => {
     await user.click(await screen.findByRole("button", { name: "确认生成" }));
     completeRun();
 
+    await user.click(await screen.findByRole("button", { name: "我知道了" }));
     const retryButton = await screen.findByRole("button", {
       name: "重试全部同类模型",
     });
@@ -2117,22 +2134,16 @@ describe("TopBar", () => {
     await user.click(await screen.findByRole("button", { name: "开始模型任务" }));
     await user.click(await screen.findByRole("button", { name: "确认生成" }));
 
-    const statusCard = screen
-      .getByText("状态")
-      .closest("[data-testid='generation-task-status-card']");
-    expect(statusCard).toHaveClass("min-w-0", "max-w-full", "overflow-hidden");
-
-    const errorCard = screen.getByTestId("generation-task-error-card");
-    expect(errorCard).toHaveClass("min-w-0", "max-w-full", "overflow-hidden");
-    expect(within(errorCard).queryByText(longToken)).not.toBeInTheDocument();
-
-    const executionBox = screen
-      .getByText((content) => content.includes(longStream.slice(0, 30)))
-      .closest("[data-testid='generation-task-execution-box']");
-    expect(executionBox).toHaveClass("min-w-0", "max-w-full", "overflow-auto");
-    expect(within(executionBox as HTMLElement).getByText(/RequirementBaselineBlocked/u)).toHaveClass(
-      "break-all",
-    );
+    const transcript = screen.getByTestId("generation-transcript");
+    expect(transcript).toHaveClass("min-w-0");
+    expect(transcript.querySelector('[data-slot="card"]')).toBeNull();
+    expect(screen.queryByTestId("generation-task-error-card")).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "我知道了" }));
+    const call = within(transcript).getByRole("button", { name: /生成需求模型/ });
+    await user.click(call);
+    const output = within(transcript).getByText((content) => content.includes(longStream.slice(0, 30)));
+    expect(output).toHaveClass("break-all");
+    expect(output.closest("pre")).toHaveClass("overflow-auto");
   });
 
   it("shows design debug trace from restored design history", async () => {
@@ -2192,10 +2203,10 @@ describe("TopBar", () => {
 
     await user.click(screen.getByRole("button", { name: "恢复设计追踪" }));
 
-    expect(await screen.findByText("设计调试追踪")).toBeInTheDocument();
-    expect(screen.getByText(/渲染图像 \/ sequence \/ 第 1 次 \/ 渲染错误/)).toBeInTheDocument();
-    expect(screen.getAllByText("Syntax Error? (line 2)").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "复制追踪内容" })).toBeInTheDocument();
+    await screen.findByTestId("generation-transcript");
+    expect(screen.queryByText("设计调试追踪")).not.toBeInTheDocument();
+    expect(screen.queryByText(/渲染图像 \/ sequence \/ 第 1 次 \/ 渲染错误/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "复制追踪内容" })).not.toBeInTheDocument();
   });
 
   it("hides code skill resource internals in task details", async () => {
@@ -2322,10 +2333,10 @@ describe("TopBar", () => {
 
     await user.click(screen.getByRole("button", { name: "恢复代码资源" }));
 
-    expect(await screen.findByText("链路阶段")).toBeInTheDocument();
-    expect(screen.getByText("代码调试追踪")).toBeInTheDocument();
-    expect(screen.getByText(/生成代码文件操作 \/ 全局 \/ 第 1 次 \/ 解析错误/)).toBeInTheDocument();
-    expect(screen.getByText(/operations\.0\.operation/)).toBeInTheDocument();
+    expect((await screen.findAllByTestId("generation-task-step"))[0]).toBeInTheDocument();
+    expect(screen.queryByText("代码调试追踪")).not.toBeInTheDocument();
+    expect(screen.queryByText(/生成代码文件操作 \/ 全局 \/ 第 1 次 \/ 解析错误/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/operations\.0\.operation/)).not.toBeInTheDocument();
     expect(screen.queryByText("界面方案资源")).not.toBeInTheDocument();
     expect(screen.queryByText("资源查询结果")).not.toBeInTheDocument();
     expect(screen.queryByText("React TypeScript CSS variables UI rules")).not.toBeInTheDocument();

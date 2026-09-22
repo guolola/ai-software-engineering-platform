@@ -14,7 +14,6 @@ import {
   DialogTitle,
 } from "../../../shared/ui/dialog";
 import { Badge } from "../../../shared/ui/badge";
-import { ScaleToFitFrame } from "../../../shared/ui/scale-to-fit";
 import { cn } from "../../../shared/ui/utils";
 import { systemNoticeApi } from "../system-notice-api";
 import type { badgeVariants } from "../../../shared/ui/badge";
@@ -31,10 +30,10 @@ const NOTICE_TYPE_DOT_CLASS: Record<SystemNoticeType, string> = {
 };
 
 const NOTICE_TYPE_BADGE_VARIANT: Record<SystemNoticeType, NoticeBadgeVariant> = {
-  model_update: "info",
-  feature_update: "info",
+  model_update: "secondary",
+  feature_update: "secondary",
   important: "destructive",
-  maintenance: "warning",
+  maintenance: "secondary",
 };
 
 function fireSystemNoticeConfetti() {
@@ -227,11 +226,11 @@ export function SystemNoticeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="grid h-[min(928px,calc(100vh-4rem))] w-[1120px] max-w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-xl border-border bg-card p-0 shadow-lg sm:max-w-[calc(100vw-2rem)] xl:max-w-[1120px]"
-        overlayClassName="bg-foreground/40 backdrop-blur-[4px]"
+        overlayClassName="bg-foreground/40 "
       >
-        <DialogHeader className="border-b border-border bg-background/80 px-6 py-4 text-left backdrop-blur-md">
+        <DialogHeader className="border-b border-border bg-background/80 px-6 py-4 text-left ">
           <div className="flex items-center gap-3">
-            <Badge variant="info" className="rounded-full px-3 py-1 text-[11px] tracking-[0.08em]">
+            <Badge variant="secondary" className="px-3 py-1 text-[11px] tracking-[0.08em]">
               {t("notices.badge")}
             </Badge>
             <DialogTitle className="text-xl leading-7 text-foreground">
@@ -253,16 +252,16 @@ export function SystemNoticeDialog({
               {error}
             </div>
           ) : (
-            <ScaleToFitFrame minWidth={1040} contentClassName="w-[1040px]">
+            <div className="w-full min-w-0 overflow-x-auto">
               <SystemNoticeTimeline notices={notices} />
-            </ScaleToFitFrame>
+            </div>
           )}
         </div>
-        <div className="flex justify-center border-t border-border bg-card/90 px-4 py-4 backdrop-blur-md">
+        <div className="flex justify-center border-t border-border bg-card/90 px-4 py-4 ">
           <Button
             type="button"
             variant="outline"
-            className="h-11 w-full max-w-md rounded-full border-primary text-primary hover:bg-primary/10 hover:text-primary"
+            className="h-11 w-full max-w-md"
             onClick={onMarkRead}
             disabled={loading}
           >
@@ -340,7 +339,11 @@ export function SystemNoticeButton({
         >
           <Bell className="size-5" />
           {unreadCount > 0 && (
-            <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-destructive" />
+            <span
+              data-slot="notification-unread-dot"
+              aria-hidden="true"
+              className="absolute -right-0.5 -top-0.5 size-2 animate-bounce rounded-full bg-sky-600 motion-reduce:animate-none dark:bg-sky-400"
+            />
           )}
         </Button>
       </div>

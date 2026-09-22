@@ -1,11 +1,38 @@
 // Owns project member invitation, role, and removal interactions.
+import { Alert } from "../../../shared/ui/alert";
+import { Avatar, AvatarFallback } from "../../../shared/ui/avatar";
+import { Card } from "../../../shared/ui/card";
+import { Input } from '../../../shared/ui/input';
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Mail, UserRound } from "lucide-react";
+import { Mail, UserRoundMinus, UserRoundPlus } from "lucide-react";
 import { Badge } from "../../../shared/ui/badge";
 import { Button } from "../../../shared/ui/button";
-import { Label } from "../../../shared/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../../shared/ui/dialog";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "../../../shared/ui/field";
 import { SelectControl } from "../../../shared/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../shared/ui/table";
+import { TablePagination, TableToolbar } from "../../../shared/template/layout/page";
+import { useFloatingAlert } from "../../../shared/ui/floating-alert";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../../shared/ui/tooltip";
 import { cn } from "../../../shared/ui/utils";
 import {
   formatMemberDate,
@@ -32,11 +59,17 @@ export function ProjectMembers({
   layout?: "page" | "drawer";
 }) {
   const { t, i18n } = useTranslation();
+  const { showAlert } = useFloatingAlert();
   const locale = i18n.resolvedLanguage?.startsWith("en") ? "en-US" : "zh-CN";
   const [currentMembers, setCurrentMembers] = useState(members);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("viewer");
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [memberFilter, setMemberFilter] = useState<"all" | "active" | "invited">("all");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [searchFilter, setSearchFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const inviteEmailRef = useRef<HTMLInputElement | null>(null);
@@ -44,6 +77,7 @@ export function ProjectMembers({
 
   useEffect(() => {
     setCurrentMembers(members);
+    setPage(1);
   }, [members]);
 
   const inviteMember = async () => {
@@ -92,10 +126,15 @@ export function ProjectMembers({
       if (inviteEmailRef.current) {
         inviteEmailRef.current.value = "";
       }
-      setMessage(t("projectShell.membersUi.messages.invited", { email: nextMember.email }));
+      setInviteOpen(false);
+      const success = t("projectShell.membersUi.messages.invited", { email: nextMember.email });
+      setMessage(success);
+      showAlert({ title: success, tone: "success" });
     } catch {
       setCurrentMembers((current) => current.filter((member) => member.id !== optimisticMember.id));
-      setError(t("projectShell.membersUi.errors.invite"));
+      const failure = t("projectShell.membersUi.errors.invite");
+      setError(failure);
+      showAlert({ title: failure, tone: "destructive" });
     }
   };
 
@@ -113,12 +152,16 @@ export function ProjectMembers({
           member.id === memberId ? { ...member, ...response.member } : member,
         ),
       );
-      setMessage(t("projectShell.membersUi.messages.roleUpdated", {
+      const success = t("projectShell.membersUi.messages.roleUpdated", {
         email: response.member.email,
         role: memberRoleLabel(response.member.role, t),
-      }));
+      });
+      setMessage(success);
+      showAlert({ title: success, tone: "success" });
     } catch {
-      setError(t("projectShell.membersUi.errors.role"));
+      const failure = t("projectShell.membersUi.errors.role");
+      setError(failure);
+      showAlert({ title: failure, tone: "destructive" });
     }
   };
 
@@ -132,9 +175,13 @@ export function ProjectMembers({
     try {
       await platformApi.removeProjectMember(project.id, member.id);
       setCurrentMembers((current) => current.filter((item) => item.id !== member.id));
-      setMessage(t("projectShell.membersUi.messages.removed", { email: member.email }));
+      const success = t("projectShell.membersUi.messages.removed", { email: member.email });
+      setMessage(success);
+      showAlert({ title: success, tone: "success" });
     } catch {
-      setError(t("projectShell.membersUi.errors.remove"));
+      const failure = t("projectShell.membersUi.errors.remove");
+      setError(failure);
+      showAlert({ title: failure, tone: "destructive" });
     }
   };
 
@@ -155,9 +202,13 @@ export function ProjectMembers({
       setCurrentMembers((current) =>
         current.map((item) => (item.id === member.id ? { ...item, ...nextMember } : item)),
       );
-      setMessage(t("projectShell.membersUi.messages.resent", { email: member.email }));
+      const success = t("projectShell.membersUi.messages.resent", { email: member.email });
+      setMessage(success);
+      showAlert({ title: success, tone: "success" });
     } catch {
-      setError(t("projectShell.membersUi.errors.resend"));
+      const failure = t("projectShell.membersUi.errors.resend");
+      setError(failure);
+      showAlert({ title: failure, tone: "destructive" });
     }
   };
 
@@ -175,19 +226,34 @@ export function ProjectMembers({
           item.id === member.id ? { ...item, status: "revoked" } : item,
         ),
       );
-      setMessage(t("projectShell.membersUi.messages.revoked", { email: member.email }));
+      const success = t("projectShell.membersUi.messages.revoked", { email: member.email });
+      setMessage(success);
+      showAlert({ title: success, tone: "success" });
     } catch {
-      setError(t("projectShell.membersUi.errors.revoke"));
+      const failure = t("projectShell.membersUi.errors.revoke");
+      setError(failure);
+      showAlert({ title: failure, tone: "destructive" });
     }
   };
 
   const filteredMembers = currentMembers.filter((member) => {
-    if (memberFilter === "active") return member.status === "active";
-    if (memberFilter === "invited") {
-      return member.status === "invited" || member.status === "expired";
+    if (memberFilter === "active" && member.status !== "active") return false;
+    if (
+      memberFilter === "invited" &&
+      member.status !== "invited" &&
+      member.status !== "expired"
+    ) {
+      return false;
+    }
+    if (roleFilter !== "all" && member.role !== roleFilter) return false;
+    const query = searchFilter.trim().toLowerCase();
+    if (query) {
+      const identity = `${member.displayName ?? ""} ${member.email}`.toLowerCase();
+      if (!identity.includes(query)) return false;
     }
     return true;
   });
+
   const activeCount = currentMembers.filter((member) => member.status === "active").length;
   const invitedCount = currentMembers.filter(
     (member) => member.status === "invited" || member.status === "expired",
@@ -205,29 +271,301 @@ export function ProjectMembers({
   ];
   const containerClass =
     layout === "drawer"
-      ? "min-w-0 max-w-full space-y-6 overflow-hidden"
-      : "space-y-5";
-  const shellClass =
-    layout === "drawer" ? "min-w-0 max-w-full overflow-hidden border-0 bg-transparent p-0" : "";
+      ? "grid min-w-0 max-w-full gap-4 overflow-hidden"
+      : "grid gap-5";
+  const pageCount = Math.max(1, Math.ceil(filteredMembers.length / pageSize));
+  const pagedMembers = filteredMembers.slice((page - 1) * pageSize, page * pageSize);
+  // Invite failures surface inline inside the dialog while it is open.
+  const inviteDialogError = inviteOpen ? error : "";
 
   return (
-    <section className={`rounded-md border border-border bg-card p-5 ${shellClass}`}>
-      <div className={containerClass}>
-        <p className="text-sm leading-6 text-muted-foreground">
-          {t("projectShell.membersUi.summary", { activeCount, ownerCount, editorCount, viewerCount, invitedCount })}
-        </p>
-        {!canManageMembers && (
-          <div className="rounded-md border border-primary/10 bg-primary/10 p-3 text-sm leading-6 text-muted-foreground">
-            {t("projectShell.membersUi.readonly")}
-          </div>
-        )}
-        <div className="min-w-0 max-w-full overflow-hidden rounded-md border border-border/60 bg-muted/40 p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold">{t("projectShell.membersUi.inviteTitle")}</h2>
-          <div className={layout === "drawer" ? "grid gap-3" : "grid gap-3 md:grid-cols-[minmax(0,1fr)_150px]"}>
-            <div className="relative min-w-0">
-              <Label htmlFor="member-invite-email" className="sr-only">{t("projectShell.membersUi.emailLabel")}</Label>
-              <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input
+    <div className={containerClass}>
+      {!canManageMembers && (
+        <Alert className="text-sm leading-6">
+          {t("projectShell.membersUi.readonly")}
+        </Alert>
+      )}
+      {/* users-list idiom: toolbar -> table -> pagination inside one flat card */}
+      <Card className="min-w-0 max-w-full overflow-hidden border py-0 shadow-none ring-0">
+        <TableToolbar
+          search={searchFilter}
+          onSearchChange={(value) => {
+            setSearchFilter(value);
+            setPage(1);
+          }}
+          searchPlaceholder={t("projectShell.membersUi.searchPlaceholder")}
+          searchLabel={t("projectShell.membersUi.searchPlaceholder")}
+          rowsPerPage={pageSize}
+          onRowsPerPageChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setPage(1);
+          }}
+          filters={
+            <>
+              <SelectControl
+                aria-label={t("projectShell.membersUi.statusFilter")}
+                value={memberFilter}
+                onValueChange={(value) => {
+                  setMemberFilter(value as "all" | "active" | "invited");
+                  setPage(1);
+                }}
+                className="w-fit"
+                options={[
+                  { value: "all", label: t("projectShell.membersUi.filters.all") },
+                  { value: "active", label: t("projectShell.membersUi.status.active") },
+                  { value: "invited", label: t("projectShell.membersUi.status.invited") },
+                ]}
+              />
+              <SelectControl
+                aria-label={t("projectShell.membersUi.roleFilter")}
+                value={roleFilter}
+                onValueChange={(value) => {
+                  setRoleFilter(value);
+                  setPage(1);
+                }}
+                className="w-fit"
+                options={[
+                  { value: "all", label: t("projectShell.membersUi.allRoles") },
+                  { value: "owner", label: t("projectShell.membersUi.roles.owner") },
+                  ...roleOptions,
+                ]}
+              />
+            </>
+          }
+          actions={
+            <Button
+              type="button"
+              onClick={() => {
+                setError("");
+                setInviteOpen(true);
+              }}
+              disabled={!canManageMembers}
+            >
+              <UserRoundPlus className="size-4" />
+              {t("projectShell.membersUi.inviteTitle")}
+            </Button>
+          }
+        />
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("projectShell.membersUi.columns.member")}</TableHead>
+              <TableHead>{t("projectShell.membersUi.columns.status")}</TableHead>
+              <TableHead>{t("projectShell.membersUi.columns.role")}</TableHead>
+              <TableHead>{t("projectShell.membersUi.columns.joined")}</TableHead>
+              <TableHead>{t("projectShell.membersUi.columns.actions")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pagedMembers.map((member) => {
+              const invitationLike = member.status === "invited" || member.status === "expired";
+              const isLastOwner = member.role === "owner" && ownerCount <= 1;
+              const displayName = member.displayName || member.email;
+              const invitedAtText = t("projectShell.membersUi.invitedAt", {
+                date: member.invitedAt
+                  ? formatMemberDate(member.invitedAt, locale, t)
+                  : t("projectShell.membersUi.noTime"),
+                role: memberRoleLabel(member.role, t),
+              });
+              return (
+                <TableRow
+                  key={member.id}
+                  data-testid="project-member-card"
+                  className={cn("max-w-full min-w-0", invitationLike && "bg-muted/30")}
+                >
+                  <TableCell className="min-w-0 max-w-64">
+                    {/* Two-line member cell mirrors admin datatable-transaction */}
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Avatar className="size-9">
+                        {member.avatarUrl && !invitationLike ? (
+                          <img
+                            src={member.avatarUrl}
+                            alt={t("projectShell.membersUi.avatar", { name: displayName })}
+                            className="size-full rounded-full object-cover"
+                          />
+                        ) : (
+                          <AvatarFallback
+                            className={cn(
+                              "text-xs",
+                              invitationLike
+                                ? "text-muted-foreground border border-dashed"
+                                : "bg-primary/10 text-primary",
+                            )}
+                          >
+                            {invitationLike ? <Mail className="size-4" /> : memberInitials(member)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div className="flex min-w-0 flex-col text-sm">
+                        <span className="truncate font-medium" title={displayName}>
+                          {displayName}
+                        </span>
+                        <span className="text-muted-foreground truncate text-xs" title={member.email}>
+                          {member.email}
+                        </span>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {invitationLike ? (
+                      <Badge variant={member.status === "expired" ? "destructive" : "secondary"}>
+                        {memberStatusLabel(member.status, t)}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-success/30 bg-success/10 text-success">
+                        {memberStatusLabel(member.status, t)}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {invitationLike ? (
+                      <span className="text-muted-foreground block max-w-40 truncate text-xs" title={invitedAtText}>
+                        {invitedAtText}
+                      </span>
+                    ) : (
+                      <SelectControl
+                        aria-label={t("projectShell.membersUi.memberRole", { email: member.email })}
+                        value={member.role}
+                        onValueChange={(value) => void updateRole(member.id, value)}
+                        disabled={!canManageMembers}
+                        className="min-w-24"
+                        size="sm"
+                        options={memberRoleOptions.map((role) => ({
+                          value: role.value,
+                          label: role.label,
+                        }))}
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground whitespace-nowrap">
+                    {member.joinedAt
+                      ? t("projectShell.membersUi.joinedAt", {
+                          date: formatMemberDate(member.joinedAt, locale, t),
+                        })
+                      : t("projectShell.membersUi.noTime")}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex min-w-0 flex-wrap justify-end gap-2">
+                      {invitationLike ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void resendInvitation(member)}
+                            disabled={!canManageMembers}
+                            aria-label={t("projectShell.membersUi.resendFor", { email: member.email })}
+                          >
+                            {t("projectShell.membersUi.resend")}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => void revokeInvitation(member)}
+                            disabled={!canManageMembers}
+                            aria-label={t("projectShell.membersUi.revokeFor", { email: member.email })}
+                          >
+                            {t("projectShell.membersUi.revoke")}
+                          </Button>
+                        </>
+                      ) : (
+                        isLastOwner || !canManageMembers ? (
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <span
+                                  tabIndex={0}
+                                  aria-label={
+                                    isLastOwner
+                                      ? t("projectShell.membersUi.lastOwnerRemoveHint")
+                                      : t("projectShell.membersUi.errors.removeReadonly")
+                                  }
+                                  className="inline-flex rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                />
+                              }
+                            >
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="size-8"
+                                disabled
+                                aria-label={t("projectShell.membersUi.removeFor", { email: member.email })}
+                              >
+                                <UserRoundMinus className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {isLastOwner
+                                ? t("projectShell.membersUi.lastOwnerRemoveHint")
+                                : t("projectShell.membersUi.errors.removeReadonly")}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="size-8"
+                            onClick={() => void removeMember(member)}
+                            aria-label={t("projectShell.membersUi.removeFor", { email: member.email })}
+                          >
+                            <UserRoundMinus className="size-4" />
+                          </Button>
+                        )
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {currentMembers.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <div className="text-muted-foreground p-4 text-center text-sm">
+                    {t("projectShell.membersUi.empty")}
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+            {currentMembers.length > 0 && filteredMembers.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <div className="text-muted-foreground p-4 text-center text-sm">
+                    {t("projectShell.membersUi.noMatches")}
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+        <TablePagination
+          total={filteredMembers.length}
+          page={page}
+          pageCount={pageCount}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          itemLabel={t("projectShell.membersUi.countLabel")}
+        />
+      </Card>
+      <Dialog
+        open={inviteOpen}
+        onOpenChange={(next) => {
+          setInviteOpen(next);
+          if (!next) setError("");
+        }}
+      >
+        <DialogContent data-form-layout="4" className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("projectShell.membersUi.inviteTitle")}</DialogTitle>
+          </DialogHeader>
+          <FieldGroup className="rounded-xl border border-border bg-muted/10 p-4 sm:p-5">
+            <Field>
+              <FieldLabel htmlFor="member-invite-email">
+                {t("projectShell.membersUi.emailLabel")}
+              </FieldLabel>
+              <Input
                 id="member-invite-email"
                 type="email"
                 ref={inviteEmailRef}
@@ -235,167 +573,41 @@ export function ProjectMembers({
                 onChange={(event) => setInviteEmail(event.target.value)}
                 placeholder={t("projectShell.membersUi.emailPlaceholder")}
                 disabled={!canManageMembers}
-                className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
               />
-            </div>
-            <SelectControl
-              id="member-invite-role"
-              aria-label={t("projectShell.membersUi.inviteRole")}
-              value={inviteRole}
-              onValueChange={setInviteRole}
-              disabled={!canManageMembers}
-              className="h-9 min-w-0 max-w-full"
-              options={roleOptions.map((role) => ({
-                value: role.value,
-                label: role.label,
-              }))}
-            />
-          </div>
-          <Button type="button" className="mt-3 w-full" onClick={() => void inviteMember()} disabled={!canManageMembers}>
-            {t("projectShell.membersUi.sendInvite")}
-          </Button>
-        </div>
-        <div className="grid min-w-0 grid-cols-3 rounded-md bg-primary/10 p-1 text-xs">
-          {[
-            ["all", t("projectShell.membersUi.filters.all")],
-            ["active", t("projectShell.membersUi.status.active")],
-            ["invited", t("projectShell.membersUi.status.invited")],
-          ].map(([value, label]) => (
-            <Button
-              key={value}
-              type="button"
-              variant={memberFilter === value ? "secondary" : "ghost"}
-              size="sm"
-              className="h-8 text-xs"
-              onClick={() => setMemberFilter(value as "all" | "active" | "invited")}
-            >
-              {label}
+              {inviteDialogError && <FieldError>{inviteDialogError}</FieldError>}
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="member-invite-role">
+                {t("projectShell.membersUi.inviteRole")}
+              </FieldLabel>
+              <SelectControl
+                id="member-invite-role"
+                aria-label={t("projectShell.membersUi.inviteRole")}
+                value={inviteRole}
+                onValueChange={setInviteRole}
+                disabled={!canManageMembers}
+                options={roleOptions.map((role) => ({
+                  value: role.value,
+                  label: role.label,
+                }))}
+              />
+            </Field>
+          </FieldGroup>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>
+              {t("projectShell.membersUi.cancel")}
             </Button>
-          ))}
-        </div>
-        <div className="grid gap-3">
-          {filteredMembers.map((member) => {
-            const invitationLike = member.status === "invited" || member.status === "expired";
-            const displayName = member.displayName || member.email;
-            return (
-              <div
-                key={member.id}
-                data-testid="project-member-card"
-                className={`min-w-0 max-w-full overflow-hidden rounded-md border p-3 ${
-                  invitationLike
-                    ? "border-dashed border-border bg-background/50"
-                    : "border-border/70 bg-background"
-                }`}
-              >
-                <div className="flex min-w-0 gap-3">
-                  <span className={`flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md text-xs font-semibold ${
-                    invitationLike ? "border border-dashed border-border bg-background text-muted-foreground" : "bg-primary/10 text-primary"
-                  }`}>
-                    {member.avatarUrl && !invitationLike ? (
-                      <img src={member.avatarUrl} alt={t("projectShell.membersUi.avatar", { name: displayName })} className="size-full object-cover" />
-                    ) : invitationLike ? (
-                      <Mail className="size-4" />
-                    ) : (
-                      memberInitials(member)
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1 overflow-hidden">
-                    <div className="flex min-w-0 items-center justify-between gap-2">
-                      <span className="min-w-0 truncate text-sm font-medium" title={displayName}>{displayName}</span>
-                      {invitationLike ? (
-                        <Badge variant={member.status === "expired" ? "destructive" : "secondary"} className="shrink-0 text-[10px]">
-                          {member.status === "expired" ? t("projectShell.membersUi.status.expired") : t("projectShell.membersUi.pending")}
-                        </Badge>
-                      ) : (
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {t("projectShell.membersUi.joinedAt", { date: formatMemberDate(member.joinedAt, locale, t) })}
-                        </span>
-                      )}
-                    </div>
-                    <p className="min-w-0 truncate text-xs text-muted-foreground" title={member.email}>{member.email}</p>
-                    {invitationLike && (
-                      <p className="mt-1 truncate text-xs text-muted-foreground" title={t("projectShell.membersUi.invitedAt", { date: member.invitedAt ? formatMemberDate(member.invitedAt, locale, t) : t("projectShell.membersUi.noTime"), role: memberRoleLabel(member.role, t) })}>
-                        {t("projectShell.membersUi.invitedAt", { date: member.invitedAt ? formatMemberDate(member.invitedAt, locale, t) : t("projectShell.membersUi.noTime"), role: memberRoleLabel(member.role, t) })}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className={cn("mt-3 min-w-0 gap-2", layout === "drawer" ? "grid grid-cols-1" : "flex items-center justify-between")}>
-                  {invitationLike ? (
-                    <span className="text-xs text-muted-foreground">{memberStatusLabel(member.status, t)}</span>
-                  ) : (
-                    <SelectControl
-                      aria-label={t("projectShell.membersUi.memberRole", { email: member.email })}
-                      value={member.role}
-                      onValueChange={(value) => void updateRole(member.id, value)}
-                      disabled={!canManageMembers}
-                      className={cn("h-8 text-xs", layout === "drawer" ? "w-full min-w-0 max-w-full" : "min-w-24")}
-                      size="sm"
-                      options={memberRoleOptions.map((role) => ({
-                        value: role.value,
-                        label: role.label,
-                      }))}
-                    />
-                  )}
-                  <div className="flex min-w-0 flex-wrap justify-end gap-2">
-                    {invitationLike ? (
-                      <>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs"
-                          onClick={() => void resendInvitation(member)}
-                          disabled={!canManageMembers}
-                          aria-label={t("projectShell.membersUi.resendFor", { email: member.email })}
-                        >
-                          {t("projectShell.membersUi.resend")}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs text-destructive hover:text-destructive"
-                          onClick={() => void revokeInvitation(member)}
-                          disabled={!canManageMembers}
-                          aria-label={t("projectShell.membersUi.revokeFor", { email: member.email })}
-                        >
-                          {t("projectShell.membersUi.revoke")}
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        onClick={() => void removeMember(member)}
-                        disabled={member.role === "owner" || !canManageMembers}
-                        aria-label={t("projectShell.membersUi.removeFor", { email: member.email })}
-                      >
-                        <UserRound className="size-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {currentMembers.length === 0 && (
-            <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">{t("projectShell.membersUi.empty")}</div>
-          )}
-          {currentMembers.length > 0 && filteredMembers.length === 0 && (
-            <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-              {t("projectShell.membersUi.noMatches")}
-            </div>
-          )}
-        </div>
-        {(message || error) && (
-          <div className="rounded-md border border-border bg-muted p-3 text-sm">
-            {message || error}
-          </div>
-        )}
-      </div>
-    </section>
+            <Button
+              type="button"
+              onClick={() => void inviteMember()}
+              disabled={!canManageMembers}
+            >
+              <Mail className="size-4" />
+              {t("projectShell.membersUi.sendInvite")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 // Owns account profile and security pages backed by the account platform APIs.
+import { Card } from "../../../shared/ui/card";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
@@ -18,7 +19,7 @@ import {
 type Navigate = (path: string) => void;
 
 const ACCOUNT_PAGE_SCROLL_CLASS =
-  "min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-scroll bg-background [scrollbar-gutter:stable]";
+  "min-h-0 min-w-0 w-full overflow-x-clip bg-background";
 function avatarUrlValidationMessage(value: string, errorMessage: string) {
   const normalized = value.trim();
   if (!normalized) return "";
@@ -39,7 +40,7 @@ function AccountPageFrame({
   void onNavigate;
   return (
     <main className={ACCOUNT_PAGE_SCROLL_CLASS}>
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex w-full max-w-360 flex-col gap-6 px-4 py-6 sm:px-6">
         {children}
       </div>
     </main>
@@ -54,9 +55,9 @@ function AccountSection({
   className?: string;
 }) {
   return (
-    <section className={`rounded-md border border-border bg-card p-5 ${className}`}>
+    <Card as="section" className={`rounded-md border border-border bg-card p-5 ${className}`}>
       {children}
-    </section>
+    </Card>
   );
 }
 

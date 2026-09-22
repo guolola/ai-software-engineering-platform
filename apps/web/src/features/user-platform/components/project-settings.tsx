@@ -1,4 +1,12 @@
 // Owns project settings, provider policy, retention, and high-risk project actions.
+import { Alert } from '../../../shared/ui/alert';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../../shared/ui/card";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ProjectBackgroundKey } from "@uml-platform/contracts";
@@ -12,9 +20,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../shared/ui/dialog";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "../../../shared/ui/field";
 import { Input } from "../../../shared/ui/input";
-import { Label } from "../../../shared/ui/label";
-import { Select, SelectContent, SelectControl, SelectItem, SelectTrigger } from "../../../shared/ui/select";
+import { SelectControl } from "../../../shared/ui/select";
+import { PageHeader } from "../../../shared/template/layout/page";
+import { cn } from "../../../shared/ui/utils";
 import {
   ACADEMIC_BINDING_OPTIONS,
   academicBindingFromValue,
@@ -168,191 +183,194 @@ export function ProjectSettings({
     }
   };
 
-  const retentionPolicyLabel =
-    retentionPolicy === "semester_180_days"
-      ? t("projectSettings.retention.semester")
-      : retentionPolicy === "one_year_365_days"
-        ? t("projectSettings.retention.year")
-        : t("projectSettings.retention.manual");
   const settingGridClass =
     layout === "drawer" ? "grid min-w-0 max-w-full gap-4 overflow-hidden" : "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]";
-  const sectionClass = layout === "drawer" ? "min-w-0 max-w-full overflow-hidden p-4" : "";
+  const sectionClass = layout === "drawer" ? "min-w-0 max-w-full overflow-hidden" : "";
   const canManageProjectSettings =
     !membershipRole || membershipRole === "owner";
   const settingsBlockedReason = t("projectSettings.permissionDenied");
+  // Inline the owner-required failure on its own field instead of the shared banner.
+  const ownerRequiredMessage = t("projectSettings.errors.ownerRequired");
+  const showOwnerFieldError = error === ownerRequiredMessage;
+  const feedback = message || (error && !showOwnerFieldError ? error : "");
 
   return (
     <>
-    <div className={settingGridClass}>
-      <section className={`rounded-md border border-border bg-card p-5 ${sectionClass}`}>
-        <div className="grid gap-4">
+    <div className={cn(layout === "page" && "grid min-w-0 gap-6")}>
+      {layout === "page" && (
+        <PageHeader
+          title={t("projectSettings.basic")}
+          description={t("projectSettings.basicDescription")}
+          className="mb-0 lg:mb-0"
+        />
+      )}
+      <div className={settingGridClass}>
+        <Card as="section" className={cn("gap-6 shadow-none", sectionClass)}>
           {layout === "drawer" && (
-            <div>
-              <h3 className="text-sm font-semibold">{t("projectSettings.basic")}</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">{t("projectSettings.basic")}</CardTitle>
+              <CardDescription className="text-xs">
                 {t("projectSettings.basicDescription")}
-              </p>
-            </div>
+              </CardDescription>
+            </CardHeader>
           )}
-          {!canManageProjectSettings && (
-            <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-              {settingsBlockedReason}
-            </div>
-          )}
-          <div className="grid gap-1.5">
-            <Label htmlFor="settings-project-name">{t("projectSettings.name")}</Label>
-            <Input
-              id="settings-project-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
+          <CardContent>
+            <FieldGroup className={cn(layout === "drawer" && "gap-4")}>
+              {!canManageProjectSettings && (
+                <Alert className="text-xs">
+                  {settingsBlockedReason}
+                </Alert>
+              )}
+              <Field>
+                <FieldLabel htmlFor="settings-project-name">{t("projectSettings.name")}</FieldLabel>
+                <Input
+                  id="settings-project-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  disabled={!canManageProjectSettings}
+                  title={!canManageProjectSettings ? settingsBlockedReason : undefined}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="settings-project-description">{t("projectSettings.description")}</FieldLabel>
+                <Input
+                  id="settings-project-description"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder={t("projectSettings.noDescription")}
+                  disabled={!canManageProjectSettings}
+                  title={!canManageProjectSettings ? settingsBlockedReason : undefined}
+                />
+              </Field>
+              <Field>
+                <FieldLabel>{t("projectSettings.background")}</FieldLabel>
+                <ProjectBackgroundPicker
+                  name={name}
+                  value={backgroundKey}
+                  onChange={setBackgroundKey}
+                  disabled={!canManageProjectSettings}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="settings-project-visibility">{t("projectSettings.visibility")}</FieldLabel>
+                <SelectControl
+                  id="settings-project-visibility"
+                  value={visibility}
+                  onValueChange={setVisibility}
+                  disabled={!canManageProjectSettings}
+                  options={[
+                    { value: "private", label: t("projectSettings.visibilityValues.private") },
+                    { value: "team", label: t("projectSettings.visibilityValues.team") },
+                    { value: "public", label: t("projectSettings.visibilityValues.public") },
+                  ]}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="settings-course-team">{t("projectSettings.academicBinding")}</FieldLabel>
+                <SelectControl
+                  id="settings-course-team"
+                  value={courseTeam}
+                  onValueChange={setCourseTeam}
+                  disabled={!canManageProjectSettings}
+                  options={ACADEMIC_BINDING_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: option.value === "unassigned" ? t("projectSettings.unassigned") : option.label,
+                  }))}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="settings-retention-policy">{t("projectSettings.retention.title")}</FieldLabel>
+                <SelectControl
+                  id="settings-retention-policy"
+                  value={retentionPolicy}
+                  onValueChange={setRetentionPolicy}
+                  disabled={!canManageProjectSettings}
+                  options={[
+                    { value: "semester_180_days", label: t("projectSettings.retention.semester") },
+                    { value: "one_year_365_days", label: t("projectSettings.retention.year") },
+                    { value: "manual", label: t("projectSettings.retention.manual") },
+                  ]}
+                />
+              </Field>
+              <Button
+                type="button"
+                className="w-fit"
+                onClick={() => void saveProject()}
+                disabled={!canManageProjectSettings}
+                title={!canManageProjectSettings ? settingsBlockedReason : undefined}
+              >
+                {t("projectSettings.save")}
+              </Button>
+            </FieldGroup>
+          </CardContent>
+        </Card>
+        <Card as="section" className={cn("gap-6 border border-destructive/40 shadow-none", sectionClass)}>
+          <CardHeader>
+            <CardTitle className="text-base">{t("projectSettings.danger.title")}</CardTitle>
+            <CardDescription>
+              {t("projectSettings.danger.description", { status: t(`projectSettings.status.${currentProject.status}`, { defaultValue: currentProject.status }) })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void archiveProject()}
               disabled={!canManageProjectSettings}
               title={!canManageProjectSettings ? settingsBlockedReason : undefined}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="settings-project-description">{t("projectSettings.description")}</Label>
-            <Input
-              id="settings-project-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder={t("projectSettings.noDescription")}
-              disabled={!canManageProjectSettings}
-              title={!canManageProjectSettings ? settingsBlockedReason : undefined}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label>{t("projectSettings.background")}</Label>
-            <ProjectBackgroundPicker
-              name={name}
-              value={backgroundKey}
-              onChange={setBackgroundKey}
-              disabled={!canManageProjectSettings}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="settings-project-visibility">{t("projectSettings.visibility")}</Label>
-            <SelectControl
-              id="settings-project-visibility"
-              value={visibility}
-              onValueChange={setVisibility}
-              className="h-9"
-              disabled={!canManageProjectSettings}
-              options={[
-                { value: "private", label: t("projectSettings.visibilityValues.private") },
-                { value: "team", label: t("projectSettings.visibilityValues.team") },
-                { value: "public", label: t("projectSettings.visibilityValues.public") },
-              ]}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="settings-course-team">{t("projectSettings.academicBinding")}</Label>
-            <SelectControl
-              id="settings-course-team"
-              value={courseTeam}
-              onValueChange={setCourseTeam}
-              className="h-9"
-              disabled={!canManageProjectSettings}
-              options={ACADEMIC_BINDING_OPTIONS.map((option) => ({
-                value: option.value,
-                label: option.value === "unassigned" ? t("projectSettings.unassigned") : option.label,
-              }))}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label>{t("projectSettings.retention.title")}</Label>
-            <Select
-              value={retentionPolicy}
-              onValueChange={setRetentionPolicy}
-              disabled={!canManageProjectSettings}
             >
-              <SelectTrigger className="min-w-0 max-w-full">
-                <span
-                  data-slot="select-value"
-                  className="min-w-0 truncate"
-                  title={retentionPolicyLabel}
-                >
-                  {retentionPolicyLabel}
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="semester_180_days">{t("projectSettings.retention.semester")}</SelectItem>
-                <SelectItem value="one_year_365_days">{t("projectSettings.retention.year")}</SelectItem>
-                <SelectItem value="manual">{t("projectSettings.retention.manual")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            type="button"
-            onClick={() => void saveProject()}
-            disabled={!canManageProjectSettings}
-            title={!canManageProjectSettings ? settingsBlockedReason : undefined}
-          >
-            {t("projectSettings.save")}
-          </Button>
-        </div>
-      </section>
-      <section className={`rounded-md border border-border bg-card p-5 ${sectionClass}`}>
-        <h2 className="text-base">{t("projectSettings.danger.title")}</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {t("projectSettings.danger.description", { status: t(`projectSettings.status.${currentProject.status}`, { defaultValue: currentProject.status }) })}
-        </p>
-        <div className="mt-4 grid gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void archiveProject()}
-            disabled={!canManageProjectSettings}
-            title={!canManageProjectSettings ? settingsBlockedReason : undefined}
-          >
-            <Archive className="size-4" />
-            {t("projectSettings.actions.archive")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void restoreProject()}
-            disabled={!canManageProjectSettings}
-            title={!canManageProjectSettings ? settingsBlockedReason : undefined}
-          >
-            {t("projectSettings.actions.restore")}
-          </Button>
-          <div className="grid gap-1.5">
-            <Label htmlFor="settings-transfer-owner">{t("projectSettings.actions.transfer")}</Label>
-            <Input
-              id="settings-transfer-owner"
-              value={newOwnerUserId}
-              onChange={(event) => setNewOwnerUserId(event.target.value)}
-              placeholder={t("projectSettings.ownerPlaceholder")}
-              disabled={!canManageProjectSettings}
-              title={!canManageProjectSettings ? settingsBlockedReason : undefined}
-            />
+              <Archive className="size-4" />
+              {t("projectSettings.actions.archive")}
+            </Button>
             <Button
               type="button"
               variant="outline"
-              onClick={() => void transferOwner()}
+              onClick={() => void restoreProject()}
               disabled={!canManageProjectSettings}
               title={!canManageProjectSettings ? settingsBlockedReason : undefined}
             >
-              {t("projectSettings.actions.transfer")}
+              {t("projectSettings.actions.restore")}
             </Button>
-          </div>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => setDeleteDialogOpen(true)}
-            disabled={!canManageProjectSettings || deletingProject}
-            title={!canManageProjectSettings ? settingsBlockedReason : undefined}
-          >
-            {deletingProject ? <Loader2 className="size-4 animate-spin" /> : null}
-            {t("projectSettings.actions.delete")}
-          </Button>
-        </div>
-        {(message || error) && (
-          <div className="mt-4 rounded-md border border-border bg-muted p-3 text-sm">
-            {message || error}
-          </div>
-        )}
-      </section>
+            <Field className="gap-2">
+              <FieldLabel htmlFor="settings-transfer-owner">{t("projectSettings.actions.transfer")}</FieldLabel>
+              <Input
+                id="settings-transfer-owner"
+                value={newOwnerUserId}
+                onChange={(event) => setNewOwnerUserId(event.target.value)}
+                placeholder={t("projectSettings.ownerPlaceholder")}
+                disabled={!canManageProjectSettings}
+                title={!canManageProjectSettings ? settingsBlockedReason : undefined}
+              />
+              {showOwnerFieldError && <FieldError>{ownerRequiredMessage}</FieldError>}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-fit"
+                onClick={() => void transferOwner()}
+                disabled={!canManageProjectSettings}
+                title={!canManageProjectSettings ? settingsBlockedReason : undefined}
+              >
+                {t("projectSettings.actions.transfer")}
+              </Button>
+            </Field>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => setDeleteDialogOpen(true)}
+              disabled={!canManageProjectSettings || deletingProject}
+              title={!canManageProjectSettings ? settingsBlockedReason : undefined}
+            >
+              {deletingProject ? <Loader2 className="size-4 animate-spin" /> : null}
+              {t("projectSettings.actions.delete")}
+            </Button>
+            {feedback && (
+              <Alert variant={message ? "default" : "destructive"} className="text-sm">
+                {feedback}
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
     <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
       <DialogContent className="sm:max-w-md">
@@ -362,10 +380,10 @@ export function ProjectSettings({
             {t("projectSettings.deleteDialog.description", { name: currentProject.name })}
           </DialogDescription>
         </DialogHeader>
-        {error && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        {error && !showOwnerFieldError && (
+          <Alert variant="destructive" className="text-sm">
             {error}
-          </div>
+          </Alert>
         )}
         <DialogFooter className="gap-2 sm:gap-2">
           <Button

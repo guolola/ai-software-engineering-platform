@@ -192,14 +192,14 @@ export function GenerationConfirmationDialog({
           <Button
             type="button"
             variant="ghost"
-            className="h-10 rounded-[8px] px-6 text-[14px] font-normal text-muted-foreground hover:bg-muted/60"
+            className="h-10 px-6 text-[14px] font-normal"
             onClick={onCancel}
           >
             {t("common.cancel")}
           </Button>
           <Button
             type="button"
-            className="h-10 rounded-[8px] px-6 text-[14px] font-normal shadow-sm"
+            className="h-10 px-6 text-[14px] font-normal"
             onClick={onConfirm}
           >
             {t("generation.dialog.confirmGeneration")}

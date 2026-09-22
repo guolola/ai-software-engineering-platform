@@ -4,6 +4,7 @@ node_modules/
 # build outputs
 apps/*/dist/
 apps/*/.vite/
+/apps/web/.next*/
 packages/*/dist/
 dist/
 build/
@@ -62,6 +63,8 @@ dev-implementation*.log
 vite-web*.log
 .codex-web-dev*.log
 apps/web/.codex-vite*.log
+/.tmp-*.json
+/apps/web/.tmp-*.png
 *.heapsnapshot
 *.network-request
 *.network-response

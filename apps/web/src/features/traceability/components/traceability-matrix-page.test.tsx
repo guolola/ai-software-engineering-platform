@@ -592,7 +592,7 @@ describe("TraceabilityMatrixPage", () => {
 
   it("paginates model element rows and resets pagination after page size changes", async () => {
     const user = userEvent.setup();
-    const useCases = Array.from({ length: 9 }, (_, index) => ({
+    const useCases = Array.from({ length: 26 }, (_, index) => ({
       id: `usecase-${index + 1}`,
       name: `用例 ${index + 1}`,
       goal: `目标 ${index + 1}`,
@@ -622,19 +622,21 @@ describe("TraceabilityMatrixPage", () => {
 
     const table = await findMatrixTableByText("用例 1");
     expect(within(table).getByText("用例 1")).toBeInTheDocument();
-    expect(within(table).queryByText("用例 9")).not.toBeInTheDocument();
-    expect(screen.getByText("1-8 / 9")).toBeInTheDocument();
+    expect(within(table).getByText("用例 10")).toBeInTheDocument();
+    expect(within(table).queryByText("用例 11")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("1-10 / 26")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "下一页" }));
-    expect(within(table).getByText("用例 9")).toBeInTheDocument();
-    expect(screen.getByText("9-9 / 9")).toBeInTheDocument();
+    expect(within(table).getByText("用例 11")).toBeInTheDocument();
+    expect(within(table).getByText("用例 20")).toBeInTheDocument();
+    expect(screen.getByLabelText("11-20 / 26")).toBeInTheDocument();
 
     await chooseSelectOption(
       user,
-      screen.getByRole("combobox", { name: "每页矩阵项数量" }),
-      "12",
+      screen.getByRole("combobox", { name: "每页条数" }),
+      "25",
     );
-    expect(screen.getByText("1-9 / 9")).toBeInTheDocument();
+    expect(screen.getByLabelText("1-25 / 26")).toBeInTheDocument();
   });
 
   it("explains legacy generated models that have no element-level traceability", async () => {

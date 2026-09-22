@@ -1,4 +1,6 @@
 // Renders the dialog used to create a manual requirement rule.
+import { Alert } from '../../../shared/ui/alert';
+import { Textarea } from '../../../shared/ui/textarea';
 import { DIAGRAM_ORDER, getDiagramLabel, type DiagramType } from "../../../entities/diagram/model";
 import { useTranslation } from "react-i18next";
 import {
@@ -16,6 +18,7 @@ import {
   DialogTitle,
 } from "../../../shared/ui/dialog";
 import { SelectControl } from "../../../shared/ui/select";
+import { Field, FieldGroup, FieldLabel, FieldSet } from "../../../shared/ui/field";
 
 interface NewRequirementRuleDialogProps {
   canEditRequirements: boolean;
@@ -52,7 +55,7 @@ export function NewRequirementRuleDialog({
   const categoryKey = (category: RequirementRule["category"]) => ({ "业务规则": "business", "功能需求": "functional", "外部接口": "externalInterface", "界面需求": "interface", "数据需求": "data", "非功能需求": "nonFunctional", "部署需求": "deployment", "异常处理": "exception" } as const)[category];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent data-form-layout="4" className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("requirements.newRule.title")}</DialogTitle>
           <DialogDescription>
@@ -60,9 +63,10 @@ export function NewRequirementRuleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <label className="grid gap-1.5 text-sm">
-            <span className="font-medium">{t("requirements.newRule.type")}</span>
+        <FieldSet className="rounded-xl border border-border bg-muted/10 p-4 sm:p-5">
+          <FieldGroup className="gap-5">
+          <Field>
+            <FieldLabel>{t("requirements.newRule.type")}</FieldLabel>
             <SelectControl
               value={newRuleCategory}
               onValueChange={(value) =>
@@ -75,10 +79,10 @@ export function NewRequirementRuleDialog({
                 label: t(`requirements.categories.${categoryKey(category)}`),
               }))}
             />
-          </label>
+          </Field>
 
-          <div className="grid gap-2 text-sm">
-            <span className="font-medium">{t("requirements.newRule.models")}</span>
+          <Field>
+            <FieldLabel>{t("requirements.newRule.models")}</FieldLabel>
             <div className="grid grid-cols-2 gap-2">
               {DIAGRAM_ORDER.map((diagram) => (
                 <label
@@ -96,25 +100,26 @@ export function NewRequirementRuleDialog({
                 </label>
               ))}
             </div>
-          </div>
+          </Field>
 
-          <label className="grid gap-1.5 text-sm">
-            <span className="font-medium">{t("requirements.newRule.text")}</span>
-            <textarea
+          <Field>
+            <FieldLabel>{t("requirements.newRule.text")}</FieldLabel>
+            <Textarea
               value={newRuleText}
               onChange={(event) => onTextChange(event.target.value)}
               placeholder={t("requirements.newRule.placeholder")}
-              className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-ring"
+              className="min-h-24 w-full resize-y border px-3 py-2 text-sm leading-relaxed"
               disabled={generating || !canEditRequirements}
             />
-          </label>
+          </Field>
 
           {newRuleError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            <Alert variant="destructive" className="border px-3 py-2 text-xs">
               {newRuleError}
-            </div>
+            </Alert>
           )}
-        </div>
+          </FieldGroup>
+        </FieldSet>
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

@@ -3,7 +3,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { PlatformAccountProfileResponse } from "../services/platform-api";
 
 const AuthenticatedRouteSessionContext =
-  createContext<PlatformAccountProfileResponse | null>(null);
+  createContext<PlatformAccountProfileResponse | null | undefined>(undefined);
 
 export function AuthenticatedRouteSessionProvider({
   children,

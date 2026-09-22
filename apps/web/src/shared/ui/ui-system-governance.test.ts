@@ -1,156 +1,80 @@
-// Guards the documented Radix/Tailwind shared UI system boundaries.
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { describe, expect, it } from "vitest";
-
-type PackageManifest = {
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-};
-
-const requiredRuntimeDependencies = [
-  "@radix-ui/react-checkbox",
-  "@radix-ui/react-dialog",
-  "@radix-ui/react-dropdown-menu",
-  "@radix-ui/react-label",
-  "@radix-ui/react-select",
-  "@radix-ui/react-separator",
-  "@radix-ui/react-slot",
-  "@radix-ui/react-switch",
-  "@radix-ui/react-tabs",
-  "class-variance-authority",
-  "clsx",
-  "lucide-react",
-  "tailwind-merge",
-];
-
-const requiredTailwindDependencies = ["tailwindcss", "@tailwindcss/vite"];
-
-const disallowedUiLibraryFamilies = [
-  {
-    label: "MUI",
-    matches: (dependencyName: string) => dependencyName.startsWith("@mui/"),
-  },
-  {
-    label: "Ant Design",
-    matches: (dependencyName: string) =>
-      dependencyName === "antd" || dependencyName.startsWith("@ant-design/"),
-  },
-  {
-    label: "Mantine",
-    matches: (dependencyName: string) => dependencyName.startsWith("@mantine/"),
-  },
-];
-
-const coreSharedUiFiles = [
-  "badge.tsx",
-  "button.tsx",
-  "checkbox.tsx",
-  "dialog.tsx",
-  "dropdown-menu.tsx",
-  "input.tsx",
-  "label.tsx",
-  "select.tsx",
-  "separator.tsx",
-  "switch.tsx",
-  "tabs.tsx",
-  "utils.ts",
-];
-
-const requiredThemeTokenMappings = [
-  "--color-background: var(--background);",
-  "--color-foreground: var(--foreground);",
-  "--color-card: var(--card);",
-  "--color-popover: var(--popover);",
-  "--color-primary: var(--primary);",
-  "--color-secondary: var(--secondary);",
-  "--color-muted: var(--muted);",
-  "--color-accent: var(--accent);",
-  "--color-destructive: var(--destructive);",
-  "--color-border: var(--border);",
-  "--color-input: var(--input);",
-  "--color-ring: var(--ring);",
-  "--color-sidebar: var(--sidebar);",
-  "--color-success: var(--success);",
-  "--color-warning: var(--warning);",
-  "--color-info: var(--info);",
-  "--radius-md: var(--radius);",
-  "--font-sans: var(--font-sans);",
-  "--font-display: var(--font-display);",
-  "--font-mono: var(--font-mono);",
-];
-
-const colorLiteralAllowedFiles = new Set([
-  "src/app/styles/theme.css",
-  "src/app/providers/theme-provider.test.tsx",
-  "src/features/code/components/code-generation-page.test.tsx",
-  "src/features/code/lib/default-prototype-files.ts",
-  "src/features/code/lib/preview-runtime.ts",
-]);
-
-function readPackageManifest() {
-  return JSON.parse(
-    readFileSync("package.json", "utf-8"),
-  ) as PackageManifest;
-}
-
-function sourceFilesUnder(directory: string): string[] {
-  return readdirSync(directory).flatMap((entry) => {
-    const path = `${directory}/${entry}`;
-    const stat = statSync(path);
-    if (stat.isDirectory()) {
-      return sourceFilesUnder(path);
+// Guards template provenance, SPA compatibility and the separation between AdminCN and Flow.
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import ts from 'typescript';
+import { describe, expect, it } from 'vitest';
+import sources from './template-sources.json';
+describe('template UI governance', () => {
+  it('preserves the imported Flow animation parameters', () => {
+    for (const entry of sources.filter(entry => 'motionSha256' in entry)) {
+      const file = ts.createSourceFile(entry.target, readFileSync(entry.target, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      const attributes: unknown[] = [];
+      const visit = (node: ts.Node) => {
+        if (ts.isJsxAttribute(node) && ['animate', 'initial', 'whileInView', 'whileHover', 'transition', 'viewport', 'duration', 'delay', 'motionProps', 'slide', 'inView'].includes(node.name.getText(file))) {
+          attributes.push([node.name.getText(file), node.initializer?.getText(file).replace(/\s+/g, ' ')]);
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(file);
+      expect(createHash('sha256').update(JSON.stringify(attributes)).digest('hex'), entry.target).toBe(entry.motionSha256);
     }
-    return [path];
   });
-}
-
-describe("frontend UI system governance", () => {
-  it("keeps the app on the project-owned Radix and Tailwind UI stack", () => {
-    const manifest = readPackageManifest();
-    const allDependencies = {
-      ...manifest.dependencies,
-      ...manifest.devDependencies,
+  it('keeps every imported template source accounted for', () => {
+    expect(sources.length).toBeGreaterThan(50);
+    for (const entry of sources) {
+      expect(existsSync(entry.target), entry.target).toBe(true);
+      expect(entry.sha256).toMatch(/^[a-f0-9]{64}$/);
+      const source = readFileSync(entry.target, 'utf8');
+      expect(source, entry.target).not.toMatch(/from ['"]next\//);
+    }
+  });
+  it('uses Base UI in business primitives and keeps Flow components isolated', () => {
+    for (const name of ['button', 'dialog', 'dropdown-menu', 'select', 'checkbox', 'tabs']) {
+      const source = readFileSync(`src/shared/ui/${name}.tsx`, 'utf8');
+      expect(source).toContain('@base-ui/react');
+      expect(source).not.toContain('@radix-ui/');
+    }
+    for (const file of readdirSync('src/shared/ui').filter(file => file.endsWith('.tsx'))) {
+      expect(readFileSync(`src/shared/ui/${file}`, 'utf8')).not.toContain('features/marketing-site/template');
+    }
+  });
+  it('keeps business pages on template primitives without raw form or table elements', () => {
+    const forbidden = new Set(['button', 'input', 'textarea', 'select', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th']);
+    // Documented exceptions: hidden file pickers and third-party editor hosts.
+    const whitelist: Record<string, string[]> = {
+      'src/features/user-platform/components/account-dialog.tsx': ['input']
     };
-    const dependencyNames = Object.keys(allDependencies);
-
-    for (const dependencyName of requiredRuntimeDependencies) {
-      expect(allDependencies, dependencyName).toHaveProperty(dependencyName);
-    }
-    for (const dependencyName of requiredTailwindDependencies) {
-      expect(allDependencies, dependencyName).toHaveProperty(dependencyName);
-    }
-
-    const disallowedDependencies = dependencyNames.filter((dependencyName) =>
-      disallowedUiLibraryFamilies.some((family) =>
-        family.matches(dependencyName),
-      ),
-    );
-
-    expect(disallowedDependencies).toEqual([]);
-  });
-
-  it("keeps shared primitives and theme token mappings in their documented homes", () => {
-    const sharedUiFiles = new Set(readdirSync("src/shared/ui"));
-    const themeCss = readFileSync("src/app/styles/theme.css", "utf-8");
-
-    expect(existsSync("src/app/styles/theme.css")).toBe(true);
-    for (const fileName of coreSharedUiFiles) {
-      expect(sharedUiFiles, fileName).toContain(fileName);
-    }
-    for (const tokenMapping of requiredThemeTokenMappings) {
-      expect(themeCss).toContain(tokenMapping);
+    const collect = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+        const path = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+          if (path === 'src/features/marketing-site') return [];
+          return collect(path);
+        }
+        return entry.name.endsWith('.tsx') && !entry.name.endsWith('.test.tsx') ? [path] : [];
+      });
+    for (const file of [...collect('src/features'), ...collect('src/app')]) {
+      const sourceFile = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      const violations: string[] = [];
+      const visit = (node: ts.Node) => {
+        if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node))) {
+          const tag = node.tagName.getText(sourceFile);
+          if (forbidden.has(tag) && !(whitelist[file] ?? []).includes(tag)) violations.push(tag);
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sourceFile);
+      expect(violations, file).toEqual([]);
     }
   });
-
-  it("keeps raw theme color literals out of application UI source", () => {
-    const rawColorLiteralPattern = /#[0-9a-fA-F]{3,8}\b|rgba?\(/u;
-    const filesWithRawColors = sourceFilesUnder("src")
-      .filter((filePath) => /\.(css|ts|tsx)$/.test(filePath))
-      .filter((filePath) => !colorLiteralAllowedFiles.has(filePath))
-      .filter((filePath) =>
-        rawColorLiteralPattern.test(readFileSync(filePath, "utf-8")),
-      );
-
-    expect(filesWithRawColors).toEqual([]);
+  it('retains original Flow motion timings and homepage block order', () => {
+    const base = 'src/features/marketing-site/template/components/';
+    expect(readFileSync(base + 'blocks/hero-section/text-flip.tsx', 'utf8')).toContain('duration = 3000');
+    expect(readFileSync(base + 'blocks/testimonials/testimonials.tsx', 'utf8')).toContain('duration={70}');
+    expect(readFileSync(base + 'ui/motion-preset.tsx', 'utf8')).toContain('stiffness: 200, damping: 20');
+    const home = readFileSync('src/features/marketing-site/components/marketing-home-page.tsx', 'utf8');
+    const order = ['<Hero', '<TrustedBrands', '<Features', '<Benefits', '<Testimonials', '<Pricing', '<FAQ', '<CTA'].map(tag => home.indexOf(tag));
+    expect(order.every(index => index >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a,b) => a-b));
   });
 });

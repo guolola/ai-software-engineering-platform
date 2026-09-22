@@ -202,18 +202,23 @@ export async function readDocumentRunSnapshot(
   });
 }
 
-async function streamProjectRunEvents(
+export async function streamProjectRunEvents(
   endpoint: string,
   projectId: string,
   onEvent: (event: RunEvent) => void,
+  signal?: AbortSignal,
 ) {
   const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (signal?.aborted) controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
   const response = await fetch(buildApiUrl(endpoint), {
     credentials: "include",
     headers: projectHeaders(projectId),
     signal: controller.signal,
-  });
+  }).catch((error) => { signal?.removeEventListener("abort", abort); throw error; });
   if (!response.ok) {
+    signal?.removeEventListener("abort", abort);
     let message = `HTTP ${response.status}`;
     try {
       const payload = await response.json();
@@ -230,7 +235,7 @@ async function streamProjectRunEvents(
   }
 
   const reader = response.body?.getReader();
-  if (!reader) throw new Error("SSE stream unavailable");
+  if (!reader) { signal?.removeEventListener("abort", abort); throw new Error("SSE stream unavailable"); }
 
   const decoder = new TextDecoder();
   let buffer = "";
@@ -290,6 +295,9 @@ async function streamProjectRunEvents(
     controller.abort();
     await reader.cancel().catch(() => {});
     throw error;
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    reader.releaseLock();
   }
 }
 

@@ -32,6 +32,8 @@ import {
   generatePlantUmlArtifacts,
 } from "../../plantuml.js";
 import { emitEvent, type RunRecord } from "../records/run-record-store.js";
+import { throwIfRunCancelled } from "../records/run-cancellation.js";
+import { emitOfflineDemoActivity } from "./offline-demo-activity.js";
 import { stageProgressValue } from "../pipelines/shared/pipeline-events.js";
 import { librarySeatDemoFixture } from "./fixtures/library-seat-demo-fixture.js";
 import {
@@ -76,17 +78,6 @@ function configuredOfflineDemoProjectNamePatterns() {
     .split(",")
     .map((pattern) => pattern.trim().toLocaleLowerCase())
     .filter(Boolean);
-}
-
-function offlineDemoStageDelayMs() {
-  const parsed = Number(process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
-}
-
-async function waitForOfflineDemoStage() {
-  const delayMs = offlineDemoStageDelayMs();
-  if (delayMs <= 0) return;
-  await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 export function isOfflineDemoProject(
@@ -238,6 +229,7 @@ function ensureDesignArtifacts(snapshot: DesignRunSnapshot) {
 }
 
 async function emitDemoStage(record: RunRecord, stage: RunStage, message: string) {
+  throwIfRunCancelled(record);
   record.snapshot.currentStage = stage;
   record.snapshot.status = "running";
   emitEvent(record, stageStartedRunEventSchema.parse({ type: "stage_started", stage }));
@@ -250,13 +242,14 @@ async function emitDemoStage(record: RunRecord, stage: RunStage, message: string
       message,
     }),
   );
-  await waitForOfflineDemoStage();
+  await emitOfflineDemoActivity(record, stage);
 }
 
 function completeRecord(
   record: RunRecord,
   snapshot: RunSnapshot | DesignRunSnapshot | CodeRunSnapshot,
 ) {
+  throwIfRunCancelled(record);
   snapshot.status = "completed";
   snapshot.error = null;
   record.snapshot = snapshot;
@@ -310,7 +303,7 @@ export async function completeOfflineDemoRequirementRun(
   }
   snapshot.status = "queued";
   record.snapshot = snapshot;
-  await emitDemoStage(record, "extract_rules", "离线演示：已加载固定需求规则");
+  await emitDemoStage(record, "extract_rules", "离线演示：正在整理固定需求规则");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -328,7 +321,7 @@ export async function completeOfflineDemoRequirementRun(
     }),
   );
   if (selectedKinds.length > 0) {
-    await emitDemoStage(record, "generate_models", "离线演示：已加载固定需求模型");
+    await emitDemoStage(record, "generate_models", "离线演示：正在并行整理需求模型");
     emitEvent(
       record,
       artifactReadyRunEventSchema.parse({
@@ -337,7 +330,7 @@ export async function completeOfflineDemoRequirementRun(
         artifactKind: "model",
       }),
     );
-    await emitDemoStage(record, "render_svg", "离线演示：已加载 PlantUML 渲染 SVG 图");
+    await emitDemoStage(record, "render_svg", "离线演示：正在准备已保存的图形预览");
     emitEvent(
       record,
       artifactReadyRunEventSchema.parse({
@@ -389,8 +382,8 @@ export async function completeOfflineDemoDesignRun(
   snapshot.currentStage = "render_svg";
   snapshot.status = "queued";
   record.snapshot = snapshot;
-  await emitDemoStage(record, "generate_design_sequence", "离线演示：已加载用例实现设计");
-  await emitDemoStage(record, "generate_design_models", "离线演示：已加载固定设计模型");
+  await emitDemoStage(record, "generate_design_sequence", "离线演示：正在整理用例实现设计");
+  await emitDemoStage(record, "generate_design_models", "离线演示：正在并行整理设计模型");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -399,7 +392,7 @@ export async function completeOfflineDemoDesignRun(
       artifactKind: "model",
     }),
   );
-  await emitDemoStage(record, "render_svg", "离线演示：已加载 PlantUML 渲染设计 SVG 图");
+  await emitDemoStage(record, "render_svg", "离线演示：正在准备已保存的设计图预览");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -427,7 +420,7 @@ export async function completeOfflineDemoCodeRun(record: RunRecord, input: Start
   snapshot.currentStage = "verify_code_business_assertions";
   snapshot.status = "queued";
   record.snapshot = snapshot;
-  await emitDemoStage(record, "analyze_code_business_logic", "离线演示：已加载业务逻辑");
+  await emitDemoStage(record, "analyze_code_business_logic", "离线演示：正在整理业务逻辑");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -437,7 +430,7 @@ export async function completeOfflineDemoCodeRun(record: RunRecord, input: Start
       businessLogic: snapshot.businessLogic ?? undefined,
     }),
   );
-  await emitDemoStage(record, "generate_code_spec", "离线演示：已加载代码规格");
+  await emitDemoStage(record, "generate_code_spec", "离线演示：正在整理代码规格");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -446,7 +439,7 @@ export async function completeOfflineDemoCodeRun(record: RunRecord, input: Start
       artifactKind: "codeSpec",
     }),
   );
-  await emitDemoStage(record, "generate_code_files", "离线演示：已加载固定 React 原型文件");
+  await emitDemoStage(record, "generate_code_files", "离线演示：正在准备原型文件");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -455,7 +448,7 @@ export async function completeOfflineDemoCodeRun(record: RunRecord, input: Start
       artifactKind: "codeFiles",
     }),
   );
-  await emitDemoStage(record, "verify_code_business_assertions", "离线演示：代码业务断言已通过");
+  await emitDemoStage(record, "verify_code_business_assertions", "离线演示：正在读取已保存的业务检查结果");
   if (snapshot.businessAssertionResults) {
     emitEvent(
       record,

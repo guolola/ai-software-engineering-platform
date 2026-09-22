@@ -460,7 +460,7 @@ describe("InstructionDocumentsPage", () => {
     await screen.findByRole("heading", { name: "已生成说明书" });
 
     expect(container.querySelector(".max-w-6xl")).not.toBeInTheDocument();
-    expect(container.querySelector(".max-w-none")).toBeInTheDocument();
+    expect(container.querySelector(".max-w-360")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /自动生成文档/i }),
     ).not.toBeInTheDocument();
@@ -605,8 +605,8 @@ describe("InstructionDocumentsPage", () => {
 
     await screen.findByRole("heading", { name: "已生成说明书" });
     await user.click(within(templateCard("需求规格说明书")).getByRole("button", { name: /说明书样式/i }));
-    const sizeInputs = await screen.findAllByLabelText("字号 pt");
-    fireEvent.change(sizeInputs[0], { target: { value: "18" } });
+    await user.click(screen.getByRole("button", { name: "一级标题" }));
+    fireEvent.change(await screen.findByLabelText("字号 pt"), { target: { value: "18" } });
     await user.click(screen.getByRole("button", { name: "完成" }));
     await user.click(within(templateCard("需求规格说明书")).getByRole("button", { name: /生成并打开/i }));
 

@@ -14,10 +14,10 @@ import {
   sortProviderConfigsByScope,
 } from "../../../shared/lib/provider-config-models";
 import {
-  platformApi,
   type PlatformAccountProfileResponse,
   type PlatformProviderConfig,
 } from "../services/platform-api";
+import { loadProviderConfigs } from "../services/provider-config-cache";
 
 function sameSettings(left: UserSettings, right: UserSettings) {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -77,8 +77,7 @@ export function ManagedProviderSettingsSync({
     if (!userId) return;
     let cancelled = false;
     const refreshProviderSettings = () => {
-      platformApi
-        .listProviderConfigs()
+      loadProviderConfigs(userId)
         .then((response) => {
           if (cancelled) return;
           const next = resolveManagedProviderSettingsSync(

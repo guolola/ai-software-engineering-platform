@@ -56,66 +56,7 @@ export const MARKETING_SEO: Record<MarketingRoutePath, MarketingSeoMetadata> = {
       },
     },
   },
-  "/features": {
-    path: "/features",
-    title: "功能特性｜需求分析、UML 建模、原型与文档生成",
-    description: "了解软件工程实践平台如何连接需求评审、UML 模型、设计推导、代码原型、测试追踪与说明书生成。",
-    canonicalPath: "/features",
-    imagePath: "/og-cover.png",
-    indexable: true,
-    localized: {
-      en: {
-        title: "Features | Requirements, UML Modeling, Prototypes, and Documents",
-        description:
-          "See how the platform connects requirements review, UML models, design derivation, code prototypes, testing traceability, and specification generation.",
-      },
-    },
-  },
-  "/workflow": {
-    path: "/workflow",
-    title: "使用流程｜从需求输入到 UML、代码与说明书",
-    description: "按照阶段化工作流完成需求输入、规则审查、UML 建模、设计推导、原型代码和软件说明书交付。",
-    canonicalPath: "/workflow",
-    imagePath: "/og-cover.png",
-    indexable: true,
-    localized: {
-      en: {
-        title: "Workflow | From Requirements to UML, Code, and Documents",
-        description:
-          "Follow a staged workflow for requirements input, rule review, UML modeling, design derivation, prototype code, and software specifications.",
-      },
-    },
-  },
-  "/cases": {
-    path: "/cases",
-    title: "案例展示｜软件工程建模与生成实践",
-    description: "通过实验室预约、订单履约、设备监控和图书借阅等案例，了解从可行性分析到需求模型、设计模型、代码与文档的完整实践链路。",
-    canonicalPath: "/cases",
-    imagePath: "/og-cover.png",
-    indexable: true,
-    localized: {
-      en: {
-        title: "Case Studies | Software Engineering Modeling and Generation",
-        description:
-          "Explore lab booking, order fulfillment, device monitoring, and library lending examples from feasibility analysis to models, code, and documents.",
-      },
-    },
-  },
-  "/pricing": {
-    path: "/pricing",
-    title: "价格方案｜软件工程实践平台",
-    description: "查看软件工程实践平台当前可用方案与生成权益，按实际需求选择适合的软件工程建模和交付能力。",
-    canonicalPath: "/pricing",
-    imagePath: "/og-cover.png",
-    indexable: true,
-    localized: {
-      en: {
-        title: "Pricing | Software Engineering Practice Platform",
-        description:
-          "Review available plans and generation credits, then choose the software engineering modeling and delivery capabilities that fit your needs.",
-      },
-    },
-  },
+
 };
 
 function localizeMetadata(metadata: MarketingSeoMetadata, locale: AppLocale) {

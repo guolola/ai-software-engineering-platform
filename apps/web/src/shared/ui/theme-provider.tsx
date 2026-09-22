@@ -1,63 +1,104 @@
-// Provides the app-wide theme and font-size bridge as a shared UI context for composition layers and features.
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+// Shares system-aware light/dark mode and AdminCN color presets across application surfaces.
 import {
-  loadUserSettings,
-  USER_SETTINGS_CHANGED_EVENT,
-  type UserSettings,
-} from "../lib/user-settings";
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  ThemeProvider as TemplateThemeProvider,
+  useTheme as useTemplateTheme,
+} from "next-themes";
 
-type Theme = "light" | "dark";
-const STORAGE_KEY = "ui-theme";
-const FONT_SIZE_PX: Record<UserSettings["fontSize"], string> = {
-  sm: "14px",
-  md: "15px",
-  lg: "16px",
+import { themePresets, type ThemePresetKey } from "./theme-presets";
+
+const THEME_PRESET_STORAGE_KEY = "admincn-ui-theme-preset";
+const themePresetKeys = new Set<ThemePresetKey>([
+  "default",
+  ...(Object.keys(themePresets) as Array<keyof typeof themePresets>),
+]);
+const presetCssVariables = Array.from(
+  new Set(
+    Object.values(themePresets).flatMap((preset) =>
+      Object.values(preset.styles).flatMap((styles) => Object.keys(styles)),
+    ),
+  ),
+);
+
+type WorkspaceThemeContextValue = {
+  theme: "light" | "dark";
+  themePreset: ThemePresetKey;
+  setThemePreset: (preset: ThemePresetKey) => void;
+  toggle: () => void;
 };
 
-const ThemeCtx = createContext<{ theme: Theme; toggle: () => void } | null>(null);
+const WorkspaceThemeContext = createContext<WorkspaceThemeContextValue | null>(null);
 
-function applyFontSize() {
-  if (typeof window === "undefined") return;
-  const fontSize = loadUserSettings().fontSize;
-  document.documentElement.style.setProperty("--font-size", FONT_SIZE_PX[fontSize]);
+function readStoredThemePreset(): ThemePresetKey {
+  if (typeof window === "undefined") return "default";
+  const stored = window.localStorage.getItem(THEME_PRESET_STORAGE_KEY) as ThemePresetKey | null;
+  return stored && themePresetKeys.has(stored) ? stored : "default";
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "dark";
-    const saved = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    if (saved === "light" || saved === "dark") return saved;
-    return "dark";
-  });
+function WorkspaceThemeController({ children }: { children: ReactNode }) {
+  const { resolvedTheme, setTheme } = useTemplateTheme();
+  const theme: "light" | "dark" = resolvedTheme === "dark" ? "dark" : "light";
+  const [themePreset, setThemePresetState] = useState<ThemePresetKey>(readStoredThemePreset);
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
-    localStorage.setItem(STORAGE_KEY, theme);
-  }, [theme]);
+    presetCssVariables.forEach((key) => root.style.removeProperty(`--${key}`));
+    if (themePreset === "default") return;
 
-  useEffect(() => {
-    applyFontSize();
-    window.addEventListener(USER_SETTINGS_CHANGED_EVENT, applyFontSize);
-    return () => {
-      window.removeEventListener(USER_SETTINGS_CHANGED_EVENT, applyFontSize);
-    };
-  }, []);
+    const preset = themePresets[themePreset];
+    Object.entries(preset.styles[theme]).forEach(([key, value]) => {
+      root.style.setProperty(`--${key}`, value);
+    });
+  }, [theme, themePreset]);
+
+  const value = useMemo<WorkspaceThemeContextValue>(
+    () => ({
+      theme,
+      themePreset,
+      setThemePreset: (preset) => {
+        setThemePresetState(preset);
+        if (preset === "default") {
+          window.localStorage.removeItem(THEME_PRESET_STORAGE_KEY);
+        } else {
+          window.localStorage.setItem(THEME_PRESET_STORAGE_KEY, preset);
+        }
+      },
+      toggle: () => setTheme(theme === "dark" ? "light" : "dark"),
+    }),
+    [setTheme, theme, themePreset],
+  );
 
   return (
-    <ThemeCtx.Provider
-      value={{
-        theme,
-        toggle: () => setTheme((t) => (t === "dark" ? "light" : "dark")),
-      }}
-    >
+    <WorkspaceThemeContext.Provider value={value}>
       {children}
-    </ThemeCtx.Provider>
+    </WorkspaceThemeContext.Provider>
+  );
+}
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  return (
+    <TemplateThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      storageKey="admincn-ui-theme"
+    >
+      <WorkspaceThemeController>{children}</WorkspaceThemeController>
+    </TemplateThemeProvider>
   );
 }
 
 export function useTheme() {
-  const v = useContext(ThemeCtx);
-  if (!v) throw new Error("useTheme must be inside ThemeProvider");
-  return v;
+  const value = useContext(WorkspaceThemeContext);
+  if (!value) throw new Error("useTheme must be used within ThemeProvider");
+  return value;
 }
+
+export { themePresets, type ThemePresetKey } from "./theme-presets";

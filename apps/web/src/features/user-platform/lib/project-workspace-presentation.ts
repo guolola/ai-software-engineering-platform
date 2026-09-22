@@ -162,16 +162,17 @@ export function getProjectRunStatusLabel(status?: string | null, t?: TFunction) 
 }
 
 export function getProjectRunStatusClasses(status?: string | null) {
+  // Semantic status tokens keep run states consistent with the AdminCN palette.
   switch (status) {
     case "completed":
       return {
-        bar: "bg-emerald-500",
-        badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        bar: "bg-success",
+        badge: "border-success/30 bg-success/10 text-success",
       };
     case "interrupted":
       return {
-        bar: "bg-amber-500",
-        badge: "border-amber-200 bg-amber-50 text-amber-700",
+        bar: "bg-warning",
+        badge: "border-warning/30 bg-warning/10 text-warning",
       };
     case "failed":
       return {

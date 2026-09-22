@@ -1,5 +1,6 @@
+import { Button } from "./button";
 import { useEffect, useMemo, useState } from "react";
-import { Check, Cpu } from "lucide-react";
+import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { i18n as appI18n } from "../i18n";
 import {
@@ -20,6 +21,7 @@ import {
   USER_SETTINGS_CHANGED_EVENT,
   loadUserSettings,
 } from "../lib/user-settings";
+import { ProviderIcon } from "./provider-icon";
 
 function getProviderModelGroups(
   modelIds: string[],
@@ -128,35 +130,37 @@ export function ModelPicker({
       ? getProviderModelLabel(value)
       : t("modelPicker.notSelected"),
   };
+  const selectedProvider = providerModels.includes(value.trim())
+    ? inferProviderModelGroup(value, providerSettings.providerLabel)
+    : null;
   const emptyStateLabel = providerSettings.providerConfigId
     ? t("modelPicker.noModels")
     : t("modelPicker.selectProvider");
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
+      <DropdownMenuTrigger render={<Button variant="outline"
           type="button"
           className={cn(
-            "inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent",
+            "h-9 gap-1.5 px-3 py-2",
             fullWidth && "w-full justify-between rounded-md text-left",
             disabled && "cursor-not-allowed opacity-50 hover:bg-background",
             triggerClassName,
           )}
           title={t("modelPicker.switch")}
           disabled={disabled}
-        >
+        />} >
           <span className="inline-flex min-w-0 items-center gap-1.5">
-            <Cpu className="size-3.5 shrink-0 text-muted-foreground" />
+            <ProviderIcon providerId={selectedProvider?.id ?? ""} className="size-3.5" />
             <span className="truncate">{display.triggerLabel}</span>
           </span>
-        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="min-w-56">
         {providerModelGroups.length > 0 ? (
           providerModelGroups.map((vendor) => (
             <DropdownMenuSub key={vendor.id}>
               <DropdownMenuSubTrigger className="gap-2 text-xs">
+                <ProviderIcon providerId={vendor.id} />
                 <span className="font-medium">{vendor.label}</span>
                 {vendor.models.some((model) => model.id === value) && (
                   <span className="ml-auto font-mono text-[10px] text-muted-foreground">
@@ -168,7 +172,7 @@ export function ModelPicker({
                 {vendor.models.map((model) => (
                   <DropdownMenuItem
                     key={model.id}
-                    onSelect={() => onValueChange(model.id)}
+                    onClick={() => onValueChange(model.id)}
                     className="flex items-center justify-between gap-3 text-xs"
                     title={model.fullLabel}
                   >

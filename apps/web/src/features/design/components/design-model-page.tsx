@@ -1,4 +1,5 @@
 // Renders design-stage model generation controls, selection state, and requirement-to-design trace summaries.
+import { Card } from "../../../shared/ui/card";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DiagramModelSpec } from "@uml-platform/contracts";
@@ -7,7 +8,6 @@ import {
   AlertTriangle,
   Box,
   BookOpen,
-  CheckCircle2,
   Database,
   Eye,
   GitBranch,
@@ -18,6 +18,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { Badge } from "../../../shared/ui/badge";
+import { PageContainer, PageHeader } from "../../../shared/template/layout/page";
 import { Button } from "../../../shared/ui/button";
 import {
   Dialog,
@@ -33,7 +34,6 @@ import {
   useFeedbackDialog,
   type FeedbackDialogState,
 } from "../../../shared/ui/feedback-dialog";
-import { ScaleToFitFrame, ScaledToolbar } from "../../../shared/ui/scale-to-fit";
 import { cn } from "../../../shared/ui/utils";
 import {
   DESIGN_DIAGRAM_META,
@@ -67,6 +67,7 @@ import {
   mobileTouchTargetClass,
 } from "../../workspace-shell/components/mobile-density";
 import { ModelBentoCard } from "../../workspace-shell/components/model-bento-card";
+import { useModelCardStatus } from "../../workspace-shell/lib/use-model-card-status";
 import { useWorkspaceSession } from "../../workspace-session/state";
 import { designBlockGuidance } from "../lib/design-feedback";
 
@@ -265,6 +266,7 @@ function stageRepairCopy(text: string) {
 
 export function DesignModelPage() {
   const { t } = useTranslation();
+  const { designStatusFor } = useModelCardStatus();
   const {
     rules,
     models,
@@ -592,29 +594,23 @@ export function DesignModelPage() {
   }, [designModels, generationBlockFeedback, openFeedbackOnce, visibleGenerationBlockReason]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-auto bg-background">
-      <div className="w-full p-4 lg:p-5">
-        <div className="mx-auto flex w-full max-w-none flex-col gap-5">
-          <header>
-            <ScaledToolbar
-              minWidth={500}
-              minReadableScale={0.68}
-              contentClassName="w-full items-end justify-between gap-6"
-            >
-              <div className="min-w-0">
-                <div className="flex flex-nowrap items-center gap-2">
-                  <h2 className="text-2xl font-semibold tracking-normal text-foreground lg:text-3xl">
-                    {t("designPage.title")}
-                  </h2>
-                  <Badge variant="secondary" className="rounded-full font-mono">
-                    {effectiveSelected.length}/{DESIGN_DIAGRAM_ORDER.length}
-                  </Badge>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t("designPage.description")}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
+    <div className="flex min-h-full flex-col bg-background">
+      <PageContainer className="flex flex-col gap-5">
+          <PageHeader
+            title={t("designPage.title")}
+            titleAccessory={
+              <>
+                <Badge variant="secondary" className="font-mono">
+                  {effectiveSelected.length}/{DESIGN_DIAGRAM_ORDER.length}
+                </Badge>
+                {generationBlockFeedback?.keepReopenEntry ? (
+                  <FeedbackReopenButton feedback={generationBlockFeedback} />
+                ) : null}
+              </>
+            }
+            description={t("designPage.description")}
+            actions={
+              <>
                 <ModelPicker
                   value={defaultModel}
                   onValueChange={updateModel}
@@ -623,7 +619,7 @@ export function DesignModelPage() {
                 />
                 <Button
                   size="sm"
-                  className="h-9 rounded-lg"
+                  className="h-9"
                   onClick={runGenerate}
                   disabled={!canGenerate || generating}
                   title={designGenerationBlockedReason ?? selectedDesignBlockReason ?? undefined}
@@ -635,17 +631,11 @@ export function DesignModelPage() {
                   )}
                   {t("designPage.generate")}
                 </Button>
-              </div>
-            </ScaledToolbar>
-          </header>
+              </>
+            }
+          />
 
-          {generationBlockFeedback?.keepReopenEntry ? (
-            <div className="flex justify-end">
-              <FeedbackReopenButton feedback={generationBlockFeedback} />
-            </div>
-          ) : null}
-
-          <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
+          <div className="min-w-0">
             <main className="flex min-w-0 flex-col gap-4">
               <section>
                 <MobileCompactGrid
@@ -692,10 +682,6 @@ export function DesignModelPage() {
                     );
                     const generated = viewableModels.length > 0;
                     const firstGeneratedModel = viewableModels[0] ?? generatedModels[0];
-                    const generatedLabel =
-                      diagram === "sequence" && viewableModels.length > 0
-                        ? t("designPage.sequenceCount", { count: viewableModels.length })
-                        : t("designPage.generated");
                     const error = designDiagramErrors[diagram];
                     const DiagramIcon = DESIGN_DIAGRAM_ICON[diagram];
                     return (
@@ -716,16 +702,12 @@ export function DesignModelPage() {
                         ariaLabel={t(checked ? "designPage.deselect" : "designPage.select", { label: localizedLabel })}
                         checkboxLabel={localizedLabel}
                         onSelectedChange={(value) => toggleDiagram(diagram, value)}
-                        statusClassName={generated ? "bg-primary/5" : undefined}
-                        status={
+                        status={designStatusFor(diagram)}
+                        content={
                           <div className="space-y-1.5">
                             {generated ? (
                               <>
-                                <div className="flex items-center gap-1.5 text-primary">
-                                  <CheckCircle2 className="size-3.5 shrink-0" />
-                                  <span>{generatedLabel}</span>
-                                </div>
-                                <button
+                                <Button variant="ghost"
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
@@ -739,28 +721,23 @@ export function DesignModelPage() {
                                   }}
                                   onKeyDown={(event) => event.stopPropagation()}
                                   className={cn(
-                                    "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10",
+                                    "inline-flex items-center gap-1 px-2 py-1 text-[11px]",
                                     mobileTouchTargetClass,
                                     "sm:min-h-0",
                                   )}
                                 >
                                   <Eye className="size-3" />
                                   {t("designPage.view")}
-                                </button>
+                                </Button>
                               </>
                             ) : (
                               <>
-                                <div
-                                  className={cn(
-                                    "flex items-center gap-1.5",
-                                    blockReason
-                                      ? "text-destructive"
-                                      : "text-muted-foreground",
-                                  )}
+                                {blockReason && <div
+                                  className="flex items-center gap-1.5 text-destructive"
                                 >
                                   <AlertTriangle className="size-3.5 shrink-0" />
-                                  <span>{blockReason ? localizeDesignBlockReason(blockReason, t) : t("designPage.waiting")}</span>
-                                </div>
+                                  <span>{localizeDesignBlockReason(blockReason, t)}</span>
+                                </div>}
                                 {autoFillLabels.length > 0 && !blockReason && (
                                   <div className="text-warning">
                                     {t("designPage.autoFill", {
@@ -768,9 +745,6 @@ export function DesignModelPage() {
                                     })}
                                   </div>
                                 )}
-                                <div className="text-muted-foreground">
-                                  {t("designPage.source", { source: sourceLabel })}
-                                </div>
                               </>
                             )}
                             {error && (
@@ -786,142 +760,10 @@ export function DesignModelPage() {
                 </MobileCompactGrid>
               </section>
 
-              <section className="border-t border-border pt-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {t("designPage.requirementSources")}
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {designRepairRecords.length > 0 && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-8 rounded-lg bg-card"
-                        aria-label={t("designPage.traceAria", { count: designRepairRecords.length })}
-                        onClick={() => setTraceabilityDialogOpen(true)}
-                      >
-                        <Eye className="size-3.5" />
-                        {t("designPage.trace")}
-                        <span className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">
-                          {t("designPage.items", { count: designRepairRecords.length })}
-                        </span>
-                      </Button>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {t("designPage.currentModel", { model: getProviderModelDisplayName(defaultModel).triggerLabel })}
-                    </span>
-                  </div>
-                </div>
-                <MobileStatusRail className="mt-3">
-                  {DIAGRAM_ORDER.map(
-                    (diagram) => {
-                      const SourceIcon = REQUIREMENT_SOURCE_ICON[diagram];
-                      const stale = sourceStatus[diagram] && staleDiagrams.includes(diagram);
-                      const sourceStateLabel = stale
-                        ? t("designPage.sourceStatus.stale")
-                        : sourceStatus[diagram]
-                          ? t("designPage.sourceStatus.available")
-                          : t("designPage.sourceStatus.missing");
-                      return (
-                        <MobileStatusPill
-                          key={diagram}
-                          aria-label={`${getDiagramLabel(diagram, t)} ${sourceStateLabel}`}
-                          className={cn(
-                            stale
-                              ? "border-warning/35 bg-warning/10 text-warning"
-                              : sourceStatus[diagram]
-                              ? "border-border bg-card text-foreground"
-                              : "border-border bg-muted/30 text-muted-foreground",
-                          )}
-                        >
-                          {stale ? (
-                            <AlertTriangle className="size-3.5 text-warning" />
-                          ) : sourceStatus[diagram] ? (
-                            <CheckCircle2 className="size-3.5 text-primary" />
-                          ) : (
-                            <SourceIcon className="size-3.5 text-muted-foreground" />
-                          )}
-                          <span className="max-w-24 truncate">
-                            {getDiagramLabel(diagram, t)}
-                          </span>
-                          <span className="font-mono text-[10px] text-muted-foreground">
-                            {sourceStateLabel}
-                          </span>
-                        </MobileStatusPill>
-                      );
-                    },
-                  )}
-                </MobileStatusRail>
-                <div className="mt-3 text-xs text-muted-foreground">
-                  {t("designPage.requirementSourceHint")}
-                </div>
-              </section>
-
             </main>
 
-            <aside className="flex min-w-0 flex-col gap-3">
-              <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="size-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {t("designPage.guide.title")}
-                  </h3>
-                </div>
-                <div className="mt-3 grid gap-2">
-                  <div className="rounded-lg border-l-2 border-primary bg-muted/40 px-3 py-2">
-                    <h4 className="text-xs font-medium text-foreground">
-                      {t("designPage.guide.boundaryTitle")}
-                    </h4>
-                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-                      {t("designPage.guide.boundaryDescription")}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border-l-2 border-primary bg-muted/40 px-3 py-2">
-                    <h4 className="text-xs font-medium text-foreground">
-                      {t("designPage.guide.dependenciesTitle")}
-                    </h4>
-                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-                      {requirementDependencyGuideText}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border-l-2 border-primary bg-muted/40 px-3 py-2">
-                    <h4 className="text-xs font-medium text-foreground">
-                      {t("designPage.guide.architectureTitle")}
-                    </h4>
-                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-                      {t("designPage.guide.architectureDescription")}
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <Route className="size-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {t("designPage.patterns.title")}
-                  </h3>
-                </div>
-                <MobileRail className="mt-3 md:grid-cols-1">
-                  {[
-                    t("designPage.patterns.tiered"),
-                    t("designPage.patterns.microservices"),
-                    t("designPage.patterns.eda"),
-                  ].map((pattern) => (
-                    <MobileRailCard key={pattern} className="min-w-[180px]">
-                      <div className="flex min-h-11 items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground transition-colors hover:bg-muted/50 md:min-h-0 md:border-0 md:bg-transparent md:px-2 md:py-1.5">
-                        <span className="truncate">{pattern}</span>
-                        <span className="text-muted-foreground">›</span>
-                      </div>
-                    </MobileRailCard>
-                  ))}
-                </MobileRail>
-              </section>
-            </aside>
           </div>
-        </div>
-      </div>
+      </PageContainer>
       <Dialog open={traceabilityDialogOpen} onOpenChange={setTraceabilityDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -931,8 +773,8 @@ export function DesignModelPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-auto pr-1">
-            <ScaleToFitFrame minWidth={640} contentClassName="w-[640px]">
-            <div className="flex flex-nowrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 p-3">
+            <div className="w-full min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 p-3">
               <div>
                 <div className="text-sm font-medium text-foreground">
                   {t("designPage.traceDialogs.evidence")}
@@ -943,7 +785,7 @@ export function DesignModelPage() {
               </div>
               <Badge
                 variant="outline"
-                className="border-success/35 bg-success/10 text-success"
+                className="border-success/35 text-success"
               >
                 {t("designPage.traceDialogs.complete")}
               </Badge>
@@ -984,7 +826,7 @@ export function DesignModelPage() {
                 </div>
               ))}
             </div>
-            </ScaleToFitFrame>
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" onClick={() => setTraceabilityDialogOpen(false)}>

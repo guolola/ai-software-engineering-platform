@@ -1,3 +1,5 @@
+import { SidebarProvider } from '../shared/ui/sidebar';
+import { TooltipProvider } from '../shared/ui/tooltip';
 import type { ReactNode } from "react";
 import { AppI18nProvider } from "../app/providers/i18n-provider";
 import { ThemeProvider } from "../shared/ui/theme-provider";
@@ -173,7 +175,7 @@ export function withWorkspaceProviders(
         <FeedbackDialogProvider>
           <WorkspaceShellProvider>
             <WorkspaceRepositoryProvider repository={repository}>
-              <WorkspaceSessionProvider>{children}</WorkspaceSessionProvider>
+              <WorkspaceSessionProvider><SidebarProvider><TooltipProvider>{children}</TooltipProvider></SidebarProvider></WorkspaceSessionProvider>
             </WorkspaceRepositoryProvider>
           </WorkspaceShellProvider>
         </FeedbackDialogProvider>

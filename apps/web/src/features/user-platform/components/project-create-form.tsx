@@ -1,11 +1,13 @@
 // Renders project creation state and maps selected bindings into createProject input.
-import { useEffect, useState } from "react";
+import { Textarea } from '../../../shared/ui/textarea';
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import type { ProjectBackgroundKey } from "@uml-platform/contracts";
-import { ChevronDown, Loader2, Settings2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
 import { Input } from "../../../shared/ui/input";
-import { Label } from "../../../shared/ui/label";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSet } from "../../../shared/ui/field";
 import { SelectControl } from "../../../shared/ui/select";
 import {
   UNASSIGNED_ACADEMIC_OPTION,
@@ -45,7 +47,7 @@ function SegmentedButtonGroup({
             size="sm"
             variant={selected ? "secondary" : "outline"}
             aria-pressed={selected}
-            className="h-8 rounded-md px-3 text-xs"
+            className="h-8 px-3 text-xs"
             onClick={() => onChange(option.value)}
           >
             {option.label}
@@ -70,7 +72,18 @@ export function ProjectCreateForm({ onNavigate }: { onNavigate: Navigate }) {
   const [backgroundKey, setBackgroundKey] = useState<ProjectBackgroundKey | null>(null);
   const [creating, setCreating] = useState(false);
   const [status, setStatus] = useState("");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [step, setStep] = useState(0);
+  const mounted = useRef(false);
+  const navigationTimer = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      // Leaving the form must cancel its delayed redirect, including during route transitions.
+      window.clearTimeout(navigationTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -110,105 +123,130 @@ export function ProjectCreateForm({ onNavigate }: { onNavigate: Navigate }) {
         teamId: academicBinding.teamId,
         backgroundKey,
       });
-      setStatus(t("projects.createForm.saved"));
-      window.setTimeout(() => onNavigate(`/projects/${response.project.id}`), 900);
+      if (!mounted.current) return;
+      toast.success(t("projects.createForm.created"));
+      navigationTimer.current = window.setTimeout(() => {
+        if (mounted.current) onNavigate(`/projects/${response.project.id}`);
+      }, 900);
     } catch {
-      setStatus(t("projects.createForm.failed"));
+      if (mounted.current) setStatus(t("projects.createForm.failed"));
     } finally {
-      setCreating(false);
+      if (mounted.current) setCreating(false);
     }
   };
 
   return (
-    <form className="grid gap-5">
-      <div className="grid gap-1.5">
-        <Label htmlFor="project-name">{t("projects.createForm.name")}</Label>
-        <Input id="project-name" value={name} onChange={(event) => setName(event.target.value)} />
-      </div>
-      <div className="grid gap-1.5">
-        <Label>{t("projects.createForm.background")}</Label>
-        <ProjectBackgroundPicker
-          name={name}
-          value={backgroundKey}
-          onChange={setBackgroundKey}
-          disabled={creating}
-        />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="project-description">{t("projects.createForm.description")}</Label>
-        <textarea
-          id="project-description"
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder={t("projects.createForm.descriptionPlaceholder")}
-          rows={4}
-          className="min-h-24 w-full resize-y rounded-md border border-input bg-input-background px-3 py-2 text-base text-foreground placeholder:text-muted-foreground outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-        />
-      </div>
-      <div className="grid gap-1.5">
-        <Label id="project-visibility-label">{t("projects.createForm.visibility")}</Label>
-        <SegmentedButtonGroup
-          labelId="project-visibility-label"
-          value={visibility}
-          options={[
-            { value: "private", label: t("projects.createForm.visibilityOptions.private") },
-            { value: "team", label: t("projects.createForm.visibilityOptions.team") },
-            { value: "course", label: t("projects.createForm.visibilityOptions.course") },
-          ]}
-          onChange={setVisibility}
-        />
-      </div>
-      <div className="grid gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-expanded={advancedOpen}
-          aria-controls="project-create-advanced-settings"
-          className="h-8 w-fit px-2 text-xs text-muted-foreground"
-          onClick={() => setAdvancedOpen((current) => !current)}
-        >
-          <Settings2 className="size-3.5" />
-          {t("projects.createForm.advanced")}
-          <ChevronDown
-            className={`size-3.5 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
-          />
+    <form className="grid gap-6" onSubmit={(event) => event.preventDefault()}>
+      <ol aria-label={t("projects.createForm.stepsLabel")} className="grid grid-cols-3 gap-2">
+        {["basic", "binding", "confirm"].map((key, index) => (
+          <li key={key} className="min-w-0">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-auto w-full justify-start gap-2 rounded-lg border border-border bg-muted/20 p-2 text-left transition-colors hover:bg-muted/50 disabled:cursor-default"
+              aria-current={step === index ? "step" : undefined}
+              disabled={index > step}
+              onClick={() => setStep(index)}
+            >
+              <span className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${step > index ? "bg-success/10 text-success" : step === index ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                {step > index ? <Check className="size-3.5" /> : index + 1}
+              </span>
+              <span className="hidden min-w-0 truncate text-xs font-medium sm:block">
+                {t(`projects.createForm.steps.${key}`)}
+              </span>
+            </Button>
+          </li>
+        ))}
+      </ol>
+
+      {step === 0 ? (
+        <FieldSet>
+          <FieldGroup className="gap-5">
+            <Field>
+              <FieldLabel htmlFor="project-name">{t("projects.createForm.name")}</FieldLabel>
+              <Input id="project-name" value={name} onChange={(event) => setName(event.target.value)} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="project-description">{t("projects.createForm.description")}</FieldLabel>
+              <Textarea
+                id="project-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder={t("projects.createForm.descriptionPlaceholder")}
+                rows={4}
+                className="min-h-24 w-full resize-y"
+              />
+            </Field>
+            <Field>
+              <FieldLabel>{t("projects.createForm.background")}</FieldLabel>
+              <ProjectBackgroundPicker name={name} value={backgroundKey} onChange={setBackgroundKey} disabled={creating} />
+            </Field>
+          </FieldGroup>
+        </FieldSet>
+      ) : null}
+
+      {step === 1 ? (
+        <FieldSet>
+          <FieldGroup className="gap-5">
+            <Field>
+              <FieldLabel id="project-visibility-label">{t("projects.createForm.visibility")}</FieldLabel>
+              <SegmentedButtonGroup
+                labelId="project-visibility-label"
+                value={visibility}
+                options={[
+                  { value: "private", label: t("projects.createForm.visibilityOptions.private") },
+                  { value: "team", label: t("projects.createForm.visibilityOptions.team") },
+                  { value: "course", label: t("projects.createForm.visibilityOptions.course") },
+                ]}
+                onChange={setVisibility}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="course-team">{t("projects.createForm.academicBinding")}</FieldLabel>
+              <SelectControl
+                id="course-team"
+                aria-label={t("projects.createForm.academicBinding")}
+                value={courseTeam}
+                onValueChange={setCourseTeam}
+                disabled={academicLoading}
+                className="h-9"
+                options={academicOptions.map((option) => ({
+                  value: option.value,
+                  label: option.value === UNASSIGNED_ACADEMIC_OPTION.value ? t("projects.createForm.unassigned") : option.label,
+                }))}
+              />
+              {academicStatus ? <FieldDescription>{academicStatus}</FieldDescription> : null}
+            </Field>
+          </FieldGroup>
+        </FieldSet>
+      ) : null}
+
+      {step === 2 ? (
+        <section className="grid gap-4 rounded-xl border border-border bg-muted/20 p-4" aria-label={t("projects.createForm.steps.confirm")}>
+          <div><p className="text-xs text-muted-foreground">{t("projects.createForm.name")}</p><p className="mt-1 font-medium">{name}</p></div>
+          <div><p className="text-xs text-muted-foreground">{t("projects.createForm.description")}</p><p className="mt-1 text-sm">{description.trim() || "—"}</p></div>
+          <div><p className="text-xs text-muted-foreground">{t("projects.createForm.visibility")}</p><p className="mt-1 text-sm">{t(`projects.createForm.visibilityOptions.${visibility}`)}</p></div>
+        </section>
+      ) : null}
+
+      <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+        <Button type="button" variant="outline" onClick={() => setStep((current) => Math.max(0, current - 1))} disabled={step === 0 || creating}>
+          <ChevronLeft className="size-4" />
+          {t("projects.createForm.previous")}
         </Button>
-        {advancedOpen && (
-          <div
-            id="project-create-advanced-settings"
-            className="grid gap-1.5 rounded-md border border-border/60 bg-muted/20 p-3"
-          >
-            <Label htmlFor="course-team">{t("projects.createForm.academicBinding")}</Label>
-            <SelectControl
-              id="course-team"
-              aria-label={t("projects.createForm.academicBinding")}
-              value={courseTeam}
-              onValueChange={setCourseTeam}
-              disabled={academicLoading}
-              className="h-9"
-              options={academicOptions.map((option) => ({
-                value: option.value,
-                label: option.value === UNASSIGNED_ACADEMIC_OPTION.value ? t("projects.createForm.unassigned") : option.label,
-              }))}
-            />
-            {academicStatus && (
-              <span className="text-xs text-muted-foreground">{academicStatus}</span>
-            )}
-          </div>
+        {step < 2 ? (
+          <Button type="button" onClick={() => setStep((current) => Math.min(2, current + 1))} disabled={step === 0 && !name.trim()}>
+            {t("projects.createForm.next")}
+            <ChevronRight className="size-4" />
+          </Button>
+        ) : (
+          <Button type="button" onClick={createProject} disabled={creating || !name.trim()}>
+            {creating && <Loader2 className="size-4 animate-spin" />}
+            {t("projects.createForm.submit")}
+          </Button>
         )}
       </div>
-      <div>
-        <Button type="button" onClick={createProject} disabled={creating}>
-          {creating && <Loader2 className="size-4 animate-spin" />}
-          {t("projects.createForm.submit")}
-        </Button>
-        {status && (
-          <div className="mt-3 rounded-md border border-border bg-muted p-3 text-sm">
-            {status}
-          </div>
-        )}
-      </div>
+      {status ? <div className="rounded-md border border-border bg-muted p-3 text-sm">{status}</div> : null}
     </form>
   );
 }

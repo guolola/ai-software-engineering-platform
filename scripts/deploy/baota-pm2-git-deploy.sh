@@ -176,10 +176,6 @@ verify_web_seo_artifacts() {
     "sitemap.xml"
     "404.html"
     "seo-manifest.json"
-    "features/index.html"
-    "workflow/index.html"
-    "cases/index.html"
-    "pricing/index.html"
     "og-cover.png"
   )
 
@@ -423,6 +419,9 @@ reload_pm2_for_release() {
 }
 
 rollback_to_previous_release() {
+  # Restore the matching routing configuration before serving the previous app.
+  node "$SOURCE_DIR/scripts/deploy/nginx-marketing-routes.mjs" restore \
+    "$RELEASE_DIR/nginx-routing-backup.json" || return 1
   if [[ -z "$PREVIOUS_RELEASE" || ! -d "$PREVIOUS_RELEASE" ]]; then
     echo "No previous release is available for rollback" >&2
     return 1
@@ -502,6 +501,14 @@ ln -sfnT "$RELEASE_DIR" "$DEPLOY_PATH/current"
 if ! run_timed "PM2 reload and release verification" \
   reload_pm2_for_release "$RELEASE_DIR" "$RELEASE_SHA" "$RELEASE_STARTED_AT"; then
   echo "New release failed health checks; restoring previous release" >&2
+  rollback_to_previous_release
+  exit 1
+fi
+
+if ! run_timed "migrate retired marketing routes" \
+  node "$SOURCE_DIR/scripts/deploy/nginx-marketing-routes.mjs" apply \
+    "$RELEASE_DIR/nginx-routing-backup.json" "$DEPLOY_PATH/current/apps/web/dist"; then
+  echo "Nginx route migration failed; restoring previous release" >&2
   rollback_to_previous_release
   exit 1
 fi

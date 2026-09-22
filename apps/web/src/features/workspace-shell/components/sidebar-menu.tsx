@@ -1,4 +1,10 @@
 // Renders the workspace sidebar navigation and diagram status tree used by desktop and wide viewport layouts.
+import { Badge } from '../../../shared/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../shared/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../../shared/ui/collapsible";
+import { SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu as TemplateSidebarMenu, SidebarMenuItem, SidebarMenuSub, SidebarMenuAction, SidebarMenuButton, useSidebar } from '../../../shared/ui/sidebar';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuSeparator, DropdownMenuGroup } from '../../../shared/ui/dropdown-menu';
+import { Button } from '../../../shared/ui/button';
 import {
   useEffect,
   useState,
@@ -126,36 +132,27 @@ function TraceBadge({
   label: string | number;
   tooltip?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const tooltipId = `sidebar-trace-${String(label).replace(/\W+/g, "-")}`;
+  const badge = <Badge variant="secondary" className="max-w-24 shrink-0 truncate px-2 py-0.5 text-[11px]">{label}</Badge>;
+  return tooltip ? <Tooltip><TooltipTrigger render={<span tabIndex={0} />}>{badge}</TooltipTrigger><TooltipContent className="max-w-64">{tooltip}</TooltipContent></Tooltip> : badge;
+}
 
-  return (
-    <span
-      className="relative shrink-0"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
-    >
-      <span
-        tabIndex={tooltip ? 0 : undefined}
-        aria-describedby={tooltip && open ? tooltipId : undefined}
-        className="block max-w-24 truncate rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground outline-none ring-ring focus-visible:ring-2"
-        title={tooltip ? undefined : String(label)}
-      >
-        {label}
-      </span>
-      {tooltip && open && (
-        <span
-          id={tooltipId}
-          role="tooltip"
-          className="absolute right-0 top-full z-30 mt-1 w-max max-w-64 rounded-md border border-border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-lg"
-        >
-          {tooltip}
-        </span>
-      )}
-    </span>
-  );
+// Collapsed navigation uses actual menu items, preserving arrow-key traversal at every depth.
+function FlyoutItems({ node, onSelect }: { node: Node; onSelect?: () => void }) {
+  const select = () => {
+    if (node.selectable !== false && node.onSelect) { node.onSelect(); onSelect?.(); }
+    else if (node.unavailableReason) toast.message(node.unavailableReason);
+  };
+  return <DropdownMenuGroup>
+    <DropdownMenuItem onClick={select} title={node.unavailableReason}>{node.icon}<span className="truncate">{node.label}</span></DropdownMenuItem>
+    {!!node.children?.length && <DropdownMenuSeparator />}
+    {node.children?.map(child => child.children?.length ? <DropdownMenuSub key={child.key}>
+      <DropdownMenuSubTrigger>{child.icon}<span className="truncate">{child.label}</span></DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="max-h-[80vh] w-72 overflow-auto"><FlyoutItems node={child} onSelect={onSelect} /></DropdownMenuSubContent>
+    </DropdownMenuSub> : <DropdownMenuItem key={child.key} title={child.unavailableReason} onClick={() => {
+      if (child.selectable !== false && child.onSelect) { child.onSelect(); onSelect?.(); }
+      else if(child.unavailableReason) toast.message(child.unavailableReason);
+    }}>{child.icon}<span className="truncate">{child.label}</span></DropdownMenuItem>)}
+  </DropdownMenuGroup>;
 }
 
 function GenerationStatusIndicator({
@@ -188,7 +185,7 @@ function GenerationStatusIndicator({
       ) : status === "failed" ? (
         <XCircle className="size-3.5 text-destructive" />
       ) : (
-        <CheckCircle2 className="size-3.5 text-primary" />
+        <CheckCircle2 className="size-3.5 text-success" />
       )}
     </span>
   );
@@ -220,17 +217,18 @@ function TreeItem({
   onNavigateItemSelect?: () => void;
 }) {
   const { t } = useTranslation();
+  const { state, isMobile } = useSidebar();
   const hasChildren = !!node.children?.length;
   const open = openKeys.has(node.key);
   const selected = selectedKey === node.key;
   const selectable = node.selectable ?? true;
-  const toggleOpen = () =>
+  const setNodeOpen = (nextOpen: boolean) =>
     setOpenKeys((current) => {
       const next = new Set(current);
-      if (next.has(node.key)) {
-        next.delete(node.key);
-      } else {
+      if (nextOpen) {
         next.add(node.key);
+      } else {
+        next.delete(node.key);
       }
       return next;
     });
@@ -246,77 +244,46 @@ function TreeItem({
       toast.message(node.unavailableReason);
       return;
     }
-    if (hasChildren) {
-      toggleOpen();
-    }
   };
 
-  return (
-    <div>
-      <div
-        className={cn(
-          "mx-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-xl py-1.5 pr-2 text-left text-sm font-medium text-sidebar-foreground/82 transition-colors hover:bg-muted hover:text-sidebar-foreground [&_svg]:transition-colors",
-          depth === 0 && "min-h-11",
-          depth > 0 && "min-h-10",
-          selected &&
-            "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm [&_svg]:text-sidebar-accent-foreground",
-        )}
-        style={{ paddingLeft: 10 + depth * 14 }}
-      >
-        {hasChildren ? (
-          <button
-            type="button"
-            aria-label={t(open ? "workspace.sidebar.collapse" : "workspace.sidebar.expand", { label: node.label })}
-            onClick={toggleOpen}
-            className="inline-flex size-6 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <ChevronRight
-              className={cn(
-                "size-3.5 transition-transform",
-                open && "rotate-90",
-              )}
-            />
-          </button>
-        ) : (
-          <span className="size-5 shrink-0" />
-        )}
+  // Icon mode uses the template menu flyout so every nested business item remains reachable.
+  if (state === 'collapsed' && !isMobile) {
+    return <DropdownMenu>
+      <DropdownMenuTrigger render={<SidebarMenuButton aria-label={node.label} isActive={selected} />}>
         {node.icon}
-        <button
-          type="button"
-          onClick={handleSelect}
-          className="min-w-0 flex-1 truncate text-left"
-        >
-          {node.label}
-        </button>
-        {node.badge !== undefined && (
-          <TraceBadge label={node.badge} tooltip={node.badgeTooltip} />
-        )}
-        {node.badges?.map((badge) => (
-          <TraceBadge key={badge} label={badge} />
-        ))}
-        {node.status && (
-          <GenerationStatusIndicator
-            status={node.status}
-            tooltip={node.statusTooltip}
-          />
-        )}
-      </div>
-      {hasChildren && open && (
-        <div>
-          {node.children!.map((child) => (
-            <TreeItem
-              key={child.key}
-              node={child}
-              depth={depth + 1}
-              selectedKey={selectedKey}
-              openKeys={openKeys}
-              setOpenKeys={setOpenKeys}
-              onNavigateItemSelect={onNavigateItemSelect}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="right" align="start" className="max-h-[80vh] w-72 overflow-auto">
+        <FlyoutItems node={node} onSelect={onNavigateItemSelect} />
+      </DropdownMenuContent>
+    </DropdownMenu>;
+  }
+  return (
+    <Collapsible open={open} onOpenChange={setNodeOpen} render={<SidebarMenuItem />}>
+      <SidebarMenuButton
+        isActive={selected}
+        tooltip={node.label}
+        onClick={handleSelect}
+        aria-label={node.label}
+        className="data-active:bg-primary/10!"
+        title={node.unavailableReason ?? node.statusTooltip}
+      >
+        {node.icon}
+        <span className="truncate">{node.label}</span>
+        {node.badge !== undefined && <TraceBadge label={node.badge} tooltip={node.badgeTooltip} />}
+        {node.badges?.map(badge => <TraceBadge key={badge} label={badge} />)}
+        {node.status && <GenerationStatusIndicator status={node.status} tooltip={node.statusTooltip} />}
+      </SidebarMenuButton>
+      {hasChildren && <CollapsibleTrigger
+        aria-label={t(open ? "workspace.sidebar.collapse" : "workspace.sidebar.expand", { label: node.label })}
+        aria-controls={`sidebar-panel-${node.key}`}
+        render={<SidebarMenuAction />}
+      ><ChevronRight className={cn('transition-transform duration-200', open && 'rotate-90')} /></CollapsibleTrigger>}
+      {hasChildren && <CollapsibleContent id={`sidebar-panel-${node.key}`} className="h-(--collapsible-panel-height) overflow-hidden transition-all duration-200 data-ending-style:h-0 data-starting-style:h-0">
+        <SidebarMenuSub className={depth === 0 ? "mr-0 pr-0" : "mr-0 ml-2 pr-0 pl-2"}>
+          {node.children!.map(child => <TreeItem key={child.key} node={child} depth={depth + 1} selectedKey={selectedKey} openKeys={openKeys} setOpenKeys={setOpenKeys} onNavigateItemSelect={onNavigateItemSelect} />)}
+        </SidebarMenuSub>
+      </CollapsibleContent>}
+    </Collapsible>
   );
 }
 
@@ -985,6 +952,12 @@ export function SidebarMenu({
             (sequenceSubtaskNodes.length > 1 ||
               (sequenceGenerationActive && sequenceSubtaskNodes.length > 0))
           ) {
+            const sequenceGroupViewable = sequenceSubtaskNodes.some((node) =>
+              designModelViewable("sequence", node.id),
+            );
+            const sequenceGroupHasStructuredModel = sequenceSubtaskNodes.some((node) =>
+              Boolean(designModels[node.id]),
+            );
             const sequenceGroupStale =
               staleDesignDiagrams.includes("sequence") ||
               sequenceSubtaskNodes.some((node) =>
@@ -1006,7 +979,7 @@ export function SidebarMenu({
               undefined,
             );
             return {
-              key: "design-diagram-group:sequence",
+              key: "design-diagram:sequence",
               label: t("workspace.sidebar.groupCount", { label: getDesignDiagramLabel("sequence", t), count: sequenceSubtaskNodes.length }),
               icon: (
                 <span className="relative inline-flex">
@@ -1019,7 +992,7 @@ export function SidebarMenu({
                   )}
                 </span>
               ),
-              selectable: false,
+              selectable: sequenceGroupViewable,
               status: groupStatus,
               statusTooltip:
                 generationStatusTooltip(
@@ -1028,8 +1001,19 @@ export function SidebarMenu({
                   sequenceSubtaskNodes.some((node) =>
                     designModelViewable("sequence", node.id),
                   ),
-                  sequenceSubtaskNodes.some((node) => Boolean(designModels[node.id])),
+                  sequenceGroupHasStructuredModel,
                 ),
+              unavailableReason: sequenceGroupViewable
+                ? undefined
+                : diagramUnavailableReason(groupStatus, sequenceGroupHasStructuredModel),
+              onSelect: sequenceGroupViewable
+                ? () =>
+                    openDesignDiagram(
+                      "sequence",
+                      undefined,
+                      getDesignDiagramLabel("sequence", t),
+                    )
+                : undefined,
               children: sequenceSubtaskNodes.map((node) =>
                 {
                   const model = designModels[node.id];
@@ -1137,31 +1121,15 @@ export function SidebarMenu({
   ];
 
   return (
-    <nav
-      aria-label={t("workspace.sidebar.navigation")}
-      className="flex h-full w-full flex-col overflow-hidden py-6 text-sidebar-foreground"
-    >
-      <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-button]:hidden [&::-webkit-scrollbar-button]:size-0 [&::-webkit-scrollbar-track]:bg-transparent">
-        <div className="mb-3 flex items-center gap-2 px-4 py-2">
-          <Layers className="size-4 text-muted-foreground" />
-          <span className="text-xs font-semibold uppercase tracking-[0.88px] text-muted-foreground">
-            {t("workspace.sidebar.navigation")}
-          </span>
-        </div>
-        <div className="flex flex-col gap-1">
-          {tree.map((node) => (
-            <TreeItem
-              key={node.key}
-              node={node}
-              depth={0}
-              selectedKey={selectedKey}
-              openKeys={openKeys}
-              setOpenKeys={setOpenKeys}
-              onNavigateItemSelect={onNavigateItemSelect}
-            />
-          ))}
-        </div>
-      </div>
+    <nav aria-label={t("workspace.sidebar.navigation")} className="h-full w-full">
+      <SidebarGroup>
+        <SidebarGroupLabel className="text-sidebar-foreground/50 tracking-wider uppercase">{t("workspace.sidebar.navigation")}</SidebarGroupLabel>
+        <SidebarGroupContent>
+          <TemplateSidebarMenu>
+            {tree.map(node => <TreeItem key={node.key} node={node} depth={0} selectedKey={selectedKey} openKeys={openKeys} setOpenKeys={setOpenKeys} onNavigateItemSelect={onNavigateItemSelect} />)}
+          </TemplateSidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
     </nav>
   );
 }

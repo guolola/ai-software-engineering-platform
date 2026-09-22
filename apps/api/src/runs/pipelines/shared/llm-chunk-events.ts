@@ -8,6 +8,7 @@ import { emitEvent, type RunRecord } from "../../records/run-record-store.js";
 import { stageProgressValue } from "./pipeline-events.js";
 import type { ModelTaskActivity } from "./model-task-timeout.js";
 import type { LlmChunkHandlers } from "./structured-output.js";
+import { createCallActivity } from "./call-activity.js";
 
 const BLANK_CHUNK_NOTICE_COUNT = 40;
 const BLANK_CHUNK_NOTICE_INTERVAL_MS = 10_000;
@@ -51,6 +52,7 @@ export function createRunLlmChunkHandlers({
   noVisibleChunkHeartbeatIntervalMs = NO_VISIBLE_CHUNK_HEARTBEAT_INTERVAL_MS,
   noVisibleChunkHeartbeatMessage = NO_VISIBLE_CHUNK_HEARTBEAT_MESSAGE,
 }: RunLlmChunkHandlerOptions): LlmChunkHandlers {
+  const activity = createCallActivity({ record, stage, subtaskId: subtaskId ?? modelId ?? diagramKind, subtaskLabel });
   let emittedChunks = 0;
   let emittedChars = 0;
   let blankChunksSinceContent = 0;
@@ -75,7 +77,9 @@ export function createRunLlmChunkHandlers({
   };
 
   const handlers: LlmChunkHandlers = {
+    ...activity,
     onChunk(chunk) {
+      activity.onChunk(chunk);
       blankChunksSinceContent = 0;
       onActivity?.();
       if (emittedChunks >= maxVisibleChunks || emittedChars >= maxVisibleChars) {
@@ -96,7 +100,9 @@ export function createRunLlmChunkHandlers({
         }),
       );
     },
-    onBlankChunk() {
+    onBlankChunk(chunk) {
+      // Whitespace may belong inside a streamed JSON string; retain it in durable output.
+      activity.onChunk(chunk);
       onBlankActivity?.();
       blankChunksSinceContent += 1;
       const now = Date.now();

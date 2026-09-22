@@ -1,4 +1,5 @@
 // Defines the in-memory run record boundary shared by routes, pipelines, and SSE.
+import { randomUUID } from "node:crypto";
 import type {
   CodeRunSnapshot,
   DesignRunSnapshot,
@@ -14,6 +15,7 @@ export interface RunRecord {
   eventCreatedAt?: string[];
   listeners: Set<(event: RunEvent) => void>;
   terminal: boolean;
+  beforeTerminal?: Set<() => void>;
   documentBuffer?: Buffer;
   metadata?: RunRecordMetadata;
   persist?: (record: RunRecord, event?: RunEvent) => void | Promise<void>;
@@ -145,6 +147,11 @@ export function emitEvent(record: RunRecord, event: RunEvent) {
       return;
     }
   }
+  if (isTerminalRunEvent(event)) {
+    for (const flush of record.beforeTerminal ?? []) flush();
+    record.beforeTerminal?.clear();
+  }
+  event = { ...event, eventId: event.eventId ?? randomUUID(), createdAt: event.createdAt ?? new Date().toISOString() };
   const storeEvent = shouldStoreEvent(event);
   if (storeEvent) {
     record.events.push(event);

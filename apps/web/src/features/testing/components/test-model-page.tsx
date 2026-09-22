@@ -1,8 +1,11 @@
 // Builds black-box test cases and coverage links from requirement and design models.
+import { Card } from "../../../shared/ui/card";
 import { useEffect, useMemo, useState } from "react";
+import type { ColumnDef, PaginationState } from "@tanstack/react-table";
 import { useTranslation } from "react-i18next";
+import { PageContainer, PageHeader } from "../../../shared/template/layout/page";
 import type { TFunction } from "i18next";
-import { ClipboardCheck, Filter, Play, ShieldCheck } from "lucide-react";
+import { Filter, Play, ShieldCheck } from "lucide-react";
 import type {
   BlackBoxTestCase,
   DesignDiagramModelSpec,
@@ -17,8 +20,8 @@ import type {
 } from "@uml-platform/contracts";
 import { Badge } from "../../../shared/ui/badge";
 import { Button } from "../../../shared/ui/button";
-import { ScaledTable, ScaledToolbar } from "../../../shared/ui/scale-to-fit";
 import { SelectControl } from "../../../shared/ui/select";
+import { StudioDataTable } from "../../../shared/ui/studio-data-table";
 import {
   FeedbackReopenButton,
   useFeedbackDialog,
@@ -307,6 +310,7 @@ export function TestModelPage() {
   const { openRequirementsText, openSystemRequirements } = useWorkspaceShell();
   const { openFeedback, openFeedbackOnce } = useFeedbackDialog();
   const [scenarioFilter, setScenarioFilter] = useState<TestScenarioType | "all">("all");
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
   const useCaseModel = models.usecase;
   const blockedReason =
     !useCaseModel || !("useCases" in useCaseModel) || useCaseModel.useCases.length === 0
@@ -361,6 +365,74 @@ export function TestModelPage() {
     return new Map((result?.coverageRelations ?? []).map((item) => [item.testCaseId, item]));
   }, [result?.coverageRelations]);
 
+  useEffect(() => {
+    setPagination(current => ({ ...current, pageIndex: 0 }));
+  }, [result, scenarioFilter]);
+
+  const testColumns = useMemo<ColumnDef<BlackBoxTestCase>[]>(() => [
+    {
+      accessorKey: "title",
+      header: t("testingPage.columns.case"),
+      size: 260,
+      cell: ({ row }) => (
+        <div className="min-w-56 max-w-80 whitespace-normal">
+          <div className="font-semibold text-foreground">{row.original.title}</div>
+          <div className="mt-1 font-mono text-[11px] text-muted-foreground">{row.original.id}</div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "scenarioType",
+      header: t("testingPage.columns.scenario"),
+      size: 140,
+      cell: ({ row }) => <Badge variant="secondary">{t(`testingPage.scenarios.${row.original.scenarioType.replace("-", "_")}`)}</Badge>,
+    },
+    {
+      id: "steps",
+      header: t("testingPage.columns.steps"),
+      size: 330,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <div className="min-w-72 max-w-[34rem] space-y-2 whitespace-normal">
+          {row.original.steps.slice(0, 3).map(step => (
+            <div key={step.order} className="rounded-md bg-muted/40 px-3 py-2">
+              <div className="text-xs font-medium text-foreground">{step.order}. {step.action}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{step.expectedResult}</div>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "coverage",
+      header: t("testingPage.columns.coverage"),
+      size: 210,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const coverage = coverageByCase.get(row.original.id);
+        return (
+          <div className="flex min-w-40 max-w-64 flex-wrap gap-1 whitespace-normal">
+            {(coverage?.requirementIds ?? []).map(id => <Badge key={id} variant="outline" className="text-[10px]">{formatRuleId(id)}</Badge>)}
+            {(coverage?.useCaseIds ?? []).map(id => <Badge key={id} variant="secondary" className="text-[10px]">{id}</Badge>)}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "priority",
+      header: t("testingPage.columns.priority"),
+      size: 100,
+      cell: ({ row }) => (
+        <span className={cn(
+          "inline-flex rounded-full px-2 py-1 text-xs font-semibold",
+          row.original.priority === "P1" || row.original.priority === "P0"
+            ? "bg-primary/10 text-primary"
+            : "bg-muted text-muted-foreground",
+        )}>{row.original.priority}</span>
+      ),
+    },
+  ], [coverageByCase, t]);
+
   const coveredRequirements = new Set(
     (result?.coverageRelations ?? []).flatMap((item) => item.requirementIds),
   );
@@ -369,24 +441,15 @@ export function TestModelPage() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-auto bg-background">
-      <div className="w-full p-4 lg:p-5">
-        <div className="mx-auto flex w-full max-w-none flex-col gap-5">
-          <header>
-            <ScaledToolbar minWidth={520} contentClassName="w-full items-end justify-between gap-6">
-              <div>
-                <div className="flex items-center gap-2">
-                  <ClipboardCheck className="size-6 text-primary" />
-                  <h2 className="text-2xl font-semibold tracking-normal text-foreground lg:text-3xl">
-                    {t("testingPage.title")}
-                  </h2>
-                </div>
-                {blockFeedback?.keepReopenEntry ? (
-                  <div className="mt-2">
-                    <FeedbackReopenButton feedback={blockFeedback} />
-                  </div>
-                ) : null}
-              </div>
+    <PageContainer className="flex min-h-full flex-col">
+      <div className="flex w-full flex-col gap-5">
+          <PageHeader
+            title={t("testingPage.title")}
+            description={t("testingPage.description")}
+            titleAccessory={blockFeedback?.keepReopenEntry ? (
+              <FeedbackReopenButton feedback={blockFeedback} />
+            ) : null}
+            actions={
               <Button
                 type="button"
                 className="shrink-0 gap-2"
@@ -425,12 +488,12 @@ export function TestModelPage() {
                 <Play className="size-4" />
                 {t("testingPage.generate")}
               </Button>
-            </ScaledToolbar>
-          </header>
+            }
+          />
 
           <div
             data-testid="test-summary-grid"
-            className="grid w-full grid-cols-4 gap-2 md:gap-3"
+            className="grid w-full grid-cols-2 gap-3 lg:gap-6 xl:grid-cols-4"
           >
             {[
               [t("testingPage.summary.cases"), result?.testCases.length ?? 0],
@@ -438,131 +501,54 @@ export function TestModelPage() {
               [t("testingPage.summary.usecases"), coveredUseCases.size],
               [t("testingPage.summary.relations"), result?.coverageRelations.length ?? 0],
             ].map(([label, value]) => (
-              <div key={label} className="min-w-0 rounded-lg border border-border bg-card p-2.5 md:p-4">
-                <div className="truncate text-[12px] leading-4 text-muted-foreground md:text-xs">
+              <Card key={label} className="gap-0 py-0 min-w-0 p-4">
+                <div className="truncate text-sm text-muted-foreground">
                   {label}
                 </div>
-                <div className="mt-1 text-xl font-semibold leading-6 text-foreground md:mt-2 md:text-2xl md:leading-8">
+                <div className="mt-1 text-lg font-semibold leading-6 text-foreground">
                   {value}
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
 
-          <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-            <div className="border-b border-border bg-muted/30 px-4 py-3">
-              <ScaledToolbar minWidth={540} contentClassName="w-full justify-between gap-4">
-                <div className="flex shrink-0 items-center gap-2">
-                  <ShieldCheck className="size-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground">{t("testingPage.blackBox")}</h3>
-                  <Badge variant="secondary" className="rounded-full font-mono text-[11px]">
-                    {filteredCases.length}
-                  </Badge>
-                </div>
-                <label className="inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                  <Filter className="size-3.5" />
-                  <SelectControl
-                    aria-label={t("testingPage.filterAria")}
-                    value={scenarioFilter}
-                    onValueChange={(value) => setScenarioFilter(value as TestScenarioType | "all")}
-                    className="h-8 min-w-32 text-sm"
-                    size="sm"
-                    options={SCENARIO_TYPES.map((value) => ({ value, label: t(`testingPage.scenarios.${value.replace("-", "_")}`) }))}
-                  />
-                </label>
-              </ScaledToolbar>
-            </div>
-
-            {result ? (
-              <div className="max-w-full overflow-hidden">
-                <ScaledTable minWidth={920} className="border-collapse text-sm">
-                  <thead className="bg-muted/20 text-xs text-muted-foreground">
-                    <tr>
-                      <th className="w-[28%] border-b border-r border-border px-4 py-4 text-left font-medium">
-                        {t("testingPage.columns.case")}
-                      </th>
-                      <th className="w-[14%] border-b border-r border-border px-4 py-4 text-left font-medium">
-                        {t("testingPage.columns.scenario")}
-                      </th>
-                      <th className="w-[30%] border-b border-r border-border px-4 py-4 text-left font-medium">
-                        {t("testingPage.columns.steps")}
-                      </th>
-                      <th className="w-[18%] border-b border-r border-border px-4 py-4 text-left font-medium">
-                        {t("testingPage.columns.coverage")}
-                      </th>
-                      <th className="w-[10%] border-b border-border px-4 py-4 text-left font-medium">
-                        {t("testingPage.columns.priority")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCases.map((testCase) => {
-                      const coverage = coverageByCase.get(testCase.id);
-                      return (
-                        <tr key={testCase.id} className="border-b border-border last:border-b-0">
-                          <td className="border-r border-border px-4 py-3 align-top">
-                            <div className="font-semibold text-foreground">{testCase.title}</div>
-                            <div className="mt-1 font-mono text-[11px] text-muted-foreground">
-                              {testCase.id}
-                            </div>
-                          </td>
-                          <td className="border-r border-border px-4 py-3 align-top">
-                            <Badge variant="secondary">{t(`testingPage.scenarios.${testCase.scenarioType.replace("-", "_")}`)}</Badge>
-                          </td>
-                          <td className="border-r border-border px-4 py-3 align-top">
-                            <div className="space-y-2">
-                              {testCase.steps.slice(0, 3).map((step) => (
-                                <div key={step.order} className="rounded-md bg-muted/40 px-3 py-2">
-                                  <div className="text-xs font-medium text-foreground">
-                                    {step.order}. {step.action}
-                                  </div>
-                                  <div className="mt-1 text-xs text-muted-foreground">
-                                    {step.expectedResult}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="border-r border-border px-4 py-3 align-top">
-                            <div className="flex flex-wrap gap-1">
-                              {(coverage?.requirementIds ?? []).map((id) => (
-                                <Badge key={id} variant="outline" className="text-[10px]">
-                                  {formatRuleId(id)}
-                                </Badge>
-                              ))}
-                              {(coverage?.useCaseIds ?? []).map((id) => (
-                                <Badge key={id} variant="secondary" className="text-[10px]">
-                                  {id}
-                                </Badge>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <span
-                              className={cn(
-                                "inline-flex rounded-full px-2 py-1 text-xs font-semibold",
-                                testCase.priority === "P1" || testCase.priority === "P0"
-                                  ? "bg-primary/10 text-primary"
-                                  : "bg-muted text-muted-foreground",
-                              )}
-                            >
-                              {testCase.priority}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </ScaledTable>
+          <StudioDataTable
+            columns={testColumns}
+            data={filteredCases}
+            getRowId={testCase => testCase.id}
+            pagination={pagination}
+            onPaginationChange={setPagination}
+            pageSizeOptions={[10, 25, 50]}
+            tableClassName="min-w-[1040px]"
+            emptyState={t("testingPage.empty")}
+            footerLabel={t("testingPage.pagination.itemLabel", { defaultValue: "个测试用例" })}
+            toolbarLeading={
+              <div className="flex shrink-0 items-center gap-2">
+                <ShieldCheck className="size-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">{t("testingPage.blackBox")}</h3>
+                <Badge variant="secondary" className="font-mono text-[11px]">
+                  {filteredCases.length}
+                </Badge>
               </div>
-            ) : (
-              <div className="flex min-h-72 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-                {t("testingPage.empty")}
-              </div>
-            )}
-          </section>
-        </div>
+            }
+            filters={
+              <label className="inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                <Filter className="size-3.5" />
+                <SelectControl
+                  aria-label={t("testingPage.filterAria")}
+                  value={scenarioFilter}
+                  onValueChange={(value) => {
+                    setScenarioFilter(value as TestScenarioType | "all");
+                    setPagination((current) => ({ ...current, pageIndex: 0 }));
+                  }}
+                  className="h-8 min-w-32 text-sm"
+                  size="sm"
+                  options={SCENARIO_TYPES.map((value) => ({ value, label: t(`testingPage.scenarios.${value.replace("-", "_")}`) }))}
+                />
+              </label>
+            }
+          />
       </div>
-    </div>
+    </PageContainer>
   );
 }

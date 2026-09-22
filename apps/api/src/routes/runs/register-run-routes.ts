@@ -119,6 +119,7 @@ import {
   offlineDemoLlmTransport,
   offlineDemoProviderSettings,
 } from "../../runs/demo/offline-demo-runs.js";
+import { emitOfflineDemoActivity } from "../../runs/demo/offline-demo-activity.js";
 import {
   attachProjectWorkspaceSync,
   type ProjectWorkspaceSync,
@@ -203,6 +204,7 @@ type DocumentPipeline = (
   providerSettings: ProviderSettings,
   llmTransport: LlmTransport,
   pngRenderClient: PngRenderClient,
+  onPreparedStage?: (stage: RunStage) => Promise<void>,
 ) => Promise<void>;
 
 type RunBillingEntitlements = Pick<
@@ -1011,6 +1013,7 @@ export function registerRunRoutes({
         offlineDemoProviderSettings,
         offlineDemoLlmTransport,
         pngRenderClient,
+        (stage) => emitOfflineDemoActivity(record, stage),
       ).catch((error) => {
         handleRunPipelineError(record, error, addCodeDiagnostic);
       });
@@ -1161,7 +1164,11 @@ export function registerRunRoutes({
       projectId,
       run: await summarizeRunRecordWithCurrentDocument(record, documentLibrary),
       snapshot: record.snapshot,
-      ...(includeEvents ? { events: record.events } : {}),
+      ...(includeEvents ? { events: record.events.map((event, index) => ({
+        ...event,
+        eventId: event.eventId ?? `${runId}:legacy:${index}`,
+        createdAt: event.createdAt ?? record.eventCreatedAt?.[index],
+      })) } : {}),
     };
   });
 

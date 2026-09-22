@@ -1,6 +1,7 @@
 // Renders the code generation workspace, including model selection, file browser, and preview actions.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { PageContainer } from "../../../shared/template/layout/page";
 import { SandpackProvider } from "@codesandbox/sandpack-react";
 import {
   AlertTriangle,
@@ -12,15 +13,8 @@ import {
   Play,
   RefreshCw,
 } from "lucide-react";
-import { Badge } from "../../../shared/ui/badge";
 import { Button } from "../../../shared/ui/button";
 import { ModelPicker } from "../../../shared/ui/model-picker";
-import { ScaledToolbar } from "../../../shared/ui/scale-to-fit";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "../../../shared/ui/resizable";
 import {
   normalizeProviderModelCapability,
 } from "../../../shared/lib/provider-model-display";
@@ -35,6 +29,7 @@ import { DEFAULT_FILES } from "../lib/default-prototype-files";
 import { fileLabel } from "../lib/file-paths";
 import { isMonacoManualCancelation } from "../lib/monaco-extra-libs";
 import { FileTree } from "./file-tree";
+import { CodeStatusDialog } from "./code-status-dialog";
 import { EditorBridge, MonacoFileModelSync } from "./file-editor";
 import {
   LocalPrototypePreview,
@@ -96,7 +91,7 @@ export function CodeGenerationPage() {
   } = useWorkspaceSession();
   const { openDesignHome, openSystemRequirements } = useWorkspaceShell();
   const compactViewport = useCompactViewport();
-  const [mobilePane, setMobilePane] = useState<"files" | "editor" | "preview">("editor");
+  const [mobilePane, setMobilePane] = useState<"files" | "editor">("editor");
   const [defaultModel, setDefaultModel] = useState(
     () => loadUserSettings().defaultModel,
   );
@@ -340,392 +335,117 @@ export function CodeGenerationPage() {
   }, [recordCodePreviewDiagnostic]);
 
   return (
-    <div
-      data-testid="code-generation-page"
-      className="flex h-full min-h-0 flex-col overflow-hidden bg-background p-3 lg:p-4"
-    >
-      <div
-        data-testid="code-workspace-frame"
-        className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-sm"
-      >
-      <div className="border-b border-border px-3">
-        <ScaledToolbar
-          data-testid="code-generation-toolbar"
-          minWidth={0}
-          contentClassName="min-h-10 w-full gap-1.5"
-        >
-          <div className="flex min-w-0 shrink items-center gap-1.5">
-            <Code2 className="size-4 text-primary" />
-            <span className="hidden truncate text-sm font-semibold min-[430px]:inline">
-              {t("code.title")}
-            </span>
-            <Badge variant="secondary" className="px-1.5 font-mono text-[11px]">
-              {t("code.fileCount", { count: sortedFiles.length })}
-            </Badge>
-            <Badge
-              variant={modelCapability.supportsJsonSchema ? "secondary" : "outline"}
-              className="hidden px-1.5 text-[11px] min-[520px]:inline-flex"
-            >
-              {t(`code.modelModes.${modelCapability.structuredOutputMode}`)}
-            </Badge>
-            <Badge variant="secondary" className="hidden px-1.5 text-[11px] min-[520px]:inline-flex">
-              {t("code.designModelCount", { count: designModelCount })}
-            </Badge>
-          </div>
-          {generating && (
-            <div className="ml-2 flex min-w-0 shrink items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
-              <span className="truncate">{runMessage ?? t("code.generatingCode")}</span>
-              <span className="font-mono">{runProgress}%</span>
+    <PageContainer className="flex min-h-0 min-w-0 flex-col">
+      <div data-testid="code-generation-page" className="flex min-h-0 min-w-0 flex-col">
+        <div data-testid="code-workspace-frame" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+          <div data-testid="code-generation-toolbar" className="flex min-h-12 w-full flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <Code2 className="size-4 shrink-0 text-primary" />
+              <span className="text-sm font-semibold">{t("code.title")}</span>
+              <CodeStatusDialog status={codeStatus} diagnostics={codeDiagnostics} />
+              {!canGenerate && <FeedbackReopenButton feedback={generationBlockFeedback!} />}
             </div>
-          )}
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-          <ModelPicker
-            value={defaultModel}
-            onValueChange={updateModel}
-            align="end"
-            triggerClassName="h-8 max-w-[150px] bg-card px-2 text-xs"
-          />
-          <Button
-            size="sm"
-            className="h-8 px-2 text-xs"
-            onClick={() =>
-              void generateCodePrototype(
-            generatedFileCount > 0 ? "continue" : "regenerate",
-              )
-            }
-            disabled={!canGenerate || generating}
-          >
-            {generating ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : generatedFileCount > 0 ? (
-              <RefreshCw className="size-3.5" />
-            ) : (
-              <Play className="size-3.5" />
-            )}
-            <span className="hidden min-[430px]:inline">
-              {generatedFileCount > 0 ? t("code.actions.continue") : t("code.actions.start")}
-            </span>
-            <span className="min-[430px]:hidden">
-              {generatedFileCount > 0 ? t("code.actions.continueShort") : t("code.actions.generateShort")}
-            </span>
-          </Button>
-          {generatedFileCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-2 text-xs"
-              onClick={() => void generateCodePrototype("regenerate")}
-              disabled={!canGenerate || generating}
-            >
-              {generating ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Play className="size-3.5" />
-              )}
-              <span className="hidden min-[430px]:inline">{t("code.actions.regenerate")}</span>
-              <span className="min-[430px]:hidden">{t("code.actions.redoShort")}</span>
-            </Button>
-          )}
-          </div>
-        </ScaledToolbar>
-      </div>
-
-      {!canGenerate && (
-        <div className="flex justify-end border-b border-border px-3 py-2">
-          <FeedbackReopenButton feedback={generationBlockFeedback!} />
-        </div>
-      )}
-      {modelCapability.structuredOutputMode === "compatible" && defaultModel.trim() && (
-        <div className="border-b border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          {t("code.compatibleWarning")}
-        </div>
-      )}
-      {codeStatus && (
-        <div
-          className={cn(
-            "flex items-start gap-2 border-b px-3 py-2 text-xs",
-            codeStatus.tone === "destructive" &&
-              "border-destructive/40 bg-destructive/10 text-destructive",
-            codeStatus.tone === "success" &&
-              "border-success/30 bg-success/10 text-success",
-            codeStatus.tone === "warning" &&
-              "border-warning/40 bg-warning/10 text-warning",
-            codeStatus.tone === "primary" &&
-              "border-primary/30 bg-primary/10 text-primary",
-            codeStatus.tone === "muted" &&
-              "border-border bg-muted/30 text-muted-foreground",
-          )}
-        >
-          <codeStatus.icon
-            className={cn(
-              "mt-0.5 size-3.5 shrink-0",
-              codeStatus.icon === Loader2 && "animate-spin",
-            )}
-          />
-          <div className="min-w-0">
-            <span className="font-semibold">{codeStatus.title}</span>
-            <span className="mx-1 text-muted-foreground">·</span>
-            <span className="text-foreground/80">{codeStatus.message}</span>
             {generating && (
-              <span className="ml-2 font-mono text-muted-foreground">
-                {runProgress}%
-              </span>
+              <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" />
+                <span className="truncate">{runMessage ?? t("code.generatingCode")}</span>
+                <span className="font-mono">{runProgress}%</span>
+              </div>
             )}
-          </div>
-        </div>
-      )}
-      <SandpackProvider
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-        style={{
-          display: "flex",
-          flex: "1 1 0%",
-          minHeight: 0,
-          overflow: "hidden",
-        }}
-        template="vite-react-ts"
-        files={previewSandpackFiles}
-        customSetup={{
-          entry: "/src/main.tsx",
-          dependencies: visibleDependencies,
-        }}
-        options={{
-          activeFile,
-          visibleFiles: sortedFiles,
-          bundlerURL: sandpackBundlerUrl,
-          initMode: "immediate",
-          recompileMode: "delayed",
-          recompileDelay: 500,
-        }}
-      >
-        <MonacoFileModelSync files={files} />
-        <SandpackFileSync files={previewFiles} />
-        {compactViewport ? (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <div className="grid w-full min-w-0 grid-cols-3 gap-1 border-b border-border bg-card px-2 py-1.5">
-              {[
-                { id: "files" as const, label: t("code.panes.files") },
-                { id: "editor" as const, label: t("code.panes.editor") },
-                { id: "preview" as const, label: t("code.panes.preview") },
-              ].map((pane) => (
-                <button
-                  key={pane.id}
-                  type="button"
-                  aria-pressed={mobilePane === pane.id}
-                  className={cn(
-                    "h-8 min-w-0 rounded-md text-[13px] font-medium transition-colors",
-                    mobilePane === pane.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-                  )}
-                  onClick={() => setMobilePane(pane.id)}
-                >
-                  {pane.label}
-                </button>
-              ))}
+            <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
+              <ModelPicker value={defaultModel} onValueChange={updateModel} align="end" triggerClassName="h-8 max-w-[150px] bg-card px-2 text-xs" />
+              <Button size="sm" className="h-8 px-2 text-xs" onClick={() => void generateCodePrototype(generatedFileCount > 0 ? "continue" : "regenerate")} disabled={!canGenerate || generating}>
+                {generating ? <Loader2 className="size-3.5 animate-spin" /> : generatedFileCount > 0 ? <RefreshCw className="size-3.5" /> : <Play className="size-3.5" />}
+                <span className="hidden min-[430px]:inline">{generatedFileCount > 0 ? t("code.actions.continue") : t("code.actions.start")}</span>
+                <span className="min-[430px]:hidden">{generatedFileCount > 0 ? t("code.actions.continueShort") : t("code.actions.generateShort")}</span>
+              </Button>
+              {generatedFileCount > 0 && (
+                <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => void generateCodePrototype("regenerate")} disabled={!canGenerate || generating}>
+                  {generating ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+                  <span className="hidden min-[430px]:inline">{t("code.actions.regenerate")}</span>
+                  <span className="min-[430px]:hidden">{t("code.actions.redoShort")}</span>
+                </Button>
+              )}
+              <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" aria-label={t("code.preview.openWindow")} onClick={() => previewRef.current?.openPreviewWindow()}>
+                <Play className="size-3.5" />
+                {t("code.preview.openWindow")}
+              </Button>
+              <Button type="button" size="sm" className="h-8 px-2 text-xs" onClick={runPreview} disabled={!previewReady || previewState === "building"}>
+                {previewState === "building" ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+                {t("code.actions.runPreview")}
+              </Button>
             </div>
-            {mobilePane === "files" && (
-              <aside className="min-h-0 flex-1 bg-sidebar">
-                <div className="flex h-10 items-center gap-2 border-b border-border px-3 text-xs font-semibold text-muted-foreground">
-                  <FolderTree className="size-3.5" />
-                  {t("code.panes.files")}
-                </div>
-                <div className="min-h-0 overflow-auto py-2">
-                  <FileTree
-                    nodes={fileTree}
-                    activeFile={activeFile}
-                    expandedDirs={expandedDirs}
-                    onToggleDirectory={toggleDirectory}
-                    onSelectFile={(path) => {
-                      setActiveFile(path);
-                      setMobilePane("editor");
-                    }}
-                  />
-                </div>
-              </aside>
-            )}
-            {mobilePane === "editor" && (
-              <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <div
-                  data-testid="code-file-tabs"
-                  className="flex h-10 items-end gap-1 overflow-x-auto border-b border-border bg-card px-2 pt-1 [scrollbar-width:thin]"
-                >
-                  {sortedFiles.map((path) => (
-                    <button
-                      key={path}
-                      type="button"
-                      onClick={() => setActiveFile(path)}
-                      className={cn(
-                        "h-8 w-32 shrink-0 truncate rounded-t-md border border-b-0 px-3 text-xs",
-                        activeFile === path
-                          ? "border-border bg-background text-foreground"
-                          : "border-transparent text-muted-foreground hover:bg-muted",
-                      )}
-                    >
-                      {fileLabel(path)}
-                    </button>
+          </div>
+          {modelCapability.structuredOutputMode === "compatible" && defaultModel.trim() && (
+            <div className="border-b border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{t("code.compatibleWarning")}</div>
+          )}
+          <SandpackProvider
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            style={{ display: "flex", flexDirection: "column", flex: "1 1 0%", minHeight: 0, overflow: "hidden" }}
+            template="vite-react-ts"
+            files={previewSandpackFiles}
+            customSetup={{ entry: "/src/main.tsx", dependencies: visibleDependencies }}
+            options={{ activeFile, visibleFiles: sortedFiles, bundlerURL: sandpackBundlerUrl, initMode: "immediate", recompileMode: "delayed", recompileDelay: 500 }}
+          >
+            <MonacoFileModelSync files={files} />
+            <SandpackFileSync files={previewFiles} />
+            {/* The editor and preview share the toolbar's full width; only the file tree splits horizontally. */}
+            <section data-testid="code-editor-region" aria-label={t("code.panes.editor")} className="flex h-[480px] w-full min-w-0 shrink-0 flex-col border-b border-border lg:h-[560px]">
+              {compactViewport && (
+                <div className="grid grid-cols-2 gap-1 border-b border-border px-2 py-1.5">
+                  {(["files", "editor"] as const).map(pane => (
+                    <Button key={pane} variant={mobilePane === pane ? "secondary" : "ghost"} type="button" aria-pressed={mobilePane === pane} className="h-8 min-w-0 text-[13px]" onClick={() => setMobilePane(pane)}>{t("code.panes." + pane)}</Button>
                   ))}
                 </div>
-                <div className="min-h-0 flex-1 bg-zinc-950">
-                  <EditorBridge
-                    activeFile={activeFile}
-                    files={files}
-                    onChange={handleFileChange}
-                  />
-                </div>
-              </section>
-            )}
-            {mobilePane === "preview" && (
-              <section className="flex min-h-0 flex-1 flex-col bg-card">
-                <div className="flex h-10 items-center justify-between gap-2 border-b border-border px-3">
-                  <button
-                    type="button"
-                    className="flex min-w-0 items-center gap-2 rounded px-1 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    title={t("code.preview.openWindow")}
-                    aria-label={t("code.preview.openWindow")}
-                    onClick={() => previewRef.current?.openPreviewWindow()}
-                  >
-                    <Play className="size-3.5 text-primary" />
-                    <span className="text-xs font-semibold">{t("code.panes.preview")}</span>
-                    {codeSpec && (
-                      <span className="truncate text-xs text-muted-foreground">
-                        {codeSpec.appName}
-                      </span>
-                    )}
-                  </button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-7"
-                    onClick={runPreview}
-                    disabled={!previewReady || previewState === "building"}
-                  >
-                    {previewState === "building" ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Play className="size-3.5" />
-                    )}
-                    {t("code.actions.runPreview")}
-                  </Button>
-                </div>
-                <div className="relative min-h-0 flex-1 bg-muted/40 p-2">
-                  <LocalPrototypePreview
-                    ref={previewRef}
-                    files={previewFiles}
-                    entryFile="/src/main.tsx"
-                    onBuildError={handlePreviewBuildError}
-                    onBuildReady={handlePreviewBuildReady}
-                    onBuildStart={handlePreviewBuildStart}
-                  />
-                </div>
-              </section>
-            )}
-          </div>
-        ) : (
-          <ResizablePanelGroup direction="horizontal" className="min-h-0 flex-1">
-            <ResizablePanel defaultSize={58} minSize={34}>
-              <div className="grid h-full min-h-0 grid-cols-[210px_minmax(0,1fr)] border-r border-border">
-                <aside className="min-h-0 border-r border-border bg-sidebar">
-                  <div className="flex h-10 items-center gap-2 border-b border-border px-3 text-xs font-semibold text-muted-foreground">
-                    <FolderTree className="size-3.5" />
-                    {t("code.panes.files")}
+              )}
+              <div className={cn("grid min-h-0 min-w-0 flex-1", compactViewport ? "grid-cols-1" : "grid-cols-[210px_minmax(0,1fr)]")}>
+                {(!compactViewport || mobilePane === "files") && (
+                  <aside className="flex min-h-0 min-w-0 flex-col border-r border-border bg-sidebar">
+                    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3 text-xs font-semibold text-muted-foreground"><FolderTree className="size-3.5" />{t("code.panes.files")}</div>
+                    <div className="min-h-0 flex-1 overflow-auto py-2">
+                      <FileTree nodes={fileTree} activeFile={activeFile} expandedDirs={expandedDirs} onToggleDirectory={toggleDirectory} onSelectFile={path => { setActiveFile(path); if (compactViewport) setMobilePane("editor"); }} />
+                    </div>
+                  </aside>
+                )}
+                {(!compactViewport || mobilePane === "editor") && (
+                  <div className="flex min-h-0 min-w-0 flex-col">
+                    <div data-testid="code-file-tabs" className="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-border bg-card px-2 pt-1 [scrollbar-width:thin]">
+                      {sortedFiles.map(path => (
+                        <Button
+                          key={path}
+                          variant="ghost"
+                          type="button"
+                          aria-pressed={activeFile === path}
+                          onClick={() => setActiveFile(path)}
+                          title={path}
+                          className={cn(
+                            "h-8 w-32 shrink-0 truncate rounded-b-none border border-b-0 px-3 text-xs",
+                            activeFile === path
+                              ? "border-border bg-background text-foreground"
+                              : "border-transparent text-muted-foreground hover:bg-muted",
+                          )}
+                        >
+                          {fileLabel(path)}
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="min-h-0 flex-1 bg-muted"><EditorBridge activeFile={activeFile} files={files} onChange={handleFileChange} /></div>
                   </div>
-                  <div className="min-h-0 overflow-auto py-2">
-                    <FileTree
-                      nodes={fileTree}
-                      activeFile={activeFile}
-                      expandedDirs={expandedDirs}
-                      onToggleDirectory={toggleDirectory}
-                      onSelectFile={setActiveFile}
-                    />
-                  </div>
-                </aside>
-                <section className="flex min-h-0 min-w-0 flex-col">
-                  <div
-                    data-testid="code-file-tabs"
-                    className="flex h-10 items-end gap-1 overflow-x-auto border-b border-border bg-card px-2 pt-1 [scrollbar-width:thin]"
-                  >
-                    {sortedFiles.map((path) => (
-                      <button
-                        key={path}
-                        type="button"
-                        onClick={() => setActiveFile(path)}
-                        className={cn(
-                          "h-8 w-32 shrink-0 truncate rounded-t-md border border-b-0 px-3 text-xs",
-                          activeFile === path
-                            ? "border-border bg-background text-foreground"
-                            : "border-transparent text-muted-foreground hover:bg-muted",
-                        )}
-                      >
-                        {fileLabel(path)}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="min-h-0 flex-1 bg-zinc-950">
-                    <EditorBridge
-                      activeFile={activeFile}
-                      files={files}
-                      onChange={handleFileChange}
-                    />
-                  </div>
-                </section>
+                )}
               </div>
-            </ResizablePanel>
-            <ResizableHandle withHandle className="bg-border/70" />
-            <ResizablePanel defaultSize={42} minSize={28}>
-              <section className="flex h-full min-h-0 flex-col bg-card">
-                <div className="flex h-10 items-center justify-between border-b border-border px-3">
-                  <button
-                    type="button"
-                    className="flex min-w-0 items-center gap-2 rounded px-1 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    title={t("code.preview.openWindow")}
-                    aria-label={t("code.preview.openWindow")}
-                    onClick={() => previewRef.current?.openPreviewWindow()}
-                  >
-                    <Play className="size-3.5 text-primary" />
-                    <span className="text-xs font-semibold">{t("code.panes.preview")}</span>
-                    {codeSpec && (
-                      <span className="truncate text-xs text-muted-foreground">
-                        {codeSpec.appName}
-                      </span>
-                    )}
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-7"
-                      onClick={runPreview}
-                      disabled={!previewReady || previewState === "building"}
-                    >
-                      {previewState === "building" ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <Play className="size-3.5" />
-                      )}
-                      {t("code.actions.runPreview")}
-                    </Button>
-                    <Badge variant="secondary" className="font-mono">
-                      Local TSX
-                    </Badge>
-                  </div>
-                </div>
-                <div className="relative min-h-0 flex-1 bg-muted/40 p-2">
-                  <LocalPrototypePreview
-                    ref={previewRef}
-                    files={previewFiles}
-                    entryFile="/src/main.tsx"
-                    onBuildError={handlePreviewBuildError}
-                    onBuildReady={handlePreviewBuildReady}
-                    onBuildStart={handlePreviewBuildStart}
-                  />
-                </div>
-              </section>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        )}
-      </SandpackProvider>
+            </section>
+            <section data-testid="code-preview-region" aria-label={t("code.panes.preview")} className="flex h-[560px] w-full min-w-0 shrink-0 flex-col bg-card lg:h-[680px]">
+              <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3 text-xs">
+                <span className="font-semibold">{t("code.panes.preview")}</span>
+                {codeSpec && <span className="truncate text-muted-foreground">{codeSpec.appName}</span>}
+              </div>
+              <div className="relative min-h-0 flex-1 bg-muted/40 p-2">
+                <LocalPrototypePreview ref={previewRef} files={previewFiles} entryFile="/src/main.tsx" onBuildError={handlePreviewBuildError} onBuildReady={handlePreviewBuildReady} onBuildStart={handlePreviewBuildStart} />
+              </div>
+            </section>
+          </SandpackProvider>
+        </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

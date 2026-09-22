@@ -1,4 +1,6 @@
 // Renders editable diagram title/summary metadata and compact model counts.
+import { Input } from '../../../shared/ui/input';
+import { Textarea } from '../../../shared/ui/textarea';
 import type { ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -12,7 +14,6 @@ type DiagramDetailHeaderProps = {
   draft: Record<string, unknown> | null;
   modelTitle: string;
   modelSummary: string;
-  sourceText: string | null;
   saveStatus: "idle" | "saving" | "saved" | "error";
   saveStatusLabel: string;
   compactViewport: boolean;
@@ -28,7 +29,6 @@ export function DiagramDetailHeader({
   draft,
   modelTitle,
   modelSummary,
-  sourceText,
   saveStatus,
   saveStatusLabel,
   compactViewport,
@@ -46,11 +46,11 @@ export function DiagramDetailHeader({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {draft ? (
-              <input
+              <Input
                 aria-label={t("diagrams.detail.titleAria")}
                 value={stringValue(draft.title)}
                 onChange={(event) => onChangeTitle(event.target.value)}
-                className="min-w-0 flex-1 truncate rounded-md border border-transparent bg-transparent px-1 py-0 text-2xl font-semibold tracking-normal text-foreground outline-none transition-colors hover:border-border focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                className="min-w-0 flex-1 truncate border text-2xl tracking-normal focus-visible:border-ring"
               />
             ) : (
               <h2 className="truncate text-2xl font-semibold tracking-normal text-foreground">
@@ -59,23 +59,20 @@ export function DiagramDetailHeader({
             )}
           </div>
           {draft ? (
-            <textarea
+            <Textarea
               aria-label={t("diagrams.detail.summaryAria")}
               value={stringValue(draft.summary)}
               onChange={(event) => onChangeSummary(event.target.value)}
               rows={2}
-              className="mt-1 block w-full max-w-3xl resize-y rounded-md border border-transparent bg-transparent px-1 py-0 text-sm leading-6 text-muted-foreground outline-none transition-colors hover:border-border focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              className="mt-1 block w-full max-w-3xl resize-y border text-sm leading-6 focus-visible:border-ring"
             />
           ) : (
             <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
               {modelSummary}
             </p>
           )}
-          {sourceText ? (
+          {saveStatus !== "idle" ? (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="rounded-md border border-border bg-muted/40 px-2 py-1">
-                {sourceText}
-              </span>
               {saveStatus === "saving" ? (
                 <span className="inline-flex items-center gap-1 text-primary">
                   <Loader2 className="size-3 animate-spin" />
@@ -105,12 +102,6 @@ export function DiagramDetailHeader({
                 <span>{t("diagrams.detail.groups")}</span>
                 <span className="font-mono text-foreground">{groupCount}</span>
               </MobileStatusPill>
-              {sourceText ? (
-                <MobileStatusPill>
-                  <span>{t("diagrams.detail.source")}</span>
-                  <span className="max-w-40 truncate text-foreground">{sourceText}</span>
-                </MobileStatusPill>
-              ) : null}
               {saveStatus !== "idle" ? (
                 <MobileStatusPill>
                   <span>{t("diagrams.detail.save")}</span>
