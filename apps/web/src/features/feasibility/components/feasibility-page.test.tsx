@@ -122,7 +122,12 @@ describe("FeasibilityPage", () => {
     expect(await screen.findByRole("heading", { name: "可行性分析" })).toBeInTheDocument();
     expect(screen.getByText("系统上下文图（系统环境图）")).toBeInTheDocument();
     expect(screen.getByText("实现方案")).toBeInTheDocument();
-    expect(screen.getAllByText("未生成")).toHaveLength(2);
+    expect(screen.getAllByRole("img", { name: /：未生成$/ })).toHaveLength(2);
+    expect(screen.queryByText("未生成")).not.toBeInTheDocument();
+    const card = screen.getByRole("button", { name: "选择系统上下文图（系统环境图）" });
+    expect(card).toHaveClass("h-[212px]", "sm:h-[236px]");
+    expect(card.parentElement).toHaveAttribute("data-mobile-card-density", "model-targets");
+    expect(card.parentElement?.className).toContain("min-[1900px]:grid-cols-6");
     expect(screen.getByText("0/2")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "选择系统上下文图（系统环境图）" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "选择实现方案" })).not.toBeChecked();
@@ -369,8 +374,8 @@ describe("FeasibilityPage", () => {
     );
 
     expect(await screen.findByRole("tab", { name: "关系" })).toHaveAttribute(
-      "data-state",
-      "active",
+      "aria-selected",
+      "true",
     );
     expect(screen.getByRole("article", { name: "登录" })).toHaveAttribute(
       "aria-current",
@@ -398,7 +403,7 @@ describe("FeasibilityPage", () => {
       const repository = createMockWorkspaceRepository(createContextWorkspace());
       render(withWorkspaceProviders(<FeasibilityPage view="relations" />, repository));
       const relationsTab = await screen.findByRole("tab", { name: "关系" });
-      await waitFor(() => expect(relationsTab).toHaveAttribute("data-state", "active"));
+      await waitFor(() => expect(relationsTab).toHaveAttribute("aria-selected", "true"));
       expect(screen.getByText("关系说明")).toBeInTheDocument();
     } finally {
       restoreMatchMedia();

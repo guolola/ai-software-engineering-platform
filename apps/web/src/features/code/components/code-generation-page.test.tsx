@@ -231,15 +231,15 @@ describe("CodeGenerationPage", () => {
     render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
 
     const page = await screen.findByTestId("code-generation-page");
-    expect(page).toHaveClass("p-3");
-    expect(page).toHaveClass("lg:p-4");
+    expect(page.parentElement).toHaveClass("px-4");
+    expect(page.parentElement).toHaveClass("py-6");
 
     const workspaceFrame = screen.getByTestId("code-workspace-frame");
     expect(workspaceFrame).toHaveClass("flex");
     expect(workspaceFrame).toHaveClass("min-h-0");
     expect(workspaceFrame).toHaveClass("flex-1");
     expect(workspaceFrame).toHaveClass("overflow-hidden");
-    expect(workspaceFrame).toHaveClass("rounded-lg");
+    expect(workspaceFrame).toHaveClass("rounded-xl");
     expect(workspaceFrame).toHaveClass("border");
 
     const provider = await screen.findByTestId("sandpack-provider");
@@ -300,6 +300,23 @@ describe("CodeGenerationPage", () => {
     );
   });
 
+  it("places preview actions after regenerate and stacks full-width workspace regions", async () => {
+    render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
+    const toolbar = await screen.findByTestId("code-generation-toolbar");
+    const regenerate = within(toolbar).getByRole("button", { name: /重新生成/ });
+    const fullscreen = within(toolbar).getByRole("button", { name: "全屏预览" });
+    const run = within(toolbar).getByRole("button", { name: "运行预览" });
+    expect(regenerate.compareDocumentPosition(fullscreen) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(fullscreen.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const editor = screen.getByTestId("code-editor-region");
+    const preview = screen.getByTestId("code-preview-region");
+    expect(editor.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(editor).toHaveClass("w-full");
+    expect(preview).toHaveClass("w-full");
+    expect(within(preview).queryByRole("button", { name: "运行预览" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "全屏预览" })).toHaveLength(1);
+  });
+
   it("keeps explanatory skill/rule chrome out of the code page", async () => {
     render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
 
@@ -309,7 +326,7 @@ describe("CodeGenerationPage", () => {
     expect(screen.queryByText("业务规则说明")).not.toBeInTheDocument();
   });
 
-  it("uses mobile panes instead of the desktop split editor on compact viewports", async () => {
+  it("switches mobile files and editor while keeping the preview below them", async () => {
     stubCompactViewport(true);
 
     render(
@@ -326,17 +343,14 @@ describe("CodeGenerationPage", () => {
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("button", { name: "预览" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    expect(screen.getByTestId("code-generation-toolbar")).toHaveAttribute(
-      "data-scale-to-fit",
-      "natural",
+    expect(screen.queryByRole("button", { name: "预览" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("code-preview-region")).toBeInTheDocument();
+    expect(screen.getByTestId("code-generation-toolbar")).toHaveClass(
+      "flex-wrap",
     );
     expect(screen.getByText("前端原型代码")).toBeInTheDocument();
     expect(screen.getByText("文件")).toBeInTheDocument();
-    expect(screen.getByText(/设计模型\s*0/u)).toBeInTheDocument();
+    expect(screen.queryByText(/设计模型\s*0/u)).not.toBeInTheDocument();
     expect(document.querySelector('[data-panel-group-direction="horizontal"]')).not.toBeInTheDocument();
     const fileTabs = screen.getByTestId("code-file-tabs");
     expect(fileTabs).toHaveClass("overflow-x-auto");
@@ -345,7 +359,8 @@ describe("CodeGenerationPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "文件" }));
     expect(screen.getByText("WorkspaceShell.tsx")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "预览" }));
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    expect(screen.getByTestId("monaco-editor")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "运行预览" })).toBeInTheDocument();
   });
 
@@ -358,6 +373,7 @@ describe("CodeGenerationPage", () => {
   });
 
   it("surfaces code diagnostics while keeping the generated preview viewable", async () => {
+    const user = userEvent.setup();
     const repository = createRepository();
     repository.loadWorkspace = vi.fn(async () =>
       createWorkspaceRecord({
@@ -367,13 +383,11 @@ describe("CodeGenerationPage", () => {
           "/src/main.tsx": "import App from './App';",
         },
         codeEntryFile: "/src/main.tsx",
-        codeDiagnostics: [
-          {
+        codeDiagnostics: Array.from({ length: 18 }, (_, index) => ({
             stage: "verify_code_preview",
-            message: "检测到真实网络请求痕迹，已保留本地 mock 数据。",
+            message: index === 0 ? "检测到真实网络请求痕迹，已保留本地 mock 数据。" : `第 ${index + 1} 项诊断详情`,
             at: "2026-06-21T00:00:00.000Z",
-          },
-        ],
+        })),
       }),
     );
 
@@ -381,14 +395,20 @@ describe("CodeGenerationPage", () => {
 
     await screen.findByTestId("sandpack-provider");
 
-    expect(screen.getByText("代码生成存在诊断")).toBeInTheDocument();
-    expect(
-      screen.getByText(/检测到真实网络请求痕迹，已保留本地 mock 数据/u),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "运行预览" })).toBeEnabled();
+    expect(screen.queryByText("代码生成存在诊断")).not.toBeInTheDocument();
+    expect(screen.queryByText(/检测到真实网络请求痕迹，已保留本地 mock 数据/u)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "运行预览" })).toBeEnabled());
+    await user.click(within(screen.getByTestId("code-generation-toolbar")).getByRole("button", { name: "诊断（18）" }));
+    const dialog = screen.getByRole("dialog", { name: "代码生成存在诊断" });
+    expect(within(dialog).getAllByRole("listitem")).toHaveLength(18);
+    expect(within(dialog).getByText(/第 18 项诊断详情/)).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "诊断（18）" })).toHaveFocus();
   });
 
   it("shows source-missing status for old code when the requirement text is cleared", async () => {
+    const user = userEvent.setup();
     const repository = createRepository();
     repository.loadWorkspace = vi.fn(async () =>
       createWorkspaceRecord({
@@ -409,7 +429,10 @@ describe("CodeGenerationPage", () => {
     await screen.findByTestId("sandpack-provider");
 
     expect(screen.getByText("需求源头已删除")).toBeInTheDocument();
-    expect(screen.getByText(/当前代码为旧产物，仍可查看预览/u)).toBeInTheDocument();
+    expect(screen.queryByText(/当前代码为旧产物，仍可查看预览/u)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "需求源头已删除" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("当前代码为旧产物，仍可查看预览");
+    await user.keyboard("{Escape}");
     expect(screen.getByRole("button", { name: "运行预览" })).toBeEnabled();
     expect(screen.getByRole("button", { name: /继续生成/u })).toBeDisabled();
     expect(screen.getByRole("button", { name: /重新生成/u })).toBeDisabled();
@@ -465,7 +488,8 @@ describe("CodeGenerationPage", () => {
         "/src/App.tsx 无法解析导入 ./Missing",
       );
     });
-    expect(screen.getByText("预览构建失败")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "诊断（1）" }));
+    expect(screen.getByRole("dialog", { name: "预览构建失败" })).toBeInTheDocument();
     expect(repository.updateCodeDiagnostics).toHaveBeenCalledWith([
       expect.objectContaining({
         stage: "verify_code_preview",
@@ -514,7 +538,7 @@ describe("CodeGenerationPage", () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "新窗口查看预览" }));
+    fireEvent.click(screen.getByRole("button", { name: "全屏预览" }));
 
     await waitFor(() => {
       expect(window.open).toHaveBeenCalledWith(

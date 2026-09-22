@@ -110,11 +110,14 @@ export function createProviderSettingsInput(): ProviderSettingsInput {
     .map((option) => option.trim())
     .filter(Boolean);
 
-  if (!providerConfigId) {
-    throw new Error("请先在个人设置中选择托管 Provider");
-  }
-  if (!model) {
-    throw new Error("请先在个人设置中选择默认模型");
+  // Offline demo runs are selected by the API from the project scope and do
+  // not call a provider. Keep the request shape valid so the demo can reach
+  // that server-side branch even when local settings have no provider yet.
+  if (!providerConfigId || !model) {
+    return {
+      providerConfigId: providerConfigId || "offline-demo",
+      model: model || "offline-demo-fixed-artifacts",
+    };
   }
   if (!providerModelOptions.includes(model)) {
     throw new Error("默认模型必须来自当前托管 Provider 的模型目录");

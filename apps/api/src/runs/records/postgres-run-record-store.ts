@@ -33,6 +33,8 @@ interface RunEventRow {
 type PersistedCompletedRunEvent = {
   type: "completed";
   snapshotRef: string;
+  eventId?: string;
+  createdAt?: string;
 };
 type PersistedRunEvent = RunEvent | PersistedCompletedRunEvent;
 type PersistJob = Promise<void>;
@@ -127,7 +129,7 @@ function shouldPersistProgressSnapshots() {
 }
 
 function shouldPersistSnapshotForEvent(event: RunEvent) {
-  if (event.type === "llm_chunk") {
+  if (event.type === "llm_chunk" || event.type === "run_activity") {
     return false;
   }
   if (event.type === "stage_progress") {
@@ -138,7 +140,7 @@ function shouldPersistSnapshotForEvent(event: RunEvent) {
 
 function serializeEventForPersistence(event: RunEvent, snapshot: RunRecord["snapshot"]): PersistedRunEvent {
   if (event.type === "completed") {
-    return { type: "completed", snapshotRef: snapshot.runId };
+    return { type: "completed", snapshotRef: snapshot.runId, eventId: event.eventId, createdAt: event.createdAt };
   }
   return event;
 }
@@ -148,7 +150,7 @@ function hydratePersistedEvent(
   snapshot: RunRecord["snapshot"],
 ): RunEvent {
   if (event.type === "completed" && "snapshotRef" in event) {
-    return { type: "completed", snapshot };
+    return { type: "completed", snapshot, ...(event.eventId ? { eventId: event.eventId } : {}), ...(event.createdAt ? { createdAt: event.createdAt } : {}) };
   }
   return event;
 }
@@ -247,7 +249,9 @@ class PostgresRunRecordStore extends Map<string, RunRecord> implements Persisten
 
   private attachPersistence(record: RunRecord) {
     record.persist = (nextRecord, event) => {
-      this.enqueue(nextRecord.snapshot.runId, () => this.saveRecord(nextRecord, event));
+      // Capture before enqueue: later stream chunks must not overwrite this event's row.
+      const sequence = nextRecord.events.length;
+      this.enqueue(nextRecord.snapshot.runId, () => this.saveRecord(nextRecord, event, sequence));
     };
   }
 
@@ -348,7 +352,7 @@ class PostgresRunRecordStore extends Map<string, RunRecord> implements Persisten
     this.pending.add(tracked);
   }
 
-  private async saveRecord(record: RunRecord, event?: RunEvent) {
+  private async saveRecord(record: RunRecord, event?: RunEvent, sequence = record.events.length) {
     const snapshot = record.snapshot;
     const metadata = record.metadata;
     if (!event || shouldPersistSnapshotForEvent(event)) {
@@ -397,7 +401,6 @@ class PostgresRunRecordStore extends Map<string, RunRecord> implements Persisten
     }
 
     if (!event) return;
-    const sequence = record.events.length;
     const persistedEvent = serializeEventForPersistence(event, snapshot);
     await this.db.query(
       `

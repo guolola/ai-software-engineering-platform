@@ -1,4 +1,4 @@
-// Runs browser acceptance checks against the web workspace with mocked API contracts.
+// Runs browser acceptance checks against production web bundles with mocked API contracts.
 import { defineConfig, devices } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,8 @@ const repoRoot = path.resolve(__dirname, "../..");
 
 export default defineConfig({
   testDir: "./tests",
+  // Keep local browser resource use predictable across the viewport/theme matrix.
+  workers: 3,
   outputDir: "./test-results",
   timeout: 60_000,
   expect: {
@@ -22,11 +24,11 @@ export default defineConfig({
   },
   webServer: {
     command:
-      "npm run dev --workspace @uml-platform/web -- --host 127.0.0.1 --port 4175",
+      "npm run build:web:production && node packages/harness-e2e/src/preview-server.mjs",
     cwd: repoRoot,
     url: "http://127.0.0.1:4175",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    reuseExistingServer: false,
+    timeout: 180_000,
   },
   projects: [
     {

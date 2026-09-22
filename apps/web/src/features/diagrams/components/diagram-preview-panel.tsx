@@ -1,4 +1,5 @@
 // Owns the diagram preview toolbar, SVG canvas, and overview drawer rendering.
+import { Alert } from '../../../shared/ui/alert';
 import type { PointerEventHandler, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import type { DesignDiagramType, DiagramType } from "../../../entities/diagram/model";
@@ -160,10 +161,8 @@ export function DiagramPreviewPanel({
                 <Maximize2 className="size-3.5" />
               </Button>
               {svgUrl && (
-                <Button variant="outline" size="sm" className="h-8" asChild>
-                  <a href={svgUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink className="size-3.5" /> {t("diagrams.detail.newTab")}
-                  </a>
+                <Button role="link" variant="outline" size="sm" className="h-8" render={<a href={svgUrl} target="_blank" rel="noreferrer" />} nativeButton={false}>
+                  <ExternalLink className="size-3.5" /> {t("diagrams.detail.newTab")}
                 </Button>
               )}
               <Button
@@ -225,7 +224,7 @@ export function DiagramPreviewPanel({
             </div>
           ) : diagramError ? (
             <div className="flex min-h-full items-center justify-center">
-              <div className="max-w-xl rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
+              <Alert variant="destructive" className="max-w-xl border p-4 text-sm">
                 <div className="flex items-center gap-2 font-medium text-destructive">
                   <AlertTriangle className="size-4 shrink-0" />
                   {t("diagrams.detail.generatedFailed", { label: diagramLabel })}
@@ -233,7 +232,7 @@ export function DiagramPreviewPanel({
                 <div className="mt-2 leading-relaxed text-foreground">
                   {diagramError.error?.message}
                 </div>
-              </div>
+              </Alert>
             </div>
           ) : (
             <div className="flex min-h-full items-center justify-center text-sm text-muted-foreground">
@@ -247,7 +246,7 @@ export function DiagramPreviewPanel({
             role="complementary"
             aria-label={highlighted ? t("diagrams.detail.focusDetails") : t("diagrams.detail.modelOverview")}
             className={cn(
-              "absolute z-20 flex flex-col gap-3 overflow-auto rounded-xl border border-border bg-card/95 p-4 shadow-xl backdrop-blur",
+              "absolute z-20 flex flex-col gap-3 overflow-auto rounded-xl border border-border bg-card/95 p-4 shadow-xl ",
               compactViewport
                 ? "inset-x-3 bottom-3 top-auto max-h-[65%]"
                 : "right-3 top-3 max-h-[calc(100%-1.5rem)] w-[min(22rem,calc(100%-1.5rem))] sm:w-80",

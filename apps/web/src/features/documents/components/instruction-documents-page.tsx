@@ -1,4 +1,5 @@
 // Hosts generated instruction documents and opens them in the configured Word editor.
+import { Card } from "../../../shared/ui/card";
 import {
   useCallback,
   useEffect,
@@ -7,6 +8,7 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { PageContainer, PageHeader } from "../../../shared/template/layout/page";
 import type { TFunction } from "i18next";
 import {
   type DocumentKind,
@@ -31,7 +33,6 @@ import { toast } from "sonner";
 import { Badge } from "../../../shared/ui/badge";
 import { Button } from "../../../shared/ui/button";
 import { Input } from "../../../shared/ui/input";
-import { ScaledToolbar } from "../../../shared/ui/scale-to-fit";
 import { SelectControl } from "../../../shared/ui/select";
 import {
   FeedbackReopenButton,
@@ -177,14 +178,14 @@ function TemplatePreview({
   return (
     <div className="flex h-36 flex-col gap-2 bg-muted/60 px-3 py-3 sm:h-44 sm:px-6 sm:py-5">
       <div className="flex items-start justify-between gap-3">
-        <Badge variant="secondary" className="rounded-full text-[10px]">
+        <Badge variant="secondary" className="text-[10px]">
           {t("documentsPage.courseTemplate")}
         </Badge>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="size-9 rounded-full bg-background/80 p-0 sm:h-8 sm:w-auto sm:px-3"
+          className="size-9 p-0 sm:h-8 sm:w-auto sm:px-3"
           onClick={onOpenStyle}
           title={t("documentsPage.documentStyle")}
           aria-label={t("documentsPage.documentStyle")}
@@ -228,7 +229,7 @@ function GeneratedDocumentPreview({
     <div className="flex h-36 flex-col justify-between bg-muted/60 px-3 py-3 sm:h-44 sm:px-6 sm:py-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Badge variant="outline" className="rounded-full bg-background/70 text-[10px]">
+          <Badge variant="outline" className="text-[10px]">
             {localizedDocumentTitle(definition.kind, t)}
           </Badge>
           <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-foreground sm:text-sm">
@@ -236,7 +237,7 @@ function GeneratedDocumentPreview({
             {t("documentsPage.docxFile")}
           </p>
         </div>
-        <Badge variant="secondary" className="rounded-full font-mono text-[10px]">
+        <Badge variant="secondary" className="font-mono text-[10px]">
           v{document.version}
         </Badge>
       </div>
@@ -279,7 +280,7 @@ function TemplateDocumentCard({
 }) {
   const { t } = useTranslation();
   return (
-    <article className="group flex min-h-[236px] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-colors sm:min-h-[270px]">
+    <Card as="article" className="gap-0 py-0 group flex min-h-[236px] flex-col overflow-hidden transition-colors sm:min-h-[270px]">
       <TemplatePreview
         definition={definition}
         documentStyle={documentStyle}
@@ -300,7 +301,7 @@ function TemplateDocumentCard({
         <Button
           type="button"
           size="sm"
-          className="h-10 rounded-full sm:h-9"
+          className="h-10 sm:h-9"
           disabled={Boolean(disabledReason) || generating}
           title={disabledReason ?? t("documentsPage.generateKind", { title: localizedDocumentTitle(definition.kind, t) })}
           onClick={onGenerate}
@@ -313,7 +314,7 @@ function TemplateDocumentCard({
           {t("documentsPage.generateAndOpen")}
         </Button>
       </div>
-    </article>
+    </Card>
   );
 }
 
@@ -331,8 +332,8 @@ function GeneratedDocumentCard({
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage === "en" ? "en-US" : "zh-CN";
   return (
-    <article
-      className="group flex min-h-[258px] cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-colors hover:border-primary/45 hover:shadow-md sm:min-h-[315px]"
+    <Card as="article"
+      className="gap-0 py-0 group flex min-h-[258px] cursor-pointer flex-col overflow-hidden transition-colors hover:border-primary/45 sm:min-h-[315px]"
       onClick={onOpen}
     >
       <GeneratedDocumentPreview definition={definition} document={document} />
@@ -357,7 +358,7 @@ function GeneratedDocumentCard({
             type="button"
             variant="outline"
             size="sm"
-            className={cn("h-10 flex-1 rounded-full sm:h-9", mobileTouchTargetClass)}
+            className={cn("h-10 flex-1 sm:h-9", mobileTouchTargetClass)}
             onClick={(event) => {
               event.stopPropagation();
               onDownload();
@@ -369,7 +370,7 @@ function GeneratedDocumentCard({
           <Button
             type="button"
             size="sm"
-            className={cn("h-10 flex-1 rounded-full sm:h-9", mobileTouchTargetClass)}
+            className={cn("h-10 flex-1 sm:h-9", mobileTouchTargetClass)}
             onClick={(event) => {
               event.stopPropagation();
               onOpen();
@@ -380,7 +381,7 @@ function GeneratedDocumentCard({
           </Button>
         </div>
       </div>
-    </article>
+    </Card>
   );
 }
 
@@ -718,7 +719,7 @@ export function InstructionDocumentsPage({
               type="button"
               variant="ghost"
               size="icon"
-              className="size-9 rounded-full"
+              className="size-9"
               onClick={openDocumentsHome}
               aria-label={t("documentsPage.backToList")}
             >
@@ -740,7 +741,7 @@ export function InstructionDocumentsPage({
               type="button"
               variant="outline"
               size="sm"
-              className="h-9 rounded-full"
+              className="h-9"
               onClick={() => void loadDocuments()}
             >
               <RefreshCw className="size-3.5" />
@@ -750,7 +751,7 @@ export function InstructionDocumentsPage({
               <Button
                 type="button"
                 size="sm"
-                className="h-9 rounded-full"
+                className="h-9"
                 onClick={() => void downloadDocument(activeDocument)}
               >
                 <Download className="size-3.5" />
@@ -789,28 +790,25 @@ export function InstructionDocumentsPage({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-auto bg-background">
-      <div className="mx-auto flex w-[calc(100%-1.5rem)] max-w-none flex-col gap-6 py-6 sm:w-[calc(100%-2rem)] lg:w-[calc(100%-3rem)]">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-normal text-foreground">
-              {t("documentsPage.title")}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t("documentsPage.description")}
-            </p>
-          </div>
-        </header>
+    <PageContainer className="flex min-h-full flex-col">
+      <div className="flex w-full flex-col gap-6">
+        <PageHeader
+          title={t("documentsPage.title")}
+          description={t("documentsPage.description")}
+          titleAccessory={listErrorFeedback?.keepReopenEntry ? (
+            <FeedbackReopenButton feedback={listErrorFeedback} />
+          ) : null}
+        />
 
         <section>
-          <ScaledToolbar minWidth={760} contentClassName="w-full justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 w-full justify-between gap-4">
             <div className="flex shrink-0 items-center gap-3">
               <div className="relative w-96">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  className="h-10 rounded-lg bg-background pl-9"
+                  className="h-10 pl-9"
                   placeholder={t("documentsPage.search")}
                 />
               </div>
@@ -833,20 +831,14 @@ export function InstructionDocumentsPage({
             <Button
               type="button"
               variant="outline"
-              className="h-10 shrink-0 rounded-full bg-background"
+              className="h-10 shrink-0"
               onClick={() => void loadDocuments()}
             >
               <RefreshCw className="size-4" />
               {t("documentsPage.refresh")}
             </Button>
-          </ScaledToolbar>
-        </section>
-
-        {listErrorFeedback?.keepReopenEntry ? (
-          <div className="flex justify-end">
-            <FeedbackReopenButton feedback={listErrorFeedback} />
           </div>
-        ) : null}
+        </section>
 
         {loading ? (
           <div className="flex min-h-52 items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -917,6 +909,6 @@ export function InstructionDocumentsPage({
         value={documentStyle}
         onChange={setDocumentStyle}
       />
-    </div>
+    </PageContainer>
   );
 }

@@ -1,10 +1,15 @@
 // Hosts the top-bar account modal for profile, MFA, sessions, and login-state actions.
+import { Table } from '../../../shared/ui/table';
+import { TableCell } from '../../../shared/ui/table';
+import { TableBody } from '../../../shared/ui/table';
+import { TableHead } from '../../../shared/ui/table';
+import { TableRow } from '../../../shared/ui/table';
+import { TableHeader } from '../../../shared/ui/table';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Camera,
   CheckCircle2,
-  History,
   KeyRound,
   Laptop,
   Loader2,
@@ -20,6 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { GlobalSettingsPanel } from "../../settings/components/global-settings-panel";
+import { Avatar, AvatarFallback } from "../../../shared/ui/avatar";
 import { Badge } from "../../../shared/ui/badge";
 import { Button } from "../../../shared/ui/button";
 import {
@@ -32,8 +38,8 @@ import {
 } from "../../../shared/ui/dialog";
 import { Input } from "../../../shared/ui/input";
 import { Label } from "../../../shared/ui/label";
-import { ScaleToFitFrame, ScaledTable } from "../../../shared/ui/scale-to-fit";
 import { Separator } from "../../../shared/ui/separator";
+import { ScrollArea } from "../../../shared/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../shared/ui/tabs";
 import { cn } from "../../../shared/ui/utils";
 import { formatSessionDevice, formatSessionRegion } from "../lib/session-device";
@@ -44,15 +50,12 @@ import {
   accountStatusLabel,
   formatDate,
   initials,
-  loginDetail,
-  loginOutcomeLabel,
 } from "../lib/account-dialog-formatting";
 import {
   notifyAuthSessionChanged,
   platformApi,
   PlatformApiError,
   type PlatformAccountSession,
-  type PlatformLoginEvent,
   type PlatformMfaSetup,
   type PlatformUser,
 } from "../services/platform-api";
@@ -60,6 +63,7 @@ import { AccountAvatarPreview } from "./account-avatar-preview";
 import { MfaSetupPanel } from "./mfa-setup-panel";
 
 type AccountDialogProps = {
+  showTrigger?: boolean;
   onNavigate: (route: string) => void;
   initialUser?: PlatformUser | null;
   open?: boolean;
@@ -67,6 +71,7 @@ type AccountDialogProps = {
 };
 
 export function AccountDialog({
+  showTrigger = true,
   onNavigate,
   initialUser = null,
   open: controlledOpen,
@@ -100,7 +105,6 @@ export function AccountDialog({
   const [mfaCode, setMfaCode] = useState("");
   const [disableCode, setDisableCode] = useState("");
   const [sessions, setSessions] = useState<PlatformAccountSession[]>([]);
-  const [events, setEvents] = useState<PlatformLoginEvent[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [activeTab, setActiveTab] = useState("profile");
@@ -148,9 +152,8 @@ export function AccountDialog({
     Promise.all([
       platformApi.getAccountProfile(),
       platformApi.listAccountSessions(),
-      platformApi.listLoginEvents(),
     ])
-      .then(([profile, sessionResponse, eventResponse]) => {
+      .then(([profile, sessionResponse]) => {
         if (!active) return;
         setUser(profile.user);
         setDisplayName(profile.user.displayName);
@@ -160,7 +163,6 @@ export function AccountDialog({
         setMfaEnabled(Boolean(profile.mfa?.enabled ?? profile.user.mfaEnabled));
         setCurrentSessionId(profile.session?.id ?? null);
         setSessions(sessionResponse.sessions);
-        setEvents(eventResponse.events);
       })
       .catch((error) => {
         if (!active) return;
@@ -187,7 +189,6 @@ export function AccountDialog({
     unknown: t("account.unknown"),
   });
   const visibleSessions = sessions.slice(0, ACCOUNT_SESSION_RECORD_LIMIT);
-  const visibleEvents = events.slice(0, ACCOUNT_SESSION_RECORD_LIMIT);
 
   useEffect(() => {
     openLocationRef.current = open
@@ -334,7 +335,6 @@ export function AccountDialog({
     });
     setUser(null);
     setSessions([]);
-    setEvents([]);
     setCurrentSessionId(null);
     setMfaSetup(null);
     setMfaCode("");
@@ -412,10 +412,10 @@ export function AccountDialog({
         if (nextOpen) setDialogOpen(true);
       }}
     >
-      <DialogTrigger
+      {showTrigger && <DialogTrigger
         type="button"
         className={cn(
-          "inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary p-1 text-sm font-medium text-secondary-foreground shadow-none hover:bg-secondary/80 md:h-10 md:w-auto md:justify-start md:gap-2 md:py-1 md:pl-1 md:pr-3",
+          "inline-flex size-9 shrink-0 items-center justify-center rounded-md p-0.5 text-sm font-medium hover:bg-muted md:h-9 md:w-auto md:justify-start md:gap-2 md:pr-2",
           "outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",
           "[&_svg]:pointer-events-none [&_svg]:shrink-0",
         )}
@@ -435,25 +435,22 @@ export function AccountDialog({
         ) : (
           <LogIn className="hidden size-5 text-muted-foreground md:block" />
         )}
-      </DialogTrigger>
+      </DialogTrigger>}
       <DialogContent
         ref={dialogContentRef}
-        hideCloseButton
+        showCloseButton={false}
         tabIndex={-1}
-        className="max-h-[88vh] overflow-hidden p-0 sm:max-w-[900px]"
-        onInteractOutside={(event) => event.preventDefault()}
-        onPointerDownOutside={(event) => event.preventDefault()}
-        onFocusOutside={(event) => event.preventDefault()}
+        className="max-h-[88vh] overflow-hidden p-0 sm:max-w-[1100px]"
       >
-        <button
+        <Button variant="ghost"
           type="button"
           data-slot="dialog-close"
-          className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 z-10 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          className="absolute top-4 right-4 z-10 opacity-70 hover:opacity-100 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           onClick={closeAccountDialog}
         >
           <X />
           <span className="sr-only">{t("account.close")}</span>
-        </button>
+        </Button>
         {!user ? (
           <div className="grid gap-4 p-6">
             <DialogHeader>
@@ -474,7 +471,7 @@ export function AccountDialog({
             </Button>
           </div>
         ) : (
-          <ScaleToFitFrame minWidth={900} contentClassName="w-[900px]">
+          <div className="w-full min-w-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex h-[min(85vh,700px)] min-h-0 flex-row gap-0 overflow-hidden">
             <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-muted/30 p-4">
               <DialogHeader className="mb-4 flex-row items-center gap-3 space-y-0 text-left">
@@ -492,28 +489,28 @@ export function AccountDialog({
               <TabsList className="h-auto w-full flex-col items-stretch justify-start overflow-visible rounded-none bg-transparent p-0">
                 <TabsTrigger
                   value="profile"
-                  className="h-10 flex-none justify-start rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                  className="h-10 flex-none justify-start px-3"
                 >
                   <User className="size-4" />
                   {t("account.profile")}
                 </TabsTrigger>
                 <TabsTrigger
                   value="security"
-                  className="h-10 flex-none justify-start rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                  className="h-10 flex-none justify-start px-3"
                 >
                   <Shield className="size-4" />
                   {t("account.security")}
                 </TabsTrigger>
                 <TabsTrigger
                   value="sessions"
-                  className="h-10 flex-none justify-start rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                  className="h-10 flex-none justify-start px-3"
                 >
                   <Monitor className="size-4" />
                   {t("account.sessions")}
                 </TabsTrigger>
                 <TabsTrigger
                   value="global"
-                  className="h-10 flex-none justify-start rounded-md px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                  className="h-10 flex-none justify-start px-3"
                 >
                   <Settings className="size-4" />
                   {t("account.globalSettings")}
@@ -524,7 +521,7 @@ export function AccountDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full justify-center text-muted-foreground hover:text-destructive"
+                  className="w-full justify-center"
                   onClick={logout}
                 >
                   <LogOut className="size-4" />
@@ -533,7 +530,11 @@ export function AccountDialog({
               </div>
             </aside>
 
-            <main className="min-w-0 flex-1 overflow-y-auto bg-background p-8">
+            <ScrollArea
+              className="min-h-0 min-w-0 flex-1 bg-background"
+              viewportClassName="overflow-x-hidden"
+            >
+            <main className="min-w-0 p-6">
               {loading && (
                 <div className="mb-4 flex items-center gap-2 rounded-md border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
@@ -568,8 +569,8 @@ export function AccountDialog({
                         <Camera className="size-5" />
                       </span>
                     </label>
-                    <Badge variant="outline" className="border-emerald-600/20 bg-emerald-500/10 text-emerald-700">
-                      <span className="size-1.5 rounded-full bg-emerald-500" />
+                    <Badge variant="outline" className="border-success/30 text-success">
+                      <span className="size-1.5 rounded-full bg-success" />
                       {accountStatus}
                     </Badge>
                     <Button
@@ -610,12 +611,12 @@ export function AccountDialog({
                           id="account-email"
                           value={user.email}
                           readOnly
-                          className="bg-muted/50 text-muted-foreground"
+                          className=""
                         />
-                        <Badge variant="outline" className="w-fit text-primary">
+                        <Badge variant="outline" className="w-fit">
                           {user.emailVerified ? (
                             <>
-                              <CheckCircle2 className="size-3" />
+                              <CheckCircle2 className="size-3 text-success" />
                               {t("account.verified")}
                             </>
                           ) : (
@@ -655,8 +656,8 @@ export function AccountDialog({
                     <h3 className="text-lg font-semibold text-foreground">{t("account.security")}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">{t("account.securityDescription")}</p>
                   </div>
-                  <Badge variant="outline" className={cn(mfaEnabled ? "border-emerald-600/20 bg-emerald-500/10 text-emerald-700" : "text-muted-foreground")}>
-                    <span className={cn("size-1.5 rounded-full", mfaEnabled ? "bg-emerald-500" : "bg-muted-foreground")} />
+                  <Badge variant="outline" className={cn(mfaEnabled ? "border-success/30 text-success" : "")}>
+                    <span className={cn("size-1.5 rounded-full", mfaEnabled ? "bg-success" : "bg-muted-foreground")} />
                     {mfaEnabled ? t("account.mfaEnabled") : t("account.mfaDisabled")}
                   </Badge>
                 </div>
@@ -771,93 +772,82 @@ export function AccountDialog({
                     <h3 className="text-lg font-semibold text-foreground">{t("account.activeSessions")}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">{t("account.activeSessionsDescription")}</p>
                   </div>
-                  <Button variant="ghost" className="justify-start text-destructive hover:text-destructive" onClick={revokeOtherSessions}>
+                  <Button variant="ghost" className="justify-start" onClick={revokeOtherSessions}>
                     <LogOut className="size-4" />
                     {t("account.revokeOthers")}
                   </Button>
                 </div>
 
-                <div className="space-y-3">
-                  {visibleSessions.length === 0 ? (
-                    <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                      {t("account.noSessions")}
-                    </div>
-                  ) : visibleSessions.map((session) => {
-                    const isCurrent = session.id === currentSessionId;
-                    return (
-                      <div
-                        key={session.id}
-                        className={cn(
-                          "relative flex gap-4 rounded-md border border-border p-4 text-sm",
-                          isCurrent && "border-primary/40 bg-primary/5 pl-5",
-                        )}
-                      >
-                        {isCurrent && <span className="absolute top-0 bottom-0 left-0 w-1 rounded-l-md bg-primary" />}
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
-                          <Laptop className="size-5" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-nowrap items-center gap-2">
-                            <span className="font-medium text-foreground">{formatSessionDevice(session.userAgent, t("account.unknownDevice"))}</span>
-                            {isCurrent && <Badge variant="outline" className="text-primary">{t("account.currentDevice")}</Badge>}
-                          </div>
-                          <div className="mt-2 grid grid-cols-3 gap-1 text-xs text-muted-foreground">
-                            <span>{t("account.region", { value: formatSessionRegion(session, t("account.unknownRegion")) })}</span>
-                            <span>{t("account.lastActive", { value: formatDate(session.lastSeenAt, locale, t("account.none")) })}</span>
-                            <span>{t("account.expires", { value: formatDate(session.expiresAt, locale, t("account.none")) })}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold">
-                    <History className="size-4 text-muted-foreground" />
-                    {t("account.loginHistory")}
-                  </div>
-                  <div className="overflow-hidden rounded-md border border-border">
-                    <ScaledTable minWidth={620} className="border-collapse text-left text-sm" aria-label={t("account.loginHistory")}>
-                      <thead className="bg-muted/50 text-xs text-muted-foreground">
-                        <tr>
-                          <th className="px-4 py-2 font-medium">{t("account.status")}</th>
-                          <th className="px-4 py-2 font-medium">{t("account.time")}</th>
-                          <th className="px-4 py-2 font-medium">{t("account.regionHeader")}</th>
-                          <th className="px-4 py-2 font-medium">{t("account.details")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {visibleEvents.length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="px-4 py-4 text-center text-sm text-muted-foreground">
-                              {t("account.noLoginEvents")}
-                            </td>
-                          </tr>
-                        ) : visibleEvents.map((event) => (
-                          <tr key={event.id} className="border-t border-border">
-                            <td className={cn("px-4 py-2 font-medium", event.outcome === "success" ? "text-emerald-700" : "text-destructive")}>
-                              {loginOutcomeLabel(event.outcome, { success: t("account.success"), failed: t("account.failed") })}
-                            </td>
-                            <td className="px-4 py-2 text-muted-foreground">{formatDate(event.createdAt, locale, t("account.none"))}</td>
-                            <td className="px-4 py-2">{formatSessionRegion(event, t("account.unknownRegion"))}</td>
-                            <td className="max-w-52 truncate px-4 py-2 text-muted-foreground">{loginDetail(event, t("account.noDetails"), t("account.unknownDevice"))}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </ScaledTable>
-                  </div>
+                <div className="overflow-hidden rounded-md border border-border">
+                  <Table
+                    className="table-fixed border-collapse text-left text-sm"
+                    aria-label={t("account.activeSessions")}
+                  >
+                    <TableHeader className="bg-muted/50 text-xs text-muted-foreground">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-[34%] px-4 py-2 font-medium">{t("account.deviceHeader")}</TableHead>
+                        <TableHead className="w-[18%] px-4 py-2 font-medium">{t("account.regionHeader")}</TableHead>
+                        <TableHead className="w-[24%] whitespace-normal px-4 py-2 font-medium">{t("account.lastActiveHeader")}</TableHead>
+                        <TableHead className="w-[24%] whitespace-normal px-4 py-2 font-medium">{t("account.expiresHeader")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visibleSessions.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="px-4 py-4 text-center text-sm text-muted-foreground">
+                            {t("account.noSessions")}
+                          </TableCell>
+                        </TableRow>
+                      ) : visibleSessions.map((session) => {
+                        const isCurrent = session.id === currentSessionId;
+                        return (
+                          <TableRow
+                            key={session.id}
+                            className={cn(isCurrent && "bg-primary/5 hover:bg-primary/10")}
+                          >
+                            <TableCell className="overflow-hidden px-4 py-3 whitespace-normal">
+                              <div className="flex min-w-0 items-center gap-3">
+                                <Avatar size="lg">
+                                  <AvatarFallback className="bg-muted text-primary">
+                                    <Laptop aria-hidden="true" className="size-5" />
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                    <span className="min-w-0 truncate font-medium text-foreground">
+                                      {formatSessionDevice(session.userAgent, t("account.unknownDevice"))}
+                                    </span>
+                                    {isCurrent && <Badge variant="outline" className="shrink-0">{t("account.currentDevice")}</Badge>}
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="px-4 py-3 whitespace-normal">
+                              {formatSessionRegion(session, t("account.unknownRegion"))}
+                            </TableCell>
+                            <TableCell className="px-4 py-3 whitespace-normal text-muted-foreground">
+                              {formatDate(session.lastSeenAt, locale, t("account.none"))}
+                            </TableCell>
+                            <TableCell className="px-4 py-3 whitespace-normal text-muted-foreground">
+                              {formatDate(session.expiresAt, locale, t("account.none"))}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
 
               </TabsContent>
 
-              <TabsContent value="global" className="m-0 space-y-6">
+              <TabsContent value="global" keepMounted className="m-0 space-y-6">
                 <div className="border-b border-border pb-4">
                   <h3 className="text-lg font-semibold text-foreground">{t("account.globalSettings")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{t("account.globalSettingsDescription")}</p>
                 </div>
                 <GlobalSettingsPanel
-                  active={open && activeTab === "global"}
+                  active={open}
+                  currentUserId={userId ?? ""}
                   onNavigate={(route) => {
                     setDialogOpen(false);
                     onNavigate(route);
@@ -869,8 +859,9 @@ export function AccountDialog({
                 {currentSessionId ? t("account.currentSession", { id: currentSessionId }) : ""}
               </div>
             </main>
+            </ScrollArea>
             </Tabs>
-          </ScaleToFitFrame>
+          </div>
         )}
       </DialogContent>
     </Dialog>

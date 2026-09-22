@@ -1,11 +1,14 @@
 // Renders Markdown documentation with project-local navigation and shared UI styling.
+import { Table } from '../../../shared/ui/table';
+import { TableCell } from '../../../shared/ui/table';
+import { TableHead } from '../../../shared/ui/table';
+import { TableHeader } from '../../../shared/ui/table';
 import type { AnchorHTMLAttributes, HTMLAttributes, ImgHTMLAttributes, ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Clock, ImageIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../../shared/ui/badge";
-import { ScaledTable } from "../../../shared/ui/scale-to-fit";
 import { VideoPlayer } from "../../../shared/ui/video-player";
 import { cn } from "../../../shared/ui/utils";
 import { i18n as appI18n } from "../../../shared/i18n";
@@ -35,9 +38,13 @@ export function DocsArticleView({
   const components = createMarkdownComponents({ headingIds, onNavigate });
 
   return (
-    <article className="min-w-0 rounded-lg border border-border bg-card p-5 shadow-sm md:p-7">
-      <header className="mb-6 border-b border-border pb-5">
-        <div className="flex flex-wrap items-center gap-2">
+    <article className="min-w-0 w-full max-w-[800px]">
+      <header className="mb-8">
+        <h1 id={headings.find((heading) => heading.level === 1)?.id ?? article.id}
+          tabIndex={-1} className="scroll-mt-20 break-words text-3xl font-semibold tracking-tight outline-none @[720px]/docs:scroll-mt-6 @[720px]/docs:text-4xl">
+          {headings.find((heading) => heading.level === 1)?.title ?? article.title}
+        </h1>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <Badge variant="outline">{article.categoryLabel}</Badge>
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="size-3.5" />
@@ -97,22 +104,13 @@ function createMarkdownComponents({
   };
 
   return {
-    h1({ children, node: _node, ...props }) {
-      return (
-        <h1
-          id={headingId(1, children)}
-          className="scroll-mt-20 break-words text-3xl font-semibold leading-tight tracking-normal"
-          {...props}
-        >
-          {children}
-        </h1>
-      );
-    },
+    // The article's H1 is rendered above its summary and media.
+    h1() { return null; },
     h2({ children, node: _node, ...props }) {
       return (
         <h2
           id={headingId(2, children)}
-          className="mt-9 scroll-mt-20 break-words border-t border-border pt-6 text-2xl font-semibold tracking-normal first:mt-0 first:border-t-0 first:pt-0"
+          className="mt-6 scroll-mt-20 @[720px]/docs:scroll-mt-6 break-words text-xl font-semibold first:mt-0"
           {...props}
         >
           {children}
@@ -123,7 +121,7 @@ function createMarkdownComponents({
       return (
         <h3
           id={headingId(3, children)}
-          className="mt-6 scroll-mt-20 break-words text-xl font-semibold tracking-normal"
+          className="mt-4 scroll-mt-20 @[720px]/docs:scroll-mt-6 break-words text-base font-semibold"
           {...props}
         >
           {children}
@@ -132,21 +130,21 @@ function createMarkdownComponents({
     },
     p({ children, node: _node, ...props }) {
       return (
-        <p className="mt-4 break-words text-sm leading-7 text-muted-foreground" {...props}>
+        <p className="mt-4 break-words text-sm leading-6 text-muted-foreground" {...props}>
           {children}
         </p>
       );
     },
     ul({ children, node: _node, ...props }) {
       return (
-        <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-7 text-muted-foreground" {...props}>
+        <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground" {...props}>
           {children}
         </ul>
       );
     },
     ol({ children, node: _node, ...props }) {
       return (
-        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-7 text-muted-foreground" {...props}>
+        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground" {...props}>
           {children}
         </ol>
       );
@@ -175,7 +173,7 @@ function createMarkdownComponents({
     blockquote({ children, node: _node, ...props }) {
       return (
         <blockquote
-          className="mt-5 border-l-4 border-primary/40 bg-primary/5 px-4 py-3 text-sm leading-7 text-muted-foreground"
+          className="mt-5 border-l-4 border-primary/40 bg-primary/5 px-4 py-3 text-sm leading-6 text-muted-foreground"
           {...props}
         >
           {children}
@@ -186,7 +184,7 @@ function createMarkdownComponents({
       return (
         <code
           className={cn(
-            "rounded bg-muted px-1.5 py-0.5 font-mono text-[0.9em] text-foreground",
+            "rounded bg-muted px-1.5 py-0.5 font-mono text-sm text-foreground",
             className,
           )}
           {...props}
@@ -198,7 +196,7 @@ function createMarkdownComponents({
     pre({ children, node: _node, ...props }) {
       return (
         <pre
-          className="mt-4 max-w-full overflow-auto rounded-lg bg-zinc-950 p-4 text-sm leading-6 text-zinc-100"
+          className="bg-muted text-foreground mt-4 max-w-full overflow-x-auto rounded-lg p-4 text-sm leading-6"
           {...props}
         >
           {children}
@@ -208,31 +206,31 @@ function createMarkdownComponents({
     table({ children, node: _node, ...props }) {
       return (
         <div className="mt-5 max-w-full overflow-hidden rounded-lg border border-border">
-          <ScaledTable minWidth={620} className="border-collapse text-left text-sm" {...props}>
+          <Table className="min-w-[620px] border-collapse text-left text-sm"   {...props}>
             {children}
-          </ScaledTable>
+          </Table>
         </div>
       );
     },
     thead({ children, node: _node, ...props }) {
       return (
-        <thead className="bg-muted text-foreground" {...props}>
+        <TableHeader className="bg-muted text-foreground" {...props}>
           {children}
-        </thead>
+        </TableHeader>
       );
     },
     th({ children, node: _node, ...props }) {
       return (
-        <th className="border-b border-border px-3 py-2 font-semibold" {...props}>
+        <TableHead className="border-b border-border px-3 py-2 font-semibold" {...props}>
           {children}
-        </th>
+        </TableHead>
       );
     },
     td({ children, node: _node, ...props }) {
       return (
-        <td className="border-t border-border px-3 py-2 text-muted-foreground" {...props}>
+        <TableCell className="border-t border-border px-3 py-2 text-muted-foreground" {...props}>
           {children}
-        </td>
+        </TableCell>
       );
     },
     img({ src, alt, node: _node, ...props }) {

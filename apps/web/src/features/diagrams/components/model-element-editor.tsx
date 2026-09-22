@@ -1,4 +1,5 @@
 // Renders element-specific edit fields for the model editor dialog.
+import { Card } from "../../../shared/ui/card";
 import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../shared/ui/button";
@@ -78,7 +79,7 @@ export function ModelElementEditor({
   const itemPrefix = collection.label;
 
   return (
-    <div className="space-y-4 [&_.grid]:!grid-cols-1">
+    <div className="space-y-4">
       <LabelTextInput
         label={editorFieldLabel(collection.label, "name")}
         value={itemLabel(item, collection)}
@@ -751,9 +752,9 @@ function TableColumnEditor({
               ? (column.references as Record<string, unknown>)
               : {};
           return (
-            <div
+            <Card
               key={`${itemPrefix}:column:${columnId}`}
-              className="space-y-2 rounded-md border border-border bg-card p-3"
+              className="gap-0 py-0 space-y-2 p-3"
             >
               <div className="grid gap-2 md:grid-cols-3">
                 <LabelTextInput
@@ -860,7 +861,7 @@ function TableColumnEditor({
                   }
                 />
               </div>
-            </div>
+            </Card>
           );
         })}
       </div>

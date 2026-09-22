@@ -36,27 +36,27 @@ const STATUS_STYLES: Record<
   },
   current: {
     card: "border-success/30 bg-card text-card-foreground ring-1 ring-success/10",
-    badge: "bg-emerald-50 text-emerald-700",
+    badge: "bg-success/10 text-success",
     icon: CheckCircle2,
   },
   stale: {
     card: "border-warning/40 bg-card text-card-foreground ring-1 ring-warning/15",
-    badge: "bg-amber-50 text-amber-700",
+    badge: "bg-warning/10 text-warning",
     icon: AlertCircle,
   },
   error: {
     card: "border-destructive/40 bg-card text-card-foreground ring-1 ring-destructive/15",
-    badge: "bg-red-50 text-red-700",
+    badge: "bg-destructive/10 text-destructive",
     icon: AlertCircle,
   },
   running: {
     card: "border-primary/40 bg-card text-card-foreground ring-1 ring-primary/15",
-    badge: "bg-indigo-50 text-indigo-700",
+    badge: "bg-info/10 text-info",
     icon: Loader2,
   },
   interrupted: {
     card: "border-warning/40 bg-card text-card-foreground ring-1 ring-warning/15",
-    badge: "bg-amber-50 text-amber-700",
+    badge: "bg-warning/10 text-warning",
     icon: AlertCircle,
   },
 };
@@ -72,22 +72,22 @@ export const LINEAGE_KIND_STYLES: Record<
   rule: {
     icon: ListChecks,
     iconBox: "border-border bg-muted/60",
-    iconColor: "text-sky-600 dark:text-sky-300",
+    iconColor: "text-info",
   },
   "requirement-model": {
     icon: Network,
     iconBox: "border-border bg-muted/60",
-    iconColor: "text-blue-600 dark:text-blue-300",
+    iconColor: "text-info",
   },
   "design-model": {
     icon: Workflow,
     iconBox: "border-border bg-muted/60",
-    iconColor: "text-indigo-600 dark:text-indigo-300",
+    iconColor: "text-primary",
   },
   document: {
     icon: ScrollText,
     iconBox: "border-border bg-muted/60",
-    iconColor: "text-amber-600 dark:text-amber-300",
+    iconColor: "text-warning",
   },
   code: {
     icon: FileCode2,
@@ -199,7 +199,7 @@ export function LineageNodeCard({
             type="button"
             variant="ghost"
             size="icon"
-            className="size-7 rounded-md text-muted-foreground"
+            className="size-7"
             aria-label={t("lineage.more", { label: node.label })}
             onClick={(event) => {
               event.stopPropagation();

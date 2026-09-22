@@ -1,7 +1,7 @@
 // Owns LLM generation and repair for structured prototype file operations.
 
+import { createRunLlmChunkHandlers } from "../shared/llm-chunk-events.js";
 import {
-  llmChunkRunEventSchema,
   stageProgressRunEventSchema,
   type CodeBusinessLogic,
   type DesignModelCoverageReport,
@@ -129,21 +129,7 @@ export async function generateCodeFileOperationsWithRepair(
           llmTransport,
           providerSettings,
           createMessages(prompt),
-          (chunk) => {
-            if (chunk.trim()) {
-              markActivity();
-            } else {
-              markBlankActivity();
-            }
-            emitEvent(
-              record,
-              llmChunkRunEventSchema.parse({
-                type: "llm_chunk",
-                stage,
-                chunk,
-              }),
-            );
-          },
+          createRunLlmChunkHandlers({ record, stage, onActivity: markActivity, onBlankActivity: markBlankActivity }),
           responseFormat,
           abortSignal,
         ),

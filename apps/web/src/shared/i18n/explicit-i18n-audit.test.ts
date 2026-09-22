@@ -8,8 +8,6 @@ const explicitlyLocalizedUiFiles = [
   "features/user-platform/components/account-dialog.tsx",
   "features/user-platform/components/account-pages.tsx",
   "features/settings/components/global-settings-panel.tsx",
-  "features/settings/components/settings-dialog.tsx",
-  "features/history/components/history-drawer.tsx",
   "features/lineage/components/lineage-graph-dialog.tsx",
   "features/lineage/components/lineage-node.tsx",
   "features/diagrams/components/inline-svg.tsx",

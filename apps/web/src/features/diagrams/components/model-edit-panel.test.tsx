@@ -54,6 +54,18 @@ describe("ModelEditPanel context mode", () => {
     expect(screen.getByRole("button", { name: "添加人员" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "添加人员" }));
+    const dialog = screen.getByRole("dialog", { name: "添加人员" });
+    expect(dialog.querySelector('[data-slot="field-set"]')).toHaveClass(
+      "rounded-xl",
+      "bg-muted/10",
+      "p-4",
+      "sm:p-5",
+    );
+    expect(screen.getByRole("checkbox", { name: "r1：客户可以发起订单" }).closest("div.grid")).not.toHaveClass("overflow-y-auto");
+    screen.getAllByRole("textbox").forEach((field) => {
+      expect(field).toHaveClass("px-4");
+      expect(field.closest('[data-slot="field"]')).toBeInTheDocument();
+    });
     expect(screen.getByRole("alert")).toHaveTextContent("请至少选择一条当前有效的来源需求规则");
     expect(screen.getByRole("button", { name: "确认添加" })).toBeDisabled();
     await user.click(screen.getByRole("checkbox", { name: "r1：客户可以发起订单" }));
@@ -70,8 +82,11 @@ describe("ModelEditPanel context mode", () => {
     const onCommit = vi.fn<(draft: Record<string, unknown>) => Promise<void>>(async () => undefined);
     render(<ContextEditor section="relationships" onCommit={onCommit} />);
 
+    expect(screen.getByText("发起支付").closest('[data-slot="spotlight-card"]')).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "添加关系" }));
+    expect(screen.getByRole("dialog", { name: "添加关系" }).querySelector('[data-slot="field-set"]')).toBeInTheDocument();
     expect(screen.getByLabelText("起点")).toBeInTheDocument();
+    expect(screen.getByLabelText("起点").closest('[data-slot="field"]')).toBeInTheDocument();
     expect(screen.getByLabelText("方向")).toBeInTheDocument();
     expect(screen.getByLabelText("终点")).toBeInTheDocument();
     expect(screen.getByLabelText("说明")).toBeInTheDocument();
@@ -84,6 +99,20 @@ describe("ModelEditPanel context mode", () => {
       relationships: expect.arrayContaining([
         expect.objectContaining({ direction: "directed", sourceRequirementIds: ["r1"] }),
       ]),
+    });
+  });
+
+  it("keeps editor content stable throughout the close animation", async () => {
+    const user = userEvent.setup();
+    render(<ContextEditor section="elements" onCommit={async () => undefined} />);
+
+    await user.click(screen.getByRole("button", { name: "编辑人员：客户" }));
+    expect(screen.getByRole("dialog", { name: "编辑人员" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "取消" }));
+
+    expect(screen.queryByText("未找到可编辑元素。")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "编辑人员" })).not.toBeInTheDocument();
     });
   });
 
@@ -105,10 +134,10 @@ describe("ModelEditPanel context mode", () => {
       />,
     );
 
-    expect(screen.getByText("1-8 / 11")).toBeInTheDocument();
+    expect(document.querySelector('[aria-label="1-8 / 11"]')).toBeInTheDocument();
     expect(screen.queryByText("人员 9")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "下一页" }));
-    expect(screen.getByText("9-11 / 11")).toBeInTheDocument();
+    expect(document.querySelector('[aria-label="9-11 / 11"]')).toBeInTheDocument();
     expect(screen.getByText("人员 9")).toBeInTheDocument();
   });
 });

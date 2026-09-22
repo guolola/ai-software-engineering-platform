@@ -1,4 +1,6 @@
 // Renders the model editor element and relationship list sections from prepared view data.
+import { SpotlightCard } from "../../../shared/ui/interactive-card";
+import { Input } from '../../../shared/ui/input';
 import { ArrowRight, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../shared/ui/button";
@@ -13,7 +15,6 @@ import {
   type EditableCollection,
 } from "../lib/model-editing";
 import { getRelationAccentClass } from "../lib/diagram-detail-view-model";
-import { diagramDetailFieldLabel } from "../lib/diagram-presentation";
 import { editorOwnerLabel, namedActionLabel } from "./model-edit-fields";
 
 type EditableItemReference = {
@@ -76,11 +77,11 @@ export function ModelElementListSection({
           <div className="flex min-w-max items-center gap-2">
             <label className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <input
+              <Input
                 aria-label={t("diagramLists.elements.search")}
                 value={elementSearch}
                 onChange={(event) => onElementSearchChange(event.target.value)}
-                className="h-9 w-64 rounded-md border border-border bg-background pl-9 pr-3 text-xs outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-9 w-64 border pl-9 pr-3 text-xs"
                 placeholder={t("diagramLists.elements.searchPlaceholder")}
               />
             </label>
@@ -94,7 +95,7 @@ export function ModelElementListSection({
                   type="button"
                   variant={elementKindFilter === "all" ? "default" : "outline"}
                   size="sm"
-                  className="h-8 rounded-full px-3 text-xs"
+                  className="h-8 px-3 text-xs"
                   onClick={() => onElementKindFilterChange("all")}
                 >
                   {t("diagramLists.elements.allTypes")}
@@ -108,7 +109,7 @@ export function ModelElementListSection({
                     type="button"
                     variant={elementKindFilter === group.kind ? "default" : "outline"}
                     size="sm"
-                    className="h-8 rounded-full px-3 text-xs"
+                    className="h-8 px-3 text-xs"
                     onClick={() => onElementKindFilterChange(group.kind)}
                   >
                     {t(`diagrams.semantic.${group.kind}.label`)}
@@ -153,38 +154,31 @@ export function ModelElementListSection({
               const active =
                 selectedElement?.kind === element.kind &&
                 selectedElement.id === element.id;
-              const fieldSummary = element.fields
-                .slice(0, 3)
-                .map((field) => `${diagramDetailFieldLabel(field.label, t)}${t("traceability.refSeparator")}${field.value}`)
-                .join(" / ");
               return (
-                <article
+                <SpotlightCard
                   key={`${element.kind}:${element.id}`}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={t("diagramLists.elements.locate", { name: element.label })}
-                  aria-pressed={active}
-                  onClick={() => onSelectElement(element)}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    event.preventDefault();
-                    onSelectElement(element);
-                  }}
+                  data-selected={active ? "true" : "false"}
                   className={cn(
-                    "min-h-[8.75rem] cursor-pointer overflow-hidden rounded-lg border p-2.5 text-left text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "min-h-[9rem] text-left text-sm",
                     active
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-card hover:bg-accent/40",
+                      ? "border-primary shadow-sm shadow-primary/10"
+                      : "",
                   )}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <Badge
-                      variant="secondary"
-                      className="shrink-0 bg-primary/10 text-xs text-primary"
-                    >
-                      {t(`diagrams.semantic.${element.kind}.label`)}
-                    </Badge>
-                    <div className="flex min-w-0 flex-1 justify-end gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label={t("diagramLists.elements.locate", { name: element.label })}
+                    aria-pressed={active}
+                    className="absolute inset-0 z-10 size-auto cursor-pointer rounded-xl p-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    onClick={() => onSelectElement(element)}
+                  />
+                  <div className="pointer-events-none relative z-20 flex min-h-[9rem] flex-col p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <Badge variant="secondary" className="shrink-0 text-xs">
+                        {t(`diagrams.semantic.${element.kind}.label`)}
+                      </Badge>
+                      <div className="pointer-events-auto flex min-w-0 flex-1 justify-end gap-1">
                       {editable ? (
                         <>
                           <Button
@@ -211,7 +205,7 @@ export function ModelElementListSection({
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="size-7 text-destructive"
+                              className="size-7"
                               aria-label={namedActionLabel(
                                 t("diagramLists.actions.delete"),
                                 editorOwnerLabel(editable.collection.label),
@@ -228,23 +222,16 @@ export function ModelElementListSection({
                           ) : null}
                         </>
                       ) : null}
+                      </div>
+                    </div>
+                    <div className="mt-3 line-clamp-2 min-w-0 break-words text-sm font-semibold leading-5 text-foreground">
+                      {element.label}
+                    </div>
+                    <div className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">
+                      {element.description || t("diagramLists.elements.noDescription")}
                     </div>
                   </div>
-                  <div className="mt-2 line-clamp-1 min-w-0 break-words text-sm font-semibold leading-5 text-foreground">
-                    {element.label}
-                  </div>
-                  <div className="mt-1.5 line-clamp-2 min-h-10 text-[11px] leading-5 text-muted-foreground">
-                    {element.description || t("diagramLists.elements.noDescription")}
-                  </div>
-                  <div className="mt-2 border-t border-border pt-2">
-                    <div className="line-clamp-1 break-words text-[11px] text-muted-foreground">
-                      {fieldSummary || t("diagramLists.elements.noFields")}
-                    </div>
-                    <div className="mt-1 font-mono text-[10px] text-muted-foreground">
-                      {t("diagramLists.elements.fieldCount", { count: element.fields.length })}
-                    </div>
-                  </div>
-                </article>
+                </SpotlightCard>
               );
             })}
           </div>
@@ -295,11 +282,11 @@ export function ModelRelationshipListSection({
           <div className="flex min-w-max items-center gap-2">
             <label className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <input
+              <Input
                 aria-label={t("diagramLists.relations.search")}
                 value={relationSearch}
                 onChange={(event) => onRelationSearchChange(event.target.value)}
-                className="h-9 w-64 rounded-md border border-border bg-background pl-9 pr-3 text-xs outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-9 w-64 border pl-9 pr-3 text-xs"
                 placeholder={t("diagramLists.relations.searchPlaceholder")}
               />
             </label>
@@ -313,7 +300,7 @@ export function ModelRelationshipListSection({
                   type="button"
                   variant={relationKindFilter === "all" ? "default" : "outline"}
                   size="sm"
-                  className="h-8 rounded-full px-3 text-xs"
+                  className="h-8 px-3 text-xs"
                   onClick={() => onRelationKindFilterChange("all")}
                 >
                   {t("diagramLists.relations.allTypes")}
@@ -327,7 +314,7 @@ export function ModelRelationshipListSection({
                     type="button"
                     variant={relationKindFilter === option.value ? "default" : "outline"}
                     size="sm"
-                    className="h-8 rounded-full px-3 text-xs"
+                    className="h-8 px-3 text-xs"
                     onClick={() => onRelationKindFilterChange(option.value)}
                   >
                     {option.label}
@@ -370,10 +357,10 @@ export function ModelRelationshipListSection({
               typeLabel,
             } = relationSummary;
             return (
-              <article
+              <SpotlightCard
                 key={id}
                 className={cn(
-                  "rounded-lg border border-border border-l-4 bg-card shadow-sm",
+                  "gap-0 py-0 border-l-4",
                   getRelationAccentClass(
                     Math.max(0, relationshipOrderIds.indexOf(id)),
                   ),
@@ -420,7 +407,7 @@ export function ModelRelationshipListSection({
                     type="button"
                     size="icon"
                     variant="ghost"
-                    className="size-8 text-destructive"
+                    className="size-8"
                     aria-label={namedActionLabel(t("diagramLists.actions.delete"), t("diagramLists.relations.kind"), displayLabel)}
                     disabled={saving}
                     onClick={() => onDeleteRelation(id, displayLabel)}
@@ -428,7 +415,7 @@ export function ModelRelationshipListSection({
                     <Trash2 className="size-3.5" />
                   </Button>
                 </div>
-              </article>
+              </SpotlightCard>
             );
           })
         )}

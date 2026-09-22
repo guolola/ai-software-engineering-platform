@@ -1,10 +1,21 @@
 // Owns documentation navigation, category grouping, and search result selection.
-import { BookOpen, FileText, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../../shared/ui/badge";
-import { Button } from "../../../shared/ui/button";
-import { Input } from "../../../shared/ui/input";
-import { cn } from "../../../shared/ui/utils";
+import {
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+} from "../../../shared/ui/sidebar";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "../../../shared/ui/input-group";
+import { Label } from "../../../shared/ui/label";
 import { i18n as appI18n } from "../../../shared/i18n";
 import type {
   ProductDocArticle,
@@ -41,48 +52,53 @@ export function DocsSidebar({
   return (
     <aside
       aria-label={t("docs.directoryAria")}
-      className="min-w-0 overflow-x-hidden rounded-lg border border-border bg-card p-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"
+      className="min-w-0 py-2 @[720px]/docs:pr-6"
     >
       <div className="flex items-center gap-2">
-        <BookOpen className="size-4 text-primary" />
         <h2 className="text-base font-semibold">{t("docs.directory")}</h2>
       </div>
 
-      <label className="mt-4 block text-xs font-medium text-muted-foreground" htmlFor="product-docs-search">
+      <Label
+        className="mt-4 text-xs font-medium tracking-wide text-muted-foreground"
+        htmlFor="product-docs-search"
+      >
         {t("docs.searchLabel")}
-      </label>
-      <div className="relative mt-2">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
+      </Label>
+      <InputGroup className="mt-2">
+        <InputGroupAddon>
+          <Search />
+        </InputGroupAddon>
+        <InputGroupInput
           id="product-docs-search"
           value={searchQuery}
           onChange={(event) => onSearchQueryChange(event.target.value)}
           placeholder={t("docs.searchPlaceholder")}
-          className="pl-9"
         />
-      </div>
+      </InputGroup>
 
       {trimmedQuery ? (
         <div className="mt-4 grid gap-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-muted-foreground">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {t("docs.searchResults")}
             </span>
             <Badge variant="outline">{t("docs.resultCount", { count: searchResults.length })}</Badge>
           </div>
           {visibleArticles.length > 0 ? (
-            visibleArticles.map((article) => (
-              <ArticleButton
-                key={article.id}
-                article={article}
-                active={article.id === selectedArticleId}
-                onSelect={() => onSelectArticle(article.id)}
-              />
-            ))
+            <SidebarMenu>
+              {visibleArticles.map((article) => (
+                <ArticleButton
+                  key={article.id}
+                  article={article}
+                  active={article.id === selectedArticleId}
+                  onSelect={() => onSelectArticle(article.id)}
+                />
+              ))}
+            </SidebarMenu>
           ) : (
-            <div className="rounded-md border border-dashed border-border p-3 text-sm leading-6 text-muted-foreground">
+            <p className="py-3 text-sm leading-6 text-muted-foreground">
               {t("docs.noResults")}
-            </div>
+            </p>
           )}
         </div>
       ) : (
@@ -92,27 +108,27 @@ export function DocsSidebar({
               (article) => article.category === category.id,
             );
             return (
-              <section key={category.id} aria-labelledby={`docs-category-${category.id}`}>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3
-                    id={`docs-category-${category.id}`}
-                    className="min-w-0 break-words text-xs font-semibold text-muted-foreground"
-                  >
-                    {category.label}
-                  </h3>
-                  <Badge variant="outline">{categoryArticles.length}</Badge>
-                </div>
-                <div className="grid gap-1.5">
-                  {categoryArticles.map((article) => (
-                    <ArticleButton
-                      key={article.id}
-                      article={article}
-                      active={article.id === selectedArticleId}
-                      onSelect={() => onSelectArticle(article.id)}
-                    />
-                  ))}
-                </div>
-              </section>
+              <SidebarGroup key={category.id} className="p-0" aria-labelledby={`docs-category-${category.id}`}>
+                <SidebarGroupLabel
+                  render={<h3 />}
+                  id={`docs-category-${category.id}`}
+                  className="h-auto min-w-0 break-words px-2 py-2 text-xs font-medium text-muted-foreground"
+                >
+                  {category.label}
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {categoryArticles.map((article) => (
+                      <ArticleButton
+                        key={article.id}
+                        article={article}
+                        active={article.id === selectedArticleId}
+                        onSelect={() => onSelectArticle(article.id)}
+                      />
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
             );
           })}
         </div>
@@ -131,25 +147,18 @@ function ArticleButton({
   onSelect: () => void;
 }) {
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "h-auto w-full items-start justify-start gap-3 whitespace-normal rounded-md px-3 py-2 text-left",
-        active && "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary",
-      )}
-      onClick={onSelect}
-    >
-      <FileText className="mt-0.5 size-4 shrink-0" />
-      <span className="min-w-0 flex-1 whitespace-normal">
-        <span className="block break-words text-sm font-semibold leading-5">
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        type="button"
+        isActive={active}
+        aria-current={active ? "page" : undefined}
+        className="h-auto min-h-8 items-start whitespace-normal px-2 py-1.5 [&>span:last-child]:whitespace-normal [&>span:last-child]:overflow-visible"
+        onClick={onSelect}
+      >
+        <span className="min-w-0 break-words text-sm leading-5">
           {article.title}
         </span>
-        <span className="mt-1 block break-words whitespace-normal text-xs leading-5 text-muted-foreground">
-          {article.summary}
-        </span>
-      </span>
-    </Button>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }

@@ -56,6 +56,8 @@ export interface StreamChatCompletionInput {
   onResponseFormatFallback?: (event: ResponseFormatFallbackEvent) => void;
   onTokenUsage?: (usage: StreamTokenUsage) => void;
   onReasoningChunk?: () => void;
+  // Only explicitly public summaries are forwarded; raw provider reasoning is activity only.
+  onReasoningSummary?: (chunk: string) => void;
   onUsageUnavailable?: (reason: string) => void;
 }
 
@@ -566,7 +568,7 @@ export function normalizeStreamTokenUsage(value: unknown): StreamTokenUsage | nu
 
 async function* extractChatCompletionText(
   stream: AsyncIterable<ChatCompletionChunk>,
-  observer: Pick<StreamChatCompletionInput, "onTokenUsage" | "onReasoningChunk" | "onUsageUnavailable"> = {},
+  observer: Pick<StreamChatCompletionInput, "onTokenUsage" | "onReasoningChunk" | "onReasoningSummary" | "onUsageUnavailable"> = {},
 ) {
   let usageSeen = false;
   for await (const chunk of stream) {
@@ -578,12 +580,14 @@ async function* extractChatCompletionText(
     }
     const choice = chunk.choices?.[0] as
       | {
-          delta?: { content?: unknown; reasoning?: unknown; reasoning_content?: unknown };
+          delta?: { content?: unknown; reasoning?: unknown; reasoning_content?: unknown; reasoning_summary?: unknown };
           message?: { content?: unknown };
         }
       | undefined;
     const reasoning = choice?.delta?.reasoning_content ?? choice?.delta?.reasoning;
     if (typeof reasoning === "string" && reasoning) observer.onReasoningChunk?.();
+    const summary = choice?.delta?.reasoning_summary;
+    if (typeof summary === "string" && summary) observer.onReasoningSummary?.(summary);
     const text = choice?.delta?.content ?? choice?.message?.content ?? "";
     if (typeof text === "string" && text) {
       yield text;
@@ -848,6 +852,7 @@ export function createRealLlmTransport(
       onResponseFormatFallback,
       onTokenUsage,
       onReasoningChunk,
+      onReasoningSummary,
       onUsageUnavailable,
     }: StreamChatCompletionInput) {
       const safeBaseUrl = normalizeManagedProviderBaseUrl(
@@ -952,7 +957,7 @@ export function createRealLlmTransport(
         }
 
         for await (const text of withIdleTimeout(
-          extractChatCompletionText(stream, { onTokenUsage, onReasoningChunk, onUsageUnavailable }),
+          extractChatCompletionText(stream, { onTokenUsage, onReasoningChunk, onReasoningSummary, onUsageUnavailable }),
           responseTimeoutMs,
           () => activeAbortController.abort(),
         )) {

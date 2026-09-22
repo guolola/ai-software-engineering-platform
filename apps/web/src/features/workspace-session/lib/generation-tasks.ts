@@ -15,6 +15,7 @@ import {
   shouldDisplayDiagnosticEvent,
   summarizeEvent,
 } from "./diagnostics";
+import { appendTranscriptEvent } from "./run-transcript";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -325,6 +326,8 @@ function updateSubtasksFromEvent(
   subtasks: GenerationSubtask[],
   event: RunEvent,
 ): GenerationSubtask[] {
+  // Call telemetry never changes the pipeline's authoritative artifact/subtask status.
+  if (event.type === "run_activity") return subtasks;
   const subtaskId = subtaskIdFromEvent(event);
   const rawSubtaskId = rawSubtaskIdFromEvent(event);
   if (!subtaskId) return subtasks;
@@ -714,6 +717,7 @@ export function updateDiagnosticsFromEvent(
   const shouldDisplayEvent = shouldDisplayDiagnosticEvent(event);
   return {
     ...current,
+    transcript: appendTranscriptEvent(current.transcript ?? [], event),
     finishedAt:
       event.type === "completed" || event.type === "failed" || event.type === "cancelled"
         ? diagnosticEvent.at

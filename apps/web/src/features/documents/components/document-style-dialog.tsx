@@ -5,6 +5,8 @@ import type {
   DocumentStyleSettings,
 } from "@uml-platform/contracts";
 import { useTranslation } from "react-i18next";
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
 import {
   Dialog,
@@ -16,7 +18,6 @@ import {
 } from "../../../shared/ui/dialog";
 import { Input } from "../../../shared/ui/input";
 import { Label } from "../../../shared/ui/label";
-import { ScaleToFitFrame } from "../../../shared/ui/scale-to-fit";
 import {
   Select,
   SelectContent,
@@ -25,6 +26,8 @@ import {
   SelectValue,
 } from "../../../shared/ui/select";
 import { Switch } from "../../../shared/ui/switch";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../../shared/ui/collapsible";
+import { cn } from "../../../shared/ui/utils";
 import { cloneDefaultDocumentStyle } from "../lib/document-style";
 
 type StyleKey = "heading1" | "heading2" | "heading3" | "body" | "table" | "caption";
@@ -54,6 +57,7 @@ export function DocumentStyleDialog({
   onChange,
 }: DocumentStyleDialogProps) {
   const { t } = useTranslation();
+  const [openSection, setOpenSection] = useState<StyleKey | null>("body");
   const updateStyle = (patch: Partial<DocumentStyleSettings>) => {
     onChange({ ...value, ...patch });
   };
@@ -83,7 +87,7 @@ export function DocumentStyleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent data-form-layout="6" className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{t("documentsPage.styleDialog.title")}</DialogTitle>
           <DialogDescription>
@@ -91,7 +95,7 @@ export function DocumentStyleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScaleToFitFrame minWidth={720} contentClassName="w-[720px]">
+        <div className="w-full min-w-0">
         <div className="grid gap-4">
           <div className="grid grid-cols-2 gap-3 rounded-md border border-border p-3">
             <div className="flex items-center justify-between gap-3">
@@ -118,10 +122,18 @@ export function DocumentStyleDialog({
             const section = value[key] ?? {};
             const spacing = section.lineSpacing ?? { type: "single" as const, value: 1 };
             return (
-              <section key={key} className="grid gap-3 rounded-md border border-border p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold">{t(`documentsPage.styleDialog.sections.${key}`)}</h3>
-                  <div className="flex items-center gap-2">
+              <Collapsible
+                key={key}
+                open={openSection === key}
+                onOpenChange={(open) => setOpenSection(open ? key : null)}
+                className="rounded-xl border border-border bg-muted/10"
+              >
+                <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold">
+                  <span>{t(`documentsPage.styleDialog.sections.${key}`)}</span>
+                  <ChevronDown className={cn("size-4 transition-transform", openSection === key && "rotate-180")} />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="grid gap-3 border-t border-border p-4">
+                  <div className="flex items-center justify-end gap-2">
                     <Label htmlFor={`doc-style-bold-${key}`} className="text-xs">
                       {t("documentsPage.styleDialog.bold")}
                     </Label>
@@ -133,7 +145,6 @@ export function DocumentStyleDialog({
                       }
                     />
                   </div>
-                </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   <div className="grid gap-1.5">
@@ -270,11 +281,12 @@ export function DocumentStyleDialog({
                     />
                   </div>
                 )}
-              </section>
+                </CollapsibleContent>
+              </Collapsible>
             );
           })}
         </div>
-        </ScaleToFitFrame>
+        </div>
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button

@@ -744,7 +744,24 @@ export const runActionRunEventSchema = z.object({
   createdAt: z.string().min(1),
 });
 
-export type RunEvent =
+// User-visible execution records are separate from bounded technical diagnostics.
+export const runActivityEventSchema = z.object({
+  type: z.literal("run_activity"),
+  eventId: z.string().min(1),
+  createdAt: z.string().datetime(),
+  runId: z.string().min(1),
+  stage: runStageSchema,
+  callId: z.string().min(1),
+  subtaskId: z.string().optional(),
+  subtaskLabel: z.string().optional(),
+  phase: z.enum(["started", "output", "thinking", "summary", "completed", "failed"]),
+  format: z.enum(["text", "technical"]).default("technical"),
+  text: z.string().optional(),
+});
+export type RunActivityEvent = z.infer<typeof runActivityEventSchema>;
+
+export type RunEvent = { eventId?: string; createdAt?: string } & (
+  | RunActivityEvent
   | z.infer<typeof queuedRunEventSchema>
   | z.infer<typeof stageStartedRunEventSchema>
   | z.infer<typeof llmChunkRunEventSchema>
@@ -754,9 +771,10 @@ export type RunEvent =
   | z.infer<typeof completedRunEventSchema>
   | z.infer<typeof failedRunEventSchema>
   | z.infer<typeof cancelledRunEventSchema>
-  | z.infer<typeof runActionRunEventSchema>;
+  | z.infer<typeof runActionRunEventSchema>);
 
 export const runEventSchema: z.ZodType<RunEvent, z.ZodTypeDef, unknown> = z.discriminatedUnion("type", [
+  runActivityEventSchema,
   queuedRunEventSchema,
   stageStartedRunEventSchema,
   llmChunkRunEventSchema,
@@ -767,7 +785,7 @@ export const runEventSchema: z.ZodType<RunEvent, z.ZodTypeDef, unknown> = z.disc
   failedRunEventSchema,
   cancelledRunEventSchema,
   runActionRunEventSchema,
-]);
+]).and(z.object({ eventId: z.string().optional(), createdAt: z.string().optional() }));
 
 export const runActionResultSchema = z.object({
   action: runActionSchema,

@@ -151,7 +151,7 @@ describe("createStartRunInput", () => {
     localStorage.clear();
   });
 
-  it("requires a managed provider before starting generation", () => {
+  it("uses the offline demo provider when no managed provider is selected", () => {
     localStorage.setItem(
       "uml-lab-settings",
       JSON.stringify({
@@ -164,12 +164,15 @@ describe("createStartRunInput", () => {
       }),
     );
 
-    expect(() => createStartRunInput("生成 UML", ["usecase"])).toThrow(
-      "请先在个人设置中选择托管 Provider",
-    );
+    expect(createStartRunInput("生成 UML", ["usecase"])).toMatchObject({
+      providerSettings: {
+        providerConfigId: "offline-demo",
+        model: "offline-demo-fixed-artifacts",
+      },
+    });
   });
 
-  it("rejects stale plaintext provider settings even when they are still in local storage", () => {
+  it("uses the offline demo provider when only stale plaintext settings remain", () => {
     localStorage.setItem(
       "uml-lab-settings",
       JSON.stringify({
@@ -183,9 +186,12 @@ describe("createStartRunInput", () => {
       }),
     );
 
-    expect(() => createStartRunInput("生成 UML", ["usecase"])).toThrow(
-      "请先在个人设置中选择托管 Provider",
-    );
+    expect(createStartRunInput("生成 UML", ["usecase"])).toMatchObject({
+      providerSettings: {
+        providerConfigId: "offline-demo",
+        model: "offline-demo-fixed-artifacts",
+      },
+    });
   });
 
   it("includes only managed provider config references when selected", () => {

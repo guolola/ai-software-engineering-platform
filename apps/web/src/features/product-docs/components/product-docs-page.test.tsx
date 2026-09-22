@@ -3,8 +3,18 @@ import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
-import { ProductDocsPage } from "./product-docs-page";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ProductDocsPage as ProductDocsPageView } from "./product-docs-page";
+import { SidebarProvider } from "../../../shared/ui/sidebar";
+
+function ProductDocsPage(props: Parameters<typeof ProductDocsPageView>[0]) {
+  return <SidebarProvider><ProductDocsPageView {...props} /></SidebarProvider>;
+}
+
+afterEach(() => {
+  window.innerWidth = 1440;
+  vi.restoreAllMocks();
+});
 import {
   PRODUCT_DOC_ARTICLES,
   PRODUCT_DOC_CATEGORIES,
@@ -18,9 +28,6 @@ describe("ProductDocsPage", () => {
   it("shows the project-local quick start article by default", () => {
     render(<ProductDocsPage />);
 
-    expect(
-      screen.getByRole("heading", { name: "软件工程实践平台使用手册" }),
-    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "快速开始" })).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: "普通用户完整操作路径" }),
@@ -188,7 +195,7 @@ describe("ProductDocsPage", () => {
     });
   });
 
-  it("renders markdown images and navigates app links through the shell callback", async () => {
+  it("renders markdown images for the selected article", async () => {
     const user = userEvent.setup();
     const onNavigate = vi.fn();
     render(<ProductDocsPage onNavigate={onNavigate} />);
@@ -203,8 +210,6 @@ describe("ProductDocsPage", () => {
       "/help/images/docs-code-preview.png",
     );
 
-    await user.click(screen.getByRole("button", { name: "进入项目" }));
-    expect(onNavigate).toHaveBeenCalledWith("/projects");
   });
 
   it("navigates markdown local links through the shell callback", async () => {
@@ -215,6 +220,45 @@ describe("ProductDocsPage", () => {
     await user.click(screen.getAllByRole("link", { name: "项目首页" })[0]);
 
     expect(onNavigate).toHaveBeenCalledWith("/projects");
+  });
+
+  it("renders one article title before its summary and media without a card", () => {
+    render(<ProductDocsPage />);
+    const article = screen.getByRole("article");
+    const title = within(article).getByRole("heading", { level: 1 });
+    const video = screen.getByLabelText("快速开始项目演示视频");
+    expect(title.compareDocumentPosition(video) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(article).not.toHaveAttribute("data-slot", "card");
+    const sidebar = screen.getByRole("complementary", { name: "使用文档目录" });
+    expect(sidebar.querySelector('[data-slot="sidebar-menu"]')).toBeInTheDocument();
+    expect(within(sidebar).queryByText(PRODUCT_DOC_ARTICLES[0].summary)).not.toBeInTheDocument();
+  });
+
+  it("clears stale anchors and focuses the new article title after selection", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, "", "/tutorial#映射关系");
+    const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
+    render(<ProductDocsPage />);
+    await user.click(screen.getByRole("button", { name: "项目首页与项目创建" }));
+    expect(screen.getByRole("heading", { name: "项目首页与项目创建" })).toHaveFocus();
+    expect(window.location.hash).toBe("");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+  });
+
+  it("opens the mobile directory and collapses it after selecting an article", async () => {
+    window.innerWidth = 390;
+    const user = userEvent.setup();
+    render(<ProductDocsPage />);
+    const trigger = screen.getByRole("button", { name: "文档目录" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(document.getElementById("product-docs-directory")).toHaveClass("hidden");
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById("product-docs-directory")).not.toHaveClass("hidden");
+    await user.click(screen.getByRole("button", { name: "项目首页与项目创建" }));
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(document.getElementById("product-docs-directory")).toHaveClass("hidden");
+    expect(screen.getByRole("heading", { name: "项目首页与项目创建" })).toHaveFocus();
   });
 
   it("keeps every manifest article attached to a local docs screenshot", () => {

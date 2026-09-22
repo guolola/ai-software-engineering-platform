@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { MarketingRoutePath } from "../../../shared/lib/app-route-types";
 import { applyRouteMetadata, MARKETING_SEO, PUBLIC_SITE_URL, SEO_JSON_LD_ID } from "./seo";
 
-const expectedRoutes: MarketingRoutePath[] = ["/", "/features", "/workflow", "/cases", "/pricing"];
+const expectedRoutes: MarketingRoutePath[] = ["/"];
 
 describe("marketing SEO metadata", () => {
   it("defines complete unique metadata for every public route", () => {

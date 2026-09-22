@@ -35,6 +35,8 @@ type StaticProjectMemberPreview = {
   label: string;
   initial: string;
   avatarUrl: string | null;
+  role: string;
+  status: string;
 };
 
 export const PROJECT_SCOPE_OPTIONS = [
@@ -107,6 +109,8 @@ function projectMemberPreviewsFromApi(
         label: ownerName,
         initial: ownerInitial(ownerName),
         avatarUrl: project.ownerAvatarUrl ?? null,
+        role: "owner",
+        status: "active",
       },
     ];
   }
@@ -118,6 +122,8 @@ function projectMemberPreviewsFromApi(
       label,
       initial: ownerInitial(label),
       avatarUrl: member.avatarUrl ?? null,
+      role: member.role,
+      status: member.status,
     };
   });
 }

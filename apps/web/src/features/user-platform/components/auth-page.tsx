@@ -1,23 +1,34 @@
 // Hosts the public authentication routes and their API-backed submission flows.
-import { FormEvent, useEffect, useState } from "react";
-import type { CSSProperties } from "react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "../../../shared/ui/input-otp";
+import {
+  type CSSProperties,
+  FormEvent,
+  type PointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import { useTranslation } from "react-i18next";
 import {
-  Activity,
-  ArrowRight,
-  CheckCircle2,
-  Code2,
+  ArrowLeft,
+  Boxes,
   Eye,
   EyeOff,
-  GitBranch,
+  FileCode2,
   KeyRound,
   Loader2,
   Lock,
   Mail,
+  Workflow,
 } from "lucide-react";
 import type { AuthRoutePath } from "../../../shared/lib/app-route-types";
+import Logo from "../../../shared/template/assets/svg/logo";
 import { Button } from "../../../shared/ui/button";
+import { Card } from "../../../shared/ui/card";
+import { useFloatingAlert } from "../../../shared/ui/floating-alert";
 import { Input } from "../../../shared/ui/input";
+import { Checkbox } from '../../../shared/ui/checkbox';
 import { Label } from "../../../shared/ui/label";
 import { LanguagePreferenceMenu } from "../../../shared/i18n/components/language-preference-menu";
 import {
@@ -36,6 +47,53 @@ type Navigate = (path: string) => void;
 
 const REMEMBERED_LOGIN_EMAIL_STORAGE_KEY = "uml-auth-remembered-email";
 const REMEMBERED_LOGIN_PASSWORD_STORAGE_KEY = "uml-auth-remembered-password";
+
+function WorkbenchThemeImage({
+  lightSrc,
+  darkSrc,
+  className,
+}: {
+  lightSrc: string;
+  darkSrc: string;
+  className: string;
+}) {
+  return (
+    <>
+      <img src={lightSrc} alt="" className={`${className} dark:hidden`} />
+      <img src={darkSrc} alt="" className={`hidden ${className} dark:block`} />
+    </>
+  );
+}
+
+function WorkbenchBackdrop() {
+  const tiles = [
+    ["/help/images/workbench-kpi.png", "/help/images/workbench-kpi-dark.png"],
+    ["/help/images/workbench-timeline.png", "/help/images/workbench-timeline-dark.png"],
+    ["/help/images/workbench-weekly.png", "/help/images/workbench-weekly-dark.png"],
+    ["/help/images/workbench-conversion.png", "/help/images/workbench-conversion-dark.png"],
+    ["/help/images/workbench-performance.png", "/help/images/workbench-performance-dark.png"],
+    ["/help/images/workbench-table.png", "/help/images/workbench-table-dark.png"],
+  ] as const;
+
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-background">
+      <div className="absolute -inset-10 grid grid-cols-4 grid-rows-3 gap-4 -rotate-2">
+        {[...tiles, ...tiles].map(([lightSrc, darkSrc], index) => (
+          <div
+            key={`${lightSrc}-${index}`}
+            className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm"
+          >
+            <WorkbenchThemeImage
+              lightSrc={lightSrc}
+              darkSrc={darkSrc}
+              className="size-full object-cover object-left-top"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function readRememberedLoginCredentials() {
   if (typeof window === "undefined") {
@@ -67,135 +125,6 @@ function writeRememberedLoginCredentials(
   localStorage.removeItem(REMEMBERED_LOGIN_PASSWORD_STORAGE_KEY);
 }
 
-function AuthSecurityPanel() {
-  const { t } = useTranslation();
-  const workflowSteps = [
-    { label: t("auth.page.requirements"), status: "done" },
-    { label: t("auth.page.design"), status: "done" },
-    { label: t("auth.page.code"), status: "active" },
-    { label: t("auth.page.document"), status: "idle" },
-  ];
-
-  return (
-    <aside
-      data-testid="auth-security-panel"
-      data-motion="auth-security"
-      className="motion-auth-security-panel relative hidden min-h-full w-full overflow-hidden bg-muted p-8 md:flex md:w-1/2 md:items-center md:justify-center"
-    >
-      <div className="absolute inset-0 bg-gradient-to-br from-muted via-background/80 to-accent/70" />
-      <div className="relative z-10 w-full max-w-sm">
-        <div
-          data-testid="auth-lifecycle-card"
-          className="motion-auth-card group rotate-[-2deg] rounded-xl border border-border/70 bg-card/80 p-6 shadow-xl backdrop-blur-xl transition-all duration-300 ease-in-out hover:-translate-y-1 hover:rotate-[-1deg] hover:shadow-xl"
-        >
-          <div className="mb-6 flex items-center">
-            <span className="mr-3 inline-flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <GitBranch className="size-5" />
-            </span>
-            <div>
-              <div className="font-display text-xl font-semibold leading-7 text-card-foreground">{t("auth.page.lifecycle")}</div>
-              <div className="text-sm leading-5 text-muted-foreground">{t("auth.page.iterating")}</div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div>
-              <div className="mb-3 text-sm font-medium leading-5 text-card-foreground">{t("auth.page.process")}</div>
-              <div className="flex items-start px-2">
-                {workflowSteps.map((step, index) => (
-                  <div key={step.label} className="contents">
-                    <div className="flex w-10 shrink-0 flex-col items-center gap-1">
-                      {step.status === "done" ? (
-                        <CheckCircle2 className="size-5 text-success" />
-                      ) : step.status === "active" ? (
-                        <Code2 className="size-5 text-primary" />
-                      ) : (
-                        <span className="mt-0.5 size-4 rounded-full border border-muted-foreground/40" />
-                      )}
-                      <span className={step.status === "active" ? "text-[10px] font-bold text-primary" : "text-[10px] text-muted-foreground"}>
-                        {step.label}
-                      </span>
-                    </div>
-                    {index < workflowSteps.length - 1 && (
-                      <div
-                        data-testid={index < 2 ? "auth-progress-shimmer" : undefined}
-                        className={
-                          index < 1
-                            ? "progress-shimmer mt-2 h-0.5 flex-1 bg-success"
-                            : index === 1
-                              ? "progress-shimmer mt-2 h-0.5 flex-1 bg-primary"
-                              : "mt-2 h-0.5 flex-1 bg-border"
-                        }
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-2 text-sm font-medium leading-5 text-card-foreground">{t("auth.page.umlPreview")}</div>
-              <div className="grid gap-2 rounded-lg border border-border/60 bg-muted/70 p-3">
-                <div className="flex gap-2">
-                  <div className="h-12 flex-1 rounded border border-primary/40 bg-card/70 p-1">
-                    <div className="mb-1 h-2 w-2/3 rounded bg-primary/20" />
-                    <div className="mb-0.5 h-1 w-full rounded bg-border" />
-                    <div className="h-1 w-full rounded bg-border" />
-                  </div>
-                  <div className="h-12 flex-1 rounded border border-info/40 bg-card/70 p-1">
-                    <div className="mb-1 h-2 w-2/3 rounded bg-info/20" />
-                    <div className="mb-0.5 h-1 w-full rounded bg-border" />
-                    <div className="h-1 w-full rounded bg-border" />
-                  </div>
-                </div>
-                <div className="relative h-px bg-border">
-                  <span className="absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 bg-card px-1 text-muted-foreground">
-                    <ArrowRight className="size-3" />
-                  </span>
-                </div>
-                <div className="flex h-8 items-center justify-center rounded border border-border bg-card/70 px-2">
-                  <div className="h-2 w-1/2 rounded bg-border" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 flex items-center justify-between border-t border-border/60 pt-4">
-            <span className="rounded bg-muted px-2 py-1 font-mono text-xs font-medium leading-4 text-muted-foreground">Project-Main</span>
-            <span className="flex items-center gap-1 text-sm leading-5 text-muted-foreground">
-              <span className="size-2 rounded-full bg-success motion-auth-pulse" />
-              {t("auth.page.compiled")}
-            </span>
-          </div>
-        </div>
-
-        <div className="motion-auth-card group absolute bottom-12 right-8 w-48 rotate-[4deg] rounded-lg border border-border/70 bg-card/80 p-4 shadow-lg backdrop-blur-xl transition-all duration-300 ease-in-out hover:-translate-y-1 hover:rotate-[3deg] hover:shadow-xl">
-          <div className="mb-2 flex items-center gap-2">
-            <Activity className="size-4 text-info" />
-            <span className="font-display text-sm font-semibold leading-5 text-card-foreground">{t("auth.page.apiLatency")}</span>
-          </div>
-          <div
-            data-testid="auth-api-latency-value"
-            className="font-mono text-xl font-medium leading-7 text-primary transition-colors duration-300 group-hover:text-primary/80"
-          >
-            24ms
-          </div>
-          <div className="mt-2 flex h-8 items-end gap-1">
-            {[40, 60, 30, 80, 50].map((height, index) => (
-              <span
-                key={height}
-                data-testid={index === 3 ? "auth-progress-shimmer" : undefined}
-                className={index === 3 ? "progress-shimmer w-full rounded-t-sm bg-primary" : "w-full rounded-t-sm bg-border"}
-                style={{ height: `${height}%` }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
 export function AuthPage({
   path,
   onNavigate,
@@ -204,9 +133,11 @@ export function AuthPage({
   onNavigate: Navigate;
 }) {
   const { t, i18n } = useTranslation();
+  const { showAlert } = useFloatingAlert();
   const locale = i18n.resolvedLanguage === "en" ? "en-US" : "zh-CN";
+  const rootRef = useRef<HTMLElement>(null);
   const [email, setEmail] = useState(() =>
-    path === "/login" ? readRememberedLoginCredentials().email : "",
+    path === "/login" ? readRememberedLoginCredentials().email : getQueryParam("email"),
   );
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -218,6 +149,7 @@ export function AuthPage({
   );
   const [showPassword, setShowPassword] = useState(false);
   const [mfaCode, setMfaCode] = useState("");
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [mfaChallenge, setMfaChallenge] = useState<PlatformMfaChallenge | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [invitationToken, setInvitationToken] = useState(() => {
@@ -240,6 +172,7 @@ export function AuthPage({
       : new URLSearchParams(window.location.search).get("token") ?? "";
   const [verificationToken, setVerificationToken] = useState(() => urlToken);
   const queryEmail = getQueryParam("email");
+  const authReason = getQueryParam("reason");
   const redirectPath = getSafeRedirectPath();
 
   useEffect(() => {
@@ -291,7 +224,7 @@ export function AuthPage({
         if (nextMfaChallenge) {
           setMfaChallenge(nextMfaChallenge);
           setMfaCode("");
-          setMessage(t("auth.page.mfaPrompt"));
+          setMessage("");
           return;
         }
         writeRememberedLoginCredentials({ email, password }, rememberLogin);
@@ -395,12 +328,9 @@ export function AuthPage({
       : password.length >= 8
         ? t("auth.page.strengthMedium")
         : t("auth.page.strengthWeak");
-  const authPrimaryActionClass =
-    "motion-action h-12 w-full rounded-lg px-6 font-display text-xl font-semibold leading-7 shadow-sm hover:shadow-md";
-  const authTextActionClass =
-    "motion-action font-medium text-primary underline-offset-4 hover:underline";
-  const authInputClass =
-    "motion-auth-input h-12 rounded-lg bg-card px-4 text-base leading-6 text-foreground placeholder:text-muted-foreground";
+  const authPrimaryActionClass = 'w-full';
+  const authTextActionClass = 'h-auto p-0 font-medium underline-offset-4 hover:underline';
+  const authInputClass = 'w-full';
   const submitLabel =
     path === "/login"
       ? mfaChallenge
@@ -415,51 +345,105 @@ export function AuthPage({
           : path === "/forgot-password"
             ? t("auth.page.sendReset")
             : t("auth.page.submitReset");
+  const loginNotice = path === "/login" && authReason
+    ? authReason === "session-expired"
+      ? t("auth.page.sessionExpiredNotice")
+      : authReason === "session-check-failed"
+        ? t("auth.page.sessionCheckFailedNotice")
+        : t("auth.page.loginRequiredNotice")
+    : "";
+  useEffect(() => {
+    if (!loginNotice) return;
+    showAlert({
+      id: `auth-login-${authReason}`,
+      title: t("auth.page.loginNoticeTitle"),
+      description: loginNotice,
+      tone: authReason === "session-check-failed" ? "warning" : "info",
+    });
+  }, [authReason, loginNotice, showAlert, t]);
+  const offScreenSpotlight = {
+    "--spot-x": "-100vw",
+    "--spot-y": "-100vh",
+  } as CSSProperties;
+  const handlePointerMove = (event: PointerEvent<HTMLElement>) => {
+    const root = rootRef.current;
+    if (!root) return;
+    const rect = root.getBoundingClientRect();
+    root.style.setProperty("--spot-x", `${event.clientX - rect.left}px`);
+    root.style.setProperty("--spot-y", `${event.clientY - rect.top}px`);
+  };
 
+  // All public authentication states share the compact Login 08 shell while the handlers retain each flow's transitions.
   return (
     <main
+      ref={rootRef}
+      onPointerMove={handlePointerMove}
+      style={offScreenSpotlight}
       data-testid="auth-shell"
-      data-auth-layout="design-replica-card"
-      data-motion="auth-shell"
-      className="relative min-h-0 flex-1 overflow-auto bg-background text-foreground"
+      data-auth-layout="admincn-v2"
+      className="group/backdrop relative isolate flex min-h-svh flex-1 flex-col overflow-x-hidden bg-background"
     >
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-muted/70 to-accent/80" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle,var(--border)_1px,transparent_1px)] bg-[size:24px_24px] opacity-40" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-30 scale-105">
+        <div className="absolute inset-0 opacity-95 blur-[3px] saturate-[0.55]">
+          <WorkbenchBackdrop />
+        </div>
       </div>
-      <div className="relative z-10 flex min-h-dvh items-center justify-center px-4 py-10 md:px-12">
-        <div className="motion-auth-shell-card flex w-full max-w-[1000px] flex-col overflow-hidden rounded-xl border border-border/60 bg-card/80 shadow-lg backdrop-blur-xl md:flex-row">
-          <section
-            data-testid="auth-form-panel"
-            data-motion="auth-form"
-            className="motion-auth-form-panel relative flex w-full flex-col justify-center p-8 md:w-1/2 md:p-12"
-          >
-            <LanguagePreferenceMenu className="motion-action absolute right-4 top-4 size-10 rounded-full bg-transparent text-muted-foreground shadow-none hover:bg-secondary hover:text-foreground md:right-5 md:top-5" />
-            <button
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-20 bg-muted/55 dark:bg-background/50" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 scale-105 opacity-0 transition-opacity duration-500 group-hover/backdrop:opacity-100 motion-reduce:hidden"
+        style={{
+          maskImage: "radial-gradient(circle 300px at var(--spot-x) var(--spot-y), black 0%, transparent 70%)",
+          WebkitMaskImage: "radial-gradient(circle 300px at var(--spot-x) var(--spot-y), black 0%, transparent 70%)",
+        }}
+      >
+        <WorkbenchBackdrop />
+      </div>
+      <header className="relative z-20 flex items-center justify-between px-4 py-4 sm:px-8">
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-10 gap-2 px-2 text-sm font-semibold"
+          onClick={() => onNavigate("/")}
+        >
+          <Logo className="size-7 object-contain" />
+          <span>{t("auth.page.platformName")}</span>
+        </Button>
+        <LanguagePreferenceMenu />
+      </header>
+      <section
+        data-testid="auth-form-panel"
+        className="relative z-10 flex flex-1 items-center justify-center px-4 pb-14 pt-2 sm:px-6"
+      >
+        <Card className="w-full max-w-md gap-0 overflow-hidden bg-card/95 p-0 shadow-xl backdrop-blur-2xl supports-backdrop-filter:bg-card/85 dark:bg-popover/95 dark:supports-backdrop-filter:bg-popover/85 lg:grid lg:max-w-4xl lg:grid-cols-2">
+          <div className="flex flex-col gap-6 p-6 sm:p-8">
+            <Button
               type="button"
-              className="motion-auth-brand mb-8 pr-12 text-left"
-              style={{ "--motion-delay": "40ms" } as CSSProperties}
-              onClick={() => onNavigate("/")}
-              aria-label={t("auth.page.backHome")}
+              variant="link"
+              className="group h-auto w-fit gap-2 px-0 text-muted-foreground"
+              onClick={() => {
+                if (mfaChallenge) {
+                  setMfaChallenge(null);
+                  setMfaCode("");
+                  return;
+                }
+                onNavigate("/");
+              }}
             >
-              <div className="font-display text-[32px] font-semibold leading-10 text-primary">{t("auth.page.platformName")}</div>
-              <div className="mt-2 text-base leading-6 text-muted-foreground">
-                {path === "/login" ? t("auth.page.welcome") : t("auth.page.productTagline")}
+              <ArrowLeft className="size-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
+              {mfaChallenge ? t("auth.page.backLogin") : t("auth.page.backHome")}
+            </Button>
+            <div className="flex flex-col gap-6">
+              <div className="space-y-2">
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                  {mfaChallenge ? t("auth.page.mfaCode") : path === "/verify-email" ? t("auth.page.verifyHeading") : titles[path]}
+                </h1>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {mfaChallenge ? t("auth.page.mfaPrompt") : descriptions[path]}
+                </p>
               </div>
-            </button>
-            <div
-              className="motion-auth-title mb-6"
-              style={{ "--motion-delay": "100ms" } as CSSProperties}
-            >
-              <h1 className="font-display text-2xl font-semibold leading-8 text-foreground">
-                {path === "/verify-email" ? t("auth.page.verifyHeading") : titles[path]}
-              </h1>
-              <p className="mt-2 text-sm leading-5 text-muted-foreground">
-                {descriptions[path]}
-              </p>
-            </div>
-            <form className="motion-auth-form grid gap-6" onSubmit={submit}>
-              {path !== "/reset-password" && (
+            <form className="grid gap-6" onSubmit={submit}>
+              {path !== "/reset-password" && !mfaChallenge && (
                 <div className="grid gap-2">
                   <Label htmlFor="auth-email" className="text-sm font-medium leading-5 text-foreground">
                     {path === "/login"
@@ -486,20 +470,20 @@ export function AuthPage({
                   </div>
                 </div>
               )}
-              {(path === "/login" || path === "/register" || path === "/reset-password") && (
+              {!mfaChallenge && (path === "/login" || path === "/register" || path === "/reset-password") && (
                 <div className="grid gap-2">
                   <div className="flex items-center justify-between gap-3">
                     <Label htmlFor="auth-password" className="text-sm font-medium leading-5 text-foreground">
                       {path === "/reset-password" ? t("auth.page.newPassword") : t("auth.page.password")}
                     </Label>
                     {path === "/login" && (
-                      <button
+                      <Button variant="link"
                         type="button"
                         className={`${authTextActionClass} text-sm leading-5`}
                         onClick={() => onNavigate("/forgot-password")}
                       >
                         {t("auth.page.forgotPassword")}
-                      </button>
+                      </Button>
                     )}
                   </div>
                   <div className="relative">
@@ -517,15 +501,15 @@ export function AuthPage({
                       required
                       className={`${authInputClass} pl-10 pr-12`}
                     />
-                    <button
+                    <Button variant="link"
                       type="button"
                       aria-label={showPassword ? t("auth.page.hidePassword") : t("auth.page.showPassword")}
                       title={showPassword ? t("auth.page.hidePassword") : t("auth.page.showPassword")}
-                      className="motion-action absolute right-3 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                      className="absolute right-3 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center"
                       onClick={() => setShowPassword((current) => !current)}
                     >
                       {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
-                    </button>
+                    </Button>
                   </div>
                   {path !== "/login" && (
                     <div className="grid gap-2">
@@ -543,14 +527,12 @@ export function AuthPage({
                   )}
                 </div>
               )}
-              {path === "/login" && (
+              {path === "/login" && !mfaChallenge && (
                 <div className="flex items-center">
-                  <input
-                    className="size-4 rounded border-border bg-input-background accent-primary"
+                  <Checkbox
                     id="auth-remember"
-                    type="checkbox"
                     checked={rememberLogin}
-                    onChange={(event) => setRememberLogin(event.target.checked)}
+                    onCheckedChange={setRememberLogin}
                   />
                   <Label htmlFor="auth-remember" className="ml-2 text-sm leading-5 text-muted-foreground">
                     {t("auth.page.remember")}
@@ -558,20 +540,20 @@ export function AuthPage({
                 </div>
               )}
               {path === "/login" && mfaChallenge && (
-                <div className="motion-status grid gap-2 rounded-lg border border-border bg-muted p-3">
-                  <Label htmlFor="auth-mfa-code" className="text-sm font-medium text-foreground">{t("auth.page.mfaCode")}</Label>
-                  <Input
-                    id="auth-mfa-code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    value={mfaCode}
-                    onChange={(event) => setMfaCode(event.target.value)}
-                    placeholder={t("auth.page.mfaPlaceholder")}
-                    required
-                    className={authInputClass}
-                  />
+                <div className="grid gap-4" data-auth-layout="collectui-two-factor">
+                  <div className="flex items-center justify-between gap-1">
+                    <Label htmlFor="auth-mfa-code" className="text-base">{t("auth.page.mfaCode")}</Label>
+                    <Button type="button" variant="link" className="h-auto p-0 text-base" onClick={() => { setUseRecoveryCode(!useRecoveryCode); setMfaCode(''); }}>
+                      {t(useRecoveryCode ? 'auth.page.useAuthenticator' : 'auth.page.useRecoveryCode')}
+                    </Button>
+                  </div>
+                  {useRecoveryCode ? <Input id="auth-mfa-code" autoComplete="one-time-code" value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} required className={authInputClass} /> :
+                  <InputOTP id="auth-mfa-code" maxLength={6} pattern="[0-9]*" inputMode="numeric" autoComplete="one-time-code" value={mfaCode} onChange={setMfaCode} required>
+                    <InputOTPGroup className="w-full justify-center gap-4 *:data-[slot=input-otp-slot]:rounded-lg *:data-[slot=input-otp-slot]:border">
+                      {[0,1,2,3,4,5].map(index => <InputOTPSlot key={index} index={index} className="input-size-lg" />)}
+                    </InputOTPGroup>
+                  </InputOTP>}
                   <span className="text-xs text-muted-foreground">
-                    {t("auth.page.mfaPrompt")}
                     {mfaChallenge.expiresAt
                       ? ` ${t("auth.page.mfaExpiry", { time: formatDateTime(mfaChallenge.expiresAt, locale) })}`
                       : ""}
@@ -627,12 +609,11 @@ export function AuthPage({
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       id="terms"
                       checked={termsAccepted}
-                      onChange={(event) => setTermsAccepted(event.target.checked)}
-                      className="size-4 rounded border-border accent-primary"
+                      onCheckedChange={setTermsAccepted}
+                      className="size-4 accent-primary"
                     />
                     <Label htmlFor="terms" className="text-sm text-muted-foreground">
                       {t("auth.page.terms")}
@@ -642,7 +623,7 @@ export function AuthPage({
               )}
               {path === "/verify-email" && (
                 <>
-                  <div className="motion-status rounded-lg border border-border bg-muted p-4 text-sm leading-6 text-muted-foreground">
+                  <div className="rounded-lg border border-border bg-muted p-4 text-sm leading-6 text-muted-foreground">
                     {getQueryParam("sent")
                       ? t("auth.page.verifySent", { email: queryEmail || t("auth.page.yourEmail") })
                       : t("auth.page.verifyInstruction")}
@@ -677,34 +658,59 @@ export function AuthPage({
               {path === "/login" && (
                 <p className="text-center text-sm leading-5 text-muted-foreground">
                   {t("auth.page.noAccount")} {" "}
-                  <button type="button" className={authTextActionClass} onClick={() => onNavigate("/register")}>
+                  <Button variant="link" type="button" className={authTextActionClass} onClick={() => onNavigate("/register")}>
                     {t("auth.page.createAccount")}
-                  </button>
+                  </Button>
                 </p>
               )}
               {path === "/register" && (
                 <p className="text-center text-sm leading-5 text-muted-foreground">
                   {t("auth.page.haveAccount")} {" "}
-                  <button type="button" className={authTextActionClass} onClick={() => onNavigate("/login")}>
+                  <Button variant="link" type="button" className={authTextActionClass} onClick={() => onNavigate("/login")}>
                     {t("auth.page.loginLink")}
-                  </button>
+                  </Button>
                 </p>
               )}
               {path !== "/login" && path !== "/register" && (
-                <Button type="button" variant="ghost" className="motion-action w-fit px-0 text-primary hover:bg-transparent hover:text-primary/80" onClick={() => onNavigate("/login")}>
+                <Button type="button" variant="ghost" className="w-fit px-0" onClick={() => onNavigate("/login")}>
                   {t("auth.page.backLogin")}
                 </Button>
               )}
               {message && (
-                <div className="motion-status rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">
                   {message}
                 </div>
               )}
             </form>
-          </section>
-          <AuthSecurityPanel />
-        </div>
-      </div>
+            </div>
+            <p className="text-center text-xs leading-5 text-muted-foreground">
+              {t("auth.page.securityFootnote")}
+            </p>
+          </div>
+          <aside className="hidden flex-col justify-center gap-8 rounded-r-2xl border-s bg-muted/40 p-8 lg:flex">
+            <div>
+              <p className="text-2xl font-semibold tracking-tight">{t("auth.page.platformName")}</p>
+              <p className="mt-3 text-balance text-sm leading-relaxed text-muted-foreground">
+                {t("auth.page.panelDescription")}
+              </p>
+            </div>
+            <ul className="flex flex-col gap-5">
+              {[
+                { Icon: Boxes, label: t("auth.page.capabilityModels") },
+                { Icon: Workflow, label: t("auth.page.capabilityWorkflow") },
+                { Icon: FileCode2, label: t("auth.page.capabilityArtifacts") },
+              ].map(({ Icon, label }) => (
+                <li key={label} className="flex items-center gap-3.5">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                    <Icon className="size-4" aria-hidden="true" />
+                  </span>
+                  <span className="text-sm leading-relaxed">{label}</span>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        </Card>
+      </section>
     </main>
   );
 }

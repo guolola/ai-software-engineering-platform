@@ -1,18 +1,20 @@
 // Provides shared project page scaffolding used by user-platform subpages.
+import { Card } from '../../../shared/ui/card';
+import { PageContainer } from '../../../shared/template/layout/page';
 type ProjectPageFrameProps = {
   children: React.ReactNode;
   onNavigate?: (path: string) => void;
 };
 
 const STABLE_PLATFORM_SCROLL_CLASS =
-  "min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-scroll bg-background [scrollbar-gutter:stable]";
+  "min-h-0 min-w-0 w-full overflow-x-clip bg-background";
 
 export function PageFrame({ children }: ProjectPageFrameProps) {
   return (
     <main className={STABLE_PLATFORM_SCROLL_CLASS}>
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-6">
+      <PageContainer className="flex flex-col gap-6">
         {children}
-      </div>
+      </PageContainer>
     </main>
   );
 }
@@ -25,8 +27,8 @@ export function SectionCard({
   className?: string;
 }) {
   return (
-    <section className={`rounded-md border border-border bg-card p-5 ${className}`}>
+    <Card className={`gap-0 p-5 shadow-none ${className}`}>
       {children}
-    </section>
+    </Card>
   );
 }

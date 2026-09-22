@@ -45,6 +45,26 @@ async function createSseTestApp() {
   return { app, runs };
 }
 
+test("replays history before buffered terminal publications and deduplicates overlapping live events", async () => {
+  const app = Fastify();
+  const started: RunEvent = { type: "stage_started", stage: "generate_models", eventId: "stage-one" };
+  const record: RunRecord = { snapshot: { ...completedSnapshot, status: "running" }, events: [{ type: "queued", eventId: "queued" }, started], listeners: new Set(), terminal: false };
+  let closed = false;
+  registerRunEventsRoute({
+    app, runs: new Map([["run-1", record]]), path: "/runs/:runId/events", notFoundMessage: "missing", defaultAllowOrigin: "http://localhost:5173",
+    subscribeRunEvents: async (_runId, receive) => {
+      receive(started);
+      receive({ type: "cancelled", eventId: "end", message: "已取消" });
+      return { close: async () => { closed = true; } };
+    },
+  });
+  const response = await app.inject({ method: "GET", url: "/runs/run-1/events" });
+  const events = response.body.split("\n").filter((line) => line.startsWith("data:")).map((line) => JSON.parse(line.slice(5)));
+  assert.deepEqual(events.map((event) => event.eventId), ["queued", "stage-one", "end"]);
+  assert.equal(closed, true);
+  await app.close();
+});
+
 async function withApiCorsOrigins<T>(
   value: string | undefined,
   callback: () => Promise<T>,

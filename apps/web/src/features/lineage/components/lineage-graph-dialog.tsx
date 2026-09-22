@@ -1,4 +1,5 @@
 // Presents the full project generation lineage as a fixed-column dependency map.
+import { Card } from "../../../shared/ui/card";
 import {
   useCallback,
   useEffect,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import { Badge } from "../../../shared/ui/badge";
 import { Button } from "../../../shared/ui/button";
+import { ScrollArea } from "../../../shared/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +48,6 @@ import {
   type LineageNodeStatus,
 } from "../lib/lineage-graph-model";
 import {
-  LINEAGE_KIND_STYLES,
   LineageKindIcon,
   LineageNodeCard,
 } from "./lineage-node";
@@ -69,12 +70,12 @@ const EDGE_SOURCE_OFFSET = 12;
 const EDGE_TARGET_OFFSET = 22;
 
 const STATUS_BADGE_CLASS: Record<LineageNodeStatus, string> = {
-  "not-generated": "border-slate-200 bg-slate-50 text-slate-600",
-  current: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  stale: "border-amber-200 bg-amber-50 text-amber-700",
-  error: "border-red-200 bg-red-50 text-red-700",
-  running: "border-indigo-200 bg-indigo-50 text-indigo-700",
-  interrupted: "border-amber-200 bg-amber-50 text-amber-700",
+  "not-generated": "border-border bg-muted text-muted-foreground",
+  current: "border-success/30 bg-success/10 text-success",
+  stale: "border-warning/30 bg-warning/10 text-warning",
+  error: "border-destructive/30 bg-destructive/10 text-destructive",
+  running: "border-info/30 bg-info/10 text-info",
+  interrupted: "border-warning/30 bg-warning/10 text-warning",
 };
 
 const FILTERS: LineageFilter[] = ["all", "stale", "error", "impact"];
@@ -292,7 +293,12 @@ function LineageDetailPanel({
           </Button>
         </div>
       </div>
-      <div className="min-h-0 flex-1 space-y-5 overflow-auto p-5">
+      <ScrollArea
+        data-testid="lineage-detail-scroll-area"
+        className="min-h-0 flex-1"
+        viewportClassName="overflow-x-hidden"
+        contentClassName="space-y-5 p-5"
+      >
         <section>
           <h4 className="text-xs font-semibold text-muted-foreground">{t("lineage.statusReason")}</h4>
           <p className="mt-2 rounded-md bg-muted px-3 py-2 text-sm leading-6">
@@ -334,7 +340,7 @@ function LineageDetailPanel({
             <p className="mt-2 text-sm text-muted-foreground">{t("lineage.noRecent")}</p>
           )}
         </section>
-      </div>
+      </ScrollArea>
     </aside>
   );
 }
@@ -484,9 +490,14 @@ function LineageCanvas({
   );
 
   return (
-    <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto bg-background">
+    <ScrollArea
+      data-testid="lineage-canvas-scroll-area"
+      viewportRef={scrollRef}
+      showHorizontalScrollbar
+      className="min-h-0 flex-1 bg-background"
+    >
       <div ref={surfaceRef} className="relative min-h-[720px] min-w-[1300px] p-5 pt-[4.5rem]">
-        <div className="absolute left-4 right-4 top-4 z-20 flex flex-wrap items-center gap-2 rounded-lg border bg-card/95 p-2 shadow-sm backdrop-blur">
+        <Card className="gap-0 py-0 absolute left-4 right-4 top-4 z-20 flex flex-wrap items-center gap-2 p-2  flex-row">
           {FILTERS.map((item) => (
             <Button
               key={item}
@@ -509,7 +520,7 @@ function LineageCanvas({
             <span>{t("lineage.summaryError", { count: graph.summary.error })}</span>
             <span>{t("lineage.summaryInterrupted", { count: graph.summary.interrupted })}</span>
           </div>
-        </div>
+        </Card>
         <svg
           className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible"
           aria-hidden="true"
@@ -635,7 +646,7 @@ function LineageCanvas({
           ))}
         </div>
       </div>
-    </div>
+    </ScrollArea>
   );
 }
 
@@ -733,7 +744,7 @@ export function LineageGraphDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        hideCloseButton
+        showCloseButton={false}
         className="grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0"
         style={{
           width: "min(1580px, calc(100vw - 4rem))",
@@ -758,9 +769,9 @@ export function LineageGraphDialog({
                 <Search className="size-3" />
                 {t("lineage.nodes", { count: graph.summary.total })}
               </Badge>
-              <Badge variant="warning">{t("lineage.summaryStale", { count: graph.summary.stale })}</Badge>
+              <Badge variant="secondary">{t("lineage.summaryStale", { count: graph.summary.stale })}</Badge>
               <Badge variant="destructive">{t("lineage.summaryError", { count: graph.summary.error })}</Badge>
-              <Badge variant="warning">{t("lineage.summaryInterrupted", { count: graph.summary.interrupted })}</Badge>
+              <Badge variant="secondary">{t("lineage.summaryInterrupted", { count: graph.summary.interrupted })}</Badge>
               <Button type="button" variant="ghost" size="icon" onClick={() => onOpenChange(false)} aria-label={t("lineage.close")}>
                 <X className="size-4" />
               </Button>

@@ -164,25 +164,11 @@ describe("DesignModelPage", () => {
       withWorkspaceProviders(<DesignModelPage />, repository),
     );
 
-    const sourceRegion = await screen.findByRole("heading", { name: "需求阶段来源" });
-    const sourceGrid = sourceRegion.closest("section");
-
-    await waitFor(() =>
-      expect(
-        within(sourceGrid as HTMLElement).getByLabelText("需求分析模型 可用"),
-      ).toBeInTheDocument(),
-    );
-    const analysisSourceCard = within(sourceGrid as HTMLElement).getByLabelText(
-      "需求分析模型 可用",
-    );
-
-    expect(analysisSourceCard).toHaveTextContent("可用");
     const modelGrid = container.querySelector('[data-workspace-density="compact-grid"]');
     expect(modelGrid).toBeInTheDocument();
     expect(modelGrid).toHaveAttribute("data-mobile-card-density", "model-targets");
     expect(modelGrid).toHaveClass("grid-cols-2");
     expect(modelGrid?.className).toContain("min-[1900px]:grid-cols-6");
-    expect(sourceGrid?.querySelector('[data-workspace-density="status-rail"]')).toBeInTheDocument();
   });
 
   it("treats generated prototype model aliases as available requirement sources", async () => {
@@ -214,19 +200,7 @@ describe("DesignModelPage", () => {
 
     render(withWorkspaceProviders(<DesignModelPage />, repository));
 
-    const sourceRegion = await screen.findByRole("heading", { name: "需求阶段来源" });
-    const sourceGrid = sourceRegion.closest("section");
-
-    await waitFor(() =>
-      expect(
-        within(sourceGrid as HTMLElement).getByLabelText("原型界面关系 可用"),
-      ).toBeInTheDocument(),
-    );
-    const prototypeSourceCard = within(sourceGrid as HTMLElement).getByLabelText(
-      "原型界面关系 可用",
-    );
-
-    expect(prototypeSourceCard).toHaveTextContent("可用");
+    expect(screen.getByRole("checkbox", { name: /界面关系图/ })).not.toHaveAttribute("aria-disabled", "true");
   });
 
   it("keeps downstream design selection separate and confirms missing sequence dependency", async () => {
@@ -336,7 +310,6 @@ describe("DesignModelPage", () => {
     await userEvent.click(await screen.findByRole("button", { name: "选择界面关系图" }));
     expect(screen.getByRole("checkbox", { name: /用例实现设计/ })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: /界面关系图/ })).toBeChecked();
-    expect(screen.getByText("来源：需求阶段原型界面关系 + 设计阶段用例实现设计")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /生成设计模型/ }));
     const confirmation = await screen.findByRole("dialog", { name: "确认生成设计模型" });
     expect(within(confirmation).getByText("设计依赖补齐")).toBeInTheDocument();
@@ -438,9 +411,6 @@ describe("DesignModelPage", () => {
 
     await screen.findByText("设计模型");
     await user.click(screen.getByRole("button", { name: "选择部署设计" }));
-    expect(
-      screen.getByText("来源：需求阶段部署需求模型 + 设计阶段组件（构件）关系"),
-    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /生成设计模型/ }));
     const confirmation = await screen.findByRole("dialog", { name: "确认生成设计模型" });
@@ -582,7 +552,6 @@ describe("DesignModelPage", () => {
     expect(classDiagramCheckbox).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "选择设计类图" }));
     expect(classDiagramCheckbox).toBeChecked();
-    expect(screen.getByText("来源：需求阶段领域概念模型 + 设计阶段用例实现设计")).toBeInTheDocument();
   });
 
   it("disables sequence generation when the use case model has no use cases", async () => {
@@ -618,7 +587,7 @@ describe("DesignModelPage", () => {
     render(withWorkspaceProviders(<DesignModelPage />, repository));
 
     await screen.findByText("设计模型");
-    expect(screen.getByRole("checkbox", { name: /用例实现设计/ })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: /用例实现设计/ })).toHaveAttribute("aria-disabled", "true");
     expect(
       screen.getAllByText("需求阶段用例模型没有可生成用例实现设计的用例").length,
     ).toBeGreaterThan(0);
@@ -690,19 +659,10 @@ describe("DesignModelPage", () => {
     render(withWorkspaceProviders(<DesignModelPage />, repository));
 
     await screen.findByText("设计模型");
-    expect(screen.getByRole("checkbox", { name: /用例实现设计/ })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: /用例实现设计/ })).toHaveAttribute("aria-disabled", "true");
     expect(
       screen.getAllByText(/已有需求阶段用例模型基于旧规则，请先回到需求页更新/).length,
     ).toBeGreaterThan(0);
-    const sourceRegion = screen.getByRole("heading", { name: "需求阶段来源" });
-    const sourceGrid = sourceRegion.closest("section");
-    const usecaseSourceCard = within(sourceGrid as HTMLElement)
-      .getByText("用例模型")
-      .closest("div");
-    expect(usecaseSourceCard).toHaveTextContent("需更新");
-    expect(
-      screen.getByText(/请先回到「需求阶段」更新用例模型/),
-    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /生成设计模型/ })).toBeDisabled();
     expect(startRun).not.toHaveBeenCalled();
     expect(startDesignRun).not.toHaveBeenCalled();
@@ -777,7 +737,7 @@ describe("DesignModelPage", () => {
 
     render(withWorkspaceProviders(<DesignModelPage />, repository));
 
-    await screen.findByText("已生成设计模型");
+    await screen.findByRole("img", { name: /用例实现设计：/, hidden: true });
     expect(screen.getByText("0/7")).toBeInTheDocument();
     const blocker = await screen.findByRole("dialog", {
       name: "设计模型暂时无法生成",
@@ -795,7 +755,8 @@ describe("DesignModelPage", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "有 1 项需要处理" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /生成设计模型/ })).toBeDisabled();
-    expect(screen.getByText("已生成设计模型")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /用例实现设计：/ })).toBeInTheDocument();
+    expect(screen.queryByText("已生成设计模型")).not.toBeInTheDocument();
     expect(startDesignRun).not.toHaveBeenCalled();
   });
 
@@ -874,10 +835,12 @@ describe("DesignModelPage", () => {
       name: /用例实现设计/,
     });
     const sequenceCard = screen.getByRole("button", { name: "选择用例实现设计" });
-    expect(sequenceCard).toHaveClass("min-h-[212px]", "sm:min-h-[236px]");
-    expect(sequenceCard).toHaveClass("bg-gradient-to-br");
+    expect(sequenceCard).toHaveClass("h-[212px]", "sm:h-[236px]");
+    expect(sequenceCard).toHaveAttribute("data-slot", "spotlight-card");
     expect(sequenceCheckbox).not.toBeChecked();
-    expect(screen.getByText("2 个用例实现设计")).toBeInTheDocument();
+    expect(within(sequenceCard).getByText("2")).toBeInTheDocument();
+    expect(within(sequenceCard).getByRole("img", { name: /用例实现设计：/ })).toBeInTheDocument();
+    expect(screen.queryByText("2 个用例实现设计")).not.toBeInTheDocument();
 
     await user.click(within(sequenceCard).getByRole("button", { name: "查看" }));
 
@@ -956,7 +919,6 @@ describe("DesignModelPage", () => {
 
     render(withWorkspaceProviders(<DesignModelPage />, repository));
 
-    await screen.findByText("需求阶段来源");
     expect(screen.queryByText("设计模型 AI 修复记录")).not.toBeInTheDocument();
     expect(
       screen.queryByText(/设计元素缺少上游来源，系统自动补齐到需求用例/u),

@@ -107,7 +107,6 @@ interface WorkspaceShellState {
   selection: WorkspaceSelection;
   openTabs: WorkspaceTab[];
   activeTabId: string;
-  historyDrawerOpen: boolean;
   openWorkspaceTab: (selection: WorkspaceSelection) => void;
   activateWorkspaceTab: (tabId: string) => void;
   closeWorkspaceTab: (tabId: string) => void;
@@ -137,8 +136,6 @@ interface WorkspaceShellState {
     modelId?: string,
     label?: string,
   ) => void;
-  openHistoryDrawer: () => void;
-  closeHistoryDrawer: () => void;
   openDiagram: (diagram: DiagramType, modelId?: string, label?: string) => void;
   openDesignHome: () => void;
   openDesignTraceMatrix: (
@@ -324,7 +321,6 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
   const defaultTab = useMemo(() => createWorkspaceTab(DEFAULT_SELECTION), []);
   const [openTabs, setOpenTabs] = useState<WorkspaceTab[]>([defaultTab]);
   const [activeTabId, setActiveTabId] = useState(defaultTab.id);
-  const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
   const selection =
     openTabs.find((tab) => tab.id === activeTabId)?.selection ?? DEFAULT_SELECTION;
 
@@ -438,14 +434,6 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       label: label ? `跟踪矩阵 · ${label}` : `跟踪矩阵 · ${DIAGRAM_META[diagram].label}`,
     });
   }, [openWorkspaceTab]);
-
-  const openHistoryDrawer = useCallback(() => {
-    setHistoryDrawerOpen(true);
-  }, []);
-
-  const closeHistoryDrawer = useCallback(() => {
-    setHistoryDrawerOpen(false);
-  }, []);
 
   const openDiagram = useCallback((diagram: DiagramType, modelId?: string, label?: string) => {
     openWorkspaceTab({
@@ -593,7 +581,6 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       selection,
       openTabs,
       activeTabId,
-      historyDrawerOpen,
       openWorkspaceTab,
       activateWorkspaceTab,
       closeWorkspaceTab,
@@ -610,8 +597,6 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       openFeasibilityContextRelationship,
       openFeasibilityImplementation,
       openRequirementTraceMatrix,
-      openHistoryDrawer,
-      closeHistoryDrawer,
       openDiagram,
       openDesignHome,
       openDesignTraceMatrix,
@@ -639,8 +624,6 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       openFeasibilityContextRelationship,
       openFeasibilityImplementation,
       openRequirementTraceMatrix,
-      openHistoryDrawer,
-      closeHistoryDrawer,
       openWorkspaceTab,
       activateWorkspaceTab,
       closeWorkspaceTab,
@@ -658,7 +641,6 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       openDiagramElement,
       openDiagramRelationship,
       openWorkspacePlaceholder,
-      historyDrawerOpen,
       selection,
     ],
   );
@@ -668,6 +650,10 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       {children}
     </WorkspaceShellContext.Provider>
   );
+}
+
+export function useOptionalWorkspaceShell() {
+  return useContext(WorkspaceShellContext);
 }
 
 export function useWorkspaceShell() {

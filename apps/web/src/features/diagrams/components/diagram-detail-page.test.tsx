@@ -448,12 +448,12 @@ describe("DiagramView", () => {
     );
 
     expect(await screen.findByDisplayValue("提交订单需求分析模型")).toBeInTheDocument();
-    expect(screen.getByText("来源：用例模型事件流（用例：提交订单）")).toBeInTheDocument();
+    expect(screen.queryByText("来源：用例模型事件流（用例：提交订单）")).not.toBeInTheDocument();
     expect(screen.queryByText("来源：需求规则（未标明）")).not.toBeInTheDocument();
     expect(screen.getByText("提交订单需求分析模型 SVG")).toBeInTheDocument();
   });
 
-  it("shows requirement rule sources below the requirement model summary", async () => {
+  it("does not show requirement rule sources below the requirement model summary", async () => {
     const repository = createRepository(
       createWorkspaceRecord({
         generatedDiagramTypes: ["class"],
@@ -501,12 +501,13 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DiagramView type="class" />, repository));
 
-    expect(await screen.findByText("来源：需求规则（R1、R2）")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("领域概念模型")).toBeInTheDocument();
+    expect(screen.queryByText("来源：需求规则（R1、R2）")).not.toBeInTheDocument();
     expect(screen.queryByText("来源：需求规则（R1、R2、R3）")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "重新生成当前图" })).not.toBeInTheDocument();
   });
 
-  it("shows design model source below the detail summary", async () => {
+  it("does not show design model sources below the detail summary", async () => {
     const sequenceWithName = createRepository(
       createWorkspaceRecord({
         generatedDesignDiagramTypes: ["sequence"],
@@ -542,9 +543,8 @@ describe("DiagramView", () => {
       ),
     );
 
-    expect(
-      await screen.findByText("来源：需求阶段用例模型事件流 + 需求分析模型（用例：借出图书）"),
-    ).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("借出图书用例实现设计")).toBeInTheDocument();
+    expect(screen.queryByText("来源：需求阶段用例模型事件流 + 需求分析模型（用例：借出图书）")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "重新生成当前图" })).not.toBeInTheDocument();
     namedView.unmount();
 
@@ -582,9 +582,8 @@ describe("DiagramView", () => {
       ),
     );
 
-    expect(
-      await screen.findByText("来源：需求阶段用例模型事件流 + 需求分析模型（用例ID：uc_only）"),
-    ).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("用例实现设计")).toBeInTheDocument();
+    expect(screen.queryByText("来源：需求阶段用例模型事件流 + 需求分析模型（用例ID：uc_only）")).not.toBeInTheDocument();
     idView.unmount();
 
     const sequenceWithoutUseCase = createRepository(
@@ -615,9 +614,8 @@ describe("DiagramView", () => {
       withWorkspaceProviders(<DesignDiagramView type="sequence" />, sequenceWithoutUseCase),
     );
 
-    expect(
-      await screen.findByText("来源：需求阶段用例模型事件流 + 需求分析模型（具体用例未标明）"),
-    ).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("用例实现设计")).toBeInTheDocument();
+    expect(screen.queryByText("来源：需求阶段用例模型事件流 + 需求分析模型（具体用例未标明）")).not.toBeInTheDocument();
     missingView.unmount();
 
     const activityRepository = createRepository(
@@ -646,9 +644,8 @@ describe("DiagramView", () => {
     );
     render(withWorkspaceProviders(<DesignDiagramView type="activity" />, activityRepository));
 
-    expect(
-      await screen.findByText("来源：需求阶段原型界面关系 + 设计阶段用例实现设计"),
-    ).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("界面关系图")).toBeInTheDocument();
+    expect(screen.queryByText("来源：需求阶段原型界面关系 + 设计阶段用例实现设计")).not.toBeInTheDocument();
   });
 
   it("autosaves title and summary edits, rerenders the design diagram, and shows a toast", async () => {
@@ -680,10 +677,14 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DesignDiagramView type="class" />, repository));
 
-    await userEvent.clear(await screen.findByLabelText("模型标题"));
-    await userEvent.type(screen.getByLabelText("模型标题"), "图书馆设计类图");
-    await userEvent.clear(screen.getByLabelText("模型摘要"));
-    await userEvent.type(screen.getByLabelText("模型摘要"), "更新后的结构说明");
+    const titleInput = await screen.findByLabelText("模型标题");
+    const summaryInput = screen.getByLabelText("模型摘要");
+    expect(titleInput).toHaveClass("px-2.5", "py-1");
+    expect(summaryInput).toHaveClass("px-2.5", "py-2");
+    await userEvent.clear(titleInput);
+    await userEvent.type(titleInput, "图书馆设计类图");
+    await userEvent.clear(summaryInput);
+    await userEvent.type(summaryInput, "更新后的结构说明");
 
     await waitFor(() => {
       expect(repository.saveDesignModelEdit).toHaveBeenCalledWith(
@@ -1366,6 +1367,8 @@ describe("DiagramView", () => {
       ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     const eventCard = screen.getByRole("button", { name: "定位元素：Event" });
+    expect(eventCard.closest("[data-slot='spotlight-card']")).toBeInTheDocument();
+    expect(screen.queryByText(/个字段$/u)).not.toBeInTheDocument();
     await userEvent.click(eventCard);
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "定位元素：Event" })).toHaveAttribute(
@@ -1387,6 +1390,9 @@ describe("DiagramView", () => {
     expect(screen.getAllByText("活动关联多个提醒记录。").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("关系 rel_event_reminder 起点")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "编辑关系：活动关联多个提醒记录。" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "编辑关系：活动关联多个提醒记录。" }).closest("[data-slot='spotlight-card']"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "删除关系：活动关联多个提醒记录。" })).toBeInTheDocument();
     await userEvent.type(relationSearch, "不存在的关系");
     expect(screen.queryByRole("button", { name: "编辑关系：活动关联多个提醒记录。" })).not.toBeInTheDocument();
@@ -1545,8 +1551,8 @@ describe("DiagramView", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "添加类" }));
     let dialog = await screen.findByRole("dialog", { name: /添加类/u });
-    expect(dialog).toHaveClass("sm:max-w-lg");
-    expect(dialog.querySelector("div[class*='grid-cols-1']")).not.toBeNull();
+    expect(dialog).toHaveClass("sm:max-w-2xl");
+    expect(dialog).toHaveAttribute("data-form-layout", "4");
     expect(within(dialog).queryByText(/cls_|rel_|actor_/u)).not.toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "取消" }));
     expect(repository.renderStructuredModel).not.toHaveBeenCalled();
@@ -1566,8 +1572,8 @@ describe("DiagramView", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "添加关系" }));
     dialog = await screen.findByRole("dialog", { name: /添加关系/u });
-    expect(dialog).toHaveClass("sm:max-w-lg");
-    expect(dialog.querySelector("div[class*='grid-cols-1']")).not.toBeNull();
+    expect(dialog).toHaveClass("sm:max-w-2xl");
+    expect(dialog).toHaveAttribute("data-form-layout", "6");
     expect(dialog.querySelector("select")).toBeNull();
     expect(within(dialog).getByRole("combobox", { name: "起点" })).toBeInTheDocument();
     expect(within(dialog).getByRole("combobox", { name: "终点" })).toBeInTheDocument();
@@ -1708,8 +1714,8 @@ describe("DiagramView", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "添加角色" }));
     let dialog = await screen.findByRole("dialog", { name: /添加角色/u });
-    expect(dialog).toHaveClass("sm:max-w-lg");
-    expect(dialog.querySelector("div[class*='grid-cols-1']")).not.toBeNull();
+    expect(dialog).toHaveClass("sm:max-w-2xl");
+    expect(dialog).toHaveAttribute("data-form-layout", "4");
     expect(within(dialog).getByLabelText("角色名称")).toBeInTheDocument();
     expect(within(dialog).queryByText(/actor_/u)).not.toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "取消" }));
@@ -1717,8 +1723,8 @@ describe("DiagramView", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "编辑角色：教师" }));
     dialog = await screen.findByRole("dialog", { name: /编辑角色/u });
-    expect(dialog).toHaveClass("sm:max-w-lg");
-    expect(dialog.querySelector("div[class*='grid-cols-1']")).not.toBeNull();
+    expect(dialog).toHaveClass("sm:max-w-2xl");
+    expect(dialog).toHaveAttribute("data-form-layout", "4");
     expect(within(dialog).queryByText(/actor_/u)).not.toBeInTheDocument();
     const actorNameInput = within(dialog).getByLabelText("角色名称");
     await userEvent.clear(actorNameInput);
@@ -1728,8 +1734,8 @@ describe("DiagramView", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "编辑关系：发起" }));
     dialog = await screen.findByRole("dialog", { name: /编辑关系/u });
-    expect(dialog).toHaveClass("sm:max-w-lg");
-    expect(dialog.querySelector("div[class*='grid-cols-1']")).not.toBeNull();
+    expect(dialog).toHaveClass("sm:max-w-2xl");
+    expect(dialog).toHaveAttribute("data-form-layout", "6");
     expect(dialog.querySelector("select")).toBeNull();
     expect(within(dialog).getByRole("combobox", { name: "起点" })).toBeInTheDocument();
     expect(within(dialog).getByRole("combobox", { name: "终点" })).toBeInTheDocument();
@@ -1864,8 +1870,8 @@ describe("DiagramView", () => {
     expect(screen.queryByLabelText("模型备注")).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "编辑类：Order" }));
     let dialog = await screen.findByRole("dialog", { name: /编辑类/u });
-    expect(dialog).toHaveClass("sm:max-w-lg");
-    expect(dialog.querySelector("div[class*='grid-cols-1']")).not.toBeNull();
+    expect(dialog).toHaveClass("sm:max-w-2xl");
+    expect(dialog).toHaveAttribute("data-form-layout", "4");
     await userEvent.clear(within(dialog).getByLabelText("第 1 个属性名称"));
     await userEvent.type(within(dialog).getByLabelText("第 1 个属性名称"), "totalAmount");
     await userEvent.clear(within(dialog).getByLabelText("第 1 个操作的第 1 个参数名称"));
@@ -2124,7 +2130,7 @@ describe("DiagramView", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "编辑组合片段：认证成功" }));
     dialog = await screen.findByRole("dialog", { name: /编辑组合片段/u });
-    await userEvent.click(within(dialog).getByLabelText("包含消息：返回结果"));
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "包含消息：返回结果" }));
     await userEvent.click(within(dialog).getByRole("button", { name: "确认编辑" }));
 
     await waitFor(() => {

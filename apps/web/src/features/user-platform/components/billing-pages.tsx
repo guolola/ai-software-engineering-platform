@@ -1,17 +1,25 @@
 // Renders billing and payment UI for public pricing and authenticated account pages.
+import { Alert } from '../../../shared/ui/alert';
+import { Card } from "../../../shared/ui/card";
+import { Table } from '../../../shared/ui/table';
+import { TableCell } from '../../../shared/ui/table';
+import { TableBody } from '../../../shared/ui/table';
+import { TableHead } from '../../../shared/ui/table';
+import { TableRow } from '../../../shared/ui/table';
+import { TableHeader } from '../../../shared/ui/table';
 import {
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import type { KeyboardEvent } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
   BadgeCheck,
   Check,
   CheckCircle2,
-  CreditCard,
   ExternalLink,
   Loader2,
   RefreshCw,
@@ -25,7 +33,6 @@ import type {
 } from "@uml-platform/contracts";
 import { Badge } from "../../../shared/ui/badge";
 import { Button } from "../../../shared/ui/button";
-import { ScaleToFitFrame, ScaledTable } from "../../../shared/ui/scale-to-fit";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +41,7 @@ import {
   DialogTitle,
 } from "../../../shared/ui/dialog";
 import { cn } from "../../../shared/ui/utils";
+import { PageContainer } from "../../../shared/template/layout/page";
 import { useAppI18n } from "../../../shared/i18n";
 import { billingApi } from "../services/billing-api";
 import { toast } from "sonner";
@@ -83,6 +91,23 @@ function channelLabel(channel: PaymentChannel, t: TFunction) {
   return channel === "alipay" ? t("billing.payment.channels.alipay") : channel;
 }
 
+function AlipayIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      data-testid="alipay-icon"
+      viewBox="0 0 16 16"
+      className={className}
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Bootstrap Icons Alipay mark, embedded locally to keep checkout independent of a CDN. */}
+      <path d="M2.541 0H13.5a2.55 2.55 0 0 1 2.54 2.563v8.297c-.006 0-.531-.046-2.978-.813-.412-.14-.916-.327-1.479-.536q-.456-.17-.957-.353a13 13 0 0 0 1.325-3.373H8.822V4.649h3.831v-.634h-3.83V2.121H7.26c-.274 0-.274.273-.274.273v1.621H3.11v.634h3.875v1.136h-3.2v.634H9.99c-.227.789-.532 1.53-.894 2.202-2.013-.67-4.161-1.212-5.51-.878-.864.214-1.42.597-1.746.998-1.499 1.84-.424 4.633 2.741 4.633 1.872 0 3.675-1.053 5.072-2.787 2.08 1.008 6.37 2.738 6.387 2.745v.105A2.55 2.55 0 0 1 13.5 16H2.541A2.55 2.55 0 0 1 0 13.437V2.563A2.55 2.55 0 0 1 2.541 0" />
+      <path d="M2.309 9.27c-1.22 1.073-.49 3.034 1.978 3.034 1.434 0 2.868-.925 3.994-2.406-1.602-.789-2.959-1.353-4.425-1.207-.397.04-1.14.217-1.547.58Z" />
+    </svg>
+  );
+}
+
 function orderStatusLabel(status: BillingOrderStatusDto["status"], t: TFunction) {
   return t(`billing.order.status.${status}`);
 }
@@ -104,10 +129,10 @@ function orderIsPayable(order: BillingOrderStatusDto) {
 }
 
 const paymentPrimaryButtonClass =
-  "h-11 rounded-lg px-5 font-display text-[15px] font-semibold leading-6 shadow-sm hover:shadow-md";
+  "h-11 px-5 font-display text-sm leading-6";
 
 const paymentSecondaryButtonClass =
-  "h-11 rounded-lg px-5 font-display text-[15px] font-semibold leading-6";
+  "h-11 px-5 font-display text-sm leading-6";
 
 function useBillingSkus(t: TFunction) {
   const [skus, setSkus] = useState<BillingSkuDto[]>([]);
@@ -151,27 +176,30 @@ function PaymentMethodCard({
   t: TFunction;
 }) {
   return (
-    <button
+    <Button
+      variant="outline"
       type="button"
+      role="radio"
       data-testid="payment-method-card"
-      aria-pressed={active}
+      aria-checked={active}
+      tabIndex={active ? 0 : -1}
       onClick={() => onSelect(channel)}
       className={cn(
-        "grid rounded-lg border bg-card p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30",
+        "grid h-auto w-full shrink cursor-pointer gap-0 whitespace-normal border p-4 text-left transition-colors duration-200 motion-reduce:transition-none",
         active
-          ? "border-primary ring-2 ring-primary/15"
-          : "border-border hover:border-primary/60 hover:bg-accent/40",
+          ? "border-primary bg-primary/5 hover:border-primary hover:bg-primary/10"
+          : "border-border bg-background hover:border-primary/60 hover:bg-muted/60",
       )}
     >
       <span className="flex items-center justify-between gap-3">
-        <span className="flex items-center gap-2 font-display text-[15px] font-semibold leading-6 text-foreground">
+        <span className="flex items-center gap-2 font-display text-sm font-semibold leading-6 text-foreground">
           <span
             className={cn(
-              "grid size-8 place-items-center rounded-lg",
-              "bg-info/10 text-info",
+              "grid size-9 place-items-center rounded-lg",
+              "bg-[#1677ff]/10 text-[#1677ff] dark:bg-[#1677ff]/20",
             )}
           >
-            <CreditCard className="size-4" />
+            <AlipayIcon className="size-5" />
           </span>
           {channelLabel(channel, t)}
         </span>
@@ -184,10 +212,10 @@ function PaymentMethodCard({
           <Check className="size-3" />
         </span>
       </span>
-      <span className="mt-3 text-[13px] leading-5 text-muted-foreground">
+      <span className="mt-2 text-sm leading-5 text-muted-foreground">
         {t("billing.payment.alipayDesktop")}
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -218,47 +246,51 @@ function PaymentConfirmDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="payment-confirm-dialog"
-        overlayClassName="bg-foreground/40 backdrop-blur-[1px]"
+        overlayClassName="bg-foreground/40 "
         className="overflow-hidden rounded-xl border-border bg-card p-0 shadow-xl sm:max-w-[440px]"
       >
-        <ScaleToFitFrame minWidth={440} contentClassName="w-[440px]">
+        <div className="w-full min-w-0">
           <DialogHeader className="border-b border-border px-6 py-5 pr-12 text-left">
-            <DialogTitle className="font-display text-[20px] font-semibold leading-7 text-foreground">
+            <DialogTitle className="font-display text-xl font-semibold leading-7 text-foreground">
               {t("billing.payment.confirmTitle")}
             </DialogTitle>
-            <DialogDescription className="text-[13px] leading-5 text-muted-foreground">
+            <DialogDescription className="text-sm leading-5 text-muted-foreground">
               {t("billing.payment.confirmDescription")}
             </DialogDescription>
           </DialogHeader>
           {sku && (
             <div className="grid gap-4 px-6 py-5">
-              <section className="rounded-xl border border-border bg-muted/30 p-4">
+              <section className="rounded-xl border border-border bg-muted/30 p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-[12px] font-medium leading-5 text-muted-foreground">
+                    <div className="text-xs font-medium leading-5 text-muted-foreground">
                       {t("billing.payment.purchaseContent")}
                     </div>
-                    <div className="mt-1 font-display text-[16px] font-semibold leading-6 text-foreground">
+                    <div className="mt-1 font-display text-base font-semibold leading-6 text-foreground">
                       {skuCopy(sku, "name", t)}
                     </div>
-                    <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       {skuCopy(sku, "description", t)}
                     </p>
                   </div>
-                  <Badge variant="success">
+                  <Badge variant="secondary">
                     {skuMetric(sku, t)}
                   </Badge>
                 </div>
                 <div className="mt-4 flex items-end justify-between gap-3">
-                  <span className="text-[12px] leading-5 text-muted-foreground">
+                  <span className="text-xs leading-5 text-muted-foreground">
                     {t("billing.payment.orderAmount")}
                   </span>
-                  <span className="font-display text-[28px] font-bold leading-9 tracking-normal text-primary">
+                  <span className="font-display text-3xl font-bold leading-9 tracking-normal text-primary">
                     {formatCny(sku.amountCents, locale)}
                   </span>
                 </div>
               </section>
-              <div className="grid gap-3">
+              <div
+                role="radiogroup"
+                aria-label={t("billing.payment.methodLabel")}
+                className="grid gap-3"
+              >
                 <PaymentMethodCard
                   channel="alipay"
                   active={channel === "alipay"}
@@ -267,9 +299,9 @@ function PaymentConfirmDialog({
                 />
               </div>
               {error && (
-                <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
+                <Alert variant="destructive" className="border px-3 py-2 text-sm">
                   {error}
-                </div>
+                </Alert>
               )}
             </div>
           )}
@@ -277,7 +309,7 @@ function PaymentConfirmDialog({
             <Button
               type="button"
               variant="ghost"
-              className="rounded-lg px-0 text-[14px] text-muted-foreground hover:bg-transparent hover:text-foreground"
+              className="px-0 text-sm"
               onClick={() => onOpenChange(false)}
             >
               {t("billing.actions.cancel")}
@@ -292,7 +324,7 @@ function PaymentConfirmDialog({
               {creating ? t("billing.actions.creatingOrder") : t("billing.actions.payNow")}
             </Button>
           </div>
-        </ScaleToFitFrame>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -322,16 +354,16 @@ function BillingSkuGrid({
   const creditSkus = useMemo(() => skus, [skus]);
   if (loading) {
     return (
-      <div className="rounded-xl border border-border bg-card p-6 text-[14px] leading-6 text-muted-foreground shadow-sm">
+      <Card className="gap-0 py-0 p-6 text-sm leading-6 text-muted-foreground">
         {t("billing.loading.skus")}
-      </div>
+      </Card>
     );
   }
   if (error) {
     return (
-      <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-[14px] leading-6 text-destructive">
+      <Alert variant="destructive" className="border p-6 text-sm leading-6">
         {error}
-      </div>
+      </Alert>
     );
   }
   const groupDefs = [
@@ -353,18 +385,15 @@ function BillingSkuGrid({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <span className="h-6 w-1 rounded-full bg-primary" />
-              <h2 className="font-display text-[22px] font-semibold leading-8 tracking-normal text-foreground">
+              <h2 className="font-display text-2xl font-semibold leading-8 tracking-normal text-foreground">
                 {group.title}
               </h2>
-              <Badge variant="info">
+              <Badge variant="secondary">
                 {group.subtitle}
               </Badge>
             </div>
           </div>
-          <ScaleToFitFrame
-            minWidth={1040}
-            contentClassName="grid w-full grid-cols-4 gap-4"
-          >
+          <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {group.items.map((sku) => (
               <BillingSkuCard
                 key={sku.code}
@@ -378,7 +407,7 @@ function BillingSkuGrid({
                 t={t}
               />
             ))}
-          </ScaleToFitFrame>
+          </div>
         </section>
       ))}
     </div>
@@ -406,38 +435,38 @@ function BillingSkuCard({
 }) {
   const actionLabel = signedIn ? t("billing.actions.buyNow") : t("billing.actions.loginToBuy");
   return (
-    <article
+    <Card as="article"
       data-testid={recommended ? "billing-recommended-sku" : "billing-sku-card"}
       className={cn(
-        "relative grid overflow-hidden rounded-xl border bg-card text-left shadow-sm",
-        variant === "pricing" ? "min-h-[255px] gap-4 p-5" : "min-h-[230px] gap-3 p-4",
+        "gap-0 py-0 relative grid overflow-hidden text-left",
+        variant === "pricing" ? "gap-0 py-0 min-h-[255px] gap-4 p-6" : "gap-0 py-0 min-h-[230px] gap-3 p-5",
         recommended
-          ? "border-primary shadow-md ring-1 ring-primary"
-          : "border-border hover:border-primary/60",
+          ? "gap-0 py-0 border-primary ring-1 ring-primary"
+          : "gap-0 py-0 hover:border-primary/60",
       )}
     >
       {recommended && (
-        <span className="absolute right-4 top-0 rounded-b-lg bg-primary px-3 py-1 text-[11px] font-semibold leading-4 text-primary-foreground">
+        <span className="absolute right-5 top-0 rounded-b-lg bg-primary px-3 py-1 text-xs font-semibold leading-4 text-primary-foreground">
           {t("billing.sku.recommended")}
         </span>
       )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-display text-[20px] font-semibold leading-7 tracking-normal text-foreground">
+          <h3 className="font-display text-xl font-semibold leading-7 tracking-normal text-foreground">
             {skuCopy(sku, "name", t)}
           </h3>
-          <p className="mt-2 min-h-10 text-[13px] leading-5 text-muted-foreground">
+          <p className="mt-2 min-h-10 text-sm leading-5 text-muted-foreground">
             {skuCopy(sku, "description", t)}
           </p>
         </div>
         <Badge
-          className="px-2.5 py-1 text-[12px]"
-          variant="success"
+          className="px-2.5 py-1 text-xs"
+          variant="secondary"
         >
           {skuMetric(sku, t)}
         </Badge>
       </div>
-      <ul className="grid gap-1.5 text-[12px] leading-5 text-muted-foreground">
+      <ul className="grid gap-1.5 text-xs leading-5 text-muted-foreground">
         {skuFeatures(sku, t).map((feature) => (
           <li key={feature} className="flex items-start gap-2">
             <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
@@ -446,7 +475,7 @@ function BillingSkuCard({
         ))}
       </ul>
       <div className="mt-auto">
-        <div className="font-display text-[30px] font-bold leading-9 tracking-normal text-foreground">
+        <div className="font-display text-3xl font-bold leading-9 tracking-normal text-foreground">
           {formatCny(sku.amountCents, locale)}
         </div>
       </div>
@@ -468,7 +497,307 @@ function BillingSkuCard({
         <WalletCards className="size-4" />
         {actionLabel}
       </Button>
-    </article>
+    </Card>
+  );
+}
+
+function creditPackArtworkClass(sku: BillingSkuDto) {
+  if (sku.code === "credits_10") return "border-primary/25 bg-primary text-primary-foreground";
+  if (sku.code === "credits_50") return "border-border bg-secondary text-secondary-foreground";
+  if (sku.code === "credits_100") return "border-foreground/20 bg-foreground text-background";
+  return "border-primary/20 bg-accent text-accent-foreground";
+}
+
+function CreditPackArtwork({
+  sku,
+  locale,
+  t,
+  compact = false,
+}: {
+  sku: BillingSkuDto;
+  locale: string;
+  t: TFunction;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      data-testid={compact ? undefined : "billing-account-sku-artwork"}
+      role={compact ? undefined : "img"}
+      aria-hidden={compact || undefined}
+      aria-label={
+        compact
+          ? undefined
+          : t("billing.sku.selector.artworkLabel", {
+              name: skuCopy(sku, "name", t),
+              metric: skuMetric(sku, t),
+              price: formatCny(sku.amountCents, locale),
+            })
+      }
+      className={cn(
+        "relative isolate aspect-[16/10] w-full overflow-hidden rounded-lg border",
+        creditPackArtworkClass(sku),
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute -right-[12%] -top-[24%] size-[62%] rounded-full border-[1.5rem] border-current opacity-10"
+      />
+      <span
+        aria-hidden="true"
+        className="absolute -bottom-[30%] -left-[8%] size-[56%] rounded-full bg-current opacity-[0.08]"
+      />
+      <div className={cn("relative z-10 flex h-full flex-col justify-between", compact ? "p-2.5" : "p-5 sm:p-6")}>
+        <div className="flex items-start justify-between gap-2">
+          <span className={cn("font-display font-semibold tracking-wide", compact ? "text-[9px]" : "text-xs")}>
+            UML LAB
+          </span>
+          {!compact && isRecommendedSku(sku) && (
+            <span className="rounded-full border border-current/25 px-2 py-0.5 text-[10px] font-medium">
+              {t("billing.sku.recommended")}
+            </span>
+          )}
+        </div>
+        <div>
+          <div className={cn("font-display font-bold tracking-tight", compact ? "text-sm" : "text-3xl sm:text-4xl")}>
+            {skuMetric(sku, t)}
+          </div>
+          {!compact && (
+            <div className="mt-1 text-xs font-medium opacity-75">
+              {t("billing.sku.selector.artworkEyebrow")}
+            </div>
+          )}
+        </div>
+        <div className={cn("flex items-end justify-between gap-2 font-medium", compact ? "text-[8px]" : "text-xs")}>
+          <span>{skuCopy(sku, "name", t)}</span>
+          <span>{formatCny(sku.amountCents, locale)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AccountCreditPackSelector({
+  skus,
+  loading,
+  error,
+  channel,
+  creating,
+  purchaseError,
+  onChannelChange,
+  onPurchase,
+  locale,
+  t,
+}: {
+  skus: BillingSkuDto[];
+  loading: boolean;
+  error: string;
+  channel: PaymentChannel;
+  creating: boolean;
+  purchaseError: string;
+  onChannelChange: (channel: PaymentChannel) => void;
+  onPurchase: (sku: BillingSkuDto) => void;
+  locale: string;
+  t: TFunction;
+}) {
+  const orderedSkus = useMemo(
+    () => [...skus].sort((left, right) => left.sortOrder - right.sortOrder),
+    [skus],
+  );
+  const [selectedCode, setSelectedCode] = useState("credits_100");
+  const selectedIndex = Math.max(0, orderedSkus.findIndex((sku) => sku.code === selectedCode));
+  const selectedSku = orderedSkus[selectedIndex] ?? null;
+
+  if (loading) {
+    return (
+      <Card className="gap-0 p-6 text-sm leading-6 text-muted-foreground">
+        {t("billing.loading.skus")}
+      </Card>
+    );
+  }
+  if (error) {
+    return (
+      <Alert variant="destructive" className="border p-6 text-sm leading-6">
+        {error}
+      </Alert>
+    );
+  }
+  if (!selectedSku) {
+    return (
+      <Card className="gap-0 border-dashed p-6 text-sm leading-6 text-muted-foreground">
+        {t("billing.sku.selector.empty")}
+      </Card>
+    );
+  }
+
+  const selectAtIndex = (index: number) => {
+    const nextSku = orderedSkus[index];
+    if (nextSku) setSelectedCode(nextSku.code);
+  };
+
+  const handleOptionKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (index + 1) % orderedSkus.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (index - 1 + orderedSkus.length) % orderedSkus.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = orderedSkus.length - 1;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    selectAtIndex(nextIndex);
+    event.currentTarget.parentElement
+      ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+      .item(nextIndex)
+      .focus();
+  };
+
+  return (
+    <Card
+      as="section"
+      data-testid="billing-account-sku-selector"
+      className="gap-0 p-5 sm:p-6"
+    >
+      <div className="grid min-w-0 gap-6 lg:grid-cols-2 lg:gap-8">
+        <div className="min-w-0 space-y-2.5">
+          <CreditPackArtwork sku={selectedSku} locale={locale} t={t} />
+          <div
+            className="grid grid-cols-4 gap-2"
+            role="group"
+            aria-label={t("billing.sku.selector.previewGroupLabel")}
+          >
+            {orderedSkus.map((sku) => {
+              const selected = sku.code === selectedSku.code;
+              return (
+                <Button
+                  key={sku.code}
+                  type="button"
+                  variant="outline"
+                  aria-pressed={selected}
+                  aria-label={t("billing.sku.selector.previewLabel", {
+                    name: skuCopy(sku, "name", t),
+                  })}
+                  onClick={() => setSelectedCode(sku.code)}
+                  className={cn(
+                    "cursor-pointer overflow-hidden rounded-md border bg-background p-1 text-left transition-colors duration-200 outline-none motion-reduce:transition-none",
+                    "hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    selected ? "border-primary ring-1 ring-primary" : "border-border",
+                  )}
+                >
+                  <CreditPackArtwork sku={sku} locale={locale} t={t} compact />
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-5">
+          <div aria-live="polite" className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-display text-2xl font-semibold leading-8 text-foreground">
+                {skuCopy(selectedSku, "name", t)}
+              </h3>
+              {isRecommendedSku(selectedSku) && (
+                <Badge variant="secondary">{t("billing.sku.recommended")}</Badge>
+              )}
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {skuCopy(selectedSku, "description", t)}
+            </p>
+            <ul className="grid gap-2 text-sm leading-5 text-muted-foreground">
+              {skuFeatures(selectedSku, t).map((feature) => (
+                <li key={feature} className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-2.5">
+            <div className="text-sm font-medium text-foreground">
+              {t("billing.sku.selector.groupLabel")}
+            </div>
+            <div
+              role="radiogroup"
+              aria-label={t("billing.sku.selector.groupLabel")}
+              className="grid grid-cols-2 gap-2 xl:grid-cols-4"
+            >
+              {orderedSkus.map((sku, index) => {
+                const selected = sku.code === selectedSku.code;
+                return (
+                  <Button
+                    key={sku.code}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    tabIndex={selected ? 0 : -1}
+                    variant={selected ? "default" : "secondary"}
+                    className="h-auto min-w-0 cursor-pointer flex-col items-start gap-0.5 px-3 py-2.5 text-left transition-colors duration-200 motion-reduce:transition-none"
+                    onClick={() => setSelectedCode(sku.code)}
+                    onKeyDown={(event) => handleOptionKeyDown(event, index)}
+                  >
+                    <span className="w-full truncate text-xs font-semibold">
+                      {skuCopy(sku, "name", t)}
+                    </span>
+                    <span className="text-[11px] opacity-75">
+                      {formatCny(sku.amountCents, locale)}
+                    </span>
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            <div className="text-sm font-medium text-foreground">
+              {t("billing.payment.methodLabel")}
+            </div>
+            <div
+              role="radiogroup"
+              aria-label={t("billing.payment.methodLabel")}
+              className="grid"
+            >
+              <PaymentMethodCard
+                channel="alipay"
+                active={channel === "alipay"}
+                onSelect={onChannelChange}
+                t={t}
+              />
+            </div>
+          </div>
+
+          <div className="mt-auto flex flex-col gap-3 border-t border-border pt-5">
+            <div className="flex items-end justify-between gap-4">
+              <span className="text-sm text-muted-foreground">
+                {t("billing.payment.orderAmount")}
+              </span>
+              <span className="font-display text-3xl font-bold leading-9 text-foreground">
+                {formatCny(selectedSku.amountCents, locale)}
+              </span>
+            </div>
+            {purchaseError && (
+              <Alert variant="destructive" className="border px-3 py-2 text-sm">
+                {purchaseError}
+              </Alert>
+            )}
+            <Button
+              type="button"
+              data-testid="billing-account-buy-button"
+              size="lg"
+              className="w-full cursor-pointer text-base"
+              disabled={creating}
+              onClick={() => onPurchase(selectedSku)}
+            >
+              {creating ? <Loader2 className="size-4 animate-spin" /> : <WalletCards className="size-4" />}
+              {creating ? t("billing.actions.creatingOrder") : t("billing.actions.buyNow")}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -478,13 +807,14 @@ function usePaymentFlow(onNavigate: Navigate, t: TFunction, onPaid?: () => void)
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
-  const createOrder = async () => {
-    if (!selectedSku) return;
+  const createOrder = async (skuOverride?: BillingSkuDto) => {
+    const orderSku = skuOverride ?? selectedSku;
+    if (!orderSku) return;
     setCreating(true);
     setError("");
     try {
       const response = await billingApi.createOrder({
-        skuCode: selectedSku.code,
+        skuCode: orderSku.code,
         channel,
         returnUrl: `${window.location.origin}/billing/alipay/return`,
       });
@@ -536,14 +866,14 @@ export function PricingBillingPage({
     >
       <div className="mx-auto grid w-full max-w-[1400px] content-start gap-10">
         <div className="mx-auto grid max-w-4xl gap-3 text-center">
-          <Badge variant="info" className="mx-auto w-fit rounded-full px-3 py-1 text-[12px]">
+          <Badge variant="secondary" className="mx-auto w-fit px-3 py-1 text-xs">
             <BadgeCheck className="size-3.5" />
             {t("billing.pricing.badge")}
           </Badge>
-          <h1 className="font-display text-[32px] font-bold leading-[40px] tracking-normal text-foreground md:text-[44px] md:leading-[52px]">
+          <h1 className="font-display text-3xl font-bold leading-9 tracking-normal text-foreground md:text-4xl md:leading-10">
             {t("billing.pricing.title")}
           </h1>
-          <p className="text-[15px] leading-[24px] text-muted-foreground md:text-[16px]">
+          <p className="text-sm leading-7 text-muted-foreground md:text-base">
             {t("billing.pricing.description")}
           </p>
         </div>
@@ -592,46 +922,46 @@ function SummaryPanel({
   t: TFunction;
 }) {
   return (
-    <ScaleToFitFrame minWidth={760} contentClassName="grid w-[760px] grid-cols-2 gap-4">
-      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+    <div className="grid w-full min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+      <Card as="section" className="gap-0 py-0 p-6">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-[13px] font-medium leading-5 text-muted-foreground">
+          <div className="text-sm font-medium leading-5 text-muted-foreground">
             {t("billing.summary.availableCredits")}
           </div>
           <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
             <WalletCards className="size-4" />
           </span>
         </div>
-        <div className="mt-4 font-display text-[34px] font-bold leading-10 tracking-normal text-foreground">
+        <div className="mt-4 font-display text-4xl font-bold leading-10 tracking-normal text-foreground">
           {summary.creditBalance}
         </div>
-        <div className="mt-1 text-[12px] leading-5 text-success">
+        <div className="mt-1 text-xs leading-5 text-success">
           {t("billing.summary.signupBonusIncluded")}
         </div>
-      </section>
-      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+      </Card>
+      <Card as="section" className="gap-0 py-0 p-6">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-[13px] font-medium leading-5 text-muted-foreground">
+          <div className="text-sm font-medium leading-5 text-muted-foreground">
             {t("billing.summary.signupBonus")}
           </div>
           <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
             <BadgeCheck className="size-4" />
           </span>
         </div>
-        <div className="mt-4 font-display text-[22px] font-semibold leading-8 text-foreground">
+        <div className="mt-4 font-display text-2xl font-semibold leading-8 text-foreground">
           {summary.signupBonus.granted
             ? t("billing.units.credits", { count: summary.signupBonus.creditAmount })
             : t("billing.summary.unclaimed")}
         </div>
-        <div className="mt-1 text-[13px] leading-5 text-muted-foreground">
+        <div className="mt-1 text-sm leading-5 text-muted-foreground">
           {summary.signupBonus.granted
             ? t("billing.summary.validUntil", {
                 date: formatDate(summary.signupBonus.validUntil, locale, t),
               })
             : t("billing.summary.issuedAfterVerification")}
         </div>
-      </section>
-    </ScaleToFitFrame>
+      </Card>
+    </div>
   );
 }
 
@@ -694,25 +1024,23 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
   };
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto bg-background">
-      <div
-        data-testid="account-billing-dashboard"
-        className="mx-auto grid w-full max-w-[1440px] gap-6 px-[clamp(1rem,3vw,2rem)] py-6"
-      >
+    <main className="min-h-0 w-full overflow-x-clip bg-background">
+      <PageContainer>
+      <div data-testid="account-billing-dashboard" className="grid w-full gap-6">
         <section className="grid min-w-0 flex-1 content-start gap-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="font-display text-[28px] font-bold leading-9 tracking-normal text-foreground">
+              <h1 className="font-display text-3xl font-bold leading-9 tracking-normal text-foreground">
                 {t("billing.account.title")}
               </h1>
-              <p className="mt-2 max-w-3xl text-[14px] leading-6 text-muted-foreground">
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                 {t("billing.account.description")}
               </p>
             </div>
             <Button
               type="button"
               variant="outline"
-              className="rounded-lg bg-card"
+              className=""
               onClick={refreshSummary}
             >
               <RefreshCw className="size-4" />
@@ -720,54 +1048,46 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
             </Button>
           </div>
           {summaryLoading && (
-            <div className="rounded-xl border border-border bg-card p-5 text-[14px] leading-6 text-muted-foreground">
+            <Card className="gap-0 py-0 p-5 text-sm leading-6 text-muted-foreground">
               {t("billing.loading.summary")}
-            </div>
+            </Card>
           )}
           {summaryError && (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-5 text-[14px] leading-6 text-destructive">
+            <Alert variant="destructive" className="border p-5 text-sm leading-6">
               {summaryError}
-            </div>
+            </Alert>
           )}
           {orderActionError && (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-5 text-[14px] leading-6 text-destructive">
+            <Alert variant="destructive" className="border p-5 text-sm leading-6">
               {orderActionError}
-            </div>
+            </Alert>
           )}
           {summary && <SummaryPanel summary={summary} locale={locale} t={t} />}
-          {summary?.signupBonus.granted && (
-            <div className="flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-[14px] leading-6 text-success">
-              <CheckCircle2 className="size-4" />
-              {t("billing.summary.signupBonusGranted", {
-                count: summary.signupBonus.creditAmount,
-                date: formatDate(summary.signupBonus.validUntil, locale, t),
-              })}
-            </div>
-          )}
           <section className="grid gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-display text-[22px] font-semibold leading-8 text-foreground">
+              <h2 className="font-display text-2xl font-semibold leading-8 text-foreground">
                 {t("billing.account.purchaseTitle")}
               </h2>
-              <span className="text-[13px] leading-5 text-muted-foreground">
+              <span className="text-sm leading-5 text-muted-foreground">
                 {t("billing.account.purchaseSubtitle")}
               </span>
             </div>
-            <BillingSkuGrid
+            <AccountCreditPackSelector
               skus={skus}
               loading={loading}
               error={error}
-              signedIn
-              onNavigate={onNavigate}
-              onSelect={payment.setSelectedSku}
-              variant="account"
+              channel={payment.channel}
+              creating={payment.creating}
+              purchaseError={payment.error}
+              onChannelChange={payment.setChannel}
+              onPurchase={(sku) => void payment.createOrder(sku)}
               locale={locale}
               t={t}
             />
           </section>
-          <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <Card as="section" className="gap-0 overflow-hidden border py-0 ring-0">
             <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-              <h2 className="font-display text-[20px] font-semibold leading-7 text-foreground">
+              <h2 className="font-display text-xl font-semibold leading-7 text-foreground">
                 {t("billing.orders.history")}
               </h2>
               <Badge variant="secondary">
@@ -776,41 +1096,41 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
             </div>
             {summary?.recentOrders.length ? (
               <div className="max-w-full overflow-hidden">
-                <ScaledTable minWidth={760} data-testid="billing-order-table" className="text-left text-[13px] leading-5">
-                  <thead className="bg-muted/40 text-muted-foreground">
-                    <tr>
-                      <th className="px-5 py-3 font-medium">{t("billing.orders.columns.orderNo")}</th>
-                      <th className="px-5 py-3 font-medium">{t("billing.orders.columns.sku")}</th>
-                      <th className="px-5 py-3 font-medium">{t("billing.orders.columns.amount")}</th>
-                      <th className="px-5 py-3 font-medium">{t("billing.orders.columns.status")}</th>
-                      <th className="px-5 py-3 font-medium">{t("billing.orders.columns.createdAt")}</th>
-                      <th className="px-5 py-3 font-medium">{t("billing.orders.columns.actions")}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border text-muted-foreground">
+                <Table className="min-w-[760px] text-left text-sm leading-5"  data-testid="billing-order-table" >
+                  <TableHeader className="bg-muted/40 text-muted-foreground">
+                    <TableRow>
+                      <TableHead className="px-5 py-3 font-medium">{t("billing.orders.columns.orderNo")}</TableHead>
+                      <TableHead className="px-5 py-3 font-medium">{t("billing.orders.columns.sku")}</TableHead>
+                      <TableHead className="px-5 py-3 font-medium">{t("billing.orders.columns.amount")}</TableHead>
+                      <TableHead className="px-5 py-3 font-medium">{t("billing.orders.columns.status")}</TableHead>
+                      <TableHead className="px-5 py-3 font-medium">{t("billing.orders.columns.createdAt")}</TableHead>
+                      <TableHead className="px-5 py-3 font-medium">{t("billing.orders.columns.actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-border text-muted-foreground">
                     {summary.recentOrders.map((order) => (
-                      <tr key={order.orderId} className="transition-colors hover:bg-muted/30">
-                        <td className="px-5 py-3 font-mono text-[12px] text-muted-foreground">
+                      <TableRow key={order.orderId} className="transition-colors hover:bg-muted/30">
+                        <TableCell className="px-5 py-3 font-mono text-xs text-muted-foreground">
                           {order.merchantOrderNo}
-                        </td>
-                        <td className="px-5 py-3 font-medium text-foreground">
+                        </TableCell>
+                        <TableCell className="px-5 py-3 font-medium text-foreground">
                           {skuCopy(order.sku, "name", t)}
-                        </td>
-                        <td className="px-5 py-3">{formatCny(order.amountCents, locale)}</td>
-                        <td className="px-5 py-3">
+                        </TableCell>
+                        <TableCell className="px-5 py-3">{formatCny(order.amountCents, locale)}</TableCell>
+                        <TableCell className="px-5 py-3">
                           <Badge variant={orderStatusBadgeVariant(order.status)}>
                             {orderStatusLabel(order.status, t)}
                           </Badge>
-                        </td>
-                        <td className="px-5 py-3 text-muted-foreground">
+                        </TableCell>
+                        <TableCell className="px-5 py-3 text-muted-foreground">
                           {formatDate(order.createdAt, locale, t)}
-                        </td>
-                        <td className="px-5 py-3">
+                        </TableCell>
+                        <TableCell className="px-5 py-3">
                           {orderIsPayable(order) ? (
                             <Button
                               type="button"
                               variant="outline"
-                              className="h-9 rounded-lg bg-card px-3 text-[12px]"
+                              className="h-9 px-3 text-xs"
                               disabled={resumingOrderId === order.orderId}
                               onClick={() => void resumeOrder(order)}
                             >
@@ -822,38 +1142,25 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
                               {t("billing.actions.resumePayment")}
                             </Button>
                           ) : order.status === "expired" ? (
-                            <span className="text-[12px] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               {t("billing.order.status.expired")}
                             </span>
                           ) : null}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </ScaledTable>
+                  </TableBody>
+                </Table>
               </div>
             ) : (
-              <div className="px-5 py-8 text-center text-[14px] leading-6 text-muted-foreground">
+              <div className="px-5 py-8 text-center text-sm leading-6 text-muted-foreground">
                 {t("billing.orders.empty")}
               </div>
             )}
-          </section>
+          </Card>
         </section>
       </div>
-      <PaymentConfirmDialog
-        sku={payment.selectedSku}
-        open={Boolean(payment.selectedSku)}
-        creating={payment.creating}
-        error={payment.error}
-        channel={payment.channel}
-        locale={locale}
-        t={t}
-        onChannelChange={payment.setChannel}
-        onOpenChange={(open) => {
-          if (!open) payment.setSelectedSku(null);
-        }}
-        onConfirm={payment.createOrder}
-      />
+      </PageContainer>
     </main>
   );
 }
@@ -917,11 +1224,11 @@ export function AlipayReturnPage({ onNavigate }: { onNavigate: Navigate }) {
         <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
           <BadgeCheck className="size-4" />
         </span>
-        <span className="font-display text-[14px] font-semibold leading-5">UML Lab</span>
+        <span className="font-display text-sm font-semibold leading-5">UML Lab</span>
       </div>
-      <section
+      <Card as="section"
         data-testid="alipay-processing-card"
-        className="grid w-full max-w-[420px] gap-5 overflow-hidden rounded-xl border border-border bg-card text-center shadow-xl"
+        className="gap-0 py-0 grid w-full max-w-[420px] gap-5 overflow-hidden text-center"
       >
         <div className="h-1.5 bg-primary" />
         <div className="grid gap-5 px-8 pb-8 pt-4">
@@ -929,20 +1236,20 @@ export function AlipayReturnPage({ onNavigate }: { onNavigate: Navigate }) {
             <ExternalLink className="size-6" />
           </div>
           <div>
-            <h1 className="font-display text-[22px] font-semibold leading-8 text-foreground">
+            <h1 className="font-display text-2xl font-semibold leading-8 text-foreground">
               {t("billing.return.title")}
             </h1>
-            <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {t("billing.return.description")}
             </p>
           </div>
-          <div className="mx-auto flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-[13px] leading-5 text-primary">
+          <div className="mx-auto flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm leading-5 text-primary">
             <Loader2 className="size-4 animate-spin" />
             {t("billing.return.connecting")}
           </div>
           {order && (
-            <div className="rounded-xl border border-border bg-muted/30 p-4 text-[13px] leading-5">
-              <div className="font-display text-[15px] font-semibold text-foreground">
+            <div className="rounded-xl border border-border bg-muted/30 p-5 text-sm leading-5">
+              <div className="font-display text-sm font-semibold text-foreground">
                 {skuCopy(order.sku, "name", t)}
               </div>
               <div className="mt-1 text-muted-foreground">
@@ -957,9 +1264,9 @@ export function AlipayReturnPage({ onNavigate }: { onNavigate: Navigate }) {
             </div>
           )}
           {error && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-[13px] text-destructive">
+            <Alert variant="destructive" className="border p-3 text-sm">
               {error}
-            </div>
+            </Alert>
           )}
           <div className="flex flex-wrap justify-center gap-3">
             <Button
@@ -972,7 +1279,7 @@ export function AlipayReturnPage({ onNavigate }: { onNavigate: Navigate }) {
           </div>
           <div ref={bridgeRef} className="hidden" aria-hidden="true" />
         </div>
-      </section>
+      </Card>
     </main>
   );
 }

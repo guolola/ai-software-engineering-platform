@@ -1,4 +1,6 @@
 // Renders the product-level route loading state shared by authenticated platform pages.
+import { Progress } from "../../../shared/ui/progress";
+import Logo from "../../../shared/template/assets/svg/logo";
 import {
   createContext,
   useCallback,
@@ -229,52 +231,16 @@ export function PlatformLoadingScreen({
       aria-busy="true"
       aria-live="polite"
     >
-      <section className="platform-loading-panel relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center px-6 text-center">
-        <div className="flex min-w-0 flex-wrap items-center justify-center gap-x-7 gap-y-3">
-          <span className="inline-flex min-w-0 items-center gap-2.5 text-2xl font-semibold tracking-normal md:text-[28px]">
-            <span className="inline-flex size-7 shrink-0 items-center justify-center rounded bg-primary text-primary-foreground">
-              <Grid3X3 className="size-[18px]" aria-hidden="true" />
-            </span>
-            <span>{t("loading.appName")}</span>
-          </span>
-          <span className="text-base text-muted-foreground" aria-hidden="true">
-            ×
-          </span>
-          <span className="text-lg font-semibold tracking-normal text-muted-foreground md:text-xl">
-            {t("loading.workspace")}
-          </span>
-          <span className="text-base text-muted-foreground" aria-hidden="true">
-            ×
-          </span>
-          <span className="font-mono text-xs font-medium uppercase tracking-normal text-muted-foreground">
-            SYS_CORE
-          </span>
+      <section className="mx-auto flex w-full max-w-md flex-col gap-6 px-6">
+        <div className="flex items-center justify-center gap-2.5">
+          <Logo className="size-9 object-contain" />
+          <span className="text-lg font-semibold">{t("loading.appName")}</span>
         </div>
-
-        <div className="mt-20 w-full max-w-md">
-          <div
-            className="platform-loading-track h-1 overflow-hidden rounded-full bg-border"
-            role="progressbar"
-            aria-label={message}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={displayProgress}
-            data-testid="platform-loading-progress"
-          >
-            <div
-              className="platform-loading-bar h-full rounded-full bg-primary"
-              style={{ width: `${displayProgress}%` }}
-            />
-          </div>
-          <div className="mt-6 flex items-center justify-between gap-4 text-xs leading-4 text-primary">
-            <span>{message}</span>
-            <span className="font-mono">{displayProgress}%</span>
-          </div>
+        <Progress value={displayProgress} aria-label={message} data-testid="platform-loading-progress" />
+        <div className="text-muted-foreground flex items-center justify-between text-sm">
+          <span>{message}</span><span className="font-mono">{displayProgress}%</span>
         </div>
       </section>
-      <span className="absolute bottom-8 left-1/2 -translate-x-1/2 font-mono text-[10px] text-muted-foreground">
-        V 4.0.1
-      </span>
     </div>
   );
 }

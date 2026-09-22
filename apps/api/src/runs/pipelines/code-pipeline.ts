@@ -1,5 +1,6 @@
 // Orchestrates the code generation run from business analysis through prototype repair.
 
+import { createRunLlmChunkHandlers } from "./shared/llm-chunk-events.js";
 import {
   artifactReadyRunEventSchema,
   codeAgentPlanResultSchema,
@@ -14,7 +15,6 @@ import {
   codeVisualDirectionResultSchema,
   completedRunEventSchema,
   loadedCodeSkillSchema,
-  llmChunkRunEventSchema,
   stageProgressRunEventSchema,
   stageStartedRunEventSchema,
   type CodeSkillResourceDiscoveryPlan,
@@ -213,16 +213,7 @@ export async function runCodeStagePipeline(
         providerSettings,
         businessLogicMessages,
         "analyze_code_business_logic",
-        (chunk) => {
-          emitEvent(
-            record,
-            llmChunkRunEventSchema.parse({
-              type: "llm_chunk",
-              stage: "analyze_code_business_logic",
-              chunk,
-            }),
-          );
-        },
+        createRunLlmChunkHandlers({ record, stage: "analyze_code_business_logic" }),
         parseCodeBusinessLogicResult,
         getGenerateCodeBusinessLogicResponseFormat(providerSettings),
         attempt,
@@ -291,16 +282,7 @@ export async function runCodeStagePipeline(
       providerSettings,
       createMessages(buildGenerateCodeVisualDirectionPrompt(businessLogic, loadedCodeSkill)),
       "plan_code_ui",
-      (chunk) => {
-        emitEvent(
-          record,
-          llmChunkRunEventSchema.parse({
-            type: "llm_chunk",
-            stage: "plan_code_ui",
-            chunk,
-          }),
-        );
-      },
+      createRunLlmChunkHandlers({ record, stage: "plan_code_ui" }),
       (text) => codeVisualDirectionResultSchema.parse(parseJson(text)),
       getGenerateCodeVisualDirectionResponseFormat(providerSettings),
     );
@@ -337,16 +319,7 @@ export async function runCodeStagePipeline(
         ),
       ),
       "plan_code_ui",
-      (chunk) => {
-        emitEvent(
-          record,
-          llmChunkRunEventSchema.parse({
-            type: "llm_chunk",
-            stage: "plan_code_ui",
-            chunk,
-          }),
-        );
-      },
+      createRunLlmChunkHandlers({ record, stage: "plan_code_ui" }),
       (text) =>
         z
           .object({ skillResourceDiscoveryPlan: codeSkillResourceDiscoveryPlanSchema })
@@ -403,16 +376,7 @@ export async function runCodeStagePipeline(
         ),
       ),
       "plan_code_ui",
-      (chunk) => {
-        emitEvent(
-          record,
-          llmChunkRunEventSchema.parse({
-            type: "llm_chunk",
-            stage: "plan_code_ui",
-            chunk,
-          }),
-        );
-      },
+      createRunLlmChunkHandlers({ record, stage: "plan_code_ui" }),
       parseCodeSkillResourcePlanResult,
       getGenerateCodeSkillResourcePlanResponseFormat(providerSettings),
     );

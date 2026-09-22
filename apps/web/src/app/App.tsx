@@ -1,13 +1,16 @@
 // Composes application providers, route matching, workspace shell layout, and top-level page selection.
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "../shared/ui/resizable";
+import { SidebarBrand } from "../shared/template/layout/sidebar-brand";
+import { PageContainer } from "../shared/template/layout/page";
+import { PlatformSidebar } from '../features/workspace-shell/components/platform-sidebar';
+import React, { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Toaster } from "../shared/ui/sonner";
-import { Button } from "../shared/ui/button";
+import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, useSidebar } from '../shared/ui/sidebar';
+import { ScrollArea } from '../shared/ui/scroll-area';
+import { TooltipProvider } from '../shared/ui/tooltip';
+import Error404 from '../shared/template/views/pages/misc/error-page-404';
+import { PageErrorBoundary } from '../shared/ui/page-error-boundary';
 import { FeedbackDialogProvider } from "../shared/ui/feedback-dialog";
+import { FloatingAlertProvider } from "../shared/ui/floating-alert";
 import { ThemeProvider } from "./providers/theme-provider";
 import { useTranslation } from "react-i18next";
 import { AppI18nProvider, useAppI18n } from "./providers/i18n-provider";
@@ -28,14 +31,13 @@ import { ProductDocsPage } from "../features/product-docs/components/product-doc
 import { SidebarMenu } from "../features/workspace-shell/components/sidebar-menu";
 import {
   TopBar,
+  type TopBarProps,
 } from "../features/workspace-shell/components/top-bar";
 import {
   findShellRouteModule,
   type ShellRoutePath,
 } from "./workspace-modules";
 import { matchAppRoute, type AppRoute } from "./app-routes";
-import { WorkspaceTabsBar } from "../features/workspace-shell/components/workspace-tabs-bar";
-import { MobileWorkspaceNavigation } from "../features/workspace-shell/components/mobile-workspace-navigation";
 import { Workspace } from "../features/workspace-shell/components/workspace-placeholder";
 import { WorkspaceRepositoryProvider } from "../services/workspace-repository";
 import { WorkspaceShellProvider, useWorkspaceShell } from "../features/workspace-shell/state";
@@ -43,7 +45,6 @@ import {
   WorkspaceSessionProvider,
   useWorkspaceSession,
 } from "../features/workspace-session/state";
-import { useCompactViewport } from "../features/workspace-shell/hooks/use-compact-viewport";
 import {
   AuthenticatedRoute,
   AuthPage,
@@ -53,13 +54,12 @@ import {
   type ProjectDrawerKind,
   ProjectWorkspaceAccessBoundary,
   ProjectsIndexPage,
-  ProjectWorkspaceBanner,
-  useCurrentProjectOverview,
+  useProjectOverview,
 } from "../features/user-platform/components/user-platform-pages";
+import { DashboardPage } from "../features/dashboard/components/dashboard-page";
 import {
   AlipayReturnPage,
   AccountBillingPage,
-  PricingBillingPage,
 } from "../features/user-platform/components/billing-pages";
 import {
   PROJECT_TASK_DRAWER_REQUEST_EVENT,
@@ -72,9 +72,9 @@ function StandaloneRoutePage({ route }: { route: Exclude<ShellRoutePath, "/works
   const routeKey = route === "/exam" ? "exam" : route === "/tutorial" ? "tutorial" : "workspace";
 
   return (
-    <main className="flex min-h-0 flex-1 bg-background px-8 py-8">
-      <section className="flex w-full items-center justify-center rounded-2xl border border-border bg-card text-center">
-        <div className="flex max-w-xl flex-col items-center gap-3 px-6">
+    <main className="flex min-h-[calc(100svh-5rem)] flex-1 bg-background">
+      <PageContainer className="flex items-center justify-center text-center">
+        <div className="flex max-w-xl flex-col items-center gap-3">
           <h1 className="text-3xl font-semibold">{t(`nav.${routeKey}`)}</h1>
           <p className="text-sm text-muted-foreground">
             {t(`workspace.routeDescriptions.${routeKey}`, {
@@ -82,7 +82,7 @@ function StandaloneRoutePage({ route }: { route: Exclude<ShellRoutePath, "/works
             })}
           </p>
         </div>
-      </section>
+      </PageContainer>
     </main>
   );
 }
@@ -90,6 +90,7 @@ function StandaloneRoutePage({ route }: { route: Exclude<ShellRoutePath, "/works
 function getProtectedRoutePath(route: AppRoute) {
   if (
     route.kind === "shell" ||
+    route.kind === "dashboard" ||
     route.kind === "projects-index" ||
     route.kind === "projects-new" ||
     route.kind === "project-workspace" ||
@@ -103,6 +104,7 @@ function getProtectedRoutePath(route: AppRoute) {
 }
 
 function ProjectWorkspaceShell({
+  header,
   projectId,
   routeDrawer,
   activeProjectDrawer,
@@ -110,6 +112,7 @@ function ProjectWorkspaceShell({
   onNavigate,
   preferredTaskRunId,
 }: {
+  header: React.ReactNode;
   projectId: string;
   routeDrawer: ProjectDrawerKind | null;
   activeProjectDrawer: ProjectDrawerKind | null;
@@ -119,13 +122,9 @@ function ProjectWorkspaceShell({
 }) {
   const { t } = useTranslation();
   const { selection } = useWorkspaceShell();
-  const { generationTasks } = useWorkspaceSession();
-  const projectOverview = useCurrentProjectOverview();
-  const projectRuns = projectOverview?.projectId === projectId ? projectOverview.overview.runs : [];
-  const compactViewport = useCompactViewport();
-  const activeGenerationTaskCount = generationTasks.filter(
-    (task) => task.status === "queued" || task.status === "running",
-  ).length;
+  const { setOpenMobile } = useSidebar();
+  const projectOverview = useProjectOverview(projectId);
+  const projectRuns = projectOverview.runs;
   const activeDrawer = routeDrawer ?? activeProjectDrawer;
   const traceabilityPrefix = t("traceability.title.scoped", { label: "" });
   const traceabilityScopeLabel = (label: string) =>
@@ -300,74 +299,43 @@ function ProjectWorkspaceShell({
       break;
   }
 
-  if (compactViewport) {
-    return (
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-          <ProjectWorkspaceBanner
-            projectId={projectId}
-            onOpenDrawer={onActiveProjectDrawerChange}
-            activeGenerationTaskCount={activeGenerationTaskCount}
-          />
-          <WorkspaceTabsBar />
-          <div className="relative min-h-0 flex-1 overflow-hidden">
-            <div className="h-full min-h-0">{body}</div>
-            <ProjectWorkspaceDrawer
-              projectId={projectId}
-              activeDrawer={activeDrawer}
-              onNavigate={onNavigate}
-              onClose={closeDrawer}
-              preferredTaskRunId={preferredTaskRunId}
-            />
-          </div>
-        </main>
-        <MobileWorkspaceNavigation projectRuns={projectRuns} />
-      </div>
-    );
-  }
-
   return (
-    <ResizablePanelGroup direction="horizontal" className="flex-1">
-      <ResizablePanel
-        data-testid="workspace-sidebar-panel"
-        data-default-size="10"
-        data-min-size="8"
-        data-max-size="22"
-        defaultSize={10}
-        minSize={8}
-        maxSize={22}
-      >
-        <aside className="h-full w-full border-r border-sidebar-border bg-sidebar">
-          <SidebarMenu projectRuns={projectRuns} />
-        </aside>
-      </ResizablePanel>
-      <ResizableHandle withHandle className="bg-border/70" />
-      <ResizablePanel defaultSize={90}>
-        <main className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background">
-          <ProjectWorkspaceBanner
-            projectId={projectId}
-            onOpenDrawer={onActiveProjectDrawerChange}
-            activeGenerationTaskCount={activeGenerationTaskCount}
-          />
-          <WorkspaceTabsBar />
-          <div className="relative min-h-0 flex-1 overflow-hidden">
-            <div className="h-full min-h-0">{body}</div>
-            <ProjectWorkspaceDrawer
-              projectId={projectId}
-              activeDrawer={activeDrawer}
-              onNavigate={onNavigate}
-              onClose={closeDrawer}
-              preferredTaskRunId={preferredTaskRunId}
-            />
-          </div>
-        </main>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+    <div className="flex min-h-0 min-w-0 flex-1">
+      <Sidebar collapsible="icon">
+        <SidebarBrand />
+        <SidebarContent><SidebarMenu projectRuns={projectRuns} onNavigateItemSelect={() => setOpenMobile(false)} /></SidebarContent>
+      </Sidebar>
+      <SidebarInset className="h-svh min-w-0 overflow-hidden">
+        {React.isValidElement(header)
+          ? React.cloneElement(header as React.ReactElement<TopBarProps>, {
+              projectDrawer: {
+                projectId,
+                onOpenDrawer: onActiveProjectDrawerChange,
+                projectRuns,
+                projectName: projectOverview.project?.name ?? projectId,
+              },
+            })
+          : header}
+        <ScrollArea className="min-h-0 flex-1" viewportClassName="overflow-x-clip overflow-y-auto" contentClassName="w-full min-w-0! pt-19">
+          <main className="relative flex min-h-full flex-col bg-background">
+            <div className="relative min-h-0 flex-1">
+              <div
+                id="workspace-active-panel"
+                role="tabpanel"
+                className="min-h-0 overflow-x-clip"
+              >
+                {body}
+              </div>
+              <ProjectWorkspaceDrawer projectId={projectId} activeDrawer={activeDrawer} onNavigate={onNavigate} onClose={closeDrawer} preferredTaskRunId={preferredTaskRunId} />
+            </div>
+          </main>
+        </ScrollArea>
+      </SidebarInset>
+    </div>
   );
 }
 
 export function Shell({ initialPath }: { initialPath?: string }) {
-  const { t } = useTranslation();
   const { locale } = useAppI18n();
   const [activeProjectDrawer, setActiveProjectDrawer] = useState<ProjectDrawerKind | null>(null);
   const [preferredTaskRunId, setPreferredTaskRunId] = useState<string | null>(null);
@@ -379,6 +347,14 @@ export function Shell({ initialPath }: { initialPath?: string }) {
   });
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("account") === "profile") {
+      setAccountDialogOpen(true);
+    }
+  }, [route]);
+
+  useEffect(() => {
+    document.documentElement.dataset.template = route.kind === 'marketing-home' ? 'flow' : 'admincn';
     // Keep head metadata aligned with client-side History API navigation.
     applyRouteMetadata(route, undefined, locale);
   }, [locale, route]);
@@ -414,7 +390,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
 
   const navigate = useCallback((nextPath: string) => {
     const nextUrl = new URL(nextPath, window.location.origin);
-    const nextLocation = `${nextUrl.pathname}${nextUrl.search}`;
+    const nextLocation = `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
     setActiveProjectDrawer(null);
     if (`${window.location.pathname}${window.location.search}` !== nextLocation) {
       window.history.pushState({}, "", nextLocation);
@@ -429,9 +405,6 @@ export function Shell({ initialPath }: { initialPath?: string }) {
 
   const renderRoute = () => {
     if (route.kind === "marketing-home") {
-      if (route.path === "/pricing") {
-        return <PricingBillingPage signedIn={false} onNavigate={navigate} />;
-      }
       return <MarketingHomePage path={route.path} onNavigate={navigate} />;
     }
     if (route.kind === "shell") {
@@ -448,6 +421,9 @@ export function Shell({ initialPath }: { initialPath?: string }) {
     }
     if (route.kind === "invitation-accept") {
       return <InvitationAcceptPage onNavigate={navigate} />;
+    }
+    if (route.kind === "dashboard") {
+      return <DashboardPage onNavigate={navigate} />;
     }
     if (route.kind === "projects-index") {
       return <ProjectsIndexPage onNavigate={navigate} />;
@@ -472,6 +448,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
         <ProjectWorkspaceAccessBoundary projectId={route.projectId} onNavigate={navigate}>
           <WorkspaceShellProvider key={route.projectId}>
             <ProjectWorkspaceShell
+              header={<TopBar currentRoute={route.path} onNavigate={navigate} accountDialogOpen={accountDialogOpen} onAccountDialogOpenChange={setAccountDialogOpen} />}
               projectId={route.projectId}
               routeDrawer={route.drawer ?? null}
               activeProjectDrawer={activeProjectDrawer}
@@ -483,61 +460,58 @@ export function Shell({ initialPath }: { initialPath?: string }) {
         </ProjectWorkspaceAccessBoundary>
       );
     }
-    return (
-      <main className="flex min-h-0 flex-1 items-center justify-center bg-background px-6 text-center">
-        <section className="max-w-xl">
-          <p className="font-display text-7xl font-black text-primary">404</p>
-          <h1 className="mt-4 font-display text-3xl font-semibold text-foreground">
-            {t("seo.notFoundHeading")}
-          </h1>
-          <p className="mt-3 text-muted-foreground">
-            {t("common.notFoundDescription")}
-          </p>
-          <Button
-            type="button"
-            className="mt-6 rounded-full px-6 py-3"
-            onClick={() => navigate("/")}
-          >
-            {t("common.backToHome")}
-          </Button>
-        </section>
-      </main>
-    );
+    return <Error404 />;
   };
 
   const protectedRoutePath = getProtectedRoutePath(route);
   const routeContent = renderRoute();
   const showWorkspaceTopBar =
+    route.kind !== "project-workspace" &&
     route.kind !== "marketing-home" &&
     route.kind !== "auth" &&
     route.kind !== "invitation-accept" &&
     route.kind !== "legacy-redirect" &&
     route.kind !== "not-found";
-  const guardedRouteContent = (
-    <>
-      {showWorkspaceTopBar && (
+  const guardedRouteContent = showWorkspaceTopBar ? (
+    <div className="flex min-h-0 min-w-0 flex-1">
+      <PlatformSidebar path={route.path} />
+      <SidebarInset className="h-svh min-w-0 overflow-hidden">
         <TopBar
           currentRoute={route.path}
           onNavigate={navigate}
           accountDialogOpen={accountDialogOpen}
           onAccountDialogOpenChange={setAccountDialogOpen}
         />
-      )}
-      {routeContent}
-    </>
-  );
+        <ScrollArea
+          className="min-h-0 flex-1"
+          viewportClassName={route.kind === "shell" && route.path === "/tutorial" ? "overflow-hidden" : "overflow-x-clip overflow-y-auto"}
+          contentClassName={route.kind === "shell" && route.path === "/tutorial" ? "h-full w-full min-w-0! overflow-hidden pt-19" : "w-full min-w-0! pt-19"}
+        >
+          {routeContent}
+        </ScrollArea>
+      </SidebarInset>
+    </div>
+  ) : routeContent;
 
   return (
-    <div className="flex h-screen h-[100dvh] min-h-[100svh] w-full flex-col overflow-hidden bg-background text-foreground">
+    <FloatingAlertProvider>
+    <SidebarProvider className={route.kind === 'marketing-home' || route.kind === 'not-found' ? 'block min-h-screen w-full' : 'flex min-h-svh w-full flex-col bg-background text-foreground'}>
+      <PageErrorBoundary resetKey={route.path}>
       {protectedRoutePath ? (
-        <AuthenticatedRoute routeKey={protectedRoutePath} onNavigate={navigate}>
+        <AuthenticatedRoute
+          routeKey={protectedRoutePath}
+          onNavigate={navigate}
+          showLoadingScreen={route.kind === "project-workspace"}
+        >
           {guardedRouteContent}
         </AuthenticatedRoute>
       ) : (
         guardedRouteContent
       )}
+      </PageErrorBoundary>
       <Toaster position="bottom-right" />
-    </div>
+    </SidebarProvider>
+    </FloatingAlertProvider>
   );
 }
 
@@ -568,13 +542,15 @@ export default function App({ initialPath }: { initialPath?: string }) {
   return (
     <AppI18nProvider>
       <ThemeProvider>
-        <FeedbackDialogProvider>
-          <WorkspaceRepositoryProvider>
-            <WorkspaceSessionProvider>
-              <Shell initialPath={initialPath} />
-            </WorkspaceSessionProvider>
-          </WorkspaceRepositoryProvider>
-        </FeedbackDialogProvider>
+        <TooltipProvider>
+          <FeedbackDialogProvider>
+            <WorkspaceRepositoryProvider>
+              <WorkspaceSessionProvider>
+                <Shell initialPath={initialPath} />
+              </WorkspaceSessionProvider>
+            </WorkspaceRepositoryProvider>
+          </FeedbackDialogProvider>
+        </TooltipProvider>
       </ThemeProvider>
     </AppI18nProvider>
   );

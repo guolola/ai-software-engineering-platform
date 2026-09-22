@@ -38,7 +38,7 @@ describe("ModelPicker", () => {
 
     await user.click(screen.getByRole("button", { name: "未选择模型" }));
 
-    expect(screen.getByText("请先选择模型供应商")).toBeInTheDocument();
+    expect((await screen.findByText("请先选择模型供应商"))).toBeInTheDocument();
     expect(screen.queryByText("OpenAI")).not.toBeInTheDocument();
     expect(screen.queryByText("Claude")).not.toBeInTheDocument();
     expect(screen.queryByText("Google")).not.toBeInTheDocument();
@@ -90,15 +90,16 @@ describe("ModelPicker", () => {
     expect(providerTrigger).not.toHaveTextContent("托管");
     await user.click(providerTrigger);
 
-    expect(screen.getByText("DeepSeek")).toBeInTheDocument();
-    expect(screen.getByText("Kimi")).toBeInTheDocument();
-    expect(screen.getByText("智谱")).toBeInTheDocument();
-    expect(screen.getByText("Minimax")).toBeInTheDocument();
-    expect(screen.getByText("Qwen")).toBeInTheDocument();
-    expect(screen.getByText("OpenAI")).toBeInTheDocument();
+    expect((await screen.findByText("DeepSeek"))).toBeInTheDocument();
+    expect(screen.getAllByTestId("provider-icon-deepseek")).not.toHaveLength(0);
+    expect((await screen.findByText("Kimi"))).toBeInTheDocument();
+    expect((await screen.findByText("智谱"))).toBeInTheDocument();
+    expect((await screen.findByText("Minimax"))).toBeInTheDocument();
+    expect((await screen.findByText("Qwen"))).toBeInTheDocument();
+    expect((await screen.findByText("OpenAI"))).toBeInTheDocument();
     expect(screen.queryByTitle("Qwen/Qwen3.6-35B-A3B")).not.toBeInTheDocument();
 
-    await user.hover(screen.getByText("DeepSeek"));
+    await user.hover((await screen.findByText("DeepSeek")));
     const deepseekPro = await screen.findByTitle("deepseek-ai/DeepSeek-V4-Pro");
     const deepseekFlash = await screen.findByTitle("deepseek-ai/DeepSeek-V4-Flash");
     expect(deepseekPro.closest("[data-slot='dropdown-menu-sub-content']")).toHaveClass(
@@ -113,16 +114,16 @@ describe("ModelPicker", () => {
     expect(within(deepseekFlash).queryByText("严格 JSON")).not.toBeInTheDocument();
     expect(within(deepseekFlash).queryByText("deepseek-ai/DeepSeek-V4-Flash")).not.toBeInTheDocument();
 
-    await user.hover(screen.getByText("Kimi"));
+    await user.hover((await screen.findByText("Kimi")));
     expect(await screen.findByTitle("Pro/moonshotai/Kimi-K2.6")).toBeInTheDocument();
 
-    await user.hover(screen.getByText("智谱"));
+    await user.hover((await screen.findByText("智谱")));
     expect(await screen.findByTitle("Pro/zai-org/GLM-5.1")).toBeInTheDocument();
 
-    await user.hover(screen.getByText("Minimax"));
+    await user.hover((await screen.findByText("Minimax")));
     expect(await screen.findByTitle("Pro/MiniMaxAI/MiniMax-M2.5")).toBeInTheDocument();
 
-    await user.hover(screen.getByText("Qwen"));
+    await user.hover((await screen.findByText("Qwen")));
     expect(await screen.findByTitle("Qwen/Qwen3.6-35B-A3B")).toBeInTheDocument();
     expect(onValueChange).not.toHaveBeenCalled();
   });
@@ -162,7 +163,7 @@ describe("ModelPicker", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "DeepSeek-V4-Pro" }));
-    await user.hover(screen.getByText("DeepSeek"));
+    await user.hover((await screen.findByText("DeepSeek")));
     const item = await screen.findByTitle("deepseek-ai/DeepSeek-V4-Flash");
     expect(within(item).getByText("兼容")).toBeInTheDocument();
     fireEvent.pointerDown(item, { button: 0, ctrlKey: false });
@@ -184,9 +185,9 @@ describe("ModelPicker", () => {
     render(<ModelPicker value="vendorless-ultra-model" onValueChange={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: "vendorless-ultra-model" }));
-    expect(screen.getByText("SiliconFlow")).toBeInTheDocument();
+    expect((await screen.findByText("SiliconFlow"))).toBeInTheDocument();
 
-    await user.hover(screen.getByText("SiliconFlow"));
+    await user.hover((await screen.findByText("SiliconFlow")));
 
     expect(await screen.findByTitle("vendorless-ultra-model")).toBeInTheDocument();
   });

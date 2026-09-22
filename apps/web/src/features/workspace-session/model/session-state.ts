@@ -40,6 +40,8 @@ export interface DiagnosticEvent {
 }
 
 export interface RunDiagnostics {
+  /** Durable conversation records, independent of the capped diagnostic log. */
+  transcript?: RunEvent[];
   runKind: "requirements" | "design" | "code" | "document" | "feasibility" | null;
   runId: string | null;
   providerModel: string | null;

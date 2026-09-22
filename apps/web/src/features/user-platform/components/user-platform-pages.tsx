@@ -1,4 +1,10 @@
 // Hosts authenticated project, account, and provider pages backed by the platform API.
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "../../../shared/ui/drawer";
+import { Avatar, AvatarFallback } from "../../../shared/ui/avatar";
+import { useIsMobile } from "../../../shared/hooks/use-mobile";
+import Forbidden403 from '../../../shared/template/views/pages/misc/forbidden-403';
+import ServerError500 from '../../../shared/template/views/pages/misc/server-error-500';
+import NotFound404 from '../../../shared/template/views/pages/misc/error-page-404';
 import {
   createContext,
   useCallback,
@@ -62,6 +68,7 @@ import { ProjectMembers } from "./project-members";
 import { PageFrame, SectionCard } from "./project-page-layout";
 import { ProjectSettings } from "./project-settings";
 import { LineageGraphDialog } from "../../lineage/components/lineage-graph-dialog";
+import { buildLoginRedirectPath } from "../lib/auth-page-routing";
 export { AuthPage } from "./auth-page";
 export { AccountPage, AccountSecurityPage } from "./account-pages";
 export { InvitationAcceptPage } from "./invitation-accept-page";
@@ -70,7 +77,6 @@ export { ProjectsIndexPage } from "./projects-index-page";
 
 type Navigate = (path: string) => void;
 
-const AUTH_ROUTE_SESSION_GRACE_MS = 60_000;
 const ACTIVE_RUNS_REFRESH_MS = 8_000;
 
 export type ProjectDrawerKind = "tasks" | "members" | "history" | "documents" | "settings";
@@ -80,6 +86,7 @@ type ProjectOverviewState = {
   error: string;
   authRequired: boolean;
   forbidden: boolean;
+  notFound: boolean;
   project: PlatformProject | null;
   membership: PlatformProjectMember | null;
   members: PlatformProjectMember[];
@@ -92,6 +99,7 @@ const emptyProjectOverview: ProjectOverviewState = {
   error: "",
   authRequired: false,
   forbidden: false,
+  notFound: false,
   project: null,
   membership: null,
   members: [],
@@ -106,7 +114,7 @@ export function useCurrentProjectOverview() {
   return useContext(ProjectOverviewContext);
 }
 
-function useProjectOverview(projectId: string) {
+export function useProjectOverview(projectId: string) {
   const { t } = useTranslation();
   const providedOverview = useContext(ProjectOverviewContext);
   const contextOverview =
@@ -130,6 +138,7 @@ function useProjectOverview(projectId: string) {
           error: "",
           authRequired: false,
           forbidden: false,
+          notFound: false,
           project: projectResponse.project,
           membership: projectResponse.membership ?? null,
           members: memberResponse.members,
@@ -145,6 +154,7 @@ function useProjectOverview(projectId: string) {
           loading: false,
           authRequired: status === 401,
           forbidden: status === 403,
+          notFound: status === 404,
           error:
             error instanceof Error
               ? error.message
@@ -229,24 +239,9 @@ function renderAccessMessage(
       </SectionCard>
     );
   }
-  if (overview.forbidden) {
-    return (
-      <SectionCard>
-        <h2 className="text-base">{t("projectShell.access.forbiddenTitle")}</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {t("projectShell.access.forbiddenDescription")}
-        </p>
-      </SectionCard>
-    );
-  }
-  if (overview.error) {
-    return (
-      <SectionCard>
-        <h2 className="text-base">{t("projectShell.access.loadFailedTitle")}</h2>
-        <p className="mt-2 text-sm text-muted-foreground">{overview.error}</p>
-      </SectionCard>
-    );
-  }
+  if (overview.forbidden) return <Forbidden403 />;
+  if (overview.notFound) return <NotFound404 />;
+  if (overview.error) return <ServerError500 />;
   return null;
 }
 
@@ -272,14 +267,20 @@ export function AuthenticatedRoute({
   children,
   onNavigate,
   routeKey,
+  showLoadingScreen = false,
 }: {
   children: React.ReactNode;
   onNavigate: Navigate;
   routeKey?: string;
+  showLoadingScreen?: boolean;
 }) {
   return (
     <PlatformLoadingCoordinatorProvider>
-      <AuthenticatedRouteContent onNavigate={onNavigate} routeKey={routeKey}>
+      <AuthenticatedRouteContent
+        onNavigate={onNavigate}
+        routeKey={routeKey}
+        showLoadingScreen={showLoadingScreen}
+      >
         {children}
       </AuthenticatedRouteContent>
     </PlatformLoadingCoordinatorProvider>
@@ -290,10 +291,12 @@ function AuthenticatedRouteContent({
   children,
   onNavigate,
   routeKey,
+  showLoadingScreen,
 }: {
   children: React.ReactNode;
   onNavigate: Navigate;
   routeKey?: string;
+  showLoadingScreen: boolean;
 }) {
   const { t } = useTranslation();
   const [checking, setChecking] = useState(true);
@@ -302,39 +305,40 @@ function AuthenticatedRouteContent({
   const childLoading = usePlatformLoadingCoordinatorState();
   const mountedRef = useRef(false);
   const requestIdRef = useRef(0);
-  const lastVerifiedAtRef = useRef(0);
-  const hasVerifiedSession =
-    Boolean(authSession) && verifiedRouteKey !== undefined;
-  const hasFreshSession =
-    hasVerifiedSession &&
-    Date.now() - lastVerifiedAtRef.current < AUTH_ROUTE_SESSION_GRACE_MS;
-  const effectiveChecking =
-    !hasVerifiedSession && (checking || verifiedRouteKey !== routeKey);
-  const overlayActive = effectiveChecking || childLoading.active;
+  const hasVerifiedSessionRef = useRef(false);
+  const hasVerifiedSession = Boolean(authSession) && verifiedRouteKey === routeKey;
+  const effectiveChecking = checking || !hasVerifiedSession;
+  const overlayActive = showLoadingScreen && (effectiveChecking || childLoading.active);
   const overlayMessage = childLoading.message ?? t("projectShell.checkingSession");
   const loadingTransition = useLoadingTransition(overlayActive);
 
-  const verifySession = useCallback((options: { blocking?: boolean } = {}) => {
+  const verifySession = useCallback(() => {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    if (options.blocking !== false) {
-      setChecking(true);
-    }
+    setChecking(true);
     platformApi
       .me()
       .then((response) => {
         if (!mountedRef.current || requestIdRef.current !== requestId) return;
         setAuthSession(response);
-        lastVerifiedAtRef.current = Date.now();
+        hasVerifiedSessionRef.current = true;
         setVerifiedRouteKey(routeKey);
         setChecking(false);
       })
-      .catch(() => {
+      .catch((error) => {
         if (!mountedRef.current || requestIdRef.current !== requestId) return;
+        const redirect = typeof window === "undefined"
+          ? routeKey ?? "/dashboard"
+          : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        const reason = hasVerifiedSessionRef.current
+          ? "session-expired"
+          : error instanceof PlatformApiError && (error.status === 401 || error.status === 403)
+            ? "login-required"
+            : "session-check-failed";
         setAuthSession(null);
         setVerifiedRouteKey(undefined);
         setChecking(false);
-        onNavigate("/");
+        onNavigate(buildLoginRedirectPath(redirect, reason));
       });
   }, [onNavigate, routeKey]);
 
@@ -347,11 +351,12 @@ function AuthenticatedRouteContent({
   }, []);
 
   useEffect(() => {
-    verifySession({ blocking: !hasFreshSession });
-  }, [hasFreshSession, routeKey, verifySession]);
+    // Route content stays unmounted until the server has validated the cookie-backed session for this exact route.
+    verifySession();
+  }, [verifySession]);
 
   useEffect(() => {
-    const handleSessionChanged = () => verifySession({ blocking: true });
+    const handleSessionChanged = () => verifySession();
     window.addEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChanged);
     return () => {
       window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChanged);
@@ -375,7 +380,7 @@ function AuthenticatedRouteContent({
         <ManagedProviderSettingsSync session={authSession} />
         {children}
       </AuthenticatedRouteSessionProvider>
-      {loadingTransition.visible && loadingTransition.phase !== "hidden" && (
+      {showLoadingScreen && loadingTransition.visible && loadingTransition.phase !== "hidden" && (
         <PlatformLoadingScreen
           message={overlayMessage}
           variant="fullscreen"
@@ -466,7 +471,7 @@ const projectDrawerMeta: Record<
     titleKey: "projectShell.drawer.tasks",
     descriptionKey: "projectShell.drawer.tasksDescription",
     icon: Activity,
-    width: "history",
+    width: "wide",
   },
   members: {
     titleKey: "projectShell.drawer.members",
@@ -510,77 +515,61 @@ function ProjectDrawerShell({
   children: React.ReactNode;
 }) {
   const { t } = useTranslation();
-  if (!open) return null;
+  const isMobile = useIsMobile();
   const meta = projectDrawerMeta[kind];
   const Icon = meta.icon;
   const title = t(meta.titleKey);
   const titleId = `project-${kind}-drawer-title`;
   const widthClass =
-    meta.width === "wide"
-      ? "w-full sm:w-[min(470px,100%)]"
-      : meta.width === "history"
-        ? "w-full sm:w-[min(423px,100%)] 2xl:w-[25vw] 2xl:max-w-[423px]"
-        : "w-full sm:w-[min(368px,100%)]";
+    meta.width === "history"
+      ? "max-w-full data-[vaul-drawer-direction=right]:sm:max-w-6xl"
+      : kind === "members"
+      ? "max-w-full data-[vaul-drawer-direction=right]:sm:max-w-2xl"
+      : "max-w-full data-[vaul-drawer-direction=right]:sm:max-w-md";
 
   return (
-    <div
-      data-testid="project-workspace-drawer-layer"
-      className="absolute inset-0 z-40 flex justify-end bg-background/45 backdrop-blur-[1px] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
-    >
-      <button
-        type="button"
-        aria-label={t("projectShell.drawer.closeOverlay", { title })}
-        tabIndex={-1}
-        className="absolute inset-0 z-0 cursor-default"
-        onClick={onClose}
-      />
-      <aside
+    <div data-testid="project-workspace-drawer-layer">
+      <Drawer direction={isMobile ? "bottom" : "right"} open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DrawerContent
         data-testid="project-workspace-drawer"
-        role="dialog"
-        aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative z-10 flex h-full ${widthClass} max-w-full flex-col overflow-x-hidden overflow-y-hidden border-l border-border bg-card text-card-foreground shadow-2xl motion-safe:animate-in motion-safe:slide-in-from-right-full motion-safe:duration-200`}
+        aria-describedby={undefined}
+        className={cn("max-w-full gap-0 overflow-x-hidden overflow-y-hidden", widthClass, kind === "tasks" && isMobile && "h-[90dvh]")}
       >
-        <header className="flex min-h-[82px] items-center justify-between gap-3 border-b border-border/70 bg-card/85 px-6 py-5 backdrop-blur-md">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-primary/10 text-primary shadow-sm">
-              <Icon className="size-5" aria-hidden="true" />
-            </span>
+        <DrawerHeader className="flex-row items-center justify-between gap-3 p-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <Avatar className="size-9.5 rounded-sm after:border-0">
+              <AvatarFallback className="bg-primary/10 text-primary size-9.5 shrink-0 rounded-sm [&>svg]:size-4.75">
+                <Icon className="size-5" aria-hidden="true" />
+              </AvatarFallback>
+            </Avatar>
             <div className="min-w-0">
-              <h2 id={titleId} className="text-xl font-semibold leading-7">
+              <DrawerTitle id={titleId} className="text-base font-semibold">
                 {title}
-              </h2>
-              <p className="truncate font-mono text-xs leading-4 text-muted-foreground">{projectName}</p>
+              </DrawerTitle>
+              <DrawerDescription className="truncate text-sm">
+                {projectName}
+              </DrawerDescription>
             </div>
           </div>
           <Button
             type="button"
             variant="ghost"
-            size="icon"
-            className="size-10 shrink-0 rounded-full"
+            size="icon-sm"
             aria-label={t("projectShell.drawer.close", { title })}
             onClick={onClose}
           >
             <X className="size-4" />
           </Button>
-        </header>
-        <div className="flex min-h-[33px] min-w-0 items-center justify-between gap-3 overflow-hidden border-b border-border/60 bg-muted/70 px-6 py-2 text-xs text-muted-foreground">
-          <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
-            <ShieldCheck className="size-3.5" aria-hidden="true" />
-            {t("projectShell.drawer.permission", { role: accessLabel ?? "unknown" })}
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-1.5 text-primary">
-            <CheckStatusDot />
-            {t("projectShell.drawer.synced")}
-          </span>
-        </div>
+        </DrawerHeader>
         <div
           data-testid="project-workspace-drawer-body"
-          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6"
+          className={cn("min-h-0 min-w-0 flex-1 overflow-x-hidden px-4 py-4", kind === "tasks" ? "flex flex-col overflow-y-hidden" : "overflow-y-auto")}
         >
           {children}
         </div>
-      </aside>
+      </DrawerContent>
+      </Drawer>
     </div>
   );
 }
@@ -604,7 +593,11 @@ export function ProjectWorkspaceDrawer({
 }) {
   const { t } = useTranslation();
   const overview = useProjectOverview(projectId);
-  if (!activeDrawer) return null;
+  // Keep the last open kind mounted so the sheet can play its exit transition.
+  const lastKindRef = useRef<ProjectDrawerKind | null>(null);
+  if (activeDrawer) lastKindRef.current = activeDrawer;
+  const drawerKind = activeDrawer ?? lastKindRef.current;
+  if (!drawerKind) return null;
 
   const projectName =
     overview.project?.name ??
@@ -625,14 +618,16 @@ export function ProjectWorkspaceDrawer({
     );
   } else if (accessMessage || !overview.project) {
     content = accessMessage;
-  } else if (activeDrawer === "tasks") {
+  } else if (drawerKind === "tasks") {
     content = (
       <ProjectGenerationTasksDrawerContent
+        projectId={projectId}
+        onViewResult={onClose}
         projectRuns={overview.runs}
         preferredRunId={preferredTaskRunId}
       />
     );
-  } else if (activeDrawer === "settings") {
+  } else if (drawerKind === "settings") {
     content = (
       <ProjectSettings
         project={overview.project}
@@ -641,7 +636,7 @@ export function ProjectWorkspaceDrawer({
         onProjectDeleted={handleProjectDeleted}
       />
     );
-  } else if (activeDrawer === "members") {
+  } else if (drawerKind === "members") {
     content = (
       <ProjectMembers
         project={overview.project}
@@ -650,7 +645,7 @@ export function ProjectWorkspaceDrawer({
         layout="drawer"
       />
     );
-  } else if (activeDrawer === "history") {
+  } else if (drawerKind === "history") {
     content = (
       <ProjectHistory
         projectId={projectId}
@@ -666,7 +661,7 @@ export function ProjectWorkspaceDrawer({
   return (
     <ProjectDrawerShell
       open={Boolean(activeDrawer)}
-      kind={activeDrawer}
+      kind={drawerKind}
       projectName={projectName}
       accessLabel={overview.membership?.role ?? null}
       onClose={onClose}
@@ -746,159 +741,5 @@ export function ProjectWorkspaceAccessBoundary({
         />
       )}
     </div>
-  );
-}
-
-export function ProjectWorkspaceBanner({
-  projectId,
-  onOpenDrawer,
-  activeGenerationTaskCount = 0,
-}: {
-  projectId: string;
-  onOpenDrawer?: (kind: ProjectDrawerKind) => void;
-  activeGenerationTaskCount?: number;
-}) {
-  const { t } = useTranslation();
-  const overview = useProjectOverview(projectId);
-  const activeServerRuns = overview.runs.filter(
-    (run) => run.status === "queued" || run.status === "running",
-  ).length;
-  const [lineageOpen, setLineageOpen] = useState(false);
-  const activeRuns = Math.max(activeServerRuns, activeGenerationTaskCount);
-  const shortcuts: Array<{ label: string; kind: ProjectDrawerKind; icon: typeof Settings }> = [
-    { label: t("projectShell.drawer.settingsShort"), kind: "settings", icon: Settings },
-    { label: t("projectShell.drawer.membersShort"), kind: "members", icon: Users },
-    { label: t("projectShell.drawer.documentsShort"), kind: "documents", icon: BookOpen },
-  ];
-
-  if (overview.loading) {
-    return (
-      <div className="flex min-h-[53px] items-center border-b border-border bg-card px-4 py-2">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          {t("projectShell.projectDataLoading")}
-        </div>
-      </div>
-    );
-  }
-
-  if (overview.authRequired || overview.forbidden || overview.error || !overview.project) {
-    return (
-      <div className="flex min-h-[53px] items-center border-b border-border bg-card px-4 py-2">
-        <div className="flex w-full flex-wrap items-center justify-between gap-3 text-sm">
-          <div className="flex items-center gap-3">
-            <Badge variant={overview.forbidden ? "destructive" : "outline"}>
-              {overview.forbidden ? t("projectShell.access.forbiddenTitle") : t("projectShell.workspace")}
-            </Badge>
-            <span className="font-semibold">{t("projectShell.projectFallback", { projectId })}</span>
-          </div>
-          <span className="text-muted-foreground">
-            {overview.authRequired
-              ? t("projectShell.requiresLoginWorkspace")
-              : overview.error || t("projectShell.projectDataUnavailable")}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {lineageOpen && (
-        <LineageGraphDialog
-          open={lineageOpen}
-          onOpenChange={setLineageOpen}
-          projectRuns={overview.runs}
-        />
-      )}
-      <div className="flex min-h-[53px] items-center border-b border-border bg-card px-3 py-2 md:px-4">
-        <div className="flex w-full min-w-0 items-center justify-between gap-3 text-sm md:flex-wrap">
-          <div className="flex min-w-0 items-center gap-2 md:gap-3">
-            <Badge variant="secondary">{t("projectShell.workspace")}</Badge>
-            <span className="min-w-0 truncate font-semibold">{overview.project.name}</span>
-            <span className="hidden text-muted-foreground sm:inline">
-              {t("projectShell.membersCount", { count: overview.members.length })}
-            </span>
-            <span className="hidden text-muted-foreground sm:inline">
-              {t("projectShell.permission", { role: overview.membership?.role ?? "unknown" })}
-            </span>
-          </div>
-          <div className="hidden flex-wrap items-center gap-2 text-muted-foreground md:flex">
-            {onOpenDrawer && (
-              <ProjectWorkspaceActions
-                projectId={projectId}
-                projectRuns={overview.runs}
-                onOpenDrawer={onOpenDrawer}
-              />
-            )}
-            {onOpenDrawer &&
-              shortcuts.map((shortcut) => {
-                const Icon = shortcut.icon;
-                return (
-                  <Button
-                    key={shortcut.kind}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onOpenDrawer(shortcut.kind)}
-                  >
-                    <Icon className="size-4" />
-                    {shortcut.label}
-                  </Button>
-                );
-              })}
-          </div>
-          {onOpenDrawer && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 shrink-0 rounded-full md:hidden"
-                  aria-label={t("projectShell.openActions")}
-                  title={t("projectShell.openActions")}
-                >
-                  <MoreHorizontal className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-52">
-                <DropdownMenuLabel>
-                  {overview.membership?.role ?? "unknown"} · {t("projectShell.drawer.synced")}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => setLineageOpen(true)}>
-                  <GitBranch className="size-4" />
-                  {t("status.lineage")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onOpenDrawer("tasks")}>
-                  <Activity className="size-4" />
-                  {t("status.tasks")}
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {activeRuns}
-                  </span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onOpenDrawer("history")}>
-                  <Clock3 className="size-4" />
-                  {t("status.runHistory")}
-                </DropdownMenuItem>
-                {shortcuts.map((shortcut) => {
-                  const Icon = shortcut.icon;
-                  return (
-                    <DropdownMenuItem
-                      key={shortcut.kind}
-                      onSelect={() => onOpenDrawer(shortcut.kind)}
-                    >
-                      <Icon className="size-4" />
-                      {shortcut.label}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      </div>
-    </>
   );
 }

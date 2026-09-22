@@ -25,6 +25,7 @@
 ### 跟踪边界
 
 - `apps/web/public/sandpack/` 由 Web 的预开发和预构建脚本生成，不跟踪。
+- `apps/web/.next*/`、根目录 `.tmp-*.json` 与 `apps/web/.tmp-*.png` 是本地构建或视觉验证产物，不跟踪。
 - `apps/api/.local-documents/`、`tmp/`、日志、测试证据和本地密钥不跟踪。
 - `plantuml/build/libs/plantuml-1.2026.3beta8.jar` 是 CI 与生产渲染的明确运行时例外，继续跟踪。
 - `apps/api/src/code-skills/ui-ux-pro-max/` 是运行时 Skill 资产，不按普通文档重写。

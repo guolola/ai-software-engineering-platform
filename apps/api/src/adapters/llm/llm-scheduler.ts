@@ -403,6 +403,7 @@ export function createScheduledLlmTransport({
               usage = { ...value };
               input.onTokenUsage?.(value);
             },
+            onReasoningSummary: input.onReasoningSummary,
             onReasoningChunk() {
               firstReasoningAt ??= Date.now();
               input.onReasoningChunk?.();

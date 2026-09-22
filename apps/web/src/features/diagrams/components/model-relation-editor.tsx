@@ -1,5 +1,9 @@
 // Renders relation-specific edit fields for the model editor dialog.
 import { useTranslation } from "react-i18next";
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../../shared/ui/collapsible";
+import { cn } from "../../../shared/ui/utils";
 import {
   relationEndpointKey,
   relationName,
@@ -44,10 +48,18 @@ export function ModelRelationEditor({
   sourceRuleOptions?: Array<{ id: string; label: string }>;
 }) {
   const { t } = useTranslation();
+  const [basicsOpen, setBasicsOpen] = useState(true);
+  const [detailsOpen, setDetailsOpen] = useState(true);
   const sourceKey = relationEndpointKey(editorDraft, "source");
   const targetKey = relationEndpointKey(editorDraft, "target");
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-form-layout="6">
+      <Collapsible open={basicsOpen} onOpenChange={setBasicsOpen} className="rounded-xl border border-border bg-muted/10">
+        <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold">
+          {t("diagramEditor.relation.basics", { defaultValue: "关系与端点" })}
+          <ChevronDown className={cn("size-4 transition-transform", basicsOpen && "rotate-180")} />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-3 border-t border-border p-4">
       {editorDraft.diagramKind !== "activity" ? (
         <LabelTextInput
           label={t("diagramEditor.relation.name")}
@@ -122,6 +134,14 @@ export function ModelRelationEditor({
           }
         />
       </div>
+        </CollapsibleContent>
+      </Collapsible>
+      <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen} className="rounded-xl border border-border bg-muted/10">
+        <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold">
+          {t("diagramEditor.relation.details", { defaultValue: "关系说明与约束" })}
+          <ChevronDown className={cn("size-4 transition-transform", detailsOpen && "rotate-180")} />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-3 border-t border-border p-4">
       {editorDraft.diagramKind === "context" ? (
         <div className="grid gap-3">
           <LabelTextarea
@@ -396,6 +416,8 @@ export function ModelRelationEditor({
           />
         </div>
       ) : null}
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

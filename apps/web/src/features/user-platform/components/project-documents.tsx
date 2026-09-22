@@ -1,12 +1,24 @@
 // Owns project document list interactions for the project workspace page and drawer.
-import { useCallback, useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { Download } from "lucide-react";
+import { Alert } from "../../../shared/ui/alert";
 import { Badge } from "../../../shared/ui/badge";
 import { Button } from "../../../shared/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../../shared/ui/card";
+import { Field, FieldLabel } from "../../../shared/ui/field";
 import { Input } from "../../../shared/ui/input";
-import { Label } from "../../../shared/ui/label";
+import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Download, FileText } from "lucide-react";
+import { EmptyState, PageHeader, TableToolbar } from "../../../shared/template/layout/page";
+import { cn } from "../../../shared/ui/utils";
 import { downloadBlobFile } from "../../../shared/lib/download";
+import { useFloatingAlert } from "../../../shared/ui/floating-alert";
 import {
   downloadStatusLabel,
   formatDateTime,
@@ -30,12 +42,15 @@ export function ProjectDocuments({
   layout?: "page" | "drawer";
 }) {
   const { t, i18n } = useTranslation();
+  const { showAlert } = useFloatingAlert();
   const locale = i18n.resolvedLanguage?.startsWith("en") ? "en-US" : "zh-CN";
   const [currentDocuments, setCurrentDocuments] = useState(documents);
   const [names, setNames] = useState<Record<string, string>>({});
   const [versions, setVersions] = useState<Record<string, PlatformDocumentVersion[]>>({});
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [searchFilter, setSearchFilter] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const notifySuccess = (title: string) => showAlert({ id: "project-documents-success", title, tone: "success" });
+  const notifyError = (title: string) => showAlert({ id: "project-documents-error", title, tone: "destructive" });
 
   const applyDocuments = useCallback((nextDocuments: PlatformDocument[]) => {
     setCurrentDocuments(nextDocuments);
@@ -63,7 +78,7 @@ export function ProjectDocuments({
       })
       .catch(() => {
         if (!active) return;
-        setError(t("projectShell.documentsUi.errors.load"));
+        setLoadError(t("projectShell.documentsUi.errors.load"));
       });
     return () => {
       active = false;
@@ -86,38 +101,32 @@ export function ProjectDocuments({
   };
 
   const loadVersions = async (documentId: string) => {
-    setMessage("");
-    setError("");
     const displayName = findDocumentDisplayName(documentId);
     try {
       const response = await platformApi.listProjectDocumentVersions(projectId, documentId);
       setVersions((current) => ({ ...current, [documentId]: response.versions }));
-      setMessage(t("projectShell.documentsUi.messages.versionsLoaded", { name: displayName }));
+      notifySuccess(t("projectShell.documentsUi.messages.versionsLoaded", { name: displayName }));
     } catch {
-      setError(t("projectShell.documentsUi.errors.versions"));
+      notifyError(t("projectShell.documentsUi.errors.versions"));
     }
   };
 
   const renameDocument = async (documentId: string) => {
-    setMessage("");
-    setError("");
     try {
       const nextName = (names[documentId] ?? "").trim();
       if (!nextName) {
-        setError(t("projectShell.documentsUi.errors.nameRequired"));
+        notifyError(t("projectShell.documentsUi.errors.nameRequired"));
         return;
       }
       const response = await platformApi.renameProjectDocument(projectId, documentId, nextName);
       updateDocument(response.document);
-      setMessage(t("projectShell.documentsUi.messages.renamed", { name: getProjectDocumentDisplayName(response.document, t) }));
+      notifySuccess(t("projectShell.documentsUi.messages.renamed", { name: getProjectDocumentDisplayName(response.document, t) }));
     } catch {
-      setError(t("projectShell.documentsUi.errors.rename"));
+      notifyError(t("projectShell.documentsUi.errors.rename"));
     }
   };
 
   const deleteDocument = async (documentId: string) => {
-    setMessage("");
-    setError("");
     const displayName = findDocumentDisplayName(documentId);
     try {
       await platformApi.deleteProjectDocument(projectId, documentId);
@@ -126,33 +135,29 @@ export function ProjectDocuments({
           document.id === documentId ? { ...document, status: "deleted" } : document,
         ),
       );
-      setMessage(t("projectShell.documentsUi.messages.deleted", { name: displayName }));
+      notifySuccess(t("projectShell.documentsUi.messages.deleted", { name: displayName }));
     } catch {
-      setError(t("projectShell.documentsUi.errors.delete"));
+      notifyError(t("projectShell.documentsUi.errors.delete"));
     }
   };
 
   const restoreDocument = async (documentId: string) => {
-    setMessage("");
-    setError("");
     try {
       const response = await platformApi.restoreProjectDocument(projectId, documentId);
       updateDocument(response.document);
-      setMessage(t("projectShell.documentsUi.messages.restored", { name: getProjectDocumentDisplayName(response.document, t) }));
+      notifySuccess(t("projectShell.documentsUi.messages.restored", { name: getProjectDocumentDisplayName(response.document, t) }));
     } catch {
-      setError(t("projectShell.documentsUi.errors.restore"));
+      notifyError(t("projectShell.documentsUi.errors.restore"));
     }
   };
 
   const downloadDocument = async (documentId: string) => {
-    setMessage("");
-    setError("");
     try {
       const file = await platformApi.downloadProjectDocument(projectId, documentId);
       downloadBlobFile(file.fileName, file.blob);
-      setMessage(t("projectShell.documentsUi.messages.downloaded", { name: file.fileName }));
+      notifySuccess(t("projectShell.documentsUi.messages.downloaded", { name: file.fileName }));
     } catch {
-      setError(t("projectShell.documentsUi.errors.download"));
+      notifyError(t("projectShell.documentsUi.errors.download"));
     }
   };
 
@@ -161,134 +166,172 @@ export function ProjectDocuments({
       (document) => document.status !== "deleted" && document.download?.status !== "unavailable",
     );
     if (downloadableDocuments.length === 0) {
-      setError(t("projectShell.documentsUi.errors.noneDownloadable"));
+      notifyError(t("projectShell.documentsUi.errors.noneDownloadable"));
       return;
     }
     for (const document of downloadableDocuments) {
       await downloadDocument(document.id);
     }
-    setMessage(t("projectShell.documentsUi.messages.batchDownloaded", { count: downloadableDocuments.length }));
+    notifySuccess(t("projectShell.documentsUi.messages.batchDownloaded", { count: downloadableDocuments.length }));
   };
 
-  const sectionClass = layout === "drawer" ? "p-4" : "";
-  const gridClass = layout === "drawer" ? "grid gap-3" : "grid gap-4 lg:grid-cols-2";
+  const query = searchFilter.trim().toLowerCase();
+  const visibleDocuments = query
+    ? currentDocuments.filter((document) =>
+        getProjectDocumentDisplayName(document, t).toLowerCase().includes(query),
+      )
+    : currentDocuments;
 
   return (
-    <section className={`rounded-md border border-border bg-card p-5 ${sectionClass}`}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base">{t("projectShell.documentsUi.title")}</h2>
-          <p className="text-sm text-muted-foreground">
-            {t("projectShell.documentsUi.description")}
-          </p>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => void batchDownload()}>
-          <Download className="size-4" />
-          {t("projectShell.documentsUi.batchDownload")}
-        </Button>
-      </div>
-      <div className={gridClass}>
-        {currentDocuments.map((document) => {
-          const displayName = getProjectDocumentDisplayName(document, t);
-          return (
-            <div key={document.id} className="rounded-md border border-border bg-background p-4">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-base">{displayName}</h2>
-                <Badge variant="secondary">{t(`projectShell.documentsUi.documentStatus.${["ready", "processing", "failed", "deleted"].includes(document.status) ? document.status : "unknown"}`)}</Badge>
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {t("projectShell.documentsUi.metadata", { projectId, version: document.version ?? 1, updatedAt: document.updatedAt ? formatDateTime(document.updatedAt, locale) : t("projectShell.documentsUi.notRecorded") })}
-              </p>
-              <div className="mt-3 grid gap-1 text-sm text-muted-foreground">
-                <span>{t("projectShell.documentsUi.onlyOffice", { status: onlyOfficeStatusLabel(document.onlyOffice?.status, t) })}</span>
-                <span>{t("projectShell.documentsUi.editLock", { value: document.editLock?.lockedBy ?? document.onlyOffice?.lockedBy ?? t("projectShell.documentsUi.unlocked") })}</span>
-                <span>
-                  {t("projectShell.documentsUi.downloadLabel")}
-                  {downloadStatusLabel(
-                    document.download?.status ?? (document.status === "deleted" ? "unavailable" : "available"),
-                    t,
-                  )}
-                </span>
-                <span>{t("projectShell.documentsUi.size", { value: document.byteLength ? `${new Intl.NumberFormat(locale).format(document.byteLength)} bytes` : t("projectShell.documentsUi.notRecorded") })}</span>
-              </div>
-              <div className="mt-4 grid gap-1.5">
-                <Label htmlFor={`document-name-${document.id}`}>{t("projectShell.documentsUi.name")}</Label>
-                <Input
-                  id={`document-name-${document.id}`}
-                  value={names[document.id] ?? ""}
-                  onChange={(event) =>
-                    setNames((current) => ({
-                      ...current,
-                      [document.id]: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  aria-label={t("projectShell.documentsUi.downloadFor", { name: displayName })}
-                  onClick={() => void downloadDocument(document.id)}
-                >
-                  {t("projectShell.documentsUi.download")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  aria-label={t("projectShell.documentsUi.renameFor", { name: displayName })}
-                  onClick={() => void renameDocument(document.id)}
-                >
-                  {t("projectShell.documentsUi.rename")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  aria-label={t("projectShell.documentsUi.versionsFor", { name: displayName })}
-                  onClick={() => void loadVersions(document.id)}
-                >
-                  {t("projectShell.documentsUi.versions")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  aria-label={t("projectShell.documentsUi.restoreFor", { name: displayName })}
-                  onClick={() => void restoreDocument(document.id)}
-                >
-                  {t("projectShell.documentsUi.restore")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  aria-label={t("projectShell.documentsUi.deleteFor", { name: displayName })}
-                  onClick={() => void deleteDocument(document.id)}
-                >
-                  {t("projectShell.documentsUi.delete")}
-                </Button>
-              </div>
-              {versions[document.id] && (
-                <div className="mt-4 rounded-md border border-border bg-muted p-3 text-sm">
-                  {versions[document.id].map((version) => (
-                    <div key={`${document.id}-${version.version}`}>
-                      v{version.version} {version.fileName}
+    <div className="grid min-w-0 gap-4">
+      <PageHeader
+        size={layout === "drawer" ? "compact" : "default"}
+        title={t("projectShell.documentsUi.title")}
+        description={t("projectShell.documentsUi.description")}
+        actions={
+          <Button type="button" variant="outline" size="sm" onClick={() => void batchDownload()}>
+            <Download className="size-4" />
+            {t("projectShell.documentsUi.batchDownload")}
+          </Button>
+        }
+        className={cn(layout === "drawer" && "mb-0 lg:mb-0")}
+      />
+      {currentDocuments.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title={t("projectShell.documentsUi.empty")}
+          description={t("projectShell.documentsUi.description")}
+          className="justify-self-center"
+        />
+      ) : (
+      <Card as="section" className="min-w-0 max-w-full py-0 shadow-none">
+        <TableToolbar
+          search={searchFilter}
+          onSearchChange={setSearchFilter}
+          searchPlaceholder={t("projectShell.documentsUi.searchPlaceholder")}
+          searchLabel={t("projectShell.documentsUi.searchPlaceholder")}
+        />
+        {visibleDocuments.length === 0 ? (
+          <div className="text-muted-foreground border-t p-4 text-center text-sm">
+            {t("projectShell.documentsUi.noMatches")}
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "grid gap-3 border-t px-3 py-3",
+              layout === "page" && "lg:grid-cols-2",
+            )}
+          >
+            {visibleDocuments.map((document) => {
+              const displayName = getProjectDocumentDisplayName(document, t);
+              return (
+                <Card key={document.id} size="sm" className="min-w-0 max-w-full gap-3">
+                  <CardHeader>
+                    <CardTitle className="min-w-0 truncate" title={displayName}>
+                      {displayName}
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      {t("projectShell.documentsUi.metadata", { projectId, version: document.version ?? 1, updatedAt: document.updatedAt ? formatDateTime(document.updatedAt, locale) : t("projectShell.documentsUi.notRecorded") })}
+                    </CardDescription>
+                    <CardAction>
+                      <Badge variant="secondary">
+                        {t(`projectShell.documentsUi.documentStatus.${["ready", "processing", "failed", "deleted"].includes(document.status) ? document.status : "unknown"}`)}
+                      </Badge>
+                    </CardAction>
+                  </CardHeader>
+                  <CardContent className="grid gap-3">
+                    <div className="text-muted-foreground grid gap-1 text-sm">
+                      <span>{t("projectShell.documentsUi.onlyOffice", { status: onlyOfficeStatusLabel(document.onlyOffice?.status, t) })}</span>
+                      <span>{t("projectShell.documentsUi.editLock", { value: document.editLock?.lockedBy ?? document.onlyOffice?.lockedBy ?? t("projectShell.documentsUi.unlocked") })}</span>
+                      <span>
+                        {t("projectShell.documentsUi.downloadLabel")}
+                        {downloadStatusLabel(
+                          document.download?.status ?? (document.status === "deleted" ? "unavailable" : "available"),
+                          t,
+                        )}
+                      </span>
+                      <span>{t("projectShell.documentsUi.size", { value: document.byteLength ? `${new Intl.NumberFormat(locale).format(document.byteLength)} bytes` : t("projectShell.documentsUi.notRecorded") })}</span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {currentDocuments.length === 0 && (
-          <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-            {t("projectShell.documentsUi.empty")}
+                    <Field>
+                      <FieldLabel htmlFor={`document-name-${document.id}`}>
+                        {t("projectShell.documentsUi.name")}
+                      </FieldLabel>
+                      <Input
+                        id={`document-name-${document.id}`}
+                        value={names[document.id] ?? ""}
+                        onChange={(event) =>
+                          setNames((current) => ({
+                            ...current,
+                            [document.id]: event.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label={t("projectShell.documentsUi.downloadFor", { name: displayName })}
+                        onClick={() => void downloadDocument(document.id)}
+                      >
+                        {t("projectShell.documentsUi.download")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label={t("projectShell.documentsUi.renameFor", { name: displayName })}
+                        onClick={() => void renameDocument(document.id)}
+                      >
+                        {t("projectShell.documentsUi.rename")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label={t("projectShell.documentsUi.versionsFor", { name: displayName })}
+                        onClick={() => void loadVersions(document.id)}
+                      >
+                        {t("projectShell.documentsUi.versions")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label={t("projectShell.documentsUi.restoreFor", { name: displayName })}
+                        onClick={() => void restoreDocument(document.id)}
+                      >
+                        {t("projectShell.documentsUi.restore")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        aria-label={t("projectShell.documentsUi.deleteFor", { name: displayName })}
+                        onClick={() => void deleteDocument(document.id)}
+                      >
+                        {t("projectShell.documentsUi.delete")}
+                      </Button>
+                    </div>
+                    {versions[document.id] && (
+                      <div className="bg-muted rounded-md border border-border p-3 text-sm">
+                        {versions[document.id].map((version) => (
+                          <div key={`${document.id}-${version.version}`}>
+                            v{version.version} {version.fileName}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
-      </div>
-      {(message || error) && (
-        <div className="mt-4 rounded-md border border-border bg-muted p-3 text-sm">
-          {message || error}
-        </div>
+      </Card>
       )}
-    </section>
+      {loadError ? <Alert variant="destructive" className="text-sm">{loadError}</Alert> : null}
+    </div>
   );
 }

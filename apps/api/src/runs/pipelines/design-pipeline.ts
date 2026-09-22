@@ -378,12 +378,16 @@ function createLimitedLlmChunkEmitter(
   stage: RunStage,
   onActivity?: ModelTaskActivity,
   onBlankActivity?: ModelTaskActivity,
+  subtaskId?: string,
+  subtaskLabel?: string,
 ) {
   return createRunLlmChunkHandlers({
     record,
     stage,
     onActivity,
     onBlankActivity,
+    subtaskId,
+    subtaskLabel,
     maxVisibleChunks: LLM_CHUNK_EVENT_LIMIT,
     maxVisibleChars: LLM_CHUNK_CHAR_LIMIT,
   });
@@ -716,6 +720,8 @@ async function generateDesignTraceabilityBatchWithRepair(
       stage,
       onActivity,
       onBlankActivity,
+      designModels.length === 1 ? designModels[0]?.modelId ?? designModels[0]?.diagramKind : undefined,
+      "补全模型与需求的对应关系",
     );
     const content = await collectTextResult(
       llmTransport,
@@ -917,6 +923,8 @@ export async function generateDesignModelsWithRepair(
   options: {
     modelRepairAttempts?: number;
     skipEmptyModelRepair?: boolean;
+    subtaskId?: string;
+    subtaskLabel?: string;
   } = {},
   onActivity?: ModelTaskActivity,
   onBlankActivity?: ModelTaskActivity,
@@ -937,6 +945,8 @@ export async function generateDesignModelsWithRepair(
       stage,
       onActivity,
       onBlankActivity,
+      options.subtaskId ?? selectedDiagrams[0],
+      options.subtaskLabel,
     );
     const content = await collectTextResult(
       llmTransport,
@@ -1478,7 +1488,7 @@ export async function runDesignStagePipeline(
                   scopedAnalysisModels,
                 ),
                 "generate_design_sequence",
-                { skipEmptyModelRepair: true },
+                { skipEmptyModelRepair: true, subtaskId: modelId, subtaskLabel: `${useCase.name}的顺序图` },
                 markActivity,
                 markBlankActivity,
                 abortSignal,
@@ -1703,7 +1713,7 @@ export async function runDesignStagePipeline(
               designContextModels,
             ),
             "generate_design_models",
-            {},
+            { subtaskId: diagram, subtaskLabel: designDiagramLabel(diagram) },
             markActivity,
             markBlankActivity,
             abortSignal,

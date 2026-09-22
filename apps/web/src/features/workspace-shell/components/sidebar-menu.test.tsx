@@ -12,8 +12,21 @@ import {
   withWorkspaceProviders,
 } from "../../../test/workspace-test-utils";
 import { useWorkspaceSession } from "../../workspace-session/state";
+import { useWorkspaceShell } from "../state";
 import { SidebarMenu } from "./sidebar-menu";
-import { WorkspaceTabsBar } from "./workspace-tabs-bar";
+
+function TabsProbe() {
+  const { openTabs, closeWorkspaceTab } = useWorkspaceShell();
+  return (
+    <div>
+      {openTabs.map((tab) => (
+        <button key={tab.id} type="button" onClick={() => closeWorkspaceTab(tab.id)}>
+          关闭 {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const { toastMessage } = vi.hoisted(() => ({
   toastMessage: vi.fn(),
@@ -32,7 +45,7 @@ function SidebarDesignGenerationHarness() {
   return (
     <>
       <SidebarMenu />
-      <WorkspaceTabsBar />
+      <TabsProbe />
       <button type="button" onClick={() => void generateDesignDiagrams(["class"])}>
         生成设计类图
       </button>
@@ -87,7 +100,7 @@ function SidebarSequenceGenerationHarness() {
   return (
     <>
       <SidebarMenu />
-      <WorkspaceTabsBar />
+      <TabsProbe />
       <button type="button" onClick={() => void generateDesignDiagrams(["sequence"])}>
         生成用例实现设计
       </button>
@@ -128,16 +141,9 @@ describe("SidebarMenu", () => {
     );
 
     expect(await screen.findByRole("navigation", { name: "项目导航" })).toHaveClass("h-full", "w-full");
-    expect(screen.getByText("项目导航")).toHaveClass("tracking-[0.88px]");
+    expect(screen.getByText("项目导航")).toHaveAttribute("data-slot", "sidebar-group-label");
     expect(screen.queryByRole("button", { name: "项目首页" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "系统需求" }).parentElement).toHaveClass(
-      "text-sm",
-      "font-medium",
-    );
-    expect(screen.getByRole("button", { name: "系统需求" }).parentElement).not.toHaveClass(
-      "text-[15px]",
-      "font-semibold",
-    );
+    expect(screen.getByRole("button", { name: "系统需求" })).toHaveAttribute("data-slot", "sidebar-menu-button");
     expect(
       screen
         .getAllByRole("button")
@@ -194,7 +200,17 @@ describe("SidebarMenu", () => {
 
     render(withWorkspaceProviders(<SidebarMenu />, repository));
 
-    await user.click(await screen.findByRole("button", { name: "展开 可行性分析" }));
+    const feasibilityMenu = await screen.findByRole("button", { name: "可行性分析" });
+    const feasibilityToggle = screen.getByRole("button", { name: "展开 可行性分析" });
+    expect(feasibilityMenu).not.toHaveAttribute("aria-expanded");
+    expect(feasibilityToggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(feasibilityMenu);
+    expect(feasibilityMenu).toHaveAttribute("data-active");
+    expect(feasibilityToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "系统上下文图（系统环境图）" })).not.toBeInTheDocument();
+
+    await user.click(feasibilityToggle);
+    expect(feasibilityToggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: "系统上下文图（系统环境图）" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "实现方案" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "跟踪矩阵" })).not.toBeInTheDocument();
@@ -215,18 +231,18 @@ describe("SidebarMenu", () => {
     await user.click(screen.getByRole("button", { name: "展开 角色" }));
     const personNode = screen.getByRole("button", { name: "用户" });
     await user.click(personNode);
-    expect(personNode.parentElement).toHaveClass("bg-sidebar-accent");
+    expect(personNode).toHaveAttribute("data-active");
 
     await user.click(screen.getByRole("button", { name: "展开 关系" }));
     const relationshipNode = screen.getByRole("button", { name: "使用" });
     await user.click(relationshipNode);
-    expect(relationshipNode.parentElement).toHaveClass("bg-sidebar-accent");
+    expect(relationshipNode).toHaveAttribute("data-active");
 
     await user.click(screen.getByRole("button", { name: "展开 实现方案" }));
     expect(screen.getByRole("button", { name: "模块化方案" })).toBeInTheDocument();
     const candidateNode = screen.getByRole("button", { name: "服务化方案" });
     await user.click(candidateNode);
-    expect(candidateNode.parentElement).toHaveClass("bg-sidebar-accent");
+    expect(candidateNode).toHaveAttribute("data-active");
   });
 
   it("projects active server requirement runs into sidebar status after reload", async () => {
@@ -638,6 +654,53 @@ describe("SidebarMenu", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
+  it("keeps requirement page navigation separate from its disclosure control", async () => {
+    const repository = createSidebarRepository(
+      createWorkspaceRecord({
+        generatedDiagramTypes: ["usecase"],
+        models: {
+          usecase: {
+            diagramKind: "usecase",
+            title: "用例模型",
+            summary: "核心用例",
+            notes: [],
+            actors: [],
+            useCases: [],
+            systemBoundaries: [],
+            relationships: [],
+          },
+        },
+      }),
+    );
+    const user = userEvent.setup();
+
+    render(
+      withWorkspaceProviders(
+        <>
+          <SidebarMenu />
+          <TabsProbe />
+        </>,
+        repository,
+      ),
+    );
+
+    const requirementsMenu = await screen.findByRole("button", { name: "需求模型" });
+    const requirementsToggle = screen.getByRole("button", { name: "展开 需求模型" });
+
+    await user.click(requirementsMenu);
+
+    expect(await screen.findByRole("button", { name: "关闭 需求模型" })).toBeInTheDocument();
+    expect(requirementsMenu).toHaveAttribute("data-active");
+    expect(requirementsToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "用例模型" })).not.toBeInTheDocument();
+
+    await user.click(requirementsToggle);
+
+    expect(requirementsToggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "用例模型" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "关闭 需求模型" })).toBeInTheDocument();
+  });
+
   it("keeps design diagram upstream provenance badges out of design entries", async () => {
     const repository: WorkspaceRepository = {
       loadWorkspace: vi.fn(async () =>
@@ -727,7 +790,7 @@ describe("SidebarMenu", () => {
       withWorkspaceProviders(
         <div>
           <SidebarMenu />
-          <WorkspaceTabsBar />
+      <TabsProbe />
         </div>,
         repository,
       ),
@@ -820,7 +883,7 @@ describe("SidebarMenu", () => {
       withWorkspaceProviders(
         <div>
           <SidebarMenu />
-          <WorkspaceTabsBar />
+      <TabsProbe />
         </div>,
         repository,
       ),
@@ -1008,7 +1071,7 @@ describe("SidebarMenu", () => {
       withWorkspaceProviders(
         <>
           <SidebarMenu />
-          <WorkspaceTabsBar />
+      <TabsProbe />
         </>,
         repository,
       ),
@@ -1043,7 +1106,7 @@ describe("SidebarMenu", () => {
       withWorkspaceProviders(
         <>
           <SidebarMenu />
-          <WorkspaceTabsBar />
+      <TabsProbe />
         </>,
         repository,
       ),
@@ -1107,7 +1170,7 @@ describe("SidebarMenu", () => {
       withWorkspaceProviders(
         <>
           <SidebarMenu />
-          <WorkspaceTabsBar />
+      <TabsProbe />
         </>,
         repository,
       ),
@@ -1173,7 +1236,7 @@ describe("SidebarMenu", () => {
       withWorkspaceProviders(
         <div>
           <SidebarMenu />
-          <WorkspaceTabsBar />
+      <TabsProbe />
         </div>,
         repository,
       ),
@@ -1729,7 +1792,11 @@ describe("SidebarMenu", () => {
     expect(screen.queryByText("生成设计模型")).not.toBeInTheDocument();
     expect(screen.queryByText("用例实现设计")).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "展开 设计模型" }));
+    const designToggle = screen.getByRole("button", { name: "展开 设计模型" });
+    expect(designToggle).toHaveAttribute("data-sidebar", "menu-action");
+    expect(designToggle).toHaveClass("peer-data-[size=default]/menu-button:top-1.5");
+    expect(designToggle).not.toHaveClass("top-0");
+    await userEvent.click(designToggle);
 
     expect(screen.getByRole("button", { name: "总体架构图" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "用例实现设计" })).toBeInTheDocument();
@@ -1854,6 +1921,20 @@ describe("SidebarMenu", () => {
               fragments: [],
             },
           },
+          designSvgArtifacts: {
+            "sequence:uc_view": {
+              diagramKind: "sequence",
+              modelId: "sequence:uc_view",
+              svg: "<svg><text>查看活动</text></svg>",
+              renderMeta: { engine: "plantuml" },
+            },
+            "sequence:uc_create": {
+              diagramKind: "sequence",
+              modelId: "sequence:uc_create",
+              svg: "<svg><text>创建活动</text></svg>",
+              renderMeta: { engine: "plantuml" },
+            },
+          },
         }),
       ),
       updateRequirementText: vi.fn(async () => {}),
@@ -1869,14 +1950,31 @@ describe("SidebarMenu", () => {
       clearRunHistory: vi.fn(async () => {}),
     };
 
-    render(withWorkspaceProviders(<SidebarMenu />, repository));
+    render(
+      withWorkspaceProviders(
+        <>
+          <SidebarMenu />
+          <TabsProbe />
+        </>,
+        repository,
+      ),
+    );
 
     await userEvent.click(await screen.findByRole("button", { name: "展开 设计模型" }));
 
-    expect(screen.getByText("用例实现设计（2）")).toBeInTheDocument();
+    const sequenceMenu = screen.getByRole("button", { name: "用例实现设计（2）" });
+    const sequenceToggle = screen.getByRole("button", { name: "展开 用例实现设计（2）" });
+    expect(sequenceMenu).not.toHaveAttribute("aria-expanded");
+    expect(sequenceToggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("查看活动")).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "展开 用例实现设计（2）" }));
+    await userEvent.click(sequenceMenu);
+    expect(await screen.findByRole("button", { name: "关闭 用例实现设计" })).toBeInTheDocument();
+    expect(sequenceMenu).toHaveAttribute("data-active");
+    expect(sequenceToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("查看活动")).not.toBeInTheDocument();
+
+    await userEvent.click(sequenceToggle);
 
     expect(screen.getByText("查看活动")).toBeInTheDocument();
     expect(screen.getByText("创建活动")).toBeInTheDocument();
@@ -1924,13 +2022,13 @@ describe("SidebarMenu", () => {
       withWorkspaceProviders(
         <div>
           <SidebarMenu />
-          <WorkspaceTabsBar />
+      <TabsProbe />
         </div>,
         repository,
       ),
     );
 
-    expect((await screen.findAllByRole("button", { name: "系统需求" })).length).toBeGreaterThan(0);
+    await userEvent.click((await screen.findAllByRole("button", { name: "系统需求" }))[0]);
     await userEvent.click(screen.getByRole("button", { name: "设计模型" }));
     await userEvent.click(screen.getByRole("button", { name: "展开 设计模型" }));
     await userEvent.click(screen.getByRole("button", { name: "用例实现设计" }));
@@ -1944,8 +2042,8 @@ describe("SidebarMenu", () => {
     await userEvent.click(screen.getByRole("button", { name: "关闭 用例实现设计" }));
     expect(screen.queryByRole("button", { name: "关闭 用例实现设计" })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "关闭 说明书" }));
     await userEvent.click(screen.getByRole("button", { name: "关闭 设计模型" }));
+    await userEvent.click(screen.getByRole("button", { name: "关闭 说明书" }));
     await userEvent.click(screen.getByRole("button", { name: "关闭 系统需求" }));
     expect(screen.getByRole("button", { name: "关闭 系统需求" })).toBeInTheDocument();
   });

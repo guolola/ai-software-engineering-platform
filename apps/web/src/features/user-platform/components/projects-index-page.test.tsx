@@ -1,5 +1,6 @@
 // Covers project index card background rendering without changing navigation behavior.
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthenticatedRouteSessionProvider } from "./authenticated-route-session";
 import { ProjectsIndexPage } from "./projects-index-page";
@@ -78,6 +79,7 @@ describe("ProjectsIndexPage", () => {
     );
 
     const card = await screen.findByRole("article");
+    expect(card).toHaveAttribute("data-slot", "perspective-card");
     expect(card).toHaveAttribute("data-background-key", "booking");
     expect(within(card).getByRole("button", { name: /进入项目/u })).toBeInTheDocument();
     expect(card).toHaveTextContent(`最近更新：${formatProjectDateTimeMinute("2026-06-21T08:09:30.000Z")}`);
@@ -86,5 +88,11 @@ describe("ProjectsIndexPage", () => {
       "src",
       expect.stringContaining("57_booking"),
     );
+    const memberTrigger = within(card).getByLabelText("成员头像 Owner User");
+    expect(memberTrigger).toHaveAttribute("tabindex", "0");
+    await userEvent.hover(memberTrigger);
+    const tooltip = await screen.findByRole("tooltip");
+    expect(within(tooltip).getByText("Owner User")).toBeInTheDocument();
+    expect(within(tooltip).getByText("所有者")).toBeInTheDocument();
   });
 });

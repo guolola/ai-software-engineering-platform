@@ -1,5 +1,7 @@
 // Renders global model and workspace preferences in either a dialog or an embedded settings tab.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Progress } from '../../../shared/ui/progress';
+import { Card } from '../../../shared/ui/card';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { KeyRound, Loader2, Pencil, Plus, PlugZap, RotateCw, Save, Trash2 } from "lucide-react";
@@ -23,7 +25,6 @@ import { Input } from "../../../shared/ui/input";
 import { Label } from "../../../shared/ui/label";
 import { Switch } from "../../../shared/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../shared/ui/select";
-import { ScaledToolbar } from "../../../shared/ui/scale-to-fit";
 import { useTheme } from "../../../shared/ui/theme-provider";
 import {
   DEFAULT_USER_SETTINGS,
@@ -45,9 +46,14 @@ import {
   type PlatformProviderConfig,
 } from "../../user-platform/services/platform-api";
 import { billingApi } from "../../user-platform/services/billing-api";
+import {
+  invalidateProviderConfigCache,
+  loadProviderConfigs,
+} from "../../user-platform/services/provider-config-cache";
 
 type GlobalSettingsPanelProps = {
   active: boolean;
+  currentUserId: string;
   onNavigate?: (route: string) => void;
   onSaved?: () => void;
 };
@@ -155,6 +161,7 @@ function providerDiscoveryProgressValue(
 
 export function GlobalSettingsPanel({
   active,
+  currentUserId,
   onNavigate,
   onSaved,
 }: GlobalSettingsPanelProps) {
@@ -167,7 +174,10 @@ export function GlobalSettingsPanel({
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null);
   const [billingSummaryUnavailable, setBillingSummaryUnavailable] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState("");
+  const billingRequestRef = useRef<{
+    userId: string;
+    request: ReturnType<typeof billingApi.getSummary>;
+  } | null>(null);
   const [providerDialogOpen, setProviderDialogOpen] = useState(false);
   const [providerDialogMode, setProviderDialogMode] = useState<"create" | "edit">("create");
   const [editingProviderId, setEditingProviderId] = useState("");
@@ -190,9 +200,7 @@ export function GlobalSettingsPanel({
         configs.filter((config) => config.status === "active"),
       );
       setProviderConfigs(activeConfigs);
-      setProviderStatus(
-        activeConfigs.length === 0 ? t("providerSettings.noManagedProviders") : "",
-      );
+      setProviderStatus("");
       setSettings((current) => {
         const selected =
           activeConfigs.find((config) => config.id === preferredProviderConfigId) ??
@@ -230,26 +238,25 @@ export function GlobalSettingsPanel({
 
   const refreshProviderConfigs = useCallback(
     async (preferredProviderConfigId?: string) => {
-      const response = await platformApi.listProviderConfigs();
+      invalidateProviderConfigCache(currentUserId);
+      const response = await loadProviderConfigs(currentUserId, { force: true });
       applyProviderConfigList(response.providerConfigs, preferredProviderConfigId);
       return response;
     },
-    [applyProviderConfigList],
+    [applyProviderConfigList, currentUserId],
   );
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || !currentUserId) return;
     setSettings(loadUserSettings());
     setProviderLoading(true);
     setProviderStatus("");
     setBillingSummaryUnavailable(false);
     setAuthRequired(false);
     let mounted = true;
-    platformApi
-      .me()
-      .then((profile) => {
-        if (mounted) setCurrentUserId(profile.user?.id ?? "");
-        return refreshProviderConfigs();
+    loadProviderConfigs(currentUserId)
+      .then((response) => {
+        if (mounted) applyProviderConfigList(response.providerConfigs);
       })
       .catch((error) => {
         if (!mounted) return;
@@ -271,8 +278,12 @@ export function GlobalSettingsPanel({
       .finally(() => {
         if (mounted) setProviderLoading(false);
       });
-    billingApi
-      .getSummary()
+    const billingRequest =
+      billingRequestRef.current?.userId === currentUserId
+        ? billingRequestRef.current.request
+        : billingApi.getSummary();
+    billingRequestRef.current = { userId: currentUserId, request: billingRequest };
+    billingRequest
       .then((summary) => {
         if (!mounted) return;
         setBillingSummary(summary);
@@ -286,7 +297,7 @@ export function GlobalSettingsPanel({
     return () => {
       mounted = false;
     };
-  }, [active, refreshProviderConfigs, t]);
+  }, [active, applyProviderConfigList, currentUserId, t]);
 
   const update = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) =>
     setSettings((current) => ({ ...current, [key]: value }));
@@ -647,7 +658,7 @@ export function GlobalSettingsPanel({
   return (
     <>
       <div className="space-y-5">
-        <section className="space-y-4 rounded-lg border border-border bg-muted/40 p-4">
+        <Card as="section" className="space-y-4 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold">{t("providerSettings.title")}</h3>
@@ -663,145 +674,142 @@ export function GlobalSettingsPanel({
               {t("providerSettings.addProvider")}
             </Button>
           </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="managed-provider-config">{t("providerSettings.managedConfig")}</Label>
-            <Select
-              value={settings.providerConfigId || "__none__"}
-              onValueChange={(value) => {
-                const providerConfigId = value === "__none__" ? "" : value;
-                const config = providerConfigs.find((item) => item.id === providerConfigId);
-                setSettings((current) => ({
-                  ...current,
-                  providerConfigId,
-                  providerModelCapabilities: providerConfigId
-                    ? getProviderModelCapabilities(config)
-                    : {},
-                  providerModelOptions: providerConfigId ? getProviderAllowedModels(config) : [],
-                  providerLabel: providerConfigId ? getProviderLabel(config) : "",
-                  providerDefaultModelSeededFor: providerConfigId ? providerConfigId : "",
-                  defaultModel: providerConfigId
-                    ? resolveProviderModel(
-                        config,
-                        current.providerConfigId === providerConfigId
-                          ? current.defaultModel
-                          : config?.defaultModel ?? "",
-                      )
-                    : "",
-                }));
-              }}
-              disabled={providerLoading || providerConfigs.length === 0}
-            >
-              <SelectTrigger
-                id="managed-provider-config"
-                aria-label={t("providerSettings.managedConfig")}
-                className="h-9"
-              >
-                <SelectValue placeholder={providerEmptyLabel} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__" disabled>
-                  {providerEmptyLabel}
-                </SelectItem>
-                {providerConfigs.map((config) => (
-                  <SelectItem key={config.id} value={config.id}>
-                    {t("providerSettings.configLabel", { name: config.name, scope: providerScopeLabel(config, {
-                      user: t("providerSettings.scopes.user"),
-                      system: t("providerSettings.scopes.system"),
-                      project: t("providerSettings.scopes.project"),
-                      managed: t("providerSettings.scopes.managed"),
-                    }) })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedProviderBillingHint ? (
-              <span className="text-[11px] text-muted-foreground">
-                {selectedProviderBillingHint}
-              </span>
-            ) : null}
-            {providerStatus && !selectedProvider ? (
-              <span className="text-[11px] text-muted-foreground">{providerStatus}</span>
-            ) : null}
-            {selectedProviderIsOwnedUserConfig && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={openEditProviderDialog}
-                  disabled={deletingProvider}
-                >
-                  <Pencil className="size-4" />
-                  {t("providerSettings.edit")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={deleteSelectedProvider}
-                  disabled={deletingProvider}
-                >
-                  {deletingProvider ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-4" />
-                  )}
-                  {t("providerSettings.delete")}
-                </Button>
-              </div>
-            )}
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="managed-default-model">{t("providerSettings.defaultModel")}</Label>
-            {selectedProvider ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="managed-provider-config">{t("providerSettings.managedConfig")}</Label>
               <Select
-                value={resolvedDefaultModel}
-                onValueChange={(value) => update("defaultModel", value)}
-                disabled={selectedProviderModels.length === 0}
+                value={settings.providerConfigId || "__none__"}
+                onValueChange={(value) => {
+                  const providerConfigId = value === "__none__" ? "" : value;
+                  const config = providerConfigs.find((item) => item.id === providerConfigId);
+                  setSettings((current) => ({
+                    ...current,
+                    providerConfigId,
+                    providerModelCapabilities: providerConfigId
+                      ? getProviderModelCapabilities(config)
+                      : {},
+                    providerModelOptions: providerConfigId ? getProviderAllowedModels(config) : [],
+                    providerLabel: providerConfigId ? getProviderLabel(config) : "",
+                    providerDefaultModelSeededFor: providerConfigId ? providerConfigId : "",
+                    defaultModel: providerConfigId
+                      ? resolveProviderModel(
+                          config,
+                          current.providerConfigId === providerConfigId
+                            ? current.defaultModel
+                            : config?.defaultModel ?? "",
+                        )
+                      : "",
+                  }));
+                }}
+                disabled={providerLoading || providerConfigs.length === 0}
               >
                 <SelectTrigger
-                  id="managed-default-model"
-                  aria-label={t("providerSettings.defaultModel")}
+                  id="managed-provider-config"
+                  aria-label={t("providerSettings.managedConfig")}
                   className="h-9"
                 >
-                  <SelectValue placeholder={t("providerSettings.selectAllowedModel")} />
+                  <SelectValue placeholder={providerEmptyLabel} />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedProviderModels.map((model) => (
-                    <SelectItem key={model} value={model}>
-                      {model}
+                  <SelectItem value="__none__" disabled>
+                    {providerEmptyLabel}
+                  </SelectItem>
+                  {providerConfigs.map((config) => (
+                    <SelectItem key={config.id} value={config.id}>
+                      {t("providerSettings.configLabel", { name: config.name, scope: providerScopeLabel(config, {
+                        user: t("providerSettings.scopes.user"),
+                        system: t("providerSettings.scopes.system"),
+                        project: t("providerSettings.scopes.project"),
+                        managed: t("providerSettings.scopes.managed"),
+                      }) })}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            ) : (
-              <Select value="__none__" disabled>
-                <SelectTrigger
-                  id="managed-default-model"
-                  aria-label={t("providerSettings.defaultModel")}
-                  className="h-9"
+              {selectedProviderBillingHint ? (
+                <span className="text-[11px] text-muted-foreground">
+                  {selectedProviderBillingHint}
+                </span>
+              ) : null}
+              {providerStatus && !selectedProvider ? (
+                <span className="text-[11px] text-muted-foreground">{providerStatus}</span>
+              ) : null}
+              {selectedProviderIsOwnedUserConfig && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={openEditProviderDialog}
+                    disabled={deletingProvider}
+                  >
+                    <Pencil className="size-4" />
+                    {t("providerSettings.edit")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={deleteSelectedProvider}
+                    disabled={deletingProvider}
+                  >
+                    {deletingProvider ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="size-4" />
+                    )}
+                    {t("providerSettings.delete")}
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="managed-default-model">{t("providerSettings.defaultModel")}</Label>
+              {selectedProvider ? (
+                <Select
+                  value={resolvedDefaultModel}
+                  onValueChange={(value) => update("defaultModel", value)}
+                  disabled={selectedProviderModels.length === 0}
                 >
-                  <SelectValue placeholder={t("providerSettings.selectProviderFirst")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">{t("providerSettings.selectProviderFirst")}</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            {selectedProvider && selectedProviderModels.length === 0 && (
-              <span className="text-[11px] text-warning">
-                {t("providerSettings.providerNoModelsHint")}
-              </span>
-            )}
-            {!selectedProvider && (
-              <span className="text-[11px] text-muted-foreground">
-                {t("providerSettings.providerFirstHint")}
-              </span>
-            )}
+                  <SelectTrigger
+                    id="managed-default-model"
+                    aria-label={t("providerSettings.defaultModel")}
+                    className="h-9"
+                  >
+                    <SelectValue placeholder={t("providerSettings.selectAllowedModel")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedProviderModels.map((model) => (
+                      <SelectItem key={model} value={model}>
+                        {model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select value="__none__" disabled>
+                  <SelectTrigger
+                    id="managed-default-model"
+                    aria-label={t("providerSettings.defaultModel")}
+                    className="h-9"
+                  >
+                    <SelectValue placeholder={t("providerSettings.selectProviderFirst")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t("providerSettings.selectProviderFirst")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              {selectedProvider && selectedProviderModels.length === 0 && (
+                <span className="text-[11px] text-warning">
+                  {t("providerSettings.providerNoModelsHint")}
+                </span>
+              )}
+            </div>
           </div>
-        </section>
+        </Card>
 
-        <section className="space-y-4 rounded-lg border border-border bg-muted/40 p-4">
+        <Card as="section" className="space-y-4 p-4">
           <div>
             <h3 className="text-sm font-semibold">{t("providerSettings.preferences")}</h3>
             <p className="text-xs text-muted-foreground">{t("providerSettings.preferencesDescription")}</p>
@@ -817,25 +825,6 @@ export function GlobalSettingsPanel({
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-col">
-              <Label>{t("providerSettings.fontSize")}</Label>
-              <span className="text-xs text-muted-foreground">{t("providerSettings.densityHint")}</span>
-            </div>
-            <Select
-              value={settings.fontSize}
-              onValueChange={(value: "sm" | "md" | "lg") => update("fontSize", value)}
-            >
-              <SelectTrigger className="h-8 w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sm">{t("providerSettings.compact")}</SelectItem>
-                <SelectItem value="md">{t("providerSettings.default")}</SelectItem>
-                <SelectItem value="lg">{t("providerSettings.comfortable")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex flex-col">
               <Label>{t("providerSettings.autoRules")}</Label>
               <span className="text-xs text-muted-foreground">{t("providerSettings.autoRulesHint")}</span>
             </div>
@@ -848,10 +837,10 @@ export function GlobalSettingsPanel({
             </div>
             <Switch checked={settings.showStaleBanner} onCheckedChange={(value) => update("showStaleBanner", value)} />
           </div>
-        </section>
+        </Card>
       </div>
 
-      <ScaledToolbar className="mt-5" contentClassName="justify-end" minWidth={360}>
+      <div className="flex flex-wrap items-center justify-between gap-2 justify-end mt-5">
         <Button variant="ghost" onClick={reset}>
           <RotateCw className="size-4" />
           {t("providerSettings.restore")}
@@ -860,10 +849,10 @@ export function GlobalSettingsPanel({
           <KeyRound className="size-4" />
           {t("providerSettings.save")}
         </Button>
-      </ScaledToolbar>
+      </div>
 
       <Dialog open={providerDialogOpen} onOpenChange={handleProviderDialogOpenChange}>
-        <DialogContent className="max-w-[720px]">
+        <DialogContent data-form-layout="4" className="max-w-[720px]">
           <DialogHeader>
             <DialogTitle>{providerDialogMode === "edit" ? t("providerSettings.editProvider") : t("providerSettings.createProvider")}</DialogTitle>
             <DialogDescription>
@@ -872,7 +861,7 @@ export function GlobalSettingsPanel({
                 : t("providerSettings.createDescription")}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4">
+          <div className="grid gap-4 rounded-xl border border-border bg-muted/10 p-4 sm:p-5">
             <div className="grid gap-1.5">
               <Label htmlFor="provider-create-name">{t("providerSettings.name")}</Label>
               <Input
@@ -946,19 +935,7 @@ export function GlobalSettingsPanel({
               </Select>
               {(discoveringModels || discoveryProgressText) && (
                 <div className="grid gap-1">
-                  <div
-                    className="h-1.5 overflow-hidden rounded-full bg-muted"
-                    role="progressbar"
-                    aria-label={t("providerSettings.discoveryProgress")}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={discoveryProgressValue}
-                  >
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: `${discoveryProgressValue}%` }}
-                    />
-                  </div>
+                  <Progress value={discoveryProgressValue} aria-label={t("providerSettings.discoveryProgress")} />
                   <span className="text-[11px] text-muted-foreground">
                     {discoveryProgressText}
                   </span>

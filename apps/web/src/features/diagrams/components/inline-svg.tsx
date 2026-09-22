@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Alert } from '../../../shared/ui/alert';
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { i18n as appI18n } from "../../../shared/i18n/i18n";
@@ -138,9 +139,9 @@ export function InlineSvg({
   }
   if (error) {
     return (
-      <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+      <Alert variant="destructive" className="border p-4 text-sm">
         {t("diagrams.detail.renderFailed", { error })}
-      </div>
+      </Alert>
     );
   }
 

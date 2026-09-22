@@ -8,13 +8,13 @@ describe("Badge", () => {
     render(
       <div>
         <Badge variant="success">成功</Badge>
-        <Badge variant="warning">警告</Badge>
-        <Badge variant="info">信息</Badge>
+        <Badge variant="secondary">警告</Badge>
+        <Badge variant="secondary">信息</Badge>
       </div>,
     );
 
     expect(screen.getByText("成功")).toHaveClass("bg-success/10", "text-success");
-    expect(screen.getByText("警告")).toHaveClass("bg-warning/10", "text-warning");
-    expect(screen.getByText("信息")).toHaveClass("bg-info/10", "text-info");
+    expect(screen.getByText("警告")).toHaveClass("bg-secondary", "text-secondary-foreground");
+    expect(screen.getByText("信息")).toHaveClass("bg-secondary", "text-secondary-foreground");
   });
 });

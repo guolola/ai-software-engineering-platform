@@ -1,10 +1,10 @@
 // Orchestrates document text, diagram image rendering, and DOCX export for document runs.
 
+import { createRunLlmChunkHandlers } from "./shared/llm-chunk-events.js";
 import {
   artifactReadyRunEventSchema,
   completedRunEventSchema,
   documentContentResultSchema,
-  llmChunkRunEventSchema,
   stageProgressRunEventSchema,
   stageStartedRunEventSchema,
   type DocumentRunSnapshot,
@@ -85,16 +85,7 @@ async function generateDocumentSectionsWithRepair(
       llmTransport,
       providerSettings,
       createMessages(prompt),
-      (chunk) => {
-        emitEvent(
-          record,
-          llmChunkRunEventSchema.parse({
-            type: "llm_chunk",
-            stage: "generate_document_text",
-            chunk,
-          }),
-        );
-      },
+      createRunLlmChunkHandlers({ record, stage: "generate_document_text" }),
       responseFormat,
     );
     previousOutput = content;
@@ -190,6 +181,7 @@ export async function runDocumentStagePipeline(
   providerSettings: ProviderSettings,
   llmTransport: LlmTransport,
   pngRenderClient: PngRenderClient,
+  onPreparedStage?: (stage: RunStage) => Promise<void>,
 ) {
   const snapshot = record.snapshot as DocumentRunSnapshot;
   snapshot.feasibilityImplementationPlan = input.feasibilityImplementationPlan;
@@ -227,8 +219,12 @@ export async function runDocumentStagePipeline(
   sections = ensureDocumentDiagramSections(input.documentKind, sections);
   sections = sanitizeDocumentSections(input, sections);
   snapshot.sections = sections;
+  // Demo observers describe the actual prepared sections; real runs omit this hook.
+  await onPreparedStage?.("generate_document_text");
 
   updateStage("render_document_file", "正在写入说明书文件");
+  await onPreparedStage?.("render_document_file");
+  throwIfRunCancelled(record);
   const missingArtifacts: string[] = [];
   const buffer = await renderDocumentBuffer(
     input.documentKind,

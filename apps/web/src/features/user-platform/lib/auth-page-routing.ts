@@ -9,7 +9,23 @@ export function getSafeRedirectPath() {
   if (redirect.startsWith("/") && !redirect.startsWith("//")) {
     return redirect;
   }
-  return "/projects";
+  return "/dashboard";
+}
+
+export type LoginRedirectReason =
+  | "login-required"
+  | "session-expired"
+  | "session-check-failed";
+
+export function buildLoginRedirectPath(
+  redirect: string,
+  reason: LoginRedirectReason,
+) {
+  const safeRedirect = redirect.startsWith("/") && !redirect.startsWith("//")
+    ? redirect
+    : "/dashboard";
+  const search = new URLSearchParams({ redirect: safeRedirect, reason });
+  return `/login?${search.toString()}`;
 }
 
 export function localizeAuthMessage(message: string) {

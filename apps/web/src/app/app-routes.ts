@@ -14,13 +14,7 @@ export type {
 } from "../shared/lib/app-route-types";
 
 const SHELL_PATHS = new Set<ShellRoutePath>(["/workspace", "/exam", "/tutorial"]);
-const MARKETING_PATHS = new Set<MarketingRoutePath>([
-  "/",
-  "/features",
-  "/workflow",
-  "/cases",
-  "/pricing",
-]);
+const MARKETING_PATHS = new Set<MarketingRoutePath>(["/"]);
 const AUTH_PATHS = new Set<AuthRoutePath>([
   "/login",
   "/register",
@@ -60,6 +54,7 @@ export function matchAppRoute(pathname: string): AppRoute {
     return { kind: "legacy-redirect", path: pathname, to: "/projects" };
   }
 
+  if (pathname === "/dashboard") return { kind: "dashboard", path: "/dashboard" };
   if (pathname === "/projects") return { kind: "projects-index", path: "/projects" };
   if (pathname === "/projects/new") return { kind: "projects-new", path: "/projects/new" };
   const projectMatch = pathname.match(

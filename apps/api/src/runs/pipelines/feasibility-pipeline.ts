@@ -1,8 +1,8 @@
 // Runs model-backed feasibility stages with capability routing and section-scoped repair.
+import { createRunLlmChunkHandlers } from "./shared/llm-chunk-events.js";
 import {
   artifactReadyRunEventSchema,
   completedRunEventSchema,
-  llmChunkRunEventSchema,
   snapshotInputFingerprint,
   stageProgressRunEventSchema,
   stageStartedRunEventSchema,
@@ -354,11 +354,7 @@ async function generateFeasibilityJson<T>(input: {
           },
           { role: "user", content: prompt },
         ],
-        (chunk) => emitEvent(input.record, llmChunkRunEventSchema.parse({
-          type: "llm_chunk",
-          stage: input.stage,
-          chunk,
-        })),
+        createRunLlmChunkHandlers({ record: input.record, stage: input.stage }),
         responseFormatFor(input.promptStage, input.diagnostics),
         undefined,
         fallback,
@@ -472,11 +468,7 @@ async function generateFeasibilityJson<T>(input: {
               },
               { role: "user", content: sectionPrompt },
             ],
-            (chunk) => emitEvent(input.record, llmChunkRunEventSchema.parse({
-              type: "llm_chunk",
-              stage: input.stage,
-              chunk,
-            })),
+            createRunLlmChunkHandlers({ record: input.record, stage: input.stage }),
             sectionResponseFormatFor(issue.section, input.diagnostics),
             undefined,
             fallback,
