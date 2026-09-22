@@ -5,13 +5,45 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      preflight_only:
+        description: Check existing Nginx permissions without deploying or restarting services
+        type: boolean
+        default: false
 
 concurrency:
-  group: deploy-production
+  group: deploy-production${{ inputs.preflight_only && '-preflight' || '' }}
   cancel-in-progress: true
 
 jobs:
+  nginx-access:
+    if: github.event_name == 'workflow_dispatch' && inputs.preflight_only
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check existing server permissions (read-only)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/www/wwwroot/uml-platform' }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_HOST" && test -n "$DEPLOY_USER" && test -n "$DEPLOY_SSH_KEY"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -T 20 -p "$DEPLOY_PORT" "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          ssh -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=yes \
+            -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash -s -- '$DEPLOY_PATH'" < scripts/deploy/check-nginx-access.sh
+
   deploy:
+    if: github.event_name != 'workflow_dispatch' || !inputs.preflight_only
     runs-on: ubuntu-latest
     services:
       postgres:

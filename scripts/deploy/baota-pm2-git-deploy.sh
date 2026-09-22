@@ -74,6 +74,20 @@ command -v dot >/dev/null || {
   exit 1
 }
 
+run_nginx_routing() {
+  local nginx_bin
+  nginx_bin="$(command -v "${NGINX_BIN:-nginx}")" || {
+    echo "nginx is required for routing preflight" >&2
+    return 1
+  }
+  local routing_command=("$(command -v node)" "$SOURCE_DIR/scripts/deploy/nginx-marketing-routes.mjs")
+  # Only Nginx configuration needs root. Builds, secrets and PM2 stay owned by the deploy user.
+  if [[ "$EUID" -ne 0 ]]; then
+    routing_command=(sudo -n -- "${routing_command[@]}")
+  fi
+  "${routing_command[@]}" "$@" --nginx-bin "$nginx_bin"
+}
+
 mkdir -p "$DEPLOY_PATH/releases" "$DEPLOY_PATH/incoming" "$DEPLOY_PATH/shared"
 
 RELEASE_DIR="$DEPLOY_PATH/releases/$RELEASE_SHA"
@@ -420,8 +434,11 @@ reload_pm2_for_release() {
 
 rollback_to_previous_release() {
   # Restore the matching routing configuration before serving the previous app.
-  node "$SOURCE_DIR/scripts/deploy/nginx-marketing-routes.mjs" restore \
-    "$RELEASE_DIR/nginx-routing-backup.json" || return 1
+  local routing_status=0
+  run_nginx_routing restore "$RELEASE_DIR/nginx-routing-backup.json" || routing_status=$?
+  if [[ "$routing_status" -ne 0 ]]; then
+    echo "Routing recovery failed; restoring the previous application still takes priority" >&2
+  fi
   if [[ -z "$PREVIOUS_RELEASE" || ! -d "$PREVIOUS_RELEASE" ]]; then
     echo "No previous release is available for rollback" >&2
     return 1
@@ -431,7 +448,8 @@ rollback_to_previous_release() {
   previous_sha="$(basename "$PREVIOUS_RELEASE")"
   echo "Rolling back to previous release: $previous_sha"
   ln -sfnT "$PREVIOUS_RELEASE" "$DEPLOY_PATH/current"
-  reload_pm2_for_release "$PREVIOUS_RELEASE" "$previous_sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
+  reload_pm2_for_release "$PREVIOUS_RELEASE" "$previous_sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" || return 1
+  return "$routing_status"
 }
 
 cleanup_old_releases() {
@@ -460,6 +478,14 @@ cleanup_old_releases() {
 }
 
 trap cleanup_tmp_dir EXIT
+
+# Fail before building or switching the current release if routing or privileges are unsuitable.
+if ! run_timed "Nginx routing preflight" \
+  run_nginx_routing check "$DEPLOY_PATH/current/apps/web/dist"; then
+  echo "Nginx preflight failed. A root deploy account or existing noninteractive sudo access is required." >&2
+  echo "Production was not switched. Ask the server administrator to verify Nginx access and routing." >&2
+  exit 1
+fi
 
 echo "Disk usage before deploy:"
 df -h "$DEPLOY_PATH" /tmp || true
@@ -506,7 +532,7 @@ if ! run_timed "PM2 reload and release verification" \
 fi
 
 if ! run_timed "migrate retired marketing routes" \
-  node "$SOURCE_DIR/scripts/deploy/nginx-marketing-routes.mjs" apply \
+  run_nginx_routing apply \
     "$RELEASE_DIR/nginx-routing-backup.json" "$DEPLOY_PATH/current/apps/web/dist"; then
   echo "Nginx route migration failed; restoring previous release" >&2
   rollback_to_previous_release
