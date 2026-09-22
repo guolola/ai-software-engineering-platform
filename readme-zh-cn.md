@@ -87,31 +87,15 @@
 
 ## 界面预览
 
-<p align="center"><strong>当前 v2 工作区亮色界面</strong></p>
+<p align="center"><strong>当前 v2 官网首页与项目仪表盘亮色界面</strong></p>
+
+### 🌐 官网首页
+
+![官网首页 — 桌面首屏](docs/images/readme-homepage.png)
 
 ### 📊 项目仪表盘
 
 ![项目仪表盘](apps/web/public/marketing/generated/workbench-dashboard-light.png)
-
-### 🧭 工作区导航
-
-![工作区导航](apps/web/public/help/images/workbench-sidebar.png)
-
-### 📋 工程数据表格
-
-![工程数据表格](apps/web/public/help/images/workbench-table.png)
-
-### 🗓️ 项目时间线
-
-![项目时间线](apps/web/public/help/images/workbench-timeline.png)
-
-### 📈 转化概览
-
-![转化概览](apps/web/public/help/images/workbench-conversion.png)
-
-### ⚡ 性能概览
-
-![性能概览](apps/web/public/help/images/workbench-performance.png)
 
 ## 技术架构
 
