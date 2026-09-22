@@ -44,6 +44,8 @@ v2 只保留单页营销首页，旧的 `/features`、`/workflow`、`/cases` 和
 
 不要把生产环境文件、服务器地址、账号或私钥提交到 Git。
 
+部署权限排查可在 `Deploy to BaoTa PM2` 的手动运行界面选择 `preflight_only`。该模式仅检查部署账号现有的 Nginx 校验与非交互式 sudo 权限，不修改配置、切换 release 或重启服务，也不会授予新权限；它与生产部署使用独立的并发组。
+
 ## 验证
 
 ```bash
