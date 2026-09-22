@@ -1,6 +1,6 @@
 // Migrates only this app's retired marketing routes, preserving site-specific TLS and proxy settings.
 import { execFileSync } from "node:child_process";
-import { readFileSync, realpathSync, writeFileSync, existsSync } from "node:fs";
+import { accessSync, constants, readFileSync, realpathSync, writeFileSync, existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const redirect = /location\s+~\s+\^\/\(features\|workflow\|cases\|pricing\)\/\$\s*\{\s*return\s+301\s+\/\$1;\s*\}/g;
@@ -34,6 +34,19 @@ function nginx(...args) {
   return execFileSync(process.env.NGINX_BIN || "nginx", args, { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
 }
 
+export function checkRouting(webRoot, runNginx = nginx) {
+  if (!webRoot?.startsWith("/") || !webRoot.endsWith("/current/apps/web/dist")) {
+    throw new Error("A release-specific absolute web root is required.");
+  }
+  const configs = findSiteConfigs(runNginx("-T"), webRoot);
+  if (configs.length !== 1) throw new Error(`Expected one active app site configuration, found ${configs.length}.`);
+  const configPath = configs[0];
+  const original = readFileSync(configPath, "utf8");
+  const migrated = migrateMarketingRoutes(original);
+  if (original !== migrated) accessSync(configPath, constants.W_OK);
+  return { configPath, original, migrated };
+}
+
 export function restoreRouting(backupPath, runNginx = nginx) {
   if (!existsSync(backupPath)) return;
   const { configPath, original, migrated } = JSON.parse(readFileSync(backupPath, "utf8"));
@@ -48,14 +61,7 @@ export function restoreRouting(backupPath, runNginx = nginx) {
 }
 
 export function applyRouting(backupPath, webRoot, runNginx = nginx) {
-  if (!webRoot?.startsWith("/") || !webRoot.endsWith("/current/apps/web/dist")) {
-    throw new Error("A release-specific absolute web root is required.");
-  }
-  const configs = findSiteConfigs(runNginx("-T"), webRoot);
-  if (configs.length !== 1) throw new Error(`Expected one active app site configuration, found ${configs.length}.`);
-  const configPath = configs[0];
-  const original = readFileSync(configPath, "utf8");
-  const migrated = migrateMarketingRoutes(original);
+  const { configPath, original, migrated } = checkRouting(webRoot, runNginx);
   if (original === migrated) {
     console.log("Retired marketing routes already return 404.");
     return;
@@ -74,9 +80,20 @@ export function applyRouting(backupPath, webRoot, runNginx = nginx) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [command, backupPath, webRoot] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  // Pass the resolved executable explicitly across sudo's sanitized environment.
+  if (args.at(-2) === "--nginx-bin") {
+    process.env.NGINX_BIN = args.pop();
+    args.pop();
+  }
+  const [command, backupPath, webRoot] = args;
+  if (command === "check") {
+    checkRouting(backupPath);
+    console.log("Nginx routing preflight passed; no configuration or service was changed.");
+    process.exit(0);
+  }
   if (!backupPath) throw new Error("A routing backup path is required.");
   if (command === "apply") applyRouting(backupPath, webRoot);
   else if (command === "restore") restoreRouting(backupPath);
-  else throw new Error("Expected apply or restore.");
+  else throw new Error("Expected check, apply or restore.");
 }

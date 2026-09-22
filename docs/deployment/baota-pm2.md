@@ -34,6 +34,8 @@
 
 v2 只保留单页营销首页，旧的 `/features`、`/workflow`、`/cases` 和 `/pricing` 返回 404。部署脚本通过 `nginx -T` 定位唯一匹配当前 Web 根目录的站点，只迁移已知的旧营销路由块，保留 TLS 与代理配置。原配置备份到 release 目录的 `nginx-routing-backup.json`，通过 `nginx -t` 后才重载；健康或 SEO 检查失败时同时恢复应用和路由配置。非标准配置会停止部署，需人工核对；可用 `NGINX_BIN` 指定 Nginx 可执行文件。
 
+在构建与切换 `current` 前，脚本先只读预检站点匹配、路由形态和配置写权限。Nginx 迁移由 root 执行；非 root 部署账号仅通过已有的 `sudo -n` 权限执行路由 helper，构建、环境变量加载和 PM2 仍由原部署账号执行。脚本不修改 sudoers 或证书权限，也不请求密码；权限不足会提前停止并保留线上版本。路由恢复失败不会阻止应用回滚，但部署仍报告失败，需人工处理配置。
+
 ## 操作与维护
 
 1. 在服务器准备 Node.js 22、Java 21、Graphviz、PM2、PostgreSQL、Redis 和 Nginx。
