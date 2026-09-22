@@ -87,31 +87,15 @@ The platform is intended for coursework, conventional business systems, and prot
 
 ## Interface Preview
 
-<p align="center"><strong>Current v2 workspace views in light mode</strong></p>
+<p align="center"><strong>Current v2 homepage and project dashboard in light mode</strong></p>
+
+### 🌐 Official homepage
+
+![Official homepage — desktop first screen](docs/images/readme-homepage.png)
 
 ### 📊 Project dashboard
 
 ![Project dashboard](apps/web/public/marketing/generated/workbench-dashboard-light.png)
-
-### 🧭 Workspace navigation
-
-![Workspace navigation](apps/web/public/help/images/workbench-sidebar.png)
-
-### 📋 Engineering data table
-
-![Engineering data table](apps/web/public/help/images/workbench-table.png)
-
-### 🗓️ Project timeline
-
-![Project timeline](apps/web/public/help/images/workbench-timeline.png)
-
-### 📈 Conversion overview
-
-![Conversion overview](apps/web/public/help/images/workbench-conversion.png)
-
-### ⚡ Performance overview
-
-![Performance overview](apps/web/public/help/images/workbench-performance.png)
 
 ## Architecture
 
