@@ -4,7 +4,7 @@ import { SidebarTrigger, useSidebar } from '../../ui/sidebar';
 import { Separator } from '../../ui/separator';
 
 export function AdmincnHeader({ navigation, actions, showSidebar = true }: { navigation: ReactNode; actions: ReactNode; showSidebar?: boolean }) {
-  const { isMobile, state } = useSidebar();
+  const { isMobile, state, isResizing } = useSidebar();
   const sidebarOffset = isMobile
     ? '0px'
     : state === 'collapsed'
@@ -16,7 +16,7 @@ export function AdmincnHeader({ navigation, actions, showSidebar = true }: { nav
       style={{ left: sidebarOffset }}
       // Vaul hides the body scrollbar while a drawer is open. Its companion
       // class keeps fixed right-aligned elements anchored to the same edge.
-      className="right-scroll-bar-position fixed right-0 top-0 z-50 mx-auto h-[53px] w-auto max-w-360 px-4 pt-2 transition-[left] duration-200 sm:px-6"
+      className={`right-scroll-bar-position fixed right-0 top-0 z-50 mx-auto h-[53px] w-auto max-w-360 px-4 pt-2 sm:px-6 ${isResizing ? 'transition-none' : 'transition-[left] duration-200'}`}
     >
       <div className="relative z-51 flex h-full w-full items-center justify-between rounded-xl border bg-card/82 px-4 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/72 sm:px-6">
         <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-4">

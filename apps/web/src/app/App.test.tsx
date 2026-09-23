@@ -1590,6 +1590,7 @@ describe("App shell routes", () => {
     window.history.pushState({}, "", "/projects/library-booking");
     render(withWorkspaceProviders(<Shell />, createRepository()));
     expect(await screen.findByText("项目导航")).toBeInTheDocument();
+    expect(screen.getByRole("separator", { name: "拖拽调整项目菜单宽度" })).toBeInTheDocument();
 
     window.history.pushState({}, "", "/tutorial");
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -1598,6 +1599,7 @@ describe("App shell routes", () => {
       expect(screen.getByRole("heading", { name: "快速开始" })).toBeInTheDocument();
     });
     expect(screen.queryByText("项目导航")).not.toBeInTheDocument();
+    expect(screen.queryByRole("separator", { name: "拖拽调整项目菜单宽度" })).not.toBeInTheDocument();
   });
 
   it("matches first-round user platform routes", () => {

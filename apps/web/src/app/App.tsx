@@ -3,7 +3,7 @@ import { SidebarBrand } from "../shared/template/layout/sidebar-brand";
 import { PageContainer } from "../shared/template/layout/page";
 import { PlatformSidebar } from '../features/workspace-shell/components/platform-sidebar';
 import React, { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, useSidebar } from '../shared/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarResizeHandle, useSidebar } from '../shared/ui/sidebar';
 import { ScrollArea } from '../shared/ui/scroll-area';
 import { TooltipProvider } from '../shared/ui/tooltip';
 import Error404 from '../shared/template/views/pages/misc/error-page-404';
@@ -363,6 +363,7 @@ function ProjectWorkspaceShell({
       <Sidebar collapsible="icon">
         <SidebarBrand />
         <SidebarContent><SidebarMenu projectRuns={projectRuns} onNavigateItemSelect={() => setOpenMobile(false)} /></SidebarContent>
+        <SidebarResizeHandle label={t("workspace.sidebar.resize")} />
       </Sidebar>
       <SidebarInset className="h-svh min-w-0 overflow-hidden">
         {React.isValidElement(header)
@@ -554,7 +555,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
 
   return (
     <FloatingAlertProvider>
-    <SidebarProvider className={route.kind === 'marketing-home' || route.kind === 'not-found' ? 'block min-h-screen w-full' : 'flex min-h-svh w-full flex-col bg-background text-foreground'}>
+    <SidebarProvider resizable={route.kind === 'project-workspace'} className={route.kind === 'marketing-home' || route.kind === 'not-found' ? 'block min-h-screen w-full' : 'flex min-h-svh w-full flex-col bg-background text-foreground'}>
       <PageErrorBoundary resetKey={route.path}>
       {protectedRoutePath ? (
         <AuthenticatedRoute

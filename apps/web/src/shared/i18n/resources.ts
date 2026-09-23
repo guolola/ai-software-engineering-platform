@@ -537,6 +537,7 @@ export const resources = {
         placeholder: "在左侧选择一项以开始编辑「{{title}}」",
         sidebar: {
           navigation: "项目导航",
+          resize: "拖拽调整项目菜单宽度",
           contextDiagram: "系统环境图",
           traceability: "跟踪矩阵",
           implementation: "实现方案",
@@ -2043,6 +2044,7 @@ export const resources = {
         placeholder: "Select an item in the sidebar to start editing {{title}}",
         sidebar: {
           navigation: "Project navigation",
+          resize: "Drag to resize the project menu",
           contextDiagram: "System Environment Diagram",
           traceability: "Traceability matrix",
           implementation: "Technical Proposed Solution",
