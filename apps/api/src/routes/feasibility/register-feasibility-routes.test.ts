@@ -207,6 +207,11 @@ test("persists the run before syncing context and implementation from the select
     .filter((event) => event.type === "stage_started")
     .map((event) => "stage" in event ? event.stage : null);
   assert.deepEqual(generationStages, ["generate_context", "render_context", "generate_business_flow", "render_business_flow", "generate_implementation"]);
+  const lifecycleEvents = runs.get(snapshot.runId)!.events.filter((event) =>
+    event.type === "stage_started" || event.type === "stage_finished",
+  );
+  assert.deepEqual(lifecycleEvents.map((event) => `${event.type}:${event.stage}`),
+    generationStages.flatMap((stage) => [`stage_started:${stage}`, `stage_finished:${stage}`]));
   assert.ok(snapshot.businessFlow?.model.swimlanes.length);
   assert.equal(snapshot.contextModel.relationships.length, 1);
   assert.equal(snapshot.implementationPlan.candidates.length, 2);

@@ -11,6 +11,34 @@ const activity = (id: string, callId: string, phase: RunActivityEvent["phase"], 
 });
 
 describe("generation transcript", () => {
+  it("shows client rule repair after extraction without exposing the empty model phase", () => {
+    const events: RunEvent[] = [
+      { type: "stage_started", stage: "extract_rules", tracksCompletion: true },
+      { type: "stage_finished", stage: "extract_rules", status: "completed" },
+      { type: "stage_started", stage: "generate_models" },
+      { type: "stage_finished", stage: "generate_models", status: "completed" },
+      { type: "completed", snapshot: createRunSnapshot({ selectedDiagrams: [], status: "completed" }) },
+    ];
+    const extraction = { id: "extract_rules", label: "抽取需求规则", status: "completed" as const, message: null, errorMessage: null };
+    const repair = { id: "repair_rules", label: "修复需求规则", status: "repairing" as const, message: "正在修复 r2", errorMessage: null };
+    const active = projectGenerationTranscript(events, "completed", [extraction, repair]);
+    expect(active.visibleSteps.map((step) => step.title)).toEqual(["抽取需求规则", "修复需求规则"]);
+    expect(active.status).toBe("running");
+    const done = projectGenerationTranscript(events, "completed", [extraction, { ...repair, status: "pending_review", pendingReviewCount: 1 }]);
+    expect(done.status).toBe("completed");
+    expect(done.visibleSteps[1].calls[0].message).toContain("1 条需求规则修复结果待确认");
+  });
+
+  it("reveals each sequential feasibility stage as soon as its successor starts", () => {
+    const stages = ["generate_context", "render_context", "generate_business_flow", "render_business_flow", "generate_implementation"] as const;
+    const events: RunEvent[] = [];
+    for (const stage of stages) {
+      events.push({ type: "stage_started", stage });
+      const result = projectGenerationTranscript(events);
+      expect(result.visibleSteps.map((step) => step.stage)).toEqual(stages.slice(0, events.length));
+      expect(result.visibleSteps.slice(0, -1).every((step) => step.finished)).toBe(true);
+    }
+  });
   it("switches from analysis to output while retaining the received thinking summary", () => {
     const events = [activity("start", "a", "started"), activity("think", "a", "thinking"), activity("summary", "a", "summary", "正在核对需求。")];
     expect(projectGenerationTranscript(events).steps[0].calls[0].thinking).toBe(true);

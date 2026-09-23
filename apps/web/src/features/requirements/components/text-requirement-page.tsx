@@ -40,6 +40,11 @@ import {
 } from "../../../entities/requirement-rule/model";
 import { useWorkspaceSession } from "../../workspace-session/state";
 import {
+  clearRequirementRuleRequest,
+  pendingRequirementRuleRequest,
+  PROJECT_REQUIREMENT_RULE_REQUEST_EVENT,
+} from "../../../shared/lib/app-navigation";
+import {
   buildRequirementModelRepairRecords,
   requirementDiagramsButtonLabel,
   requirementTargetBlockReason,
@@ -166,6 +171,22 @@ export function TextRequirementView({
   const [rulePageSize, setRulePageSize] = useState(REQUIREMENT_RULES_PER_PAGE);
   const [ruleCategoryFilter, setRuleCategoryFilter] =
     useState<RequirementRuleCategoryFilter>(ALL_RULE_CATEGORIES);
+
+  useEffect(() => {
+    if (view === "models") return;
+    const openRequestedRule = () => {
+      const ruleId = pendingRequirementRuleRequest();
+      if (!ruleId || !rules.some((rule) => rule.id === ruleId)) return;
+      clearRequirementRuleRequest(ruleId);
+      setRuleCategoryFilter(ALL_RULE_CATEGORIES);
+      setQuery(ruleId);
+      setCurrentRulePage(1);
+      setHintDetailRuleId(ruleId);
+    };
+    openRequestedRule();
+    window.addEventListener(PROJECT_REQUIREMENT_RULE_REQUEST_EVENT, openRequestedRule);
+    return () => window.removeEventListener(PROJECT_REQUIREMENT_RULE_REQUEST_EVENT, openRequestedRule);
+  }, [rules, view]);
 
   useEffect(() => {
     const syncSettings = () => {
@@ -298,7 +319,8 @@ export function TextRequirementView({
     const normalizedQuery = query.trim().toLowerCase();
     return rules.filter((rule) => {
       const matchesQuery =
-        !normalizedQuery || rule.text.toLowerCase().includes(normalizedQuery);
+        !normalizedQuery || rule.id.toLowerCase().includes(normalizedQuery) ||
+        rule.text.toLowerCase().includes(normalizedQuery);
       const matchesCategory =
         ruleCategoryFilter === ALL_RULE_CATEGORIES ||
         rule.category === ruleCategoryFilter;

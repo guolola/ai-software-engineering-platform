@@ -1438,8 +1438,9 @@ export function WorkspaceSessionProvider({
           if (clientTaskId) {
             updateGenerationTask(clientTaskId, (task) => ({
               ...task,
-              status: "completed",
+              status: repairFailedCount > 0 ? "failed" : "completed",
               progress: 100,
+              finishedAt: new Date().toISOString(),
               message:
                 repairFailedCount > 0
                   ? "需求规则修复有失败项"
@@ -1497,12 +1498,15 @@ export function WorkspaceSessionProvider({
               failure,
               runId: snapshot.runId,
               stageLabel: "需求规则",
+              requirementBaseline: snapshot.requirementBaseline,
             }),
           );
           notifyGenerationFailed(failure.message);
           return null;
         }
-        setRunUiState(completedRunUiState("生成完成"));
+        setRunUiState(repairFailedCount > 0
+          ? failedRunUiState("需求规则修复有失败项")
+          : completedRunUiState("生成完成"));
         const qualityHintCount =
           snapshot.requirementBaseline?.qualityReport.issues.length ?? 0;
         const diagramFailureCount = diagramErrorCount(snapshot);
@@ -1518,7 +1522,8 @@ export function WorkspaceSessionProvider({
             }),
           );
         }
-        notifyGenerationCompleted("requirements");
+        if (repairFailedCount > 0) notifyGenerationFailed("需求规则修复有失败项");
+        else notifyGenerationCompleted("requirements");
         if (
           baseInputFingerprint !==
           snapshotInputFingerprint({
@@ -1552,21 +1557,20 @@ export function WorkspaceSessionProvider({
             subtasks: !runId
               ? withStartupValidationFailure(task.subtasks, failure, detail)
               : mode.kind === "rules-only"
-                ? task.subtasks.map((subtask) =>
-                    subtask.id === "extract_rules"
-                      ? {
-                          ...subtask,
-                          status: "failed",
-                          message: "需求规则抽取失败",
-                          errorMessage: detail,
-                        }
-                      : subtask.id === "repair_rules"
-                        ? {
-                            ...subtask,
-                            message: "规则抽取失败，未执行修复",
-                          }
-                        : subtask,
-                  )
+                ? task.subtasks.map((subtask) => {
+                    const extractionCompleted = task.subtasks.some(
+                      (item) => item.id === "extract_rules" && item.status === "completed",
+                    );
+                    if (subtask.id === "extract_rules" && !extractionCompleted) {
+                      return { ...subtask, status: "failed", message: "需求规则抽取失败", errorMessage: detail };
+                    }
+                    if (subtask.id === "repair_rules") {
+                      return extractionCompleted
+                        ? { ...subtask, status: "failed", message: "需求规则修复失败", errorMessage: detail }
+                        : { ...subtask, message: "规则抽取失败，未执行修复" };
+                    }
+                    return subtask;
+                  })
                 : task.subtasks,
           }));
         }
@@ -1607,6 +1611,7 @@ export function WorkspaceSessionProvider({
               runId,
               stageLabel:
                 mode.kind === "rules-only" ? "需求规则" : "需求模型",
+              requirementBaseline,
             }),
           );
         }
@@ -1988,6 +1993,7 @@ export function WorkspaceSessionProvider({
               failure,
               runId,
               stageLabel: "设计模型",
+              requirementBaseline,
             }),
           );
         }
@@ -3066,6 +3072,7 @@ export function WorkspaceSessionProvider({
             failure,
             runId: null,
             stageLabel: "需求模型",
+            requirementBaseline: reviewResolution.baseline,
           }),
         );
         return;
@@ -3198,6 +3205,7 @@ export function WorkspaceSessionProvider({
             failure,
             runId: null,
             stageLabel: "设计模型",
+            requirementBaseline: reviewResolution.baseline,
           }),
         );
         return;

@@ -3596,7 +3596,7 @@ describe("WorkspaceSessionProvider", () => {
 
     expect(startRun).not.toHaveBeenCalled();
     expect(result.current.errorMessage).toBe(
-      "有 1 条需求规则修复结果仍待确认，确认后再继续生成。",
+      "有 1 条需求规则尚未确认，确认后再继续生成。 涉及规则：r1（REQ-001）。",
     );
 
     await act(async () => {
@@ -3782,10 +3782,10 @@ describe("WorkspaceSessionProvider", () => {
             severity: "warning",
             code: "missing-object",
             message: "缺少业务对象。",
-            blocksDownstream: true,
+            blocksDownstream: false,
           },
         ],
-        blockingIssueIds: ["issue-object"],
+        blockingIssueIds: [],
         reviewRequiredRequirementIds: ["REQ-001"],
       },
     });

@@ -90,7 +90,7 @@ export const feasibilityResourcesZh = {
     prerequisiteTitle: "可行性分析暂时无法生成",
   },
   artifact: {
-    businessFlow: "业务与系统流程图",
+    businessFlow: "业务流程图",
     businessFlowDescription: "根据已确认需求规则生成泳道活动图，区分人员操作与系统处理，展示核心流程、条件分支和规则来源。",
     context: "系统环境图",
     contextDescription: "中心系统、人员、外部系统与高层交互；包含跟踪矩阵、元素和关系详情。",
@@ -391,7 +391,7 @@ export const feasibilityResourcesEn: typeof feasibilityResourcesZh = {
   },
   artifact: {
     context: "System Environment Diagram",
-    businessFlow: "Business and System Flow",
+    businessFlow: "Business Flow Diagram",
     businessFlowDescription: "Generate a rule-driven activity diagram with lanes for people and systems, core workflows, conditions and requirement sources.",
     contextDescription: "The central system, people, external systems, and high-level interactions with traceability and details.",
     implementation: "Technical Proposed Solution",

@@ -39,6 +39,10 @@ const order: RunStage[] = [
   "verify_code_rendered_preview", "verify_code_business_assertions", "verify_code_preview", "repair_code_files",
   "generate_document_text", "render_document_file", "generate_context", "render_context", "generate_business_flow", "render_business_flow", "generate_implementation", "generate_tests",
 ];
+const feasibilityStages = new Set<RunStage>([
+  "generate_context", "render_context", "generate_business_flow",
+  "render_business_flow", "generate_implementation",
+]);
 const diagrams: Record<string, string> = {
   function: "功能模型", usecase: "用例图", class: "类图", activity: "活动图", deployment: "部署图",
   prototype: "界面模型", analysis: "需求分析模型", architecture: "架构图", sequence: "顺序图", component: "组件图", table: "数据表模型",
@@ -103,6 +107,11 @@ export function readableOutput(call: TranscriptCall) {
 }
 
 export function projectGenerationTranscript(events: RunEvent[], fallbackStatus = "running", subtasks: GenerationSubtask[] = []) {
+  const repairSubtask = subtasks.find((subtask) => subtask.id === "repair_rules");
+  const rulesOnly = Boolean(repairSubtask) || events.some((event) =>
+    event.type === "completed" && "selectedDiagrams" in event.snapshot &&
+    Array.isArray(event.snapshot.selectedDiagrams) && event.snapshot.selectedDiagrams.length === 0,
+  );
   const steps: TranscriptStep[] = [];
   const currentSteps = new Map<RunStage, TranscriptStep>();
   const startedOrder = new Map<TranscriptCall, number>();
@@ -140,6 +149,8 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
     if (event.eventId && seen.has(event.eventId)) continue;
     if (event.eventId) seen.add(event.eventId);
     if (completed) break;
+    // Empty diagram selections still emit an internal generate_models phase.
+    if (rulesOnly && "stage" in event && event.stage === "generate_models") continue;
     const at = event.createdAt;
     if (event.type === "run_activity") {
       const step = getStep(event.stage);
@@ -154,6 +165,23 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       continue;
     }
     if (event.type === "stage_started") {
+      // Older feasibility runs have no stage_finished events; the next sequential
+      // stage start is the completion boundary for the previous stage.
+      if (lastStage && lastStage !== event.stage &&
+          feasibilityStages.has(lastStage) && feasibilityStages.has(event.stage)) {
+        const previous = currentSteps.get(lastStage);
+        if (previous && !previous.finished) {
+          previous.finished = true;
+          previous.status = "completed";
+          for (const call of previous.calls) {
+            if (call.status === "running" || call.status === "queued") {
+              call.status = "completed";
+              call.finishedAt = at;
+              call.thinking = false;
+            }
+          }
+        }
+      }
       lastStage = event.stage;
       // A later verification/repair pass is a new step, rather than rewriting history.
       if (currentSteps.get(event.stage)?.finished && lifecycleStages.has(event.stage)) currentSteps.delete(event.stage);
@@ -282,12 +310,33 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       status = "failed";
     }
   }
+  if (repairSubtask && (currentSteps.get("extract_rules")?.finished || repairSubtask.status !== "queued")) {
+    const repairActive = ["queued", "running", "repairing", "rendering"].includes(repairSubtask.status);
+    if (repairActive) {
+      status = "running";
+      finalMessage = "";
+      completed = undefined;
+    }
+    const repairStatus: TranscriptStatus = repairActive ? "running" : repairSubtask.status as TranscriptStatus;
+    const call: TranscriptCall = {
+      id: "local:repair_rules", title: repairSubtask.label, status: repairStatus,
+      output: "", summary: "", thinking: false, technical: false,
+      message: repairSubtask.status === "pending_review"
+        ? `${repairSubtask.pendingReviewCount ?? 1} 条需求规则修复结果待确认`
+        : repairSubtask.errorMessage ?? repairSubtask.message ?? undefined,
+    };
+    steps.push({
+      id: "local:repair_rules", stage: "extract_rules", title: repairSubtask.label,
+      messages: [], calls: [call], entries: [{ kind: "call", id: call.id }],
+      status: repairStatus, finished: !repairActive,
+    });
+  }
   const terminal = !["queued", "running", "idle"].includes(status);
   for (const step of steps) {
     // Apply confirmed artifact/review state without showing unstarted placeholder steps.
     for (const subtask of currentSteps.get(step.stage) === step ? subtasks : []) {
       const prefix = `${step.stage}:`;
-      if (!subtask.id.startsWith(prefix) && subtask.id !== step.stage && !(step.stage === "extract_rules" && subtask.id === "repair_rules")) continue;
+      if (!subtask.id.startsWith(prefix) && subtask.id !== step.stage) continue;
       if (subtask.status === "queued" && !step.calls.some((call) => call.subtaskId === subtask.id.slice(prefix.length))) continue;
       const rawId = subtask.id.startsWith(prefix) ? subtask.id.slice(prefix.length) : subtask.id;
       const call = getCall(step, `${step.stage}:${rawId}`, undefined, rawId, subtask.label);

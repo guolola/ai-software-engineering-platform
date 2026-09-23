@@ -8,6 +8,7 @@ import {
   completedRunEventSchema,
   snapshotInputFingerprint,
   stageProgressRunEventSchema,
+  stageFinishedRunEventSchema,
   stageStartedRunEventSchema,
   type ContextDiagramSpec,
   type FeasibilityGenerationDiagnostics,
@@ -563,11 +564,19 @@ export async function runFeasibilityStagePipeline(
     repairs: [],
   };
   snapshot.generationDiagnostics = diagnostics;
+  let activeStage: RunStage | null = null;
   const updateStage = (stage: RunStage, message: string) => {
     throwIfRunCancelled(record);
+    // Feasibility stages are sequential: close the previous stage before exposing the next.
+    if (activeStage) {
+      emitEvent(record, stageFinishedRunEventSchema.parse({
+        type: "stage_finished", stage: activeStage, status: "completed",
+      }));
+    }
+    activeStage = stage;
     snapshot.currentStage = stage as FeasibilityRunSnapshot["currentStage"];
     snapshot.status = "running";
-    emitEvent(record, stageStartedRunEventSchema.parse({ type: "stage_started", stage }));
+    emitEvent(record, stageStartedRunEventSchema.parse({ type: "stage_started", stage, tracksCompletion: true }));
     emitEvent(record, stageProgressRunEventSchema.parse({
       type: "stage_progress",
       stage,
@@ -735,6 +744,11 @@ export async function runFeasibilityStagePipeline(
     }));
   }
 
+  if (activeStage) {
+    emitEvent(record, stageFinishedRunEventSchema.parse({
+      type: "stage_finished", stage: activeStage, status: "completed",
+    }));
+  }
   snapshot.currentStage = null;
   snapshot.status = "completed";
   snapshot.error = null;

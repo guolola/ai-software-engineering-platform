@@ -130,7 +130,7 @@ describe("SidebarMenu", () => {
     const repository = createSidebarRepository(createWorkspaceRecord({ rules: [createRule()], feasibilityBusinessFlow: createBusinessFlowArtifact() }));
     render(withWorkspaceProviders(<BusinessFlowNavigationProbe />, repository));
     await user.click(await screen.findByRole("button", { name: "展开 可行性分析" }));
-    await user.click(screen.getByRole("button", { name: "展开 业务与系统流程图" }));
+    await user.click(screen.getByRole("button", { name: "展开 业务流程图" }));
     await user.click(screen.getByRole("button", { name: "跟踪矩阵" }));
     expect(screen.getByTestId("flow-selection")).toHaveTextContent('"kind":"feasibility-business-flow-trace"');
     await user.click(screen.getByRole("button", { name: /^元素/ }));
@@ -191,7 +191,7 @@ describe("SidebarMenu", () => {
         .filter(Boolean),
     ).toEqual(["系统需求", "可行性分析", "需求模型", "设计模型", "代码", "测试", "说明书"]);
     expect(screen.queryByRole("button", { name: "展开 可行性分析" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "业务与系统流程图" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "业务流程图" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "系统环境图" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "实现方案" })).not.toBeInTheDocument();
   });
@@ -206,17 +206,17 @@ describe("SidebarMenu", () => {
     expect(screen.queryByRole("button", { name: "展开 可行性分析" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "保存流程图" }));
     await user.click(await screen.findByRole("button", { name: "展开 可行性分析" }));
-    expect(screen.getByRole("button", { name: "业务与系统流程图" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "业务流程图" })).toBeInTheDocument();
 
     const persisted = createWorkspaceRecord({ rules: [createRule()], feasibilityBusinessFlow: createBusinessFlowArtifact() });
     persisted.feasibilityBusinessFlow!.fingerprint = "stale";
     rerender(<div key="project-a-reloaded">{withWorkspaceProviders(<SidebarMenu />, createSidebarRepository(persisted))}</div>);
     await user.click(await screen.findByRole("button", { name: "展开 可行性分析" }));
-    expect(screen.getByRole("button", { name: /^业务与系统流程图/u })).toHaveTextContent("已过时");
+    expect(screen.getByRole("button", { name: /^业务流程图/u })).toHaveTextContent("已过时");
 
     rerender(<div key="project-b">{withWorkspaceProviders(<SidebarMenu />, createSidebarRepository())}</div>);
     await screen.findByRole("navigation", { name: "项目导航" });
-    expect(screen.queryByRole("button", { name: /^业务与系统流程图/u })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^业务流程图/u })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "展开 可行性分析" })).not.toBeInTheDocument();
   });
 
@@ -227,8 +227,8 @@ describe("SidebarMenu", () => {
       runId: "failed-flow", runKind: "feasibility", status: "failed", stage: "render_business_flow", createdAt: "2026-09-23T00:00:00.000Z",
     }]} />, repository));
     await user.click(await screen.findByRole("button", { name: "展开 可行性分析" }));
-    expect(screen.getByRole("button", { name: /^业务与系统流程图/u })).toBeInTheDocument();
-    expect(screen.getByLabelText(/业务与系统流程图.*失败/u)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^业务流程图/u })).toBeInTheDocument();
+    expect(screen.getByLabelText(/业务流程图.*失败/u)).toBeInTheDocument();
   });
 
   it("reveals feasibility artifact menus only after the corresponding artifacts exist", async () => {

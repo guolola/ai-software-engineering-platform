@@ -1,5 +1,6 @@
 // Owns generation result and confirmation dialog state for the session provider.
 import { useCallback, useState } from "react";
+import type { RequirementBaseline } from "@uml-platform/contracts";
 import {
   completedRunResultMessage,
   generationResultFeedback,
@@ -12,6 +13,7 @@ import { cancelledRunMessage } from "./run-events";
 import { i18n } from "../../../shared/i18n/i18n";
 import {
   requestOpenGenerationTask,
+  requestOpenRequirementRule,
   requestOpenProjectWorkspaceTarget,
 } from "../../../shared/lib/app-navigation";
 import type { OperationFailurePresentation } from "./operation-failure";
@@ -49,14 +51,26 @@ export function failedRunResultDialog(input: {
   message?: string;
   runId: string | null;
   stageLabel: string;
+  requirementBaseline?: RequirementBaseline | null;
 }): GenerationResultDialogState {
   const taskDetailsAvailable = Boolean(input.runId || input.clientTaskId);
   const diagnosticId = input.failure?.requestId ?? input.runId ?? input.clientTaskId ?? null;
   const target = input.failure?.actionTarget;
+  const ruleIds = Array.isArray(input.failure?.details?.ruleIds)
+    ? input.failure.details.ruleIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+    : [];
+  const ruleLabels = ruleIds.map((ruleId) => {
+    const requirementId = input.requirementBaseline?.requirements.find(
+      (requirement) => requirement.sourceRuleId === ruleId,
+    )?.id;
+    return requirementId ? `${ruleId}（${requirementId}）` : ruleId;
+  });
   const primaryAction = target === "pending-rules"
     ? {
         label: i18n.t("feedback.actions.pendingRules"),
-        onSelect: () => requestOpenProjectWorkspaceTarget("system-requirements"),
+        onSelect: () => ruleIds[0]
+          ? requestOpenRequirementRule(ruleIds[0])
+          : requestOpenProjectWorkspaceTarget("system-requirements"),
       }
     : target === "system-requirements"
       ? {
@@ -98,6 +112,9 @@ export function failedRunResultDialog(input: {
     tone: "destructive",
     message: [
       input.failure?.message ?? input.message ?? i18n.t("errors.codes.RUN_INTERNAL_ERROR"),
+      target === "pending-rules" && ruleLabels.length > 0
+        ? i18n.t("errors.affectedRules", { ids: ruleLabels.join("、") })
+        : null,
       diagnosticId &&
       (Boolean(input.failure?.requestId) ||
         input.failure?.code === "INTERNAL_ERROR" ||

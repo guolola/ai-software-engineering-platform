@@ -99,6 +99,7 @@ export function reviewCandidateStateLabel(
   if (candidate?.status === "failed") return "修复失败待重试";
   if (candidate?.status === "pending") return "修复结果待确认";
   if (candidate?.status === "accepted" || candidate?.status === "rejected") {
+    if (rowState === "有待确认提示" || rowState === "存在冲突提示") return rowState;
     return "已确认";
   }
   return rowState;

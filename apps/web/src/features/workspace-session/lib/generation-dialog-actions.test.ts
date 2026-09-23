@@ -5,6 +5,11 @@ import {
   failedRunResultDialog,
 } from "./generation-dialog-actions";
 import { operationFailureForCode } from "./operation-failure";
+import type { RequirementBaseline } from "@uml-platform/contracts";
+import {
+  clearRequirementRuleRequest,
+  pendingRequirementRuleRequest,
+} from "../../../shared/lib/app-navigation";
 
 describe("documentRunCompletionDialog", () => {
   it("surfaces missing diagram warnings for completed documents", () => {
@@ -33,9 +38,23 @@ describe("documentRunCompletionDialog", () => {
     });
 
     expect(dialog.title).toBe("生成前需要确认需求规则");
-    expect(dialog.message).toContain("2 条需求规则修复结果仍待确认");
+    expect(dialog.message).toContain("2 条需求规则尚未确认");
+    expect(dialog.message).toContain("涉及规则：r1、r2");
     expect(dialog.primaryAction?.label).toBe("查看待确认规则");
     expect(dialog.primaryAction?.label).not.toBe("查看任务详情");
+  });
+  it("shows the atomic requirement ID and opens the blocked rule", () => {
+    const dialog = failedRunResultDialog({
+      failure: operationFailureForCode("REQUIREMENT_REVIEWS_PENDING", {
+        params: { count: 1 }, details: { ruleIds: ["r2"] },
+      }),
+      runId: null, stageLabel: "设计模型",
+      requirementBaseline: { requirements: [{ id: "REQ-002", sourceRuleId: "r2" }] } as RequirementBaseline,
+    });
+    expect(dialog.message).toContain("r2（REQ-002）");
+    dialog.primaryAction?.onSelect?.();
+    expect(pendingRequirementRuleRequest()).toBe("r2");
+    clearRequirementRuleRequest("r2");
   });
 
   it("does not show task details for an unknown failure before a task exists", () => {
