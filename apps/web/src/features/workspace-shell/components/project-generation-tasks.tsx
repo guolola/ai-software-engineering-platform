@@ -3,8 +3,6 @@ import { useMemo, useState } from "react";
 import type { DesignDiagramKind, DiagramKind, RunEvent, RunStage } from "@uml-platform/contracts";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../shared/ui/button";
-import { Spinner } from "../../../shared/ui/spinner";
-import { ShimmerText } from "../../../shared/ui/shimmer-text";
 import { downloadBlobFile } from "../../../shared/lib/download";
 import { requestOpenGenerationTask } from "../../../shared/lib/app-navigation";
 import { useWorkspaceRepository } from "../../../services/workspace-repository";
@@ -13,6 +11,7 @@ import { useWorkspaceSession } from "../../workspace-session/state";
 import { mergeTranscriptEvents } from "../../workspace-session/lib/run-transcript";
 import type { RunDiagnostics } from "../../workspace-session/model/session-state";
 import { projectGenerationTranscript, readableTaskText } from "../lib/generation-transcript";
+import { useFrameValue } from "../lib/use-frame-value";
 import { useRunTranscript } from "../lib/use-run-transcript";
 import { GenerationTranscript } from "./generation-transcript";
 import { useOptionalWorkspaceShell } from "../state";
@@ -67,15 +66,16 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
   const restored = useRunTranscript(scopedProjectId, runId, kind);
   const diagnostics = selectedLocal?.diagnostics ?? (!runId || session.currentRunDiagnostics.runId === runId ? session.currentRunDiagnostics : undefined);
   const events = useMemo(() => {
-    const localEvents = diagnostics ? diagnostics.transcript ?? legacyDiagnostics(diagnostics) : selectedRemote?.stage ? [{ type: "stage_started", stage: selectedRemote.stage as RunStage }] as RunEvent[] : emptyEvents;
+    const localEvents = diagnostics ? diagnostics.transcript ?? (restored.events.length ? emptyEvents : legacyDiagnostics(diagnostics)) : !restored.events.length && selectedRemote?.stage ? [{ type: "stage_started", stage: selectedRemote.stage as RunStage }] as RunEvent[] : emptyEvents;
     return mergeTranscriptEvents(restored.events, localEvents);
   }, [diagnostics, restored.events, selectedRemote?.stage]);
   const fallbackStatus = relevantAction?.status ?? restored.status ?? selectedRemote?.status ?? selectedLocal?.status ?? (runId ? "running" : session.runStatus);
-  const transcript = useMemo(() => projectGenerationTranscript(events, fallbackStatus, selectedLocal?.subtasks), [events, fallbackStatus, selectedLocal?.subtasks]);
+  const taskKey = runId ?? selectedLocal?.clientTaskId ?? "empty";
+  const live = ["queued", "running"].includes(fallbackStatus) && !events.some((event) => ["completed", "failed", "cancelled"].includes(event.type));
+  const displayedEvents = useFrameValue(events, live && !restored.loading, taskKey);
+  const transcript = useMemo(() => projectGenerationTranscript(displayedEvents, fallbackStatus, selectedLocal?.subtasks), [displayedEvents, fallbackStatus, selectedLocal?.subtasks]);
   const active = ["queued", "running"].includes(transcript.status);
   const title = t(`generation.taskKinds.${kind ?? "unknown"}`);
-  const taskKey = runId ?? selectedLocal?.clientTaskId ?? "empty";
-
   const perform = async (action: () => Promise<void>) => {
     if (actionBusy) return;
     setActionBusy(true);
@@ -96,12 +96,12 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
     if (kind === "design" && ["architecture", "sequence", "class", "activity", "component", "deployment", "table"].includes(diagram)) void session.generateDesignDiagrams([diagram as DesignDiagramKind]);
   };
   const completed = transcript.completed?.snapshot;
-  return <GenerationTranscript key={taskKey} taskKey={taskKey} steps={transcript.steps} active={active}
-    introduction={runId || selectedLocal ? `正在查看${title}。执行过程将按步骤显示。` : "暂无生成任务。发起生成后，执行过程会在这里逐段显示。"}
+  return <GenerationTranscript key={taskKey} taskKey={taskKey} steps={transcript.visibleSteps} active={active}
+    introduction={runId || selectedLocal ? title : "暂无生成任务。发起生成后，执行过程会在这里逐段显示。"}
     finalMessage={transcript.finalMessage || (!active && runId ? t(`generation.status.${transcript.status === "interrupted" ? "interruptedDetail" : transcript.status}`) : "")}
     onRetry={kind === "requirements" || kind === "design" ? retrySubtask : undefined}>
-    {restored.loading && <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground"><Spinner aria-hidden="true" className="size-3.5" /><ShimmerText>正在恢复任务过程…</ShimmerText></p>}
-    {restored.disconnected && <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground"><Spinner aria-hidden="true" className="size-3.5" /><ShimmerText>连接中断，正在恢复。已收到的内容会保留。</ShimmerText></p>}
+    {restored.loading && <p role="status" className="text-sm text-muted-foreground">正在恢复任务过程…</p>}
+    {restored.disconnected && <p role="status" className="text-sm text-muted-foreground">连接中断，正在恢复。已收到的内容会保留。</p>}
     {restored.unavailable && <p role="status" className="text-xs text-destructive">无法读取任务过程，任务可能已移除或你没有访问权限。</p>}
     {!restored.loading && runId && !events.some((event) => event.type === "run_activity") && <p className="text-xs text-muted-foreground">此任务未保存完整回复，当前仅展示可用的执行记录。</p>}
     {diagnostics?.uiMockup?.imageUrl && <a className="text-sm underline underline-offset-4" href={diagnostics.uiMockup.imageUrl} target="_blank" rel="noreferrer">查看界面设计图</a>}
@@ -127,7 +127,7 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
     </div>
     {completed && previewRunId === runId && <div className="min-w-0 space-y-4" aria-label="生成结果">
       {"svgArtifacts" in completed && completed.svgArtifacts.map((artifact, index) => <figure key={index} className="min-w-0"><img alt={`生成的 UML 图 ${index + 1}`} className="max-h-96 max-w-full object-contain" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(artifact.svg)}`} /></figure>)}
-      {"files" in completed && Object.entries(completed.files).map(([path, content]) => <details key={path}><summary className="cursor-pointer break-all text-sm">{path}</summary><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{content}</pre></details>)}
+      {"files" in completed && Object.entries(completed.files).map(([path, content]) => <details key={path}><summary className="cursor-pointer break-all text-sm">{path}</summary><pre className="whitespace-pre-wrap break-all text-xs">{content}</pre></details>)}
       {"sections" in completed && completed.sections.map((section, index) => <section key={index} className="space-y-2"><h4 className="font-medium">{section.title}</h4>{section.body.map((paragraph, item) => <p key={item} className="whitespace-pre-wrap break-words">{paragraph}</p>)}</section>)}
     </div>}
   </GenerationTranscript>;

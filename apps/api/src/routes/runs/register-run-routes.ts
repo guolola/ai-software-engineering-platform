@@ -327,8 +327,8 @@ export function registerRunRoutes({
     billingEntitlements?: RunBillingEntitlements;
     documentInput?: StartDocumentRunRequest;
   }) => {
-    attachRunSideEffects(record);
-    if (runQueue?.enabled) {
+      attachRunSideEffects(record);
+      if (runQueue?.enabled && !record.metadata?.offlineDemoFixture) {
       await flushRunStoreIfAvailable(runs);
       await runQueue.enqueueRun({ record, documentInput });
       return;

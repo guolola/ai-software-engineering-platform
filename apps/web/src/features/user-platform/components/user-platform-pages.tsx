@@ -519,7 +519,9 @@ function ProjectDrawerShell({
   const title = t(meta.titleKey);
   const titleId = `project-${kind}-drawer-title`;
   const widthClass =
-    meta.width === "history"
+    kind === "tasks"
+      ? "max-w-full data-[vaul-drawer-direction=right]:sm:max-w-3xl"
+      : meta.width === "history"
       ? "max-w-full data-[vaul-drawer-direction=right]:sm:max-w-6xl"
       : kind === "members"
       ? "max-w-full data-[vaul-drawer-direction=right]:sm:max-w-2xl"

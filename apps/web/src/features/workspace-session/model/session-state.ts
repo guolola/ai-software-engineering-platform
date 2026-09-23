@@ -184,6 +184,7 @@ export interface WorkspaceSessionState {
   feasibilityContextSaveStatus: "idle" | "saving" | "saved" | "error";
   setFeasibilityContextSaveStatus: (status: "idle" | "saving" | "saved" | "error") => void;
   hasFeasibilityContextArtifact: boolean;
+  feasibilityBusinessFlow: WorkspaceRecord["feasibilityBusinessFlow"];
   hasFeasibilityImplementationArtifact: boolean;
   feasibilityImplementationPlan: WorkspaceRecord["feasibilityImplementationPlan"];
   syncFeasibilityArtifacts: (workspace: WorkspaceRecord) => void;
@@ -209,6 +210,8 @@ export interface WorkspaceSessionState {
   clearCodePreviewDiagnostics: () => void;
   canUpdateWorkspace: boolean;
   canStartRuns: boolean;
+  generationExecutionMode: import("@uml-platform/contracts").GenerationExecutionMode;
+  generationModelBlockedReason: string | null;
   workspacePermissionReason: string | null;
   generatedDesignDiagrams: DesignDiagramType[];
   generatedDiagrams: DiagramType[];

@@ -114,6 +114,7 @@ function createMetadata(row: RunRecordRow): RunRecordMetadata | undefined {
   }
   return {
     userId: row.user_id ?? undefined,
+    offlineDemoFixture: (row.snapshot as { _offlineDemoFixture?: unknown })._offlineDemoFixture === "library-seat" ? "library-seat" : undefined,
     projectId: row.project_id ?? undefined,
     sourceRunId: row.source_run_id ?? undefined,
     sourceAction: row.source_action ?? undefined,
@@ -284,6 +285,8 @@ class PostgresRunRecordStore extends Map<string, RunRecord> implements Persisten
     for (const row of rows) {
       const existing = super.get(row.id);
       const snapshot = cloneSnapshot(row.snapshot);
+      // Keep the server-only execution marker outside public run snapshots and events.
+      if ("_offlineDemoFixture" in snapshot) delete snapshot._offlineDemoFixture;
       const events = (eventRowsByRun.get(row.id) ?? []).map((eventRow) =>
         hydratePersistedEvent(eventRow.payload, snapshot),
       );
@@ -390,8 +393,8 @@ class PostgresRunRecordStore extends Map<string, RunRecord> implements Persisten
           readStage(snapshot),
           readPersistedStatus(record, event),
           readModel(snapshot),
-          readProviderConfigId(snapshot),
-          JSON.stringify(snapshot),
+          metadata?.offlineDemoFixture ? null : readProviderConfigId(snapshot),
+          JSON.stringify(metadata?.offlineDemoFixture ? { ...snapshot, _offlineDemoFixture: metadata.offlineDemoFixture } : snapshot),
           snapshot.error ? JSON.stringify(snapshot.error) : null,
           snapshot.error?.code ?? null,
           readCompletedAt(record, event),

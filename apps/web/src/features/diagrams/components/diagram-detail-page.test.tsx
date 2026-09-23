@@ -4,11 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceRepository } from "../../../services/workspace-repository";
 import {
+  createBusinessFlowArtifact,
   createRule,
   createWorkspaceRecord,
   withWorkspaceProviders,
 } from "../../../test/workspace-test-utils";
-import { ContextDiagramView, DesignDiagramView, DiagramView } from "./diagram-detail-page";
+import { BusinessFlowDiagramView, ContextDiagramView, DesignDiagramView, DiagramView } from "./diagram-detail-page";
 
 const { toastMessage, toastError } = vi.hoisted(() => ({
   toastMessage: vi.fn(),
@@ -2435,6 +2436,32 @@ describe("DiagramView", () => {
       "context.puml",
       "@startuml\n@enduml",
       "text/plain",
+    );
+  });
+
+  it("exports the saved feasibility flow using its own sources and filenames", async () => {
+    const artifact = createBusinessFlowArtifact();
+    render(withWorkspaceProviders(
+      <BusinessFlowDiagramView data={{
+        model: artifact.model,
+        plantUmlSource: artifact.plantUml.source,
+        svgMarkup: artifact.svg.svg,
+        stale: false,
+        rules: [{ id: "r1", text: "处理业务规则" }],
+        saveStatus: "idle",
+      }} />,
+      createRepository(createWorkspaceRecord({
+        plantUml: { activity: "@startuml\n:其他需求活动;\n@enduml" },
+      })),
+    ));
+
+    await userEvent.click(await screen.findByRole("button", { name: "SVG" }));
+    await userEvent.click(screen.getByRole("button", { name: "PlantUML" }));
+    expect(downloadTextFileMock).toHaveBeenNthCalledWith(
+      1, "feasibility-business-flow.svg", expect.stringContaining("业务流程"), "image/svg+xml",
+    );
+    expect(downloadTextFileMock).toHaveBeenNthCalledWith(
+      2, "feasibility-business-flow.puml", artifact.plantUml.source, "text/plain",
     );
   });
 

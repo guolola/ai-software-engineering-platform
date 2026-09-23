@@ -771,6 +771,9 @@ test("requirement pipeline renders a completed model before slower models finish
   assert.notEqual(useCaseSvgIndex, -1);
   assert.notEqual(classModelIndex, -1);
   assert.ok(useCaseSvgIndex < classModelIndex);
+  const modelFinishedIndex = record.events.findIndex((event) => event.type === "stage_finished" && event.stage === "generate_models");
+  assert.ok(modelFinishedIndex > classModelIndex);
+  assert.equal(record.events.filter((event) => event.type === "stage_finished" && event.stage === "generate_models").length, 1);
 });
 
 test("requirement pipeline reuses contextual use case event flows for analysis-only reruns", async () => {
@@ -2016,6 +2019,8 @@ test("design pipeline renders a completed use case sequence before slower sequen
   assert.notEqual(fastSvgIndex, -1);
   assert.notEqual(slowModelIndex, -1);
   assert.ok(fastSvgIndex < slowModelIndex);
+  const sequenceFinishedIndex = record.events.findIndex((event) => event.type === "stage_finished" && event.stage === "generate_design_sequence");
+  assert.ok(sequenceFinishedIndex > slowModelIndex);
   assert.equal((record.snapshot as DesignRunSnapshot).status, "completed");
 });
 

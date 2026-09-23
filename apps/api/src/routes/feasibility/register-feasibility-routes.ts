@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   buildAcceptedRequirementSnapshot,
+  readFeasibilityBusinessFlowArtifact,
   contextDiagramSpecSchema,
   contextTraceRowSchema,
   feasibilityInputsSchema,
@@ -43,6 +44,7 @@ import {
 } from "../../runs/providers/run-provider-gates.js";
 import { reserveBillingRunUsage } from "../../runs/billing/run-billing-gates.js";
 import { startFeasibilityRecordPipeline } from "../../runs/pipelines/run-record-pipeline-starter.js";
+import { isOfflineDemoProject, offlineDemoProviderSettings } from "../../runs/demo/offline-demo-runs.js";
 import type { AdminAnalyticsStore } from "../../admin/admin-analytics-store.js";
 import {
   attachProjectWorkspaceSync,
@@ -109,6 +111,7 @@ export function registerFeasibilityRoutes({
   resolveUserId,
   canUpdateProject,
   loadWorkspace,
+  resolveProjectName,
   syncProjectWorkspace,
   analyticsStore,
 }: {
@@ -126,6 +129,7 @@ export function registerFeasibilityRoutes({
   resolveUserId: (request: FastifyRequest) => Promise<string | null>;
   canUpdateProject: (projectId: string, userId: string) => Promise<boolean>;
   loadWorkspace: (projectId: string) => Promise<ProjectWorkspace>;
+  resolveProjectName?: (projectId: string) => Promise<string | null>;
   syncProjectWorkspace?: ProjectWorkspaceSync;
   analyticsStore?: Pick<AdminAnalyticsStore, "recordTelemetry">;
 }) {
@@ -146,13 +150,16 @@ export function registerFeasibilityRoutes({
     if (!(await canUpdateProject(input.projectId, userId))) {
       return reply.code(403).send({ message: "Project update access denied" });
     }
+    const offlineDemo = isOfflineDemoProject(input.projectId) ||
+      isOfflineDemoProject(input.projectId, await resolveProjectName?.(input.projectId));
     const metadata: RunRecordMetadata = {
       userId,
       projectId: input.projectId,
-      model: input.providerSettings.model,
+      model: offlineDemo ? offlineDemoProviderSettings.model : input.providerSettings.model,
+      ...(offlineDemo ? { offlineDemoFixture: "library-seat" as const } : {}),
       createdAt: new Date().toISOString(),
     };
-    const providerResolution = await resolveProviderSettingsForRun({
+    const providerResolution = offlineDemo ? { ok: true as const, providerSettings: offlineDemoProviderSettings } : await resolveProviderSettingsForRun({
       providerSettings: input.providerSettings,
       metadata,
       providerConfigs,
@@ -163,15 +170,15 @@ export function registerFeasibilityRoutes({
       return providerResolutionFailureResponse(reply, providerResolution);
     }
     const providerSettings = providerResolution.providerSettings;
-    const providerConfigId = await resolveProviderConfigIdForRun({ providerSettings: input.providerSettings });
-    const generationCheck = await checkGenerationUsageLimit({
+    const providerConfigId = offlineDemo ? null : await resolveProviderConfigIdForRun({ providerSettings: input.providerSettings });
+    const generationCheck = offlineDemo ? true : await checkGenerationUsageLimit({
       generationUsage,
       runAccessGuard: usageAccess,
       request,
       reply,
     });
     if (generationCheck !== true) return generationCheck;
-    const providerCheck = await checkProviderUsageLimit({
+    const providerCheck = offlineDemo ? true : await checkProviderUsageLimit({
       usageTracker: providerUsageTracker,
       providerConfigId,
       metadata,
@@ -190,16 +197,23 @@ export function registerFeasibilityRoutes({
     const inputs = feasibilityInputsSchema.parse(workspace.state.feasibilityInputs ?? {});
     const expectedContextFingerprint = requirementSource.fingerprint;
     const existingContext = existingContextFromWorkspace(workspace.state, expectedContextFingerprint);
+    const savedBusinessFlow = readFeasibilityBusinessFlowArtifact(workspace.state.feasibilityBusinessFlow);
+    const existingBusinessFlow = savedBusinessFlow?.fingerprint === requirementSource.fingerprint
+      ? savedBusinessFlow : null;
     if (
       input.selectedArtifacts.includes("implementation") &&
       !input.selectedArtifacts.includes("context") &&
       !existingContext
     ) {
-      return reply.code(409).send({ message: "实现方案依赖最新有效的系统上下文图（系统环境图），请同时选择该图。" });
+      return reply.code(409).send({ message: "实现方案依赖最新有效的系统环境图，请同时选择该图。" });
+    }
+    if (input.selectedArtifacts.includes("implementation") &&
+      !input.selectedArtifacts.includes("business-flow") && !existingBusinessFlow) {
+      return reply.code(409).send({ message: "实现方案依赖最新有效的业务与系统流程图，请同时选择该图。" });
     }
 
     const runId = randomUUID();
-    let runBillingEntitlements = billingEntitlements;
+    let runBillingEntitlements = offlineDemo ? undefined : billingEntitlements;
     if (providerConfigId && providerConfigs) {
       const providerConfig = await providerConfigs.get(providerConfigId);
       if (providerConfig?.scopeType === "user" && providerConfig.scopeId === userId) {
@@ -214,14 +228,14 @@ export function registerFeasibilityRoutes({
       reply,
     });
     if (billingCheck !== true) return billingCheck;
-    await recordProviderUsage({
+    if (!offlineDemo) await recordProviderUsage({
       usageTracker: providerUsageTracker,
       providerConfigId,
       metadata,
       request,
       taskType: "feasibility_analysis",
     });
-    await recordGenerationUsage({
+    if (!offlineDemo) await recordGenerationUsage({
       generationUsage,
       runAccessGuard: usageAccess,
       request,
@@ -233,12 +247,13 @@ export function registerFeasibilityRoutes({
       snapshot: createEmptyFeasibilitySnapshot(runId, {
         projectId: input.projectId,
         selectedArtifacts: input.selectedArtifacts,
-        providerSettings: input.providerSettings,
+        providerSettings: offlineDemo ? { providerConfigId: "offline-demo", model: offlineDemoProviderSettings.model } : input.providerSettings,
         rules,
         requirementBaseline: baseline,
         requirementSource,
         inputs,
         ...(existingContext ?? {}),
+        businessFlow: input.selectedArtifacts.includes("business-flow") ? null : existingBusinessFlow,
       }),
       events: [],
       listeners: new Set(),
@@ -252,7 +267,7 @@ export function registerFeasibilityRoutes({
     await flushRunStoreIfAvailable(runs);
     emitEvent(record, queuedRunEventSchema.parse({ type: "queued" }));
 
-    if (runQueue?.enabled) {
+    if (runQueue?.enabled && !offlineDemo) {
       await flushRunStoreIfAvailable(runs);
       await runQueue.enqueueRun({ record });
     } else {

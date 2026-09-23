@@ -82,7 +82,7 @@ describe("SystemNoticeButton", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const user = userEvent.setup();
-    render(<FloatingAlertProvider><SystemNoticeButton className="size-10" /></FloatingAlertProvider>);
+    render(<FloatingAlertProvider><SystemNoticeButton className="size-9" /></FloatingAlertProvider>);
 
     await waitFor(() => {
       expect(
@@ -91,7 +91,10 @@ describe("SystemNoticeButton", () => {
     });
     const unreadDot = screen.getByRole("button", { name: "系统通知，2 条未读" })
       .querySelector("[data-slot='notification-unread-dot']");
+    expect(screen.getByRole("button", { name: "系统通知，2 条未读" })).toHaveClass("size-9");
     expect(unreadDot).toHaveClass(
+      "right-0.5",
+      "top-1",
       "animate-bounce",
       "bg-sky-600",
       "dark:bg-sky-400",
@@ -115,6 +118,7 @@ describe("SystemNoticeButton", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "系统通知" })).not.toBeInTheDocument();
     });
+    expect(screen.getByRole("button", { name: "系统通知" }).querySelector("[data-slot='notification-unread-dot']")).toBeNull();
     expect(confetti).toHaveBeenCalledTimes(5);
     expect(confetti).toHaveBeenNthCalledWith(
       1,

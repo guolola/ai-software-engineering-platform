@@ -1,7 +1,9 @@
 // Verifies code generation page file browsing, preview rendering, generation actions, and diagnostics.
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { createMockWorkspaceRepository } from "../../../services/workspace-repository/mock-repository";
+import { patchUserSettings } from "../../../shared/lib/user-settings";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceRepository } from "../../../services/workspace-repository";
 import {
   createWorkspaceRecord,
@@ -206,6 +208,29 @@ function createRepository(
 }
 
 describe("CodeGenerationPage", () => {
+  afterEach(() => localStorage.clear());
+  it("requires a model for real code generation even with design inputs", async () => {
+    localStorage.clear();
+    const repository = createRepository();
+    repository.loadWorkspace = vi.fn(async () => createWorkspaceRecord({
+      requirementText: "生成代码",
+      designModels: { sequence: { diagramKind: "sequence", modelId: "sequence" } as never },
+    }));
+    repository.startCodeRun = vi.fn();
+    render(withWorkspaceProviders(<CodeGenerationPage />, repository));
+    await screen.findByTestId("sandpack-provider");
+    const button = screen.getByRole("button", { name: /启动生成/ });
+    expect(button).toBeDisabled();
+    expect(screen.getByText("请先配置并选择模型供应商。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "未选择模型" })).toBeEnabled();
+    await userEvent.setup().click(button);
+    expect(repository.startCodeRun).not.toHaveBeenCalled();
+    act(() => patchUserSettings({ providerConfigId: "provider-1", defaultModel: "model-1", providerModelOptions: ["model-1"] }));
+    expect(button).toBeEnabled();
+    act(() => patchUserSettings({ providerModelOptions: ["model-2"] }));
+    expect(button).toBeDisabled();
+  });
+
   beforeEach(() => {
     stubCompactViewport(false);
     sandpackMocks.providerProps = null;

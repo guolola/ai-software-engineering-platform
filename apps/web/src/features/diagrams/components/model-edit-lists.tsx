@@ -60,9 +60,9 @@ export function ModelElementListSection({
   editableItemsById: Map<string, EditableItemReference>;
   selectedElement?: { kind: string; id: string } | null;
   saving: boolean;
-  onCreateElement: (collection: EditableCollection) => void;
-  onEditElement: (elementId: string, editable: EditableItemReference) => void;
-  onDeleteElement: (elementId: string, editable: EditableItemReference) => void;
+  onCreateElement?: (collection: EditableCollection) => void;
+  onEditElement?: (elementId: string, editable: EditableItemReference) => void;
+  onDeleteElement?: (elementId: string, editable: EditableItemReference) => void;
   onSelectElement: (element: DiagramDetailItem) => void;
 }) {
   const { t } = useTranslation();
@@ -122,7 +122,7 @@ export function ModelElementListSection({
             ) : null}
           </div>
           <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2 sm:min-w-max sm:flex-nowrap">
-            {collections.filter((collection) => collection.allowCreate !== false).map((collection) => (
+            {onCreateElement && collections.filter((collection) => collection.allowCreate !== false).map((collection) => (
               <Button
                 key={`add:${collection.key}`}
                 type="button"
@@ -179,7 +179,7 @@ export function ModelElementListSection({
                         {t(`diagrams.semantic.${element.kind}.label`)}
                       </Badge>
                       <div className="pointer-events-auto flex min-w-0 flex-1 justify-end gap-1">
-                      {editable ? (
+                      {editable && onEditElement && onDeleteElement ? (
                         <>
                           <Button
                             type="button"
@@ -266,9 +266,9 @@ export function ModelRelationshipListSection({
   endpointOptionsCount: number;
   relationshipOrderIds: string[];
   saving: boolean;
-  onCreateRelation: () => void;
-  onEditRelation: (relationId: string) => void;
-  onDeleteRelation: (relationId: string, displayLabel: string) => void;
+  onCreateRelation?: () => void;
+  onEditRelation?: (relationId: string) => void;
+  onDeleteRelation?: (relationId: string, displayLabel: string) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -326,7 +326,7 @@ export function ModelRelationshipListSection({
               </div>
             ) : null}
           </div>
-          <Button
+          {onCreateRelation && <Button
             type="button"
             size="sm"
             variant="outline"
@@ -335,7 +335,7 @@ export function ModelRelationshipListSection({
             onClick={onCreateRelation}
           >
             <Plus className="size-3.5" /> {t("diagramLists.relations.add")}
-          </Button>
+          </Button>}
         </div>
       </div>
       <div className="space-y-3">
@@ -391,7 +391,7 @@ export function ModelRelationshipListSection({
                       {targetLabel || t("diagramLists.relations.noTarget")}
                     </div>
                   </div>
-                  <Button
+                  {onEditRelation && onDeleteRelation && <><Button
                     type="button"
                     size="icon"
                     variant="ghost"
@@ -413,7 +413,7 @@ export function ModelRelationshipListSection({
                     onClick={() => onDeleteRelation(id, displayLabel)}
                   >
                     <Trash2 className="size-3.5" />
-                  </Button>
+                  </Button></>}
                 </div>
               </SpotlightCard>
             );

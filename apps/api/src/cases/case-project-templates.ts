@@ -1,6 +1,8 @@
 // Defines deterministic marketing case project templates for one-click sample project creation.
 import {
   buildAcceptedRequirementSnapshot,
+  buildFeasibilityImplementationFingerprint,
+  type FeasibilityBusinessFlow,
   codeRunSnapshotSchema,
   completeFeasibilityImplementationPlanSchema,
   contextDiagramSpecSchema,
@@ -8,7 +10,6 @@ import {
   feasibilityInputsSchema,
   feasibilityRunSnapshotSchema,
   runSnapshotSchema,
-  snapshotInputFingerprint,
   type CodeRunSnapshot,
   type ContextTraceRow,
   type DesignDiagramKind,
@@ -26,6 +27,8 @@ import {
   type RunSnapshot,
 } from "@uml-platform/contracts";
 import { FEASIBILITY_IMPLEMENTATION_EXAMPLE } from "@uml-platform/prompts";
+import { generatePlantUmlArtifacts } from "../plantuml.js";
+import { normalizeFeasibilityBusinessFlow } from "../normalizers/feasibility/business-flow-normalizer.js";
 
 export type CaseProjectTemplate = {
   id: string;
@@ -34,6 +37,7 @@ export type CaseProjectTemplate = {
   backgroundKey: ProjectBackgroundKey;
   requirementSnapshot: RunSnapshot;
   feasibilitySnapshot: FeasibilityRunSnapshot;
+  businessFlow: FeasibilityBusinessFlow & { plantUml: PlantUmlArtifact };
   designSnapshot: DesignRunSnapshot;
   codeSnapshot: CodeRunSnapshot;
 };
@@ -143,7 +147,26 @@ export function getCaseProjectTemplate(caseId: string) {
 
 function buildCaseProjectTemplate(seed: CaseSeed): CaseProjectTemplate {
   const requirementSnapshot = buildRequirementSnapshot(seed);
-  const feasibilitySnapshot = buildFeasibilitySnapshot(seed, requirementSnapshot);
+  const activity = requirementSnapshot.models.find((model) => model.diagramKind === "activity");
+  if (!activity || activity.diagramKind !== "activity") throw new Error("Case activity model is missing");
+  const flow = normalizeFeasibilityBusinessFlow({
+    model: {
+      ...activity, modelId: "feasibility-business-flow", title: `${seed.title}业务与系统流程图`,
+      notes: ["展示案例核心业务闭环，通知按需求中规定的触发条件执行。"],
+      swimlanes: [...activity.swimlanes.slice(0, 2), { id: "system", name: seed.title }],
+      nodes: activity.nodes.map((node) => node.type === "activity" && node.actorOrLane === "lane-3"
+        ? { ...node, actorOrLane: "system" } : node),
+    },
+    traceability: [
+      ...["act-query", "act-submit"].map((targetId) => ({ requirementId: `${seed.id}-R1`, targetId, targetKind: "node" })),
+      { requirementId: `${seed.id}-R3`, targetId: "act-review", targetKind: "node" },
+      { requirementId: `${seed.id}-R4`, targetId: "act-notify", targetKind: "node" },
+      { requirementId: `${seed.id}-R1`, targetId: "lane-1", targetKind: "swimlane" },
+      { requirementId: `${seed.id}-R3`, targetId: "lane-2", targetKind: "swimlane" },
+    ],
+  }, new Set(requirementSnapshot.rules.map((rule) => rule.id)));
+  const businessFlow = { ...flow, plantUml: generatePlantUmlArtifacts([flow.model])[0]! };
+  const feasibilitySnapshot = buildFeasibilitySnapshot(seed, requirementSnapshot, businessFlow);
   const designSnapshot = buildDesignSnapshot(seed, requirementSnapshot);
   const codeSnapshot = buildCodeSnapshot(seed, designSnapshot);
   return {
@@ -153,6 +176,7 @@ function buildCaseProjectTemplate(seed: CaseSeed): CaseProjectTemplate {
     backgroundKey: seed.backgroundKey,
     requirementSnapshot,
     feasibilitySnapshot,
+    businessFlow,
     designSnapshot,
     codeSnapshot,
   };
@@ -187,6 +211,7 @@ function buildRequirementSnapshot(seed: CaseSeed): RunSnapshot {
 function buildFeasibilitySnapshot(
   seed: CaseSeed,
   requirementSnapshot: RunSnapshot,
+  businessFlow: FeasibilityBusinessFlow,
 ): FeasibilityRunSnapshot {
   const requirementSource = buildAcceptedRequirementSnapshot(
     requirementSnapshot.rules,
@@ -386,16 +411,18 @@ function buildFeasibilitySnapshot(
     source: `@startuml\nleft to right direction\nactor "${seed.actors[0]}" as Primary\nactor "${seed.actors[1]}" as Reviewer\nrectangle "${seed.title}" as System\ncloud "${seed.externalSystem}" as External\nPrimary --> System : ${seed.primaryAction}\nReviewer --> System : ${seed.approvalAction}\nSystem --> External : ${seed.notificationRule}\n@enduml`,
   };
   const contextFingerprint = requirementSource.snapshot.fingerprint;
-  const implementationFingerprint = snapshotInputFingerprint({
+  const implementationFingerprint = buildFeasibilityImplementationFingerprint({
     rules: requirementSource.rules,
+    requirementBaseline: requirementSource.baseline,
     contextModel,
+    businessFlow,
     inputs,
   });
 
   return feasibilityRunSnapshotSchema.parse({
     runId: `${seed.id}-feasibility`,
     projectId: `case-template-${seed.id}`,
-    selectedArtifacts: ["context", "implementation"],
+    selectedArtifacts: ["context", "business-flow", "implementation"],
     providerSettings: {
       providerConfigId: "case-template",
       model: "case-template",

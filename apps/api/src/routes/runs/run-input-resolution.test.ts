@@ -1,7 +1,8 @@
 // Verifies project document commands derive feasibility reports only from complete, current feasibility analysis.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { snapshotInputFingerprint } from "@uml-platform/contracts";
+import { snapshotInputFingerprint, buildFeasibilityImplementationFingerprint } from "@uml-platform/contracts";
+import { createBusinessFlowArtifact } from "../../test-fixtures/feasibility/business-flow.js";
 import { resolveDocumentRunInput } from "./run-input-resolution.js";
 
 const rules = [{
@@ -83,6 +84,7 @@ const implementationPlan = {
 
 function currentFeasibilityState() {
   const feasibilityInputs = {};
+  const businessFlow = createBusinessFlowArtifact(rules);
   return {
     requirementText: "",
     rules,
@@ -90,6 +92,7 @@ function currentFeasibilityState() {
     models: {},
     designModels: {},
     feasibilityInputs,
+    feasibilityBusinessFlow: businessFlow,
     feasibilityContextModel: contextModel,
     feasibilityContextPlantUml: "@startuml\n@enduml",
     feasibilityContextSvg: "<svg><text>维修预约系统</text></svg>",
@@ -98,8 +101,10 @@ function currentFeasibilityState() {
       requirementBaseline: null,
     }),
     feasibilityImplementationPlan: implementationPlan,
-    feasibilityImplementationFingerprint: snapshotInputFingerprint({
+    feasibilityImplementationFingerprint: buildFeasibilityImplementationFingerprint({
       rules,
+      requirementBaseline: null,
+      businessFlow,
       contextModel,
       inputs: feasibilityInputs,
     }),
@@ -161,4 +166,49 @@ test("stale feasibility analysis still blocks report generation", async () => {
   if (result.ok) return;
   assert.equal(result.statusCode, 409);
   assert.equal(result.body.error.code, "FEASIBILITY_IMPLEMENTATION_STALE");
+});
+
+test("report preflight rejects missing, stale, or changed business flow", async () => {
+  const cases = [
+    { code: "FEASIBILITY_BUSINESS_FLOW_MISSING", edit: (state: ReturnType<typeof currentFeasibilityState>) => { state.feasibilityBusinessFlow = null as never; } },
+    { code: "FEASIBILITY_BUSINESS_FLOW_STALE", edit: (state: ReturnType<typeof currentFeasibilityState>) => { state.feasibilityBusinessFlow.fingerprint = "stale"; } },
+    { code: "FEASIBILITY_IMPLEMENTATION_STALE", edit: (state: ReturnType<typeof currentFeasibilityState>) => { state.feasibilityBusinessFlow.model.nodes[1]!.name += " changed"; } },
+    { code: "FEASIBILITY_IMPLEMENTATION_STALE", edit: (state: ReturnType<typeof currentFeasibilityState>) => { state.feasibilityBusinessFlow.traceability[0]!.targetId = "end"; } },
+  ];
+  for (const entry of cases) {
+    const state = currentFeasibilityState();
+    entry.edit(state);
+    const result = await resolveDocumentRunInput(command, { projectId: "project-a" }, async () => ({ state }));
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.body.error.code, entry.code);
+  }
+});
+
+test("rerendering business flow leaves implementation report inputs current", async () => {
+  const state = currentFeasibilityState();
+  state.feasibilityBusinessFlow.svg.renderMeta.generatedAt = "2030-01-01T00:00:00.000Z";
+  state.feasibilityBusinessFlow.svg.svg = "<svg><text>rerendered</text></svg>";
+  const result = await resolveDocumentRunInput(command, { projectId: "project-a" }, async () => ({ state }));
+  assert.equal(result.ok, true);
+});
+
+test("report checks share the generation fallback for obsolete baseline formats", async () => {
+  const state = currentFeasibilityState();
+  state.requirementBaseline = { qualityStatus: "legacy" } as never;
+  const result = await resolveDocumentRunInput(command, { projectId: "project-a" }, async () => ({ state }));
+  assert.equal(result.ok, true);
+});
+
+test("full legacy report requests cannot bypass dependency checks or inject different artifacts", async () => {
+  const body = { ...command, requirementText: "client-supplied", rules: [], requirementModels: [], feasibilityImplementationPlan: implementationPlan };
+  const state = currentFeasibilityState();
+  const missingFlow = await resolveDocumentRunInput(body, { projectId: "project-a" }, async () => ({ state: { ...state, feasibilityBusinessFlow: null } }));
+  assert.equal(missingFlow.ok, false);
+  if (!missingFlow.ok) assert.equal(missingFlow.body.error.code, "FEASIBILITY_BUSINESS_FLOW_MISSING");
+  const current = await resolveDocumentRunInput(body, { projectId: "project-a" }, async () => ({ state }));
+  assert.equal(current.ok, true);
+  if (current.ok) {
+    assert.equal(current.input.requirementModels.length, 1);
+    assert.notEqual(current.input.requirementText, "client-supplied");
+  }
 });

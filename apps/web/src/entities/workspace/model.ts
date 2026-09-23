@@ -21,6 +21,7 @@ import type {
   ContextTraceRow,
   FeasibilityImplementationPlan,
   FeasibilityInputs,
+  FeasibilityBusinessFlowArtifact,
   TestGenerationResult,
 } from "@uml-platform/contracts";
 import type { DiagramType } from "../diagram/model";
@@ -106,6 +107,7 @@ export interface WorkspaceRecord {
   designInputFingerprints: Record<string, string>;
   feasibilityInputs: FeasibilityInputs;
   feasibilityContextModel: ContextDiagramSpec | null;
+  feasibilityBusinessFlow: FeasibilityBusinessFlowArtifact | null;
   feasibilityContextTraceability: ContextTraceRow[];
   feasibilityContextPlantUml: string;
   feasibilityContextSvg: string;

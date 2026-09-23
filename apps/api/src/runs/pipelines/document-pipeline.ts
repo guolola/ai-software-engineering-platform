@@ -1,5 +1,6 @@
 // Orchestrates document text, diagram image rendering, and DOCX export for document runs.
 
+import { createStageLifecycle } from "./shared/stage-lifecycle.js";
 import { createRunLlmChunkHandlers } from "./shared/llm-chunk-events.js";
 import {
   artifactReadyRunEventSchema,
@@ -187,11 +188,13 @@ export async function runDocumentStagePipeline(
   snapshot.feasibilityImplementationPlan = input.feasibilityImplementationPlan;
   snapshot.feasibilityInputs = input.feasibilityInputs;
   assertRequirementBaselineAllowsDownstream(snapshot.requirementBaseline);
+  const stages = createStageLifecycle(record);
   const updateStage = (stage: RunStage, message?: string) => {
     throwIfRunCancelled(record);
+    stages.advance(stage);
     snapshot.currentStage = stage;
     snapshot.status = "running";
-    emitEvent(record, stageStartedRunEventSchema.parse({ type: "stage_started", stage }));
+    emitEvent(record, stageStartedRunEventSchema.parse({ type: "stage_started", stage, tracksCompletion: true }));
     emitEvent(
       record,
       stageProgressRunEventSchema.parse({

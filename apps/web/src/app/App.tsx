@@ -183,6 +183,9 @@ function ProjectWorkspaceShell({
     case "feasibility-context":
       body = <FeasibilityPage view="context" />;
       break;
+    case "feasibility-business-flow":
+      body = <FeasibilityPage view="business-flow" />;
+      break;
     case "feasibility-context-element":
       body = (
         <FeasibilityPage
@@ -210,6 +213,34 @@ function ProjectWorkspaceShell({
       break;
     case "feasibility-context-relations":
       body = <FeasibilityPage view="relations" />;
+      break;
+    case "feasibility-business-flow-element":
+      body = (
+        <FeasibilityPage
+          view="business-flow"
+          highlightedElement={{
+            kind: selection.elementKind,
+            id: selection.elementId,
+          }}
+        />
+      );
+      break;
+    case "feasibility-business-flow-relationship":
+      body = (
+        <FeasibilityPage
+          view="business-flow-relations"
+          highlightedRelationshipId={selection.relationshipId}
+        />
+      );
+      break;
+    case "feasibility-business-flow-trace":
+      body = <FeasibilityPage view="business-flow-trace" />;
+      break;
+    case "feasibility-business-flow-elements":
+      body = <FeasibilityPage view="business-flow-elements" />;
+      break;
+    case "feasibility-business-flow-relations":
+      body = <FeasibilityPage view="business-flow-relations" />;
       break;
     case "feasibility-implementation":
       body = (

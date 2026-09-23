@@ -44,7 +44,9 @@ import {
   type MatrixScope,
   type RowStatus,
 } from "../lib/traceability-rows";
+import { buildBusinessFlowRows } from "../lib/business-flow-rows";
 import type {
+  FeasibilityBusinessFlowArtifact,
   ContextDiagramSpec,
   ContextTraceRow,
   DesignDiagramKind,
@@ -59,7 +61,7 @@ import {
 } from "../../../entities/diagram/model";
 import type { SemanticElementKind } from "../../../entities/diagram/lib/model-details";
 
-type MatrixMode = "requirements" | "design" | "context";
+type MatrixMode = "requirements" | "design" | "context" | "business-flow";
 type ContextMatrixData = {
   model: ContextDiagramSpec | null;
   traceability: ContextTraceRow[];
@@ -196,10 +198,12 @@ export function TraceabilityMatrixPage({
   mode,
   scope,
   contextData,
+  businessFlowData,
 }: {
   mode: MatrixMode;
   scope?: MatrixScope;
   contextData?: ContextMatrixData;
+  businessFlowData?: { artifact: FeasibilityBusinessFlowArtifact | null; rules: RequirementRule[]; stale: boolean };
 }) {
   const { t } = useTranslation();
   const {
@@ -219,7 +223,9 @@ export function TraceabilityMatrixPage({
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
   const isDesign = mode === "design";
-  const isContext = mode === "context";
+  const isBusinessFlow = mode === "business-flow";
+  const isContext = mode === "context" || isBusinessFlow;
+  const feasibilityCopyPrefix = isBusinessFlow ? "traceability.businessFlow" : "traceability.context";
   const isAnalysisRequirementScope = !isDesign && scope?.diagramKind === "analysis";
   const refSeparator = t("traceability.refSeparator");
   const traceabilityCopy = useMemo(() => createTraceabilityCopy(t), [t]);
@@ -246,7 +252,7 @@ export function TraceabilityMatrixPage({
   );
   const rows = useMemo(
     () =>
-      isContext
+      isBusinessFlow ? buildBusinessFlowRows(businessFlowData?.artifact ?? null, businessFlowData?.rules ?? [], traceabilityCopy) : isContext
         ? buildContextRows(
             contextData?.rules ?? [],
             contextData?.model ?? null,
@@ -276,6 +282,8 @@ export function TraceabilityMatrixPage({
       designModelTraceability,
       designModels,
       contextData,
+      businessFlowData,
+      isBusinessFlow,
       isContext,
       isDesign,
       models,
@@ -309,7 +317,7 @@ export function TraceabilityMatrixPage({
       ? rows.length > 0
       : requirementModelTraceability.length > 0;
   const isTraceabilityStale = isContext
-    ? Boolean(contextData?.stale)
+    ? Boolean(isBusinessFlow ? businessFlowData?.stale : contextData?.stale)
     : isDesign
     ? designTraceabilityStale
     : isAnalysisRequirementScope
@@ -318,12 +326,12 @@ export function TraceabilityMatrixPage({
   const hasIncompleteCoverage =
     hasTraceability && filteredRows.length > 0 && mappedCount < filteredRows.length;
   const missingTraceabilityTitle = isContext
-    ? t("traceability.context.missingTitle")
+    ? t(`${feasibilityCopyPrefix}.missingTitle`)
     : isDesign
     ? t("traceability.missing.designTitle")
     : t("traceability.missing.requirementTitle");
   const missingTraceabilityMessage = isContext
-    ? t("traceability.context.missingMessage")
+    ? t(`${feasibilityCopyPrefix}.missingMessage`)
     : isDesign
     ? t("traceability.missing.designMessage")
     : t("traceability.missing.requirementMessage");
@@ -346,20 +354,20 @@ export function TraceabilityMatrixPage({
   }, [totalPages]);
 
   const scopeLabel = isContext
-    ? t("traceability.context.label")
+    ? t(`${feasibilityCopyPrefix}.label`)
     : scope?.label ??
     (isDesign
       ? designGroupLabel(scope?.diagramKind ?? "sequence", traceabilityCopy)
       : requirementGroupLabel(scope?.diagramKind ?? "usecase", traceabilityCopy));
   const title = isContext
-    ? t("traceability.context.title")
+    ? t(`${feasibilityCopyPrefix}.title`)
     : scope
     ? t("traceability.title.scoped", { label: scopeLabel })
     : isDesign
       ? t("traceability.title.design")
       : t("traceability.title.requirements");
   const description = isContext
-    ? t("traceability.context.description")
+    ? t(`${feasibilityCopyPrefix}.description`)
     : scope
     ? isDesign
       ? t("traceability.description.scopedDesign", { label: scopeLabel })
@@ -370,7 +378,7 @@ export function TraceabilityMatrixPage({
       ? t("traceability.description.design")
       : t("traceability.description.requirements");
   const groupFilterLabel = isContext
-    ? t("traceability.context.filterLabel")
+    ? t(`${feasibilityCopyPrefix}.filterLabel`)
     : isDesign
       ? t("traceability.filters.designModelType")
       : t("traceability.filters.requirementModelType");
@@ -402,7 +410,7 @@ export function TraceabilityMatrixPage({
               </div>
               <p className="mt-1 leading-6">
                 {isContext
-                  ? t("traceability.context.staleMessage")
+                  ? t(`${feasibilityCopyPrefix}.${isTraceabilityStale ? "staleMessage" : "missingMessage"}`)
                   : isDesign
                   ? t("traceability.stale.designMessage")
                   : t("traceability.stale.requirementMessage")}
@@ -422,7 +430,7 @@ export function TraceabilityMatrixPage({
                     )}
                     <h3 className="text-sm font-semibold text-foreground">
                       {isContext
-                        ? t("traceability.context.mappingTitle")
+                        ? t(`${feasibilityCopyPrefix}.mappingTitle`)
                         : isDesign
                           ? t("traceability.mapping.design")
                           : t("traceability.mapping.requirements")}
@@ -479,7 +487,7 @@ export function TraceabilityMatrixPage({
                     </h3>
                     <p className="mt-2 text-sm text-muted-foreground">
                       {isContext
-                        ? t("traceability.context.emptyMessage")
+                        ? t(`${feasibilityCopyPrefix}.emptyMessage`)
                         : isDesign
                           ? t("traceability.empty.designMessage")
                           : t("traceability.empty.requirementMessage")}
@@ -493,7 +501,7 @@ export function TraceabilityMatrixPage({
                       <TableRow>
                         <TableHead className="sticky left-0 z-10 w-[34%] border-b border-r border-border bg-card px-4 py-4 text-left font-medium">
                           {isContext
-                            ? t("traceability.context.elementColumn")
+                            ? t(`${feasibilityCopyPrefix}.elementColumn`)
                             : isDesign
                               ? t("traceability.columns.designElement")
                               : t("traceability.columns.requirementElement")}

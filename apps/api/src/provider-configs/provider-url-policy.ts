@@ -119,7 +119,12 @@ export function inferOpenAiCompatibleProvider(baseUrl: string, provider?: string
 
   const hostname = new URL(normalizeManagedProviderBaseUrl(baseUrl)).hostname.toLowerCase();
   if (hostname === "api.siliconflow.cn") return "siliconflow";
-  if (hostname === "api.nonelinear.com") return "nonelinear";
+  if (
+    hostname === "api.nonelinear.com" ||
+    hostname === "api.nonelinear.com.cn"
+  ) {
+    return "nonelinear";
+  }
   if (hostname === "api.openai.com") return "openai";
   return "openai-compatible";
 }

@@ -28,6 +28,7 @@ export type WorkspaceSelection =
       label: string;
       initialSelectedArtifacts?: FeasibilityArtifactKind[];
     }
+  | { kind: "feasibility-business-flow"; label: string }
   | { kind: "feasibility-context"; label: string }
   | { kind: "feasibility-context-trace"; label: string }
   | { kind: "feasibility-context-elements"; label: string }
@@ -40,6 +41,20 @@ export type WorkspaceSelection =
     }
   | {
       kind: "feasibility-context-relationship";
+      relationshipId: string;
+      label: string;
+    }
+  | { kind: "feasibility-business-flow-trace"; label: string }
+  | { kind: "feasibility-business-flow-elements"; label: string }
+  | { kind: "feasibility-business-flow-relations"; label: string }
+  | {
+      kind: "feasibility-business-flow-element";
+      elementKind: string;
+      elementId: string;
+      label: string;
+    }
+  | {
+      kind: "feasibility-business-flow-relationship";
       relationshipId: string;
       label: string;
     }
@@ -117,6 +132,7 @@ interface WorkspaceShellState {
   openFeasibilityHome: (options?: {
     initialSelectedArtifacts?: FeasibilityArtifactKind[];
   }) => void;
+  openFeasibilityBusinessFlow: () => void;
   openFeasibilityContext: () => void;
   openFeasibilityContextTrace: () => void;
   openFeasibilityContextElements: () => void;
@@ -127,6 +143,18 @@ interface WorkspaceShellState {
     label: string,
   ) => void;
   openFeasibilityContextRelationship: (
+    relationshipId: string,
+    label: string,
+  ) => void;
+  openFeasibilityBusinessFlowTrace: () => void;
+  openFeasibilityBusinessFlowElements: () => void;
+  openFeasibilityBusinessFlowRelations: () => void;
+  openFeasibilityBusinessFlowElement: (
+    elementKind: string,
+    elementId: string,
+    label: string,
+  ) => void;
+  openFeasibilityBusinessFlowRelationship: (
     relationshipId: string,
     label: string,
   ) => void;
@@ -193,6 +221,8 @@ function tabIdForSelection(selection: WorkspaceSelection) {
       return "requirements";
     case "feasibility-home":
       return "feasibility";
+    case "feasibility-business-flow":
+      return "feasibility:business-flow";
     case "feasibility-context":
       return "feasibility:context";
     case "feasibility-context-trace":
@@ -205,6 +235,16 @@ function tabIdForSelection(selection: WorkspaceSelection) {
       return "feasibility:context";
     case "feasibility-context-relationship":
       return "feasibility:context";
+    case "feasibility-business-flow-trace":
+      return "feasibility:business-flow:trace";
+    case "feasibility-business-flow-elements":
+      return "feasibility:business-flow:elements";
+    case "feasibility-business-flow-relations":
+      return "feasibility:business-flow:relations";
+    case "feasibility-business-flow-element":
+      return "feasibility:business-flow";
+    case "feasibility-business-flow-relationship":
+      return "feasibility:business-flow";
     case "feasibility-implementation":
       return "feasibility:implementation";
     case "requirement-trace-matrix":
@@ -239,6 +279,12 @@ function tabLabelForSelection(selection: WorkspaceSelection) {
     case "requirements-text":
       return "需求模型";
     case "feasibility-home":
+    case "feasibility-business-flow":
+    case "feasibility-business-flow-trace":
+    case "feasibility-business-flow-elements":
+    case "feasibility-business-flow-relations":
+    case "feasibility-business-flow-element":
+    case "feasibility-business-flow-relationship":
     case "feasibility-context":
     case "feasibility-context-trace":
     case "feasibility-context-elements":
@@ -287,6 +333,12 @@ export function stageForSelection(selection: WorkspaceSelection): WorkspaceStage
     case "system-requirements":
       return "system-requirements";
     case "feasibility-home":
+    case "feasibility-business-flow":
+    case "feasibility-business-flow-trace":
+    case "feasibility-business-flow-elements":
+    case "feasibility-business-flow-relations":
+    case "feasibility-business-flow-element":
+    case "feasibility-business-flow-relationship":
     case "feasibility-context":
     case "feasibility-context-trace":
     case "feasibility-context-elements":
@@ -408,7 +460,8 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       }),
     [openWorkspaceTab],
   );
-  const openFeasibilityContext = useCallback(() => openWorkspaceTab({ kind: "feasibility-context", label: "系统上下文图（系统环境图）" }), [openWorkspaceTab]);
+  const openFeasibilityBusinessFlow = useCallback(() => openWorkspaceTab({ kind: "feasibility-business-flow", label: "业务与系统流程图" }), [openWorkspaceTab]);
+  const openFeasibilityContext = useCallback(() => openWorkspaceTab({ kind: "feasibility-context", label: "系统环境图" }), [openWorkspaceTab]);
   const openFeasibilityContextTrace = useCallback(() => openWorkspaceTab({ kind: "feasibility-context-trace", label: "上下文跟踪矩阵" }), [openWorkspaceTab]);
   const openFeasibilityContextElements = useCallback(() => openWorkspaceTab({ kind: "feasibility-context-elements", label: "上下文元素" }), [openWorkspaceTab]);
   const openFeasibilityContextRelations = useCallback(() => openWorkspaceTab({ kind: "feasibility-context-relations", label: "上下文关系" }), [openWorkspaceTab]);
@@ -417,6 +470,15 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
   }, [openWorkspaceTab]);
   const openFeasibilityContextRelationship = useCallback((relationshipId: string, label: string) => {
     openWorkspaceTab({ kind: "feasibility-context-relationship", relationshipId, label });
+  }, [openWorkspaceTab]);
+  const openFeasibilityBusinessFlowTrace = useCallback(() => openWorkspaceTab({ kind: "feasibility-business-flow-trace", label: "流程跟踪矩阵" }), [openWorkspaceTab]);
+  const openFeasibilityBusinessFlowElements = useCallback(() => openWorkspaceTab({ kind: "feasibility-business-flow-elements", label: "流程元素" }), [openWorkspaceTab]);
+  const openFeasibilityBusinessFlowRelations = useCallback(() => openWorkspaceTab({ kind: "feasibility-business-flow-relations", label: "流程关系" }), [openWorkspaceTab]);
+  const openFeasibilityBusinessFlowElement = useCallback((elementKind: string, elementId: string, label: string) => {
+    openWorkspaceTab({ kind: "feasibility-business-flow-element", elementKind, elementId, label });
+  }, [openWorkspaceTab]);
+  const openFeasibilityBusinessFlowRelationship = useCallback((relationshipId: string, label: string) => {
+    openWorkspaceTab({ kind: "feasibility-business-flow-relationship", relationshipId, label });
   }, [openWorkspaceTab]);
   const openFeasibilityImplementation = useCallback((candidateId?: string, label = "实现方案") => {
     openWorkspaceTab({ kind: "feasibility-implementation", candidateId, label });
@@ -589,12 +651,18 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       openSystemRequirements,
       openRequirementsText,
       openFeasibilityHome,
+      openFeasibilityBusinessFlow,
       openFeasibilityContext,
       openFeasibilityContextTrace,
+      openFeasibilityBusinessFlowTrace,
       openFeasibilityContextElements,
+      openFeasibilityBusinessFlowElements,
       openFeasibilityContextRelations,
+      openFeasibilityBusinessFlowRelations,
       openFeasibilityContextElement,
+      openFeasibilityBusinessFlowElement,
       openFeasibilityContextRelationship,
+      openFeasibilityBusinessFlowRelationship,
       openFeasibilityImplementation,
       openRequirementTraceMatrix,
       openDiagram,
@@ -616,12 +684,18 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       openRequirementsText,
       openSystemRequirements,
       openFeasibilityHome,
+      openFeasibilityBusinessFlow,
       openFeasibilityContext,
       openFeasibilityContextTrace,
+      openFeasibilityBusinessFlowTrace,
       openFeasibilityContextElements,
+      openFeasibilityBusinessFlowElements,
       openFeasibilityContextRelations,
+      openFeasibilityBusinessFlowRelations,
       openFeasibilityContextElement,
+      openFeasibilityBusinessFlowElement,
       openFeasibilityContextRelationship,
+      openFeasibilityBusinessFlowRelationship,
       openFeasibilityImplementation,
       openRequirementTraceMatrix,
       openWorkspaceTab,
@@ -672,6 +746,8 @@ export function getSelectionKey(selection: WorkspaceSelection) {
       return "requirements";
     case "feasibility-home":
       return "feasibility";
+    case "feasibility-business-flow":
+      return "feasibility:business-flow";
     case "feasibility-context":
       return "feasibility:context";
     case "feasibility-context-trace":
@@ -684,6 +760,16 @@ export function getSelectionKey(selection: WorkspaceSelection) {
       return `feasibility-context-element:context:${selection.elementKind}:${selection.elementId}`;
     case "feasibility-context-relationship":
       return `feasibility-context-relationship:context:${selection.relationshipId}`;
+    case "feasibility-business-flow-trace":
+      return "feasibility:business-flow:trace";
+    case "feasibility-business-flow-elements":
+      return "feasibility:business-flow:elements";
+    case "feasibility-business-flow-relations":
+      return "feasibility:business-flow:relations";
+    case "feasibility-business-flow-element":
+      return `feasibility-business-flow-element:feasibility-business-flow:${selection.elementKind}:${selection.elementId}`;
+    case "feasibility-business-flow-relationship":
+      return `feasibility-business-flow-relationship:feasibility-business-flow:${selection.relationshipId}`;
     case "feasibility-implementation":
       return selection.candidateId
         ? `feasibility:implementation:${selection.candidateId}`

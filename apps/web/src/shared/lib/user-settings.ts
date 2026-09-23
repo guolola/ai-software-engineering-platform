@@ -109,11 +109,8 @@ export function loadUserSettings(): UserSettings {
     const trimmedDefaultModel =
       typeof next.defaultModel === "string" ? next.defaultModel.trim() : "";
     if (next.providerConfigId) {
-      next.defaultModel =
-        sanitizedProviderModelOptions.length > 0 &&
-          !sanitizedProviderModelOptions.includes(trimmedDefaultModel)
-          ? sanitizedProviderModelOptions[0]
-          : trimmedDefaultModel || sanitizedProviderModelOptions[0] || "";
+      // Preserve missing or retired selections so generation requires an explicit valid choice.
+      next.defaultModel = trimmedDefaultModel;
     } else {
       next.defaultModel = "";
       next.providerModelOptions = [];

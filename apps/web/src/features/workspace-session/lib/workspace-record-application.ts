@@ -38,6 +38,7 @@ type WorkspaceRecordAppliers = {
     | "feasibilityContextFingerprint"
   > | null>;
   setHasFeasibilityContextArtifact: Setter<boolean>;
+  setFeasibilityBusinessFlow: Setter<WorkspaceRecord["feasibilityBusinessFlow"]>;
   setHasFeasibilityImplementationArtifact: Setter<boolean>;
   setFeasibilityImplementationPlan: Setter<WorkspaceRecord["feasibilityImplementationPlan"]>;
   setManualModelEditStatus: Setter<WorkspaceRecord["manualModelEditStatus"]>;
@@ -110,6 +111,7 @@ export function applyWorkspaceRecordToSessionState(
       workspace.feasibilityContextSvg,
     ),
   );
+  appliers.setFeasibilityBusinessFlow(workspace.feasibilityBusinessFlow ?? null);
   appliers.setHasFeasibilityImplementationArtifact(
     Boolean(workspace.feasibilityImplementationPlan),
   );

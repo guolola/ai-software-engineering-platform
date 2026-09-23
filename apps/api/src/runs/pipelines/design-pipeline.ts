@@ -1,5 +1,6 @@
 // Orchestrates design-model generation, PlantUML, and SVG rendering for design runs.
 
+import { createStageLifecycle } from "./shared/stage-lifecycle.js";
 import {
   artifactReadyRunEventSchema,
   completedRunEventSchema,
@@ -1280,11 +1281,13 @@ export async function runDesignStagePipeline(
   const requirementBaseline = snapshot.requirementBaseline;
   assertRequirementBaselineAllowsDownstream(requirementBaseline);
 
+  const stages = createStageLifecycle(record);
   const updateStage = (stage: RunStage, message?: string) => {
     throwIfRunCancelled(record);
+    stages.advance(stage);
     snapshot.currentStage = stage;
     snapshot.status = "running";
-    emitEvent(record, stageStartedRunEventSchema.parse({ type: "stage_started", stage }));
+    emitEvent(record, stageStartedRunEventSchema.parse({ type: "stage_started", stage, tracksCompletion: true }));
     emitEvent(
       record,
       stageProgressRunEventSchema.parse({
@@ -1917,6 +1920,9 @@ export async function runDesignStagePipeline(
     throw new Error(renderFailures.join("；"));
   }
 
+  stages.finish("generate_design_models");
+  stages.finish("generate_plantuml");
+  stages.finish("render_svg");
   snapshot.currentStage = "render_svg";
   throwIfRunCancelled(record);
   snapshot.status = "completed";

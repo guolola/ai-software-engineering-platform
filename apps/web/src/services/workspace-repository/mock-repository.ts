@@ -126,6 +126,9 @@ export function createMockWorkspaceRepository(
   const documents = new Map<string, DocumentLibraryItem>();
 
   return {
+    async getProjectAccess() {
+      return { capabilities: ["update_project", "start_runs"], generationExecutionMode: "offline-demo" };
+    },
     async loadWorkspace() {
       return {
         ...workspace,

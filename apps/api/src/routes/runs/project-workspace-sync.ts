@@ -42,6 +42,10 @@ function mergeFeasibilitySnapshot(
   snapshot: FeasibilityRunSnapshot,
 ) {
   const next = { ...state, feasibilityInputs: snapshot.inputs };
+  // Publish the activity model, mappings and rendered artifacts together only after success.
+  if (snapshot.businessFlow) {
+    Object.assign(next, { feasibilityBusinessFlow: snapshot.businessFlow });
+  }
   // Partial context is durable even if implementation generation fails; an old
   // implementation remains untouched until a new plan has passed validation.
   if (snapshot.contextModel && snapshot.contextPlantUml && snapshot.contextSvg) {

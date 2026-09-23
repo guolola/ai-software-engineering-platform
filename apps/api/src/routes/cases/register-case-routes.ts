@@ -121,8 +121,15 @@ async function buildTemplateWorkspaceState(
     throw new Error("Case template feasibility context source is missing");
   }
   const feasibilityRendered = await renderClient(feasibilityArtifact);
+  const businessFlowRendered = await renderClient(template.businessFlow.plantUml);
   const feasibilitySnapshot = feasibilityRunSnapshotSchema.parse({
     ...template.feasibilitySnapshot,
+    businessFlow: {
+      ...template.businessFlow,
+      fingerprint: template.feasibilitySnapshot.contextFingerprint,
+      svg: { diagramKind: "activity", modelId: template.businessFlow.model.modelId,
+        svg: businessFlowRendered.svg, renderMeta: businessFlowRendered.renderMeta },
+    },
     contextSvg: {
       diagramKind: "context",
       modelId: feasibilityArtifact.modelId ?? "context",
@@ -147,6 +154,7 @@ async function buildTemplateWorkspaceState(
   return {
     ...codeState,
     feasibilityInputs: feasibilitySnapshot.inputs,
+    feasibilityBusinessFlow: feasibilitySnapshot.businessFlow,
     feasibilityContextModel: feasibilitySnapshot.contextModel,
     feasibilityContextTraceability: feasibilitySnapshot.contextTraceability,
     feasibilityContextPlantUml: feasibilitySnapshot.contextPlantUml?.source ?? "",

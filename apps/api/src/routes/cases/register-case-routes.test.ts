@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import {
   buildAcceptedRequirementSnapshot,
-  snapshotInputFingerprint,
+  buildFeasibilityImplementationFingerprint,
+  readFeasibilityBusinessFlowArtifact,
 } from "@uml-platform/contracts";
 import {
   createInMemoryAuthStore,
@@ -181,6 +182,7 @@ test("case project creation seeds every marketing case workspace", async () => {
     assert.ok(workspace.state.codeSpec);
     assert.ok(workspace.state.codeBusinessLogic);
     assert.ok(workspace.state.feasibilityContextModel);
+    assert.ok(readFeasibilityBusinessFlowArtifact(workspace.state.feasibilityBusinessFlow));
     assert.match(String(workspace.state.feasibilityContextPlantUml), /@startuml/u);
     assert.match(String(workspace.state.feasibilityContextSvg), /<svg/u);
     assert.equal(
@@ -219,8 +221,10 @@ test("case project creation seeds every marketing case workspace", async () => {
     );
     assert.equal(
       workspace.state.feasibilityImplementationFingerprint,
-      snapshotInputFingerprint({
+      buildFeasibilityImplementationFingerprint({
         rules: requirementSource.rules,
+        requirementBaseline: requirementSource.baseline,
+        businessFlow: readFeasibilityBusinessFlowArtifact(workspace.state.feasibilityBusinessFlow),
         contextModel: workspace.state.feasibilityContextModel,
         inputs: workspace.state.feasibilityInputs,
       }),

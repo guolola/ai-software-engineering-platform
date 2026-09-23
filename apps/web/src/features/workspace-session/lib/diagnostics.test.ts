@@ -102,6 +102,15 @@ describe("workspace-session diagnostics helpers", () => {
     expect(afterProgress.events.at(-1)?.label).toBe("阶段进度");
   });
 
+  it("retains stage boundaries for replay without duplicate diagnostic notices or progress resets", () => {
+    const event: RunEvent = { type: "stage_finished", stage: "generate_models", status: "completed", eventId: "stage-end", createdAt: "2026-09-23T00:00:00.000Z" };
+    const next = deriveRunDiagnosticsFromEvent(createEmptyDiagnostics(), event, summarizeEvent(event));
+    expect(next.transcript).toEqual([event]);
+    expect(next.events).toEqual([]);
+    expect(getProgressFromEvent(event)).toBeNull();
+    expect(next.finishedAt).toBeNull();
+  });
+
   it("maps run event progress without changing SSE event shape", () => {
     expect(getProgressFromEvent({ type: "queued" })).toBe(5);
     expect(

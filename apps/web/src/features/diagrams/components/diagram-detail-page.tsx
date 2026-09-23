@@ -11,6 +11,7 @@ import {
   designDiagramModelSpecSchema,
   diagramModelSpecSchema,
   type ContextDiagramSpec,
+  type ActivityDiagramSpec,
 } from "@uml-platform/contracts";
 import { floatingAlert } from "../../../shared/ui/floating-alert";
 import {
@@ -149,6 +150,17 @@ export function ContextDiagramView({
   );
 }
 
+// A saved feasibility activity uses the same detail layout without editing requirement-stage models.
+export function BusinessFlowDiagramView({ data, section = "diagram", highlightedElement, highlightedRelationshipId }: {
+  data: Omit<ContextDiagramData, "model" | "onSave"> & { model: ActivityDiagramSpec | null; onSave?: never };
+  section?: ContextDiagramSection;
+  highlightedElement?: { kind: string; id: string } | null;
+  highlightedRelationshipId?: string | null;
+}) {
+  return <DiagramDetailView stage="business-flow" type="activity" contextData={data}
+    initialSection={section} highlightedElement={highlightedElement} highlightedRelationshipId={highlightedRelationshipId} />;
+}
+
 function DiagramDetailView({
   stage,
   type,
@@ -158,12 +170,12 @@ function DiagramDetailView({
   contextData,
   initialSection = "diagram",
 }: {
-  stage: "requirements" | "design" | "context";
+  stage: "requirements" | "design" | "context" | "business-flow";
   type: DiagramType | DesignDiagramType;
   modelId?: string;
   highlightedElement?: { kind: string; id: string } | null;
   highlightedRelationshipId?: string | null;
-  contextData?: ContextDiagramData;
+  contextData?: ContextDiagramData | (Omit<ContextDiagramData, "model" | "onSave"> & { model: ActivityDiagramSpec | null; onSave?: never });
   initialSection?: ContextDiagramSection;
 }) {
   const { t } = useTranslation();
@@ -190,18 +202,20 @@ function DiagramDetailView({
     openDiagramElement,
     openDesignDiagramElement,
   } = useWorkspaceShell();
-  const isContext = stage === "context";
+  const isBusinessFlow = stage === "business-flow";
+  const isFeasibility = stage === "context" || isBusinessFlow;
+  const readOnly = isBusinessFlow;
   const isDesign = stage === "design";
   const saveContextModel = contextData?.onSave;
   const requirementType = type as DiagramType;
   const designType = type as DesignDiagramType;
-  const isStale = isContext
+  const isStale = isFeasibility
     ? Boolean(contextData?.stale)
     : !isDesign && staleDiagrams.includes(requirementType);
   const meta = isDesign ? DESIGN_DIAGRAM_META[designType] : DIAGRAM_META[requirementType];
   const diagramKindKey = String(type);
-  const metaLabel = t(`diagrams.kinds.${diagramKindKey}.label`, { defaultValue: meta.label });
-  const metaDescription = t(`diagrams.kinds.${diagramKindKey}.description`, {
+  const metaLabel = isBusinessFlow ? t("feasibility.artifact.businessFlow") : t(`diagrams.kinds.${diagramKindKey}.label`, { defaultValue: meta.label });
+  const metaDescription = isBusinessFlow ? t("feasibility.artifact.businessFlowDescription") : t(`diagrams.kinds.${diagramKindKey}.description`, {
     defaultValue: meta.description,
   });
   const designModel = isDesign
@@ -214,7 +228,7 @@ function DiagramDetailView({
         ) ?? Object.values(designModels).find((entry) => entry.diagramKind === designType)
     : undefined;
   const designArtifactId = designModel ? getDesignModelId(designModel) : modelId ?? designType;
-  const requirementModel = !isDesign && !isContext
+  const requirementModel = !isDesign && !isFeasibility
     ? modelId
       ? models[modelId]
       : models[requirementType]
@@ -222,25 +236,25 @@ function DiagramDetailView({
   const requirementArtifactId = requirementModel
     ? getRequirementModelId(requirementModel)
     : modelId ?? requirementType;
-  const source = isContext
+  const source = isFeasibility
     ? contextData?.plantUmlSource ?? ""
     : isDesign
       ? designPlantUml[designArtifactId] ?? ""
       : plantUml[requirementArtifactId] ?? plantUml[requirementType] ?? "";
-  const model = isContext ? contextData?.model : isDesign ? designModel : requirementModel;
-  const svgMarkup = isContext
+  const model = isFeasibility ? contextData?.model : isDesign ? designModel : requirementModel;
+  const svgMarkup = isFeasibility
     ? contextData?.svgMarkup ?? ""
     : isDesign
       ? designSvgArtifacts[designArtifactId]?.svg ?? ""
       : svgArtifacts[requirementArtifactId]?.svg ?? svgArtifacts[requirementType]?.svg ?? "";
   const normalizedSvgMarkup = useMemo(() => sanitizeSvgMarkup(svgMarkup), [svgMarkup]);
-  const diagramError = isContext
+  const diagramError = isFeasibility
     ? null
     : isDesign
     ? designDiagramErrors[designType] ?? null
     : diagramErrors[requirementArtifactId] ?? diagramErrors[requirementType] ?? null;
-  const statusKey = isContext ? "context" : isDesign ? designArtifactId : requirementArtifactId;
-  const editStatus = isContext ? undefined : manualModelEditStatus[statusKey];
+  const statusKey = isBusinessFlow ? "feasibility-business-flow" : isFeasibility ? "context" : isDesign ? designArtifactId : requirementArtifactId;
+  const editStatus = isFeasibility ? undefined : manualModelEditStatus[statusKey];
   const compactViewport = useCompactViewport();
   const [activeTab, setActiveTab] = useState<"diagram" | "elements" | "relations" | "edit">(
     "diagram",
@@ -299,12 +313,13 @@ function DiagramDetailView({
     setDraft((current) => (current ? { ...current, [key]: value } : current));
   }, []);
   const commitDraftAndRerender = useCallback(async (nextDraft: Record<string, unknown>) => {
+    if (readOnly) return;
     setSaving(true);
     setSaveStatus("saving");
     try {
       // Model edits cross the UI -> workspace -> renderer contract here; parsing
       // removes editor-only metadata before it can affect downstream freshness.
-      const parsedDraft = isContext
+      const parsedDraft = isFeasibility
         ? contextDiagramSpecSchema.safeParse(nextDraft)
         : isDesign
           ? designDiagramModelSpecSchema.safeParse(nextDraft)
@@ -313,7 +328,7 @@ function DiagramDetailView({
         parsedDraft.success ? parsedDraft.data : nextDraft
       ) as unknown as Record<string, unknown>;
       setDraft(canonicalDraft);
-      if (isContext) {
+      if (isFeasibility) {
         if (!saveContextModel) {
           throw new Error("上下文模型校验失败");
         }
@@ -341,7 +356,8 @@ function DiagramDetailView({
     }
   }, [
     designArtifactId,
-    isContext,
+    readOnly,
+    isFeasibility,
     isDesign,
     requirementType,
     rerenderDesignModel,
@@ -352,7 +368,7 @@ function DiagramDetailView({
     t,
   ]);
   useEffect(() => {
-    if (!draft || saving) return;
+    if (readOnly || !draft || saving) return;
     const fingerprint = draftFingerprint(draft);
     if (fingerprint === persistedDraftFingerprintRef.current) return;
     const timer = window.setTimeout(() => {
@@ -361,15 +377,15 @@ function DiagramDetailView({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [commitDraftAndRerender, draft, saving]);
+  }, [commitDraftAndRerender, draft, saving, readOnly]);
   const sourceRules = useMemo(
     () =>
-      isContext
+      isFeasibility
         ? contextData?.rules ?? []
         : isDesign || requirementType === "analysis"
           ? []
           : rulesForDiagram(requirementType),
-    [contextData?.rules, isContext, isDesign, requirementType, rulesForDiagram],
+    [contextData?.rules, isFeasibility, isDesign, requirementType, rulesForDiagram],
   );
   const detailModel = useMemo(() => buildDiagramDetailModel(draft ?? model), [draft, model]);
   const { items, groups, relationships } = detailModel;
@@ -464,7 +480,7 @@ function DiagramDetailView({
   }, [highlightedElementKey]);
   const modelTitle = getModelText(draft ?? model, "title", metaLabel);
   const modelSummary = getModelText(draft ?? model, "summary", metaDescription);
-  const effectiveSaveStatus = isContext ? contextData?.saveStatus ?? saveStatus : saveStatus;
+  const effectiveSaveStatus = isFeasibility ? contextData?.saveStatus ?? saveStatus : saveStatus;
   const saveStatusLabel =
     effectiveSaveStatus === "saving"
       ? t("diagrams.detail.saveUpdating")
@@ -492,7 +508,7 @@ function DiagramDetailView({
       setLocalHighlightedElement(null);
       return;
     }
-    if (isContext) {
+    if (isFeasibility) {
       setActiveTab("diagram");
     } else if (isDesign) {
       openDesignDiagram(
@@ -510,7 +526,7 @@ function DiagramDetailView({
   }, [
     designArtifactId,
     designType,
-    isContext,
+    isFeasibility,
     isDesign,
     localHighlightedElement,
     metaLabel,
@@ -545,10 +561,11 @@ function DiagramDetailView({
       {!model && !source ? (
         <div className="w-full py-6 lg:py-8">
           <div className="mx-auto flex w-[calc(100%-2rem)] max-w-348 flex-col gap-4 sm:w-[calc(100%-3rem)]">
-            {isContext && contextData?.headerAction ? (
+            <h2 className="text-2xl font-semibold">{metaLabel}</h2>
+            {isFeasibility && contextData?.headerAction ? (
               <div className="flex justify-end">{contextData.headerAction}</div>
             ) : null}
-            {isContext && contextData?.errorMessage ? (
+            {isFeasibility && contextData?.errorMessage ? (
               <Alert variant="destructive" role="alert" className="flex items-center gap-2 border px-4 py-3 text-sm">
                 <AlertTriangle className="size-4 shrink-0" />
                 {contextData.errorMessage}
@@ -570,7 +587,7 @@ function DiagramDetailView({
             ) : (
               <Card className="gap-0 py-0 border-dashed px-4 py-12 text-center text-sm text-muted-foreground">
                 {t("diagrams.detail.notGenerated", {
-                  stage: isContext
+                  stage: isFeasibility
                     ? "可行性分析"
                     : t(`diagrams.stage.${isDesign ? "design" : "requirements"}`),
                 })}
@@ -588,21 +605,21 @@ function DiagramDetailView({
             </Alert>
           )}
 
-          {isContext && contextData?.errorMessage ? (
+          {isFeasibility && contextData?.errorMessage ? (
             <Alert variant="destructive" role="alert" className="flex flex-wrap items-center gap-2 border px-4 py-3 text-sm">
               <AlertTriangle className="size-4 shrink-0" />
               <span>{contextData.errorMessage}</span>
             </Alert>
           ) : null}
 
-          {isContext && contextData?.statusMessage ? (
+          {isFeasibility && contextData?.statusMessage ? (
             <Card aria-live="polite" className="gap-0 py-0 px-4 py-2 text-xs text-muted-foreground">
               {contextData.statusMessage}
             </Card>
           ) : null}
 
           <DiagramDetailHeader
-            draft={draft}
+            draft={readOnly ? null : draft}
             modelTitle={modelTitle}
             modelSummary={modelSummary}
             saveStatus={effectiveSaveStatus}
@@ -611,7 +628,7 @@ function DiagramDetailView({
             itemCount={items.length}
             relationshipCount={relationships.length}
             groupCount={groups.length}
-            actions={isContext ? contextData?.headerAction : undefined}
+            actions={isFeasibility ? contextData?.headerAction : undefined}
             onChangeTitle={(value) => setDraftField("title", value)}
             onChangeSummary={(value) => setDraftField("summary", value)}
           />
@@ -654,7 +671,7 @@ function DiagramDetailView({
                     >
                       {t("diagrams.tabs.relations")}
                     </TabsTrigger>
-                    {draft ? (
+                    {draft && !readOnly ? (
                       <TabsTrigger
                         value="edit"
                         className={cn(
@@ -674,9 +691,9 @@ function DiagramDetailView({
             <TabsContent value="diagram" className="m-0 p-0">
               <DiagramPreviewPanel
                   description={metaDescription}
-                  stage={isContext ? "feasibility" : stage}
+                  stage={isFeasibility ? "feasibility" : stage}
                   type={type}
-                  exportFileStem={isContext ? "context" : undefined}
+                  exportFileStem={isBusinessFlow ? "feasibility-business-flow" : isFeasibility ? "context" : undefined}
                   plantUmlSource={source}
                   normalizedSvgMarkup={normalizedSvgMarkup}
                   svgMarkup={svgMarkup}
@@ -709,27 +726,33 @@ function DiagramDetailView({
               />
               {!compactViewport && draft ? (
                 <div className="pt-4">
-                  <Alert className="mb-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap border px-3 py-2 text-xs text-foreground">
+                  {isBusinessFlow && Array.isArray(model?.notes) && model.notes.length > 0 && (
+                    <ul className="mb-4 list-disc pl-5 text-sm text-muted-foreground">
+                      {model.notes.map((note, index) => <li key={index}>{note}</li>)}
+                    </ul>
+                  )}
+                  {!readOnly && <Alert className="mb-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap border px-3 py-2 text-xs text-foreground">
                     <AlertTriangle className="size-3.5 shrink-0 text-warning" />
                     <span>{editWarningText}</span>
-                  </Alert>
+                  </Alert>}
                   <ModelEditPanel
+                    readOnly={readOnly}
                     draft={draft}
                     setDraft={setDraft}
                     onCommitDraft={commitDraftAndRerender}
                     onSelectElement={selectElementInDiagram}
                     selectedElement={effectiveHighlightedElement}
                     saving={saving}
-                    focusSection={isContext && !compactViewport && initialSection !== "diagram"
+                    focusSection={isFeasibility && !compactViewport && initialSection !== "diagram"
                       ? initialSection === "relations" ? "relationships" : "elements"
                       : null}
-                    sourceRuleOptions={isContext ? sourceRules.map((rule) => ({ id: rule.id, label: rule.text })) : []}
+                    sourceRuleOptions={isFeasibility ? sourceRules.map((rule) => ({ id: rule.id, label: rule.text })) : []}
                   />
                 </div>
               ) : null}
             </TabsContent>
 
-            {compactViewport && draft ? (
+            {compactViewport && draft && !readOnly ? (
             <TabsContent value="edit" className="m-0 p-0">
               <div className="px-3 pb-3 pt-3 sm:px-5 sm:pb-5 sm:pt-5">
                 <Alert className="mb-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap border px-3 py-2 text-xs text-foreground">
@@ -743,7 +766,7 @@ function DiagramDetailView({
                   onSelectElement={selectElementInDiagram}
                   selectedElement={effectiveHighlightedElement}
                   saving={saving}
-                  sourceRuleOptions={isContext ? sourceRules.map((rule) => ({ id: rule.id, label: rule.text })) : []}
+                  sourceRuleOptions={isFeasibility ? sourceRules.map((rule) => ({ id: rule.id, label: rule.text })) : []}
                 />
               </div>
             </TabsContent>
@@ -862,7 +885,7 @@ function DiagramDetailView({
                                   aria-pressed={Boolean(active)}
                                   className="absolute inset-0 z-10 size-auto cursor-pointer rounded-xl p-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                   onClick={() => {
-                                    if (isContext) {
+                                    if (isFeasibility) {
                                       selectElementInDiagram(el);
                                       setActiveTab("diagram");
                                       return;

@@ -151,7 +151,7 @@ describe("createStartRunInput", () => {
     localStorage.clear();
   });
 
-  it("uses the offline demo provider when no managed provider is selected", () => {
+  it("rejects real generation when no managed provider is selected", () => {
     localStorage.setItem(
       "uml-lab-settings",
       JSON.stringify({
@@ -164,15 +164,10 @@ describe("createStartRunInput", () => {
       }),
     );
 
-    expect(createStartRunInput("生成 UML", ["usecase"])).toMatchObject({
-      providerSettings: {
-        providerConfigId: "offline-demo",
-        model: "offline-demo-fixed-artifacts",
-      },
-    });
+    expect(() => createStartRunInput("生成 UML", ["usecase"])).toThrow("请先配置并选择模型供应商");
   });
 
-  it("uses the offline demo provider when only stale plaintext settings remain", () => {
+  it("rejects real generation when only stale plaintext settings remain", () => {
     localStorage.setItem(
       "uml-lab-settings",
       JSON.stringify({
@@ -186,12 +181,7 @@ describe("createStartRunInput", () => {
       }),
     );
 
-    expect(createStartRunInput("生成 UML", ["usecase"])).toMatchObject({
-      providerSettings: {
-        providerConfigId: "offline-demo",
-        model: "offline-demo-fixed-artifacts",
-      },
-    });
+    expect(() => createStartRunInput("生成 UML", ["usecase"])).toThrow("请先配置并选择模型供应商");
   });
 
   it("includes only managed provider config references when selected", () => {
@@ -263,6 +253,19 @@ describe("createHttpWorkspaceRepository", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     localStorage.clear();
+  });
+
+  it.each([undefined, "provider", "offline-demo", "unknown"])("loads project generation mode with permissions: %s", async (generationExecutionMode) => {
+    const fetchMock = vi.fn(async (_url: unknown) => new Response(JSON.stringify({
+      capabilities: ["update_project", "start_runs"], generationExecutionMode,
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const repository = createHttpWorkspaceRepository({ projectId: "project-mode" });
+    expect(await repository.getProjectAccess!()).toEqual({
+      capabilities: ["update_project", "start_runs"],
+      generationExecutionMode: generationExecutionMode === "offline-demo" ? "offline-demo" : "provider",
+    });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/api/projects/project-mode");
   });
 
   it("uses legacy requirement subscriptions when no project scope is available", async () => {

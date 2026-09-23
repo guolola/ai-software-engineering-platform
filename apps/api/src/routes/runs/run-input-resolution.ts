@@ -1,6 +1,8 @@
 // Resolves project-scoped run start commands into full pipeline request inputs.
 import {
   buildAcceptedRequirementSnapshot,
+  buildFeasibilityImplementationFingerprint,
+  readFeasibilityBusinessFlowArtifact,
   designInputFingerprint,
   normalizeSnapshotFingerprint,
   normalizeDesignInputFingerprint,
@@ -576,19 +578,23 @@ function rejectProjectGenerationPreflight(input: {
         "FEASIBILITY_CONTEXT_MISSING",
       );
     }
-    const contextFingerprint = snapshotInputFingerprint({
-      rules: acceptedFeasibilityRules(input.state),
-      requirementBaseline: input.state.requirementBaseline ?? null,
-    });
+      const contextFingerprint = buildAcceptedRequirementSnapshot(
+        input.state.rules ?? [], input.state.requirementBaseline ?? null,
+      ).snapshot.fingerprint;
     if (
       normalizeSnapshotFingerprint(stringValue(input.state.feasibilityContextFingerprint)) !==
       contextFingerprint
     ) {
       return runInputResolutionError(409, "FEASIBILITY_CONTEXT_STALE");
     }
-    const implementationFingerprint = snapshotInputFingerprint({
+    const businessFlow = readFeasibilityBusinessFlowArtifact(input.state.feasibilityBusinessFlow);
+    if (!businessFlow) return runInputResolutionError(409, "FEASIBILITY_BUSINESS_FLOW_MISSING");
+    if (businessFlow.fingerprint !== contextFingerprint) return runInputResolutionError(409, "FEASIBILITY_BUSINESS_FLOW_STALE");
+    const implementationFingerprint = buildFeasibilityImplementationFingerprint({
       rules: acceptedFeasibilityRules(input.state),
+      requirementBaseline: input.state.requirementBaseline ?? null,
       contextModel,
+      businessFlow,
       inputs: recordValue(input.state.feasibilityInputs),
     });
     if (
@@ -1062,9 +1068,18 @@ export async function resolveDocumentRunInput(
   loadProjectWorkspace?: LoadProjectWorkspaceForRun,
 ): Promise<InputResolution<StartDocumentRunRequest>> {
   const legacy = startDocumentRunRequestSchema.safeParse(body);
-  if (legacy.success) return { ok: true, input: legacy.data };
+  if (legacy.success && legacy.data.documentKind !== "feasibilityStudy") {
+    return { ok: true, input: legacy.data };
+  }
 
-  const command: StartDocumentRunCommand = startDocumentRunCommandSchema.parse(body);
+  // A full legacy request must not bypass feasibility dependencies or replace saved report inputs.
+  const command: StartDocumentRunCommand = legacy.success ? {
+    projectId: legacy.data.projectId,
+    documentKind: legacy.data.documentKind,
+    providerSettings: legacy.data.providerSettings,
+    useAiText: legacy.data.useAiText,
+    documentStyle: legacy.data.documentStyle,
+  } : startDocumentRunCommandSchema.parse(body);
   const workspace = await loadWorkspaceStateForCommand({
     commandProjectId: command.projectId,
     metadata,
@@ -1084,7 +1099,9 @@ export async function resolveDocumentRunInput(
       requirementText:
         stringValue(workspace.input.state.requirementText) ||
         (command.documentKind === "feasibilityStudy" ? "未提供/待确认" : ""),
-      requirementBaseline: workspace.input.state.requirementBaseline ?? null,
+      requirementBaseline: command.documentKind === "feasibilityStudy"
+        ? buildAcceptedRequirementSnapshot(workspace.input.state.rules ?? [], workspace.input.state.requirementBaseline ?? null).baseline
+        : workspace.input.state.requirementBaseline ?? null,
       rules: command.documentKind === "feasibilityStudy"
         ? acceptedFeasibilityRules(workspace.input.state)
         : arrayValue(workspace.input.state.rules),

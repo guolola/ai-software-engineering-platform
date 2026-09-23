@@ -1978,10 +1978,10 @@ describe("TopBar", () => {
     expect(within(stageSection as HTMLElement).queryByText("生成图形预览")).not.toBeInTheDocument();
     expect(within(stageSection as HTMLElement).getAllByText("用例模型")).toHaveLength(1);
     expect(within(stageSection as HTMLElement).getAllByText("领域概念模型")).toHaveLength(1);
-    expect(within(stageSection as HTMLElement).getByText("有 1 条追踪关系需复核")).toBeInTheDocument();
+    expect(within(stageSection as HTMLElement).getByText(/有 1 条追踪关系需复核/)).toBeInTheDocument();
     expect(screen.queryByText("模型子任务")).not.toBeInTheDocument();
-    await user.click(within(stageSection as HTMLElement).getByRole("button", { name: /界面关系/ }));
-    expect(within(stageSection as HTMLElement).getByText("正在排队：界面关系")).toBeInTheDocument();
+    const queuedCall = within(stageSection as HTMLElement).getByText("界面关系").closest('[data-slot="generation-call"]')!;
+    expect(within(queuedCall as HTMLElement).getByText("排队中")).toBeInTheDocument();
 
     completeRun();
     const updatedStageSection = document.querySelector('[data-slot="ai-conversation"]');
@@ -2193,11 +2193,11 @@ describe("TopBar", () => {
     expect(transcript.querySelector('[data-slot="card"]')).toBeNull();
     expect(screen.queryByTestId("generation-task-error-card")).not.toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "我知道了" }));
-    const call = within(transcript).getByRole("button", { name: /生成需求模型/ });
-    await user.click(call);
+    await user.click(within(transcript).getByText("查看技术原文 · 生成需求模型"));
     const output = within(transcript).getByText((content) => content.includes(longStream.slice(0, 30)));
     expect(output).toHaveClass("break-all");
-    expect(output.closest("pre")).toHaveClass("overflow-auto");
+    expect(output.closest("pre")).not.toHaveClass("overflow-auto");
+    expect(transcript.querySelector('[data-slot="scroll-area-viewport"]')).toBeInTheDocument();
   });
 
   it("shows design debug trace from restored design history", async () => {

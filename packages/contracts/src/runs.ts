@@ -298,6 +298,8 @@ export const runStageSchema = z.enum([
   "generate_plantuml",
   "render_svg",
   "generate_context",
+  "generate_business_flow",
+  "render_business_flow",
   "render_context",
   "generate_implementation",
 ]);
@@ -579,6 +581,14 @@ export const queuedRunEventSchema = z.object({
 export const stageStartedRunEventSchema = z.object({
   type: z.literal("stage_started"),
   stage: runStageSchema,
+  tracksCompletion: z.boolean().optional(),
+});
+
+// A pipeline boundary, not the end of an individual parallel model call.
+export const stageFinishedRunEventSchema = z.object({
+  type: z.literal("stage_finished"),
+  stage: runStageSchema,
+  status: z.enum(["completed", "failed", "cancelled", "pending_review"]),
 });
 
 export const llmChunkRunEventSchema = z.object({
@@ -650,6 +660,7 @@ export const artifactReadyRunEventSchema = z.object({
     "businessAssertionResults",
     "document",
     "feasibilityContext",
+    "feasibilityBusinessFlow",
     "feasibilityImplementation",
   ]),
   diagramKind: umlDiagramKindSchema.optional(),
@@ -764,6 +775,7 @@ export type RunEvent = { eventId?: string; createdAt?: string } & (
   | RunActivityEvent
   | z.infer<typeof queuedRunEventSchema>
   | z.infer<typeof stageStartedRunEventSchema>
+  | z.infer<typeof stageFinishedRunEventSchema>
   | z.infer<typeof llmChunkRunEventSchema>
   | z.infer<typeof stageProgressRunEventSchema>
   | z.infer<typeof artifactReadyRunEventSchema>
@@ -777,6 +789,7 @@ export const runEventSchema: z.ZodType<RunEvent, z.ZodTypeDef, unknown> = z.disc
   runActivityEventSchema,
   queuedRunEventSchema,
   stageStartedRunEventSchema,
+  stageFinishedRunEventSchema,
   llmChunkRunEventSchema,
   stageProgressRunEventSchema,
   artifactReadyRunEventSchema,

@@ -88,6 +88,7 @@ export function CodeGenerationPage() {
     updateCodeFile,
     recordCodePreviewDiagnostic,
     clearCodePreviewDiagnostics,
+    generationModelBlockedReason,
   } = useWorkspaceSession();
   const { openDesignHome, openSystemRequirements } = useWorkspaceShell();
   const compactViewport = useCompactViewport();
@@ -160,8 +161,9 @@ export function CodeGenerationPage() {
   );
   const designModelCount = Object.values(designModels).filter(Boolean).length;
   const requirementSourceMissing = requirementText.trim().length === 0;
-  const canGenerate = designModelCount > 0 && !requirementSourceMissing;
-  const generationBlockFeedback: FeedbackDialogState | null = canGenerate
+  const prerequisitesReady = designModelCount > 0 && !requirementSourceMissing;
+  const canGenerate = prerequisitesReady && !generationModelBlockedReason;
+  const generationBlockFeedback: FeedbackDialogState | null = prerequisitesReady
     ? null
     : {
         dedupeKey: requirementSourceMissing
@@ -375,6 +377,7 @@ export function CodeGenerationPage() {
               </Button>
             </div>
           </div>
+          {generationModelBlockedReason && <p role="status" className="border-b px-3 py-2 text-xs text-muted-foreground">{generationModelBlockedReason}</p>}
           {modelCapability.structuredOutputMode === "compatible" && defaultModel.trim() && (
             <div className="border-b border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{t("code.compatibleWarning")}</div>
           )}

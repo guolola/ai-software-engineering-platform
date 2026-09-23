@@ -14,6 +14,7 @@ import type {
   ProviderUsageTracker,
 } from "../../provider-configs/provider-usage-tracker.js";
 import { reserveBillingRunUsage } from "../billing/run-billing-gates.js";
+import { offlineDemoProviderSettings } from "../demo/offline-demo-runs.js";
 import {
   checkGenerationUsageLimit,
   checkProviderUsageLimit,
@@ -115,6 +116,13 @@ export async function createProjectRunAction({
     projectId,
     createdAt: new Date().toISOString(),
   };
+  if (source.metadata?.offlineDemoFixture === "library-seat" && "selectedArtifacts" in source.snapshot) {
+    const result = createQueuedRunFromSource({ runs, source, metadata, action, sourceRunId: runId, actorUserId });
+    const record = runs.get(result.runId)!;
+    await startRecordPipeline({ record, providerSettings: offlineDemoProviderSettings, providerConfigId: null });
+    reply.code(202);
+    return result;
+  }
   const providerSettingsInput = snapshotProviderSettings(source);
   const providerResolution = await resolveProviderSettingsForRun({
     providerSettings: providerSettingsInput,

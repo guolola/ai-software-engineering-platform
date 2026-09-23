@@ -1113,6 +1113,27 @@ alter table provider_configs
   add column if not exists breaker_probe_started_at timestamptz;
 `;
 
+export const noneLinearDomesticEndpointSql = `
+-- NoneLinear moved mainland traffic to the .com.cn endpoint. Reset breaker
+-- state only for rows that still point at the retired endpoint.
+update provider_configs
+set
+  provider = 'nonelinear',
+  base_url = 'https://api.nonelinear.com.cn',
+  breaker_state = 'closed',
+  breaker_failure_count = 0,
+  breaker_opened_at = null,
+  breaker_last_failure_at = null,
+  breaker_probe_started_at = null,
+  updated_at = now()
+where lower(base_url) in (
+  'https://api.nonelinear.com',
+  'https://api.nonelinear.com/',
+  'https://api.nonelinear.com/v1',
+  'https://api.nonelinear.com/v1/'
+);
+`;
+
 export const migrations = [
   {
     id: "001_user_admin_platform_base",
@@ -1213,6 +1234,10 @@ export const migrations = [
   {
     id: "025_provider_breaker_probe_lease",
     sql: providerBreakerProbeLeaseSql,
+  },
+  {
+    id: "026_nonelinear_domestic_endpoint",
+    sql: noneLinearDomesticEndpointSql,
   },
 ] as const;
 

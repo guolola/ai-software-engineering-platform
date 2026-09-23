@@ -1,5 +1,7 @@
 // Verifies requirement authoring, rule editing, quality checks, and generation action guards.
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { createMockWorkspaceRepository } from "../../../services/workspace-repository/mock-repository";
+import { patchUserSettings } from "../../../shared/lib/user-settings";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -33,6 +35,24 @@ function storeManagedUserSettings() {
 }
 
 describe("TextRequirementView", () => {
+  it("blocks real rule generation without a model and leaves selection available", async () => {
+    localStorage.clear();
+    const repository = createMockWorkspaceRepository({ requirementText: "用户可以提交订单" });
+    repository.getProjectAccess = async () => ({ capabilities: ["update_project", "start_runs"], generationExecutionMode: "provider" });
+    repository.startRun = vi.fn();
+    render(withWorkspaceProviders(<TextRequirementView view="system" />, repository));
+    const button = await screen.findByRole("button", { name: "开始分析提取" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "未选择模型" })).toBeEnabled());
+    expect(button).toBeDisabled();
+    expect(screen.getByText("请先配置并选择模型供应商。")).toBeInTheDocument();
+    await userEvent.setup().click(button);
+    expect(repository.startRun).not.toHaveBeenCalled();
+    act(() => patchUserSettings({ providerConfigId: "provider-1", defaultModel: "model-1", providerModelOptions: ["model-1"] }));
+    expect(button).toBeEnabled();
+    act(() => patchUserSettings({ defaultModel: "" }));
+    expect(button).toBeDisabled();
+  });
+
   beforeEach(() => {
     storeManagedUserSettings();
   });
@@ -652,9 +672,10 @@ describe("TextRequirementView", () => {
       name: /需求分析模型/,
     });
     expect(analysisCheckbox).toBeEnabled();
+    expect(screen.getByText("基于用例事件流的需求交互分析")).toHaveClass("truncate");
     expect(
       screen.getByText("基于用例模型事件流生成，不要求需求规则直接映射。"),
-    ).toBeInTheDocument();
+    ).toHaveClass("truncate");
     expect(
       screen.queryByText("需先选择或生成用例模型"),
     ).not.toBeInTheDocument();

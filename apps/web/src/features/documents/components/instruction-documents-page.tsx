@@ -159,6 +159,8 @@ function feasibilityDisabledReason(
   if (state.implementationStatus === "missing") {
     return t("documentsPage.prerequisites.feasibilityImplementationMissing");
   }
+  if (state.businessFlowStatus === "missing") return t("documentsPage.prerequisites.feasibilityBusinessFlowMissing");
+  if (state.businessFlowStatus === "stale") return t("documentsPage.prerequisites.feasibilityBusinessFlowStale");
   if (state.implementationStatus === "stale") {
     return t("documentsPage.prerequisites.feasibilityImplementationStale");
   }
@@ -298,6 +300,7 @@ function TemplateDocumentCard({
             />
           ) : null}
         </div>
+        {disabledReason && <p role="status" className="text-xs text-muted-foreground">{disabledReason}</p>}
         <Button
           type="button"
           size="sm"
@@ -400,6 +403,7 @@ export function InstructionDocumentsPage({
     generateRequirementsSpec,
     generateSoftwareDesignSpec,
     generateFeasibilityStudy,
+    generationModelBlockedReason,
   } = useWorkspaceSession();
   const {
     openDesignHome,
@@ -658,11 +662,11 @@ export function InstructionDocumentsPage({
     : t("documentsPage.prerequisites.design");
   const disabledReasonByKind = useMemo<Record<DocumentKind, string | null>>(
     () => ({
-      requirementsSpec: requirementDisabledReason,
-      softwareDesignSpec: designDisabledReason,
-      feasibilityStudy: feasibilityDisabledReason(feasibilityState, t),
+      requirementsSpec: requirementDisabledReason ?? generationModelBlockedReason,
+      softwareDesignSpec: designDisabledReason ?? generationModelBlockedReason,
+      feasibilityStudy: feasibilityDisabledReason(feasibilityState, t) ?? generationModelBlockedReason,
     }),
-    [designDisabledReason, feasibilityState, requirementDisabledReason, t],
+    [designDisabledReason, feasibilityState, requirementDisabledReason, generationModelBlockedReason, t],
   );
   const prerequisiteFeedbackByKind = useMemo<
     Partial<Record<DocumentKind, FeedbackDialogState>>
@@ -671,7 +675,7 @@ export function InstructionDocumentsPage({
     for (const definition of DOCUMENT_DEFINITIONS) {
       const reason = disabledReasonByKind[definition.kind];
       if (!reason) continue;
-      const primaryAction =
+      const primaryAction = reason === generationModelBlockedReason ? undefined :
         definition.kind === "requirementsSpec"
           ? {
               label: t("feedback.actions.requirementModels"),
@@ -704,6 +708,7 @@ export function InstructionDocumentsPage({
     return feedback;
   }, [
     disabledReasonByKind,
+    generationModelBlockedReason,
     feasibilityState,
     openDesignHome,
     openFeasibilityHome,

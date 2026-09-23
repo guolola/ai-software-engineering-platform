@@ -61,6 +61,10 @@ export function stageProgressValue(stage: RunStage) {
       return 95;
     case "generate_context":
       return 35;
+    case "generate_business_flow":
+      return 65;
+    case "render_business_flow":
+      return 75;
     case "render_context":
       return 60;
     case "generate_implementation":

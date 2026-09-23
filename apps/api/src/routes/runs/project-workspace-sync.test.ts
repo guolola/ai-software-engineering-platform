@@ -5,9 +5,10 @@ import type {
   DesignDiagramModelSpec,
   DiagramModelSpec,
 } from "@uml-platform/contracts";
-import { snapshotInputFingerprint } from "@uml-platform/contracts";
+import { snapshotInputFingerprint, feasibilityInputsSchema } from "@uml-platform/contracts";
+import { createBusinessFlowArtifact } from "../../test-fixtures/feasibility/business-flow.js";
 import { createInMemoryAuthStore } from "../../auth/in-memory-auth-store.js";
-import { createEmptyCodeSnapshot, createEmptyDesignSnapshot, createEmptyDocumentSnapshot, createEmptySnapshot } from "../../runs/records/snapshots.js";
+import { createEmptyCodeSnapshot, createEmptyDesignSnapshot, createEmptyDocumentSnapshot, createEmptyFeasibilitySnapshot, createEmptySnapshot } from "../../runs/records/snapshots.js";
 import { emitEvent, type RunRecord } from "../../runs/records/run-record-store.js";
 import { buildRequirementBaseline } from "../../runs/baselines/requirement-baseline.js";
 import {
@@ -132,6 +133,27 @@ async function waitForCondition(predicate: () => Promise<boolean>) {
   }
   assert.equal(await predicate(), true);
 }
+
+test("business flow is published atomically and preserved after failed or cancelled regeneration", async () => {
+  const { authStore, project, user, syncProjectWorkspace } = await createWorkspaceSyncFixture();
+  const businessFlow = createBusinessFlowArtifact([rule]);
+  const snapshot = createEmptyFeasibilitySnapshot("flow-completed", {
+    projectId: project.id, selectedArtifacts: ["business-flow"], rules: [{ ...rule, relatedDiagrams: [...rule.relatedDiagrams] }],
+    requirementBaseline: null, providerSettings: { providerConfigId: "provider-a", model: "model-a" },
+    inputs: feasibilityInputsSchema.parse({}), businessFlow,
+  });
+  const record: RunRecord = { snapshot, events: [], listeners: new Set(), terminal: true,
+    metadata: { projectId: project.id, userId: user.id, createdAt: "2026-09-01T00:00:00.000Z" } };
+  snapshot.status = "completed";
+  await syncProjectWorkspace(record);
+  assert.deepEqual((await authStore.getProjectWorkspace(project.id)).state.feasibilityBusinessFlow, businessFlow);
+  for (const status of ["failed", "cancelled"] as const) {
+    snapshot.status = status;
+    snapshot.businessFlow = null;
+    await syncProjectWorkspace(record);
+    assert.deepEqual((await authStore.getProjectWorkspace(project.id)).state.feasibilityBusinessFlow, businessFlow);
+  }
+});
 
 test("terminal requirement snapshots auto-sync into project workspace", async () => {
   const { authStore, project, user, syncProjectWorkspace } =

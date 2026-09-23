@@ -66,8 +66,10 @@ export function formatStageForDiagnostics(stage: RunStage | null) {
     render_document_file: "写入说明书文件",
     generate_plantuml: "生成图源码",
     render_svg: "渲染图像",
-    generate_context: "生成系统上下文图（系统环境图）",
-    render_context: "渲染系统上下文图（系统环境图）",
+    generate_context: "生成系统环境图",
+    generate_business_flow: "生成业务与系统流程图",
+    render_business_flow: "渲染业务与系统流程图",
+    render_context: "渲染系统环境图",
     generate_implementation: "生成实现方案",
   };
   return labels[stage];
@@ -138,7 +140,7 @@ export function isMeaningfulLlmChunkEvent(
 }
 
 export function shouldDisplayDiagnosticEvent(event: RunEvent) {
-  return event.type !== "llm_chunk" && event.type !== "run_activity";
+  return event.type !== "llm_chunk" && event.type !== "run_activity" && event.type !== "stage_finished";
 }
 
 export function summarizeEvent(event: RunEvent): DiagnosticEvent {
@@ -158,6 +160,8 @@ export function summarizeEvent(event: RunEvent): DiagnosticEvent {
         label: "阶段开始",
         detail: `${formatStageForDiagnostics(event.stage)}已开始`,
       };
+    case "stage_finished":
+      return { id: event.eventId ?? suffix, at: event.createdAt ?? at, label: "阶段结束", detail: formatStageForDiagnostics(event.stage) };
     case "stage_progress":
       return {
         id: `${suffix}:stage_progress:${event.stage}:${event.progress}`,
@@ -307,6 +311,7 @@ export function getProgressFromEvent(event: RunEvent) {
     case "llm_chunk":
     case "artifact_ready":
     case "code_file_changed":
+    case "stage_finished":
       return null;
   }
 }

@@ -5,6 +5,7 @@ import {
   projectMemberRolePermissions,
 } from "@uml-platform/contracts";
 import { toProjectDto, toProjectMemberDto } from "../auth/dto.js";
+import { isOfflineDemoProject } from "../runs/demo/offline-demo-runs.js";
 import type {
   AuthStore,
   ProjectMemberRecord,
@@ -117,6 +118,8 @@ export function projectPayload(input: {
 }) {
   return {
     project: toProjectDto(input.project),
+    generationExecutionMode: isOfflineDemoProject(input.project.id, input.project.name)
+      ? "offline-demo" as const : "provider" as const,
     membership: toProjectMemberDto(input.member),
     currentUserRole: input.member.role,
     capabilities: projectMemberRolePermissions[input.member.role],

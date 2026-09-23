@@ -382,6 +382,7 @@ export function registerApiRoutes({
     defaultSseAllowOrigin: DEFAULT_SSE_ALLOW_ORIGIN,
     syncProjectWorkspace: createProjectWorkspaceSync(authStore, { runs }),
     resolveUserId: activeUserIdFromRequest,
+    resolveProjectName: async (projectId) => (await authStore.getProject(projectId))?.name ?? null,
     canUpdateProject: (projectId, userId) =>
       projectMembershipGuard({ projectId, userId, permission: "update_project" }),
     loadWorkspace: async (projectId) => {

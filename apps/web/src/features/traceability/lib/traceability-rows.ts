@@ -190,7 +190,7 @@ export const DEFAULT_TRACEABILITY_ROW_COPY: TraceabilityRowCopy = {
     directedInteraction: "有向交互",
     bidirectionalInteraction: "双向交互",
     invalidSources: (ids) => `无效来源规则：${ids}`,
-    incompleteTrace: "持久化跟踪数据不完整，请保存或重新生成系统上下文图（系统环境图）。",
+    incompleteTrace: "持久化跟踪数据不完整，请保存或重新生成系统环境图。",
     deterministicMapping: "根据上下文模型的来源规则编号确定性映射。",
     missingSource: "缺少来源需求规则。",
     sourceRules: (ids) => `来源规则：${ids}`,

@@ -1,5 +1,6 @@
 // Orchestrates the code generation run from business analysis through prototype repair.
 
+import { createStageLifecycle } from "./shared/stage-lifecycle.js";
 import { createRunLlmChunkHandlers } from "./shared/llm-chunk-events.js";
 import {
   artifactReadyRunEventSchema,
@@ -118,11 +119,13 @@ export async function runCodeStagePipeline(
   const snapshot = record.snapshot as CodeRunSnapshot;
   throwIfRunCancelled(record);
 
+  const stages = createStageLifecycle(record);
   const updateStage = (stage: RunStage, message?: string) => {
     throwIfRunCancelled(record);
+    stages.advance(stage);
     snapshot.currentStage = stage;
     snapshot.status = "running";
-    emitEvent(record, stageStartedRunEventSchema.parse({ type: "stage_started", stage }));
+    emitEvent(record, stageStartedRunEventSchema.parse({ type: "stage_started", stage, tracksCompletion: true }));
     emitEvent(
       record,
       stageProgressRunEventSchema.parse({

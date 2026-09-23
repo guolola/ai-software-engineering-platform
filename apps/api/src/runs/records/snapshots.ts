@@ -261,6 +261,7 @@ export function createEmptyFeasibilitySnapshot(
     contextTraceability?: ContextTraceRow[];
     contextPlantUml?: PlantUmlArtifact | null;
     contextSvg?: SvgArtifact | null;
+    businessFlow?: FeasibilityRunSnapshot["businessFlow"];
     implementationPlan?: FeasibilityImplementationPlan | null;
     contextFingerprint?: string | null;
     implementationFingerprint?: string | null;

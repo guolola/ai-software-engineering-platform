@@ -16,6 +16,7 @@ export interface RunRecord {
   listeners: Set<(event: RunEvent) => void>;
   terminal: boolean;
   beforeTerminal?: Set<() => void>;
+  beforeTerminalStages?: Set<(event: RunEvent) => void>;
   documentBuffer?: Buffer;
   metadata?: RunRecordMetadata;
   persist?: (record: RunRecord, event?: RunEvent) => void | Promise<void>;
@@ -41,6 +42,8 @@ export async function refreshProjectRunRecordsIfAvailable(
 }
 
 export interface RunRecordMetadata {
+  /** Server-assigned fixture; persisted so retries remain offline. */
+  offlineDemoFixture?: "library-seat";
   userId?: string;
   projectId?: string;
   model?: string;
@@ -150,6 +153,9 @@ export function emitEvent(record: RunRecord, event: RunEvent) {
   if (isTerminalRunEvent(event)) {
     for (const flush of record.beforeTerminal ?? []) flush();
     record.beforeTerminal?.clear();
+    // Stage boundaries follow buffered output and precede the SSE terminal event.
+    for (const finish of record.beforeTerminalStages ?? []) finish(event);
+    record.beforeTerminalStages?.clear();
   }
   event = { ...event, eventId: event.eventId ?? randomUUID(), createdAt: event.createdAt ?? new Date().toISOString() };
   const storeEvent = shouldStoreEvent(event);

@@ -139,6 +139,7 @@ export function TextRequirementView({
     workspacePermissionReason,
     billingGenerationBlock,
     clearBillingGenerationBlock,
+    generationModelBlockedReason,
   } = useWorkspaceSession();
   const [query, setQuery] = useState("");
   const [defaultModel, setDefaultModel] = useState(
@@ -186,10 +187,10 @@ export function TextRequirementView({
   const editBlockedReason =
     workspacePermissionReason ?? t("requirements.permissions.edit");
   const generationBlockedByPermissionReason =
-    workspacePermissionReason ?? t("requirements.permissions.run");
+    workspacePermissionReason ?? generationModelBlockedReason ?? t("requirements.permissions.run");
 
   const runGenerateRules = () => {
-    if (!canRunGeneration) return;
+    if (!canRunGeneration || generationModelBlockedReason) return;
     if (hasGeneratedRules) {
       setRuleReplacementDialogOpen(true);
       return;
@@ -199,12 +200,12 @@ export function TextRequirementView({
 
   const confirmRuleReplacement = () => {
     setRuleReplacementDialogOpen(false);
-    if (!canRunGeneration) return;
+    if (!canRunGeneration || generationModelBlockedReason) return;
     void generateRules();
   };
 
   const runGenerateDiagrams = (only?: DiagramType[]) => {
-    if (!canRunGeneration) return;
+    if (!canRunGeneration || generationModelBlockedReason) return;
     void generateDiagrams(only);
   };
 
@@ -494,9 +495,9 @@ export function TextRequirementView({
             <Button
               type="button"
               onClick={runGenerateRules}
-              disabled={!requirementText.trim() || generating || !canRunGeneration}
+              disabled={!requirementText.trim() || generating || !canRunGeneration || Boolean(generationModelBlockedReason)}
               title={
-                !canRunGeneration
+                !canRunGeneration || Boolean(generationModelBlockedReason)
                   ? generationBlockedByPermissionReason
                   : isRulesStale
                     ? t("requirements.source.updateRules")
@@ -549,6 +550,7 @@ export function TextRequirementView({
 
   return (
     <div className="flex min-h-0 min-w-0 max-w-full flex-col overflow-x-clip bg-background">
+      {generationModelBlockedReason && <p role="status" className="px-3 py-2 text-sm text-muted-foreground">{generationModelBlockedReason}</p>}
       {view !== "models" && showStaleBanner && isRulesStale && (
         <div className="flex items-center gap-2 border-b border-warning/40 bg-warning/10 px-3 py-2 text-sm">
           <AlertTriangle className="size-4 text-warning" />
@@ -558,8 +560,8 @@ export function TextRequirementView({
             variant="outline"
             className="ml-auto h-7"
             onClick={runGenerateRules}
-            disabled={generating || !canRunGeneration}
-            title={!canRunGeneration ? generationBlockedByPermissionReason : undefined}
+            disabled={generating || !canRunGeneration || Boolean(generationModelBlockedReason)}
+            title={(!canRunGeneration || generationModelBlockedReason) ? generationBlockedByPermissionReason : undefined}
           >
             <RefreshCw className="size-3.5" /> {t("requirements.source.regenerateRules")}
           </Button>
@@ -581,10 +583,10 @@ export function TextRequirementView({
             disabled={
               generating ||
               Boolean(requirementReviewBlockedReason) ||
-              !canRunGeneration
+              !canRunGeneration || Boolean(generationModelBlockedReason)
             }
             title={
-              !canRunGeneration
+              !canRunGeneration || Boolean(generationModelBlockedReason)
                 ? generationBlockedByPermissionReason
                 : generationBlockedTitle
             }
@@ -695,10 +697,10 @@ export function TextRequirementView({
                     generating ||
                     Boolean(requirementReviewBlockedReason) ||
                     Boolean(selectedTargetBlockReason) ||
-                    !canRunGeneration
+                    !canRunGeneration || Boolean(generationModelBlockedReason)
                   }
                   title={
-                    !canRunGeneration
+                    !canRunGeneration || Boolean(generationModelBlockedReason)
                       ? generationBlockedByPermissionReason
                       : selectedTargetBlockReason ?? generationBlockedTitle
                   }
@@ -763,6 +765,7 @@ export function TextRequirementView({
                     label={localizedLabel}
                     english={meta.english}
                     description={localizedDescription}
+                    singleLineDescription={isAnalysisDiagram}
                     icon={DiagramIcon}
                     selected={checked}
                     disabled={!canSelectDiagram}
@@ -791,7 +794,7 @@ export function TextRequirementView({
                         {isAnalysisDiagram &&
                           canSelectDiagram &&
                           linkedRules.length === 0 && (
-                            <div className="text-muted-foreground">
+                            <div className="min-w-0 truncate text-muted-foreground" title={t("requirements.analysisDependency")}>
                               {t("requirements.analysisDependency")}
                             </div>
                           )}
@@ -857,7 +860,7 @@ export function TextRequirementView({
             <Button
               type="button"
               onClick={confirmRuleReplacement}
-              disabled={generating || !canRunGeneration}
+              disabled={generating || !canRunGeneration || Boolean(generationModelBlockedReason)}
             >
               {t("requirements.replace.confirm")}
             </Button>

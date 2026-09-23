@@ -61,6 +61,7 @@ import {
 } from "../../../entities/diagram/lib/model-details";
 import { getRelationDisplayLabel } from "../../diagrams/lib/diagram-detail-view-model";
 import { useWorkspaceSession } from "../../workspace-session/state";
+import { buildAcceptedRequirementSnapshot, readFeasibilityBusinessFlowArtifact } from "@uml-platform/contracts";
 import {
   getSelectionKey,
   useWorkspaceShell,
@@ -675,6 +676,9 @@ export function SidebarMenu({
     designDiagramErrors,
     generationTasks,
     feasibilityContextArtifact,
+    feasibilityBusinessFlow,
+    rules,
+    requirementBaseline,
     hasFeasibilityContextArtifact,
     hasFeasibilityImplementationArtifact,
     feasibilityImplementationPlan,
@@ -686,6 +690,12 @@ export function SidebarMenu({
     openRequirementsText,
     openFeasibilityHome,
     openFeasibilityContext,
+    openFeasibilityBusinessFlow,
+    openFeasibilityBusinessFlowTrace,
+    openFeasibilityBusinessFlowElements,
+    openFeasibilityBusinessFlowRelations,
+    openFeasibilityBusinessFlowElement,
+    openFeasibilityBusinessFlowRelationship,
     openFeasibilityContextTrace,
     openFeasibilityContextElement,
     openFeasibilityContextRelationship,
@@ -762,6 +772,9 @@ export function SidebarMenu({
         ) {
           next.add("feasibility:context");
         }
+        if (detail.kind === "feasibility" && detail.selectedArtifacts?.includes("business-flow")) {
+          next.add("feasibility:business-flow");
+        }
         return next;
       });
     };
@@ -773,6 +786,21 @@ export function SidebarMenu({
   }, []);
 
   const contextModel = feasibilityContextArtifact?.feasibilityContextModel ?? null;
+  const businessFlowArtifact = readFeasibilityBusinessFlowArtifact(feasibilityBusinessFlow);
+  const businessFlowStale = businessFlowArtifact && businessFlowArtifact.fingerprint !==
+    buildAcceptedRequirementSnapshot(rules, requirementBaseline).snapshot.fingerprint;
+  const latestFeasibilityRun = [
+    ...generationTasks.filter((task) => task.kind === "feasibility").map((task) => ({
+      stage: task.diagnostics.activeStage, status: task.status, startedAt: task.startedAt,
+    })),
+    ...projectRuns.filter((run) => run.runKind === "feasibility").map((run) => ({
+      stage: run.stage, status: run.status, startedAt: run.startedAt ?? run.createdAt ?? "",
+    })),
+  ].sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0];
+  const businessFlowRunStatus = latestFeasibilityRun &&
+    ["generate_business_flow", "render_business_flow"].includes(latestFeasibilityRun.stage ?? "") &&
+    ["running", "failed"].includes(latestFeasibilityRun.status)
+    ? latestFeasibilityRun.status as "running" | "failed" : undefined;
   const contextDetail = buildDiagramDetailModel(contextModel);
   const contextModelId = contextModel?.modelId ?? "context";
   const feasibilityChildren: Node[] = [
@@ -806,6 +834,29 @@ export function SidebarMenu({
           },
         ]
       : []),
+    ...(businessFlowArtifact ? [{
+      key: "feasibility:business-flow",
+      label: t("feasibility.artifact.businessFlow"),
+      icon: <ActivityIcon className="size-4 text-muted-foreground" />,
+      onSelect: openFeasibilityBusinessFlow,
+      children: [
+        { key: "feasibility:business-flow:trace", label: t("workspace.sidebar.traceability"), icon: <TableProperties className="size-3.5 text-muted-foreground" />, onSelect: openFeasibilityBusinessFlowTrace },
+        ...buildDiagramDetailCategoryNodes(
+          buildDiagramDetailModel(businessFlowArtifact.model), "feasibility-business-flow",
+          "feasibility-business-flow-category", "feasibility-business-flow-group",
+          "feasibility-business-flow-element", "feasibility-business-flow-relationship",
+          (element) => openFeasibilityBusinessFlowElement(element.kind, element.id, element.label),
+          (relationship, label) => openFeasibilityBusinessFlowRelationship(relationship.id, label),
+          { showGroupBadges: true }, t,
+        ).map((node) => ({ ...node, selectable: true,
+          key: `feasibility:business-flow:${node.key.endsWith(":elements") ? "elements" : "relations"}`,
+          onSelect: node.key.endsWith(":elements") ? openFeasibilityBusinessFlowElements : openFeasibilityBusinessFlowRelations,
+        })),
+      ],
+      status: businessFlowRunStatus,
+      statusTooltip: generationStatusTooltip(t("feasibility.artifact.businessFlow"), businessFlowRunStatus, true),
+      badge: businessFlowStale ? t("feasibility.status.stale") : undefined,
+    }] : []),
     ...(hasFeasibilityImplementationArtifact
       ? [
           {

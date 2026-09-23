@@ -240,9 +240,11 @@ function projectRunStageTitle(run: ProjectRunDetailResponse["run"]) {
   if (run.documentKind === "requirementsSpec") return "生成需求规格说明书";
   if (run.documentKind === "softwareDesignSpec") return "生成软件设计说明书";
   if (run.documentKind === "feasibilityStudy") return "生成可行性研究报告";
-  if (run.runKind === "feasibility" && run.stage === "generate_context") return "生成系统上下文图（系统环境图）";
-  if (run.runKind === "feasibility" && run.stage === "render_context") return "渲染系统上下文图（系统环境图）";
+  if (run.runKind === "feasibility" && run.stage === "generate_context") return "生成系统环境图";
+  if (run.runKind === "feasibility" && run.stage === "render_context") return "渲染系统环境图";
   if (run.runKind === "feasibility" && run.stage === "generate_implementation") return "生成实现方案";
+  if (run.runKind === "feasibility" && run.stage === "generate_business_flow") return "生成业务与系统流程图";
+  if (run.runKind === "feasibility" && run.stage === "render_business_flow") return "渲染业务与系统流程图";
   const stage = run.stage ?? "";
   if (stage === "render_svg") {
     return run.runKind === "design" ? "渲染设计图表" : "渲染需求图表";

@@ -72,3 +72,65 @@ describe("generation transcript", () => {
     expect(readableTaskText("generate_models https://service.example/private")).not.toMatch(/generate_models|https:/);
   });
 });
+
+describe("business stage presentation queue", () => {
+  const started = (stage: "generate_models" | "generate_plantuml" | "render_svg"): RunEvent => ({ type: "stage_started", stage, tracksCompletion: true });
+  const finished = (stage: "generate_models" | "generate_plantuml" | "render_svg"): RunEvent => ({ type: "stage_finished", stage, status: "completed" });
+
+  it("buffers downstream output while parallel models and repairs are still running", () => {
+    const events: RunEvent[] = [started("generate_models"), activity("a", "usecase", "started"), activity("b", "activity", "started"),
+      { ...activity("early", "render", "output", "提前返回的预览"), stage: "render_svg" },
+      activity("c", "usecase", "completed"),
+      { type: "artifact_ready", stage: "generate_models", artifactKind: "model" },
+    ];
+    expect(projectGenerationTranscript(events).visibleSteps.map((step) => step.stage)).toEqual(["generate_models"]);
+    events.push(activity("d", "activity", "failed"), activity("e", "retry", "started"), activity("f", "retry", "completed"));
+    expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(1);
+    events.push(finished("generate_models"));
+    const result = projectGenerationTranscript(events);
+    expect(result.visibleSteps.map((step) => step.stage)).toEqual(["generate_models", "render_svg"]);
+    expect(result.visibleSteps[1].calls[0].output).toBe("提前返回的预览");
+    expect(result.steps[0].status).toBe("completed");
+  });
+
+  it("does not let stale failure mirrors mark a new retry failed and deduplicates successful artifacts", () => {
+    const first = { ...activity("a", "first", "failed"), subtaskId: "usecase" };
+    const events: RunEvent[] = [first, { type: "stage_progress", stage: "generate_models", progress: 50, subtaskId: "usecase", subtaskStatus: "failed" },
+      { ...activity("retry", "retry", "started"), subtaskId: "usecase" }];
+    expect(projectGenerationTranscript(events).steps[0].calls.map((call) => call.status)).toEqual(["failed", "running"]);
+    const finishedRetry: RunEvent[] = [...events, { ...activity("finish-retry", "retry", "completed"), subtaskId: "usecase" }, finished("generate_models")];
+    expect(projectGenerationTranscript(finishedRetry, "completed").steps[0].calls.map((call) => call.status)).toEqual(["failed", "completed"]);
+    events.push({ ...activity("done", "retry", "completed"), subtaskId: "usecase" }, { type: "artifact_ready", stage: "generate_models", artifactKind: "model", subtaskId: "usecase" });
+    expect(projectGenerationTranscript(events).steps[0].calls).toHaveLength(2);
+  });
+
+  it("retains check, repair, recheck as three stable steps", () => {
+    const events: RunEvent[] = [];
+    for (const stage of ["audit_code_quality", "repair_code_files", "audit_code_quality"] as const) {
+      events.push({ type: "stage_started", stage, tracksCompletion: true }, { type: "stage_finished", stage, status: "completed" });
+    }
+    const steps = projectGenerationTranscript(events).visibleSteps;
+    expect(steps.map((step) => step.stage)).toEqual(["audit_code_quality", "repair_code_files", "audit_code_quality"]);
+    expect(new Set(steps.map((step) => step.id)).size).toBe(3);
+  });
+
+  it("reveals buffered content immediately on cancellation or failure", () => {
+    const events: RunEvent[] = [started("generate_models"), { ...activity("later", "render", "output", "已收到"), stage: "render_svg" }];
+    for (const terminal of [{ type: "cancelled", message: "停止" }, { type: "failed", error: { code: "RUN_LEGACY_FAILURE", message: "失败", retryable: false } }] as RunEvent[]) {
+      const result = projectGenerationTranscript([...events, terminal]);
+      expect(result.visibleSteps).toHaveLength(2);
+      expect(result.visibleSteps[1].calls[0].output).toBe("已收到");
+      expect(result.visibleSteps.every((step) => step.finished)).toBe(true);
+    }
+  });
+
+  it("restores old history directly and advances old live runs only at aggregate artifacts", () => {
+    const events: RunEvent[] = [{ type: "stage_started", stage: "generate_models" }, { type: "stage_started", stage: "render_svg" }];
+    expect(projectGenerationTranscript(events, "completed").visibleSteps).toHaveLength(2);
+    expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(1);
+    events.push({ type: "artifact_ready", stage: "generate_models", artifactKind: "model", subtaskId: "usecase" });
+    expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(1);
+    events.push({ type: "artifact_ready", stage: "generate_models", artifactKind: "model" });
+    expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(2);
+  });
+});

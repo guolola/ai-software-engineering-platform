@@ -348,7 +348,7 @@ export function SystemNoticeButton({
             <span
               data-slot="notification-unread-dot"
               aria-hidden="true"
-              className="absolute -right-0.5 -top-0.5 size-2 animate-bounce rounded-full bg-sky-600 motion-reduce:animate-none dark:bg-sky-400"
+              className="absolute right-0.5 top-1 size-2 animate-bounce rounded-full bg-sky-600 motion-reduce:animate-none dark:bg-sky-400"
             />
           )}
         </Button>

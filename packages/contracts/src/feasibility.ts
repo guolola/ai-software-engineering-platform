@@ -1,6 +1,6 @@
 // Defines editable feasibility facts, context traceability, implementation plans, and run snapshots.
 import { z } from "zod";
-import { contextDiagramSpecSchema, plantUmlArtifactSchema, svgArtifactSchema } from "./models.js";
+import { activityDiagramSpecSchema, contextDiagramSpecSchema, plantUmlArtifactSchema, svgArtifactSchema } from "./models.js";
 import { requirementBaselineSchema, requirementRulesSchema } from "./requirements.js";
 import { providerSettingsSchema } from "./provider-configs.js";
 import { snapshotInputFingerprint } from "./fingerprints.js";
@@ -8,8 +8,41 @@ import { snapshotInputFingerprint } from "./fingerprints.js";
 const optionalText = z.string().trim().default("");
 const optionalNumber = z.number().nonnegative().nullable().default(null);
 
-export const feasibilityArtifactKindSchema = z.enum(["context", "implementation"]);
+export const feasibilityArtifactKindSchema = z.enum(["context", "business-flow", "implementation"]);
 export type FeasibilityArtifactKind = z.infer<typeof feasibilityArtifactKindSchema>;
+
+// Feasibility activities have their own source mappings and never replace requirement models.
+export const feasibilityBusinessFlowSchema = z.object({
+  model: activityDiagramSpecSchema,
+  traceability: z.array(z.object({
+    requirementId: z.string().min(1),
+    targetId: z.string().min(1),
+    targetKind: z.enum(["swimlane", "node", "relationship"]),
+  })).min(1),
+});
+export type FeasibilityBusinessFlow = z.infer<typeof feasibilityBusinessFlowSchema>;
+
+export const feasibilityBusinessFlowArtifactSchema = feasibilityBusinessFlowSchema.extend({
+  plantUml: plantUmlArtifactSchema,
+  svg: svgArtifactSchema,
+  fingerprint: z.string().min(1),
+});
+export type FeasibilityBusinessFlowArtifact = z.infer<typeof feasibilityBusinessFlowArtifactSchema>;
+
+// A partial or mismatched render is not a generated artifact, even in historical workspaces.
+export function readFeasibilityBusinessFlowArtifact(value: unknown): FeasibilityBusinessFlowArtifact | null {
+  const parsed = feasibilityBusinessFlowArtifactSchema.safeParse(value);
+  if (!parsed.success) return null;
+  const artifact = parsed.data;
+  return artifact.model.modelId && artifact.model.swimlanes.some((lane) => lane.id === "system") &&
+    artifact.model.nodes.some((node) => node.type === "start") &&
+    artifact.model.nodes.some((node) => node.type === "end") &&
+    artifact.model.nodes.some((node) => node.type === "activity" && node.actorOrLane === "system") &&
+    artifact.model.relationships.length > 0 && artifact.plantUml.source.trim() && artifact.svg.svg.trim() &&
+    artifact.plantUml.diagramKind === "activity" && artifact.svg.diagramKind === "activity" &&
+    artifact.plantUml.modelId === artifact.model.modelId && artifact.svg.modelId === artifact.model.modelId
+    ? artifact : null;
+}
 
 export const acceptedRequirementSnapshotSchema = z.object({
   ruleIds: z.array(z.string().min(1)),
@@ -113,6 +146,27 @@ export const feasibilityInputsSchema = z.object({
   analysisYears: optionalNumber,
 });
 export type FeasibilityInputs = z.infer<typeof feasibilityInputsSchema>;
+
+// Share the exact semantic inputs across generation, editing, samples and report preflight.
+// Render timestamps, SVG markup and PlantUML repairs do not change the implementation basis.
+export function buildFeasibilityImplementationFingerprint(input: {
+  rules: unknown;
+  requirementBaseline: unknown;
+  contextModel: unknown;
+  businessFlow: FeasibilityBusinessFlow | null;
+  inputs: unknown;
+}) {
+  const source = buildAcceptedRequirementSnapshot(input.rules, input.requirementBaseline);
+  return snapshotInputFingerprint({
+    rules: source.rules,
+    requirementBaseline: source.baseline,
+    contextModel: input.contextModel,
+    businessFlow: input.businessFlow
+      ? { model: input.businessFlow.model, traceability: input.businessFlow.traceability }
+      : null,
+    inputs: feasibilityInputsSchema.parse(input.inputs),
+  });
+}
 
 export const feasibilitySourceRefSchema = z.object({
   sourceRequirementIds: z.array(z.string().min(1)).default([]),
@@ -457,6 +511,8 @@ export const startFeasibilityRunRequestSchema = z.object({
 export type StartFeasibilityRunRequest = z.infer<typeof startFeasibilityRunRequestSchema>;
 
 export const feasibilityRunStageSchema = z.enum([
+  "generate_business_flow",
+  "render_business_flow",
   "generate_context",
   "render_context",
   "generate_implementation",
@@ -464,6 +520,7 @@ export const feasibilityRunStageSchema = z.enum([
 export type FeasibilityRunStage = z.infer<typeof feasibilityRunStageSchema>;
 
 export const feasibilityRepairSectionSchema = z.enum([
+  "business-flow",
   "context",
   "technical",
   "delivery",
@@ -487,7 +544,7 @@ export const feasibilityGenerationDiagnosticsSchema = z.object({
   downgradeReasons: z.array(z.string().min(1)).default([]),
   normalizationActions: z.array(z.string().min(1)).default([]),
   repairs: z.array(z.object({
-    stage: z.enum(["context", "implementation"]),
+    stage: z.enum(["context", "business-flow", "implementation"]),
     candidateIndex: z.number().int().nonnegative().nullable().default(null),
     section: feasibilityRepairSectionSchema,
     round: z.number().int().positive(),
@@ -536,6 +593,7 @@ export const feasibilityRunSnapshotSchema = z.object({
   requirementBaseline: requirementBaselineSchema.nullable(),
   requirementSource: acceptedRequirementSnapshotSchema.nullable().default(null),
   inputs: feasibilityInputsSchema,
+  businessFlow: feasibilityBusinessFlowArtifactSchema.nullable().default(null),
   contextModel: contextDiagramSpecSchema.nullable(),
   contextTraceability: z.array(contextTraceRowSchema).default([]),
   contextPlantUml: plantUmlArtifactSchema.nullable(),

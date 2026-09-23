@@ -288,6 +288,7 @@ export function DesignModelPage() {
     rulesVersion,
     textVersion,
     workspaceInitialized,
+    generationModelBlockedReason,
   } = useWorkspaceSession();
   const {
     openDesignDiagram,
@@ -473,6 +474,7 @@ export function DesignModelPage() {
   }, [selectedDesignDiagrams, setSelectedDesignDiagrams, validSelectedDesignDiagrams]);
 
   const canGenerate =
+    !generationModelBlockedReason &&
     !designGenerationBlockedReason &&
     !selectedDesignBlockReason &&
     effectiveSelected.length > 0;
@@ -624,7 +626,7 @@ export function DesignModelPage() {
                   className="h-9 min-w-0 flex-1 sm:flex-none"
                   onClick={runGenerate}
                   disabled={!canGenerate || generating}
-                  title={designGenerationBlockedReason ?? selectedDesignBlockReason ?? undefined}
+                  title={generationModelBlockedReason ?? designGenerationBlockedReason ?? selectedDesignBlockReason ?? undefined}
                 >
                   {generating ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -637,6 +639,7 @@ export function DesignModelPage() {
             }
           />
 
+          {generationModelBlockedReason && <p role="status" className="text-sm text-muted-foreground">{generationModelBlockedReason}</p>}
           <div className="min-w-0">
             <main className="flex min-w-0 flex-col gap-4">
               <section>

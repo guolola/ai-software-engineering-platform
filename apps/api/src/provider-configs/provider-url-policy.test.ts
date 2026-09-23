@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   assertManagedProviderBaseUrlResolvesPublicly,
+  inferOpenAiCompatibleProvider,
   normalizeManagedProviderBaseUrl,
 } from "./provider-url-policy.js";
 
@@ -13,6 +14,13 @@ test("provider URL policy accepts arbitrary public HTTPS origins", async () => {
   );
 
   assert.equal(result, "https://custom-provider.example");
+});
+
+test("provider URL policy recognizes NoneLinear domestic endpoint", () => {
+  assert.equal(
+    inferOpenAiCompatibleProvider("https://api.nonelinear.com.cn/v1"),
+    "nonelinear",
+  );
 });
 
 test("provider URL policy rejects unsafe URL shapes", () => {

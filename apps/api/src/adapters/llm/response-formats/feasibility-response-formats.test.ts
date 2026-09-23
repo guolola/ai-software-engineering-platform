@@ -6,6 +6,7 @@ import { FEASIBILITY_IMPLEMENTATION_EXAMPLE } from "@uml-platform/prompts";
 import {
   FEASIBILITY_SECTION_REPAIR_RESPONSE_FORMATS,
   GENERATE_FEASIBILITY_CONTEXT_RESPONSE_FORMAT,
+  GENERATE_FEASIBILITY_BUSINESS_FLOW_RESPONSE_FORMAT,
   GENERATE_FEASIBILITY_IMPLEMENTATION_RESPONSE_FORMAT,
   getGenerateFeasibilityImplementationResponseFormat,
 } from "./feasibility-response-formats.js";
@@ -46,6 +47,11 @@ test("the implementation prompt example passes the complete persisted schema", (
 });
 
 test("feasibility response formats satisfy OpenAI strict object requirements", () => {
+  assertStrictObjects(GENERATE_FEASIBILITY_BUSINESS_FLOW_RESPONSE_FORMAT.json_schema.schema);
+  const schema = GENERATE_FEASIBILITY_BUSINESS_FLOW_RESPONSE_FORMAT.json_schema.schema as {
+    properties: { model: { properties: { diagramKind: { enum: string[] } } } };
+  };
+  assert.deepEqual(schema.properties.model.properties.diagramKind.enum, ["activity"]);
   assertStrictObjects(
     GENERATE_FEASIBILITY_CONTEXT_RESPONSE_FORMAT.json_schema.schema,
   );

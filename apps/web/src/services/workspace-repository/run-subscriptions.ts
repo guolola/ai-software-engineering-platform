@@ -421,6 +421,10 @@ async function waitForFeasibilityRunSnapshot(
     progressForSnapshot: (snapshot) =>
       snapshot.currentStage === "generate_implementation"
         ? 85
+        : snapshot.currentStage === "render_business_flow"
+          ? 75
+          : snapshot.currentStage === "generate_business_flow"
+            ? 65
         : snapshot.currentStage === "render_context"
           ? 60
           : 35,

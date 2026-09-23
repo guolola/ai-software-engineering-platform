@@ -94,6 +94,11 @@ export async function resolveProviderSettingsForRun({
   }
 
   if (isManagedProviderSettings(providerSettings)) {
+    // Demo placeholders are only meaningful in the server-authorized offline branch.
+    if (providerSettings.providerConfigId === "offline-demo" ||
+      providerSettings.model === "offline-demo-fixed-artifacts") {
+      return failure(400, "PROVIDER_CONFIG_INVALID");
+    }
     if (!isProjectRun) {
       return failure(401, "AUTHENTICATION_REQUIRED", "authentication");
     }

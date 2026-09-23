@@ -2,8 +2,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
+import { buildAcceptedRequirementSnapshot } from "@uml-platform/contracts";
+import { createBusinessFlowArtifact } from "../../test-fixtures/feasibility/business-flow.js";
 import { createRunRecordStore } from "../../runs/records/run-record-store.js";
 import { registerFeasibilityRoutes } from "./register-feasibility-routes.js";
+import { librarySeatDemoFixture } from "../../runs/demo/fixtures/library-seat-demo-fixture.js";
 
 function acceptedBaseline() {
   return {
@@ -26,6 +29,23 @@ const contextOutput = JSON.stringify({
   people: [{ id: "technician", name: "技工", sourceRequirementIds: ["R9"] }],
   externalSystems: [],
   relationships: [{ id: "rel-1", sourceId: "technician", targetId: "system", direction: "directed", label: "计算总成本", sourceRequirementIds: ["R9"] }],
+});
+
+const businessFlowOutput = JSON.stringify({
+  model: {
+    diagramKind: "activity", modelId: "feasibility-business-flow", title: "业务与系统流程图", summary: "计算总成本", notes: [],
+    swimlanes: [{ id: "system", name: "维修预约系统" }],
+    nodes: [
+      { id: "start", type: "start", name: "开始" },
+      { id: "calculate", type: "activity", name: "计算总成本", actorOrLane: "system", input: [], output: ["总成本"] },
+      { id: "end", type: "end", name: "结束" },
+    ],
+    relationships: [
+      { id: "flow-1", type: "control_flow", sourceId: "start", targetId: "calculate" },
+      { id: "flow-2", type: "control_flow", sourceId: "calculate", targetId: "end" },
+    ],
+  },
+  traceability: [{ requirementId: "R9", targetId: "calculate", targetKind: "node" }],
 });
 
 function generatedCandidate(id: string, name: string) {
@@ -89,11 +109,13 @@ function registerTestRoutes(input: {
   app: ReturnType<typeof Fastify>;
   outputs?: string[];
   state?: Record<string, unknown>;
+  projectName?: string;
   renderClient?: Parameters<typeof registerFeasibilityRoutes>[0]["renderClient"];
   onSync?: (record: Parameters<NonNullable<Parameters<typeof registerFeasibilityRoutes>[0]["syncProjectWorkspace"]>>[0]) => Promise<void>;
 }) {
   const runs = createRunRecordStore();
-  const outputs = [...(input.outputs ?? [contextOutput, implementationOutput])];
+  const outputs = [...(input.outputs ?? [contextOutput, businessFlowOutput, implementationOutput])];
+  const prompts: string[] = [];
   const state = input.state ?? {
     name: "维修预约系统",
     rules: [{ id: "R9", category: "功能需求", text: "完成维护后计算总成本。", relatedDiagrams: ["context"] }],
@@ -104,16 +126,66 @@ function registerTestRoutes(input: {
     app: input.app,
     runs,
     renderClient: input.renderClient ?? (async (artifact) => ({ svg: `<svg>${artifact.diagramKind}</svg>`, renderMeta: { engine: "plantuml", generatedAt: "2026-07-19T00:00:00.000Z", sourceLength: artifact.source.length, durationMs: 1 } })),
-    llmTransport: { async *streamChatCompletion() { yield outputs.shift() ?? "{}"; } },
+    llmTransport: { async *streamChatCompletion(input) { prompts.push(input.messages.map((message) => message.content).join("\n")); yield outputs.shift() ?? "{}"; } },
     providerConfigs: providerConfigs() as never,
     defaultSseAllowOrigin: "http://localhost:5173",
     resolveUserId: async (request) => request.headers.authorization === "Bearer test" ? "user-1" : null,
     canUpdateProject: async () => true,
     loadWorkspace: async () => ({ version: 1, state }),
+    resolveProjectName: async () => input.projectName ?? null,
     syncProjectWorkspace: input.onSync,
   });
-  return { runs, state };
+  return { runs, state, prompts };
 }
+
+test("real feasibility rejects absent models and demo placeholders before creating runs", async (t) => {
+  const app = Fastify();
+  t.after(() => app.close());
+  const { runs, prompts } = registerTestRoutes({ app });
+  for (const providerSettings of [
+    undefined,
+    { providerConfigId: "provider-1", model: "" },
+    { providerConfigId: "offline-demo", model: "test-model" },
+    { providerConfigId: "provider-1", model: "offline-demo-fixed-artifacts" },
+    { providerConfigId: "provider-1", model: "unlisted-model" },
+  ]) {
+    const response = await app.inject({ method: "POST", url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: {
+      projectId: "real-model-guard-project", selectedArtifacts: ["context"], providerSettings,
+    } });
+    assert.equal(response.statusCode, 400, response.body);
+    assert.equal(Array.from(runs.values()).length, 0);
+    assert.equal(prompts.length, 0);
+  }
+});
+
+test("configured demo projects generate feasibility without provider or renderer access", async (t) => {
+  const previous = process.env.UML_DEMO_OFFLINE_PROJECT_NAME_PATTERNS;
+  process.env.UML_DEMO_OFFLINE_PROJECT_NAME_PATTERNS = "图书馆座位预约系统";
+  t.after(() => { if (previous === undefined) delete process.env.UML_DEMO_OFFLINE_PROJECT_NAME_PATTERNS; else process.env.UML_DEMO_OFFLINE_PROJECT_NAME_PATTERNS = previous; });
+  const app = Fastify();
+  t.after(() => app.close());
+  let synced = false;
+  const fixture = registerTestRoutes({ app, projectName: "图书馆座位预约系统演示",
+    state: { rules: librarySeatDemoFixture.requirementSnapshot.rules, requirementBaseline: librarySeatDemoFixture.requirementSnapshot.requirementBaseline },
+    outputs: [], renderClient: async () => { throw new Error("Offline data must not use the render service"); },
+    onSync: async () => { synced = true; },
+  });
+  const request = { method: "POST" as const, url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: {
+    projectId: "project-1", selectedArtifacts: ["implementation"], providerSettings: { providerConfigId: "nonexistent-provider", model: "mock" },
+  } };
+  assert.equal((await app.inject(request)).statusCode, 409);
+  request.payload.selectedArtifacts = ["context", "business-flow", "implementation"];
+  const start = await app.inject(request);
+  assert.equal(start.statusCode, 202, start.body);
+  const snapshot = await waitForTerminal(app, start.json().runId);
+  assert.equal(snapshot.status, "completed", JSON.stringify(snapshot.error));
+  assert.ok(snapshot.businessFlow?.svg.svg.includes("校验通过"));
+  assert.equal(snapshot.implementationPlan.candidates.length, 2);
+  assert.equal(fixture.prompts.length, 0);
+  assert.equal(snapshot.providerSettings.model, "offline-demo-fixed-artifacts");
+  assert.equal(snapshot.providerSettings.providerConfigId, "offline-demo");
+  assert.equal(synced, true);
+});
 
 test("persists the run before syncing context and implementation from the selected model", async () => {
   const app = Fastify();
@@ -127,10 +199,15 @@ test("persists the run before syncing context and implementation from the select
     },
   });
   runs = registered.runs;
-  const start = await app.inject({ method: "POST", url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: { projectId: "project-1", selectedArtifacts: ["context", "implementation"], providerSettings: { providerConfigId: "provider-1", model: "test-model" } } });
+  const start = await app.inject({ method: "POST", url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: { projectId: "project-1", selectedArtifacts: ["context", "business-flow", "implementation"], providerSettings: { providerConfigId: "provider-1", model: "test-model" } } });
   assert.equal(start.statusCode, 202, start.body);
   const snapshot = await waitForTerminal(app, start.json().runId);
   assert.equal(snapshot.status, "completed");
+  const generationStages = runs.get(snapshot.runId)!.events
+    .filter((event) => event.type === "stage_started")
+    .map((event) => "stage" in event ? event.stage : null);
+  assert.deepEqual(generationStages, ["generate_context", "render_context", "generate_business_flow", "render_business_flow", "generate_implementation"]);
+  assert.ok(snapshot.businessFlow?.model.swimlanes.length);
   assert.equal(snapshot.contextModel.relationships.length, 1);
   assert.equal(snapshot.implementationPlan.candidates.length, 2);
   assert.equal(snapshot.implementationPlan.candidates[0].implementation.architecture.modules[0].id, "candidate-1-module-1");
@@ -143,6 +220,43 @@ test("persists the run before syncing context and implementation from the select
   await app.close();
 });
 
+test("generates a standalone business flow, repairs invalid references and emits persisted activity artifacts", async () => {
+  const app = Fastify();
+  const invalid = JSON.parse(businessFlowOutput);
+  invalid.traceability[0].requirementId = "R-invalid";
+  const { runs } = registerTestRoutes({ app, outputs: [JSON.stringify(invalid), businessFlowOutput] });
+  const start = await app.inject({ method: "POST", url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: {
+    projectId: "project-1", selectedArtifacts: ["business-flow"], providerSettings: { providerConfigId: "provider-1", model: "test-model" },
+  } });
+  assert.equal(start.statusCode, 202, start.body);
+  const snapshot = await waitForTerminal(app, start.json().runId);
+  assert.equal(snapshot.status, "completed", JSON.stringify(snapshot.error));
+  assert.equal(snapshot.contextModel, null);
+  assert.equal(snapshot.implementationPlan, null);
+  assert.equal(snapshot.businessFlow.model.diagramKind, "activity");
+  assert.match(snapshot.businessFlow.plantUml.source, /计算总成本/);
+  assert.match(snapshot.businessFlow.svg.svg, /activity/);
+  assert.equal(snapshot.businessFlow.fingerprint, snapshot.requirementSource.fingerprint);
+  assert.equal(snapshot.generationDiagnostics.repairs[0].section, "business-flow");
+  assert.equal(snapshot.generationDiagnostics.repairs[0].succeeded, true);
+  assert.ok(runs.get(snapshot.runId)?.events.some((event) => event.type === "artifact_ready" && event.artifactKind === "feasibilityBusinessFlow"));
+  await app.close();
+});
+
+test("does not publish a partial business flow after structured output remains invalid", async () => {
+  const app = Fastify();
+  registerTestRoutes({ app, outputs: ["{}", "{}", "{}"] });
+  const start = await app.inject({ method: "POST", url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: {
+    projectId: "project-1", selectedArtifacts: ["business-flow"], providerSettings: { providerConfigId: "provider-1", model: "test-model" },
+  } });
+  const snapshot = await waitForTerminal(app, start.json().runId);
+  assert.equal(snapshot.status, "failed");
+  assert.equal(snapshot.businessFlow, null);
+  assert.equal(snapshot.error.code, "RUN_STRUCTURED_OUTPUT_INVALID");
+  assert.match(snapshot.error.message, /业务与系统流程图/);
+  await app.close();
+});
+
 test("requires provider settings and rejects implementation without a current context", async () => {
   const app = Fastify();
   registerTestRoutes({ app });
@@ -150,7 +264,49 @@ test("requires provider settings and rejects implementation without a current co
   assert.equal(missingProvider.statusCode, 400);
   const dependency = await app.inject({ method: "POST", url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: { projectId: "project-1", selectedArtifacts: ["implementation"], providerSettings: { providerConfigId: "provider-1", model: "test-model" } } });
   assert.equal(dependency.statusCode, 409);
-  assert.match(dependency.json().message, /系统上下文图（系统环境图）/u);
+  assert.match(dependency.json().message, /系统环境图/u);
+  await app.close();
+});
+
+test("rejects missing or stale business flow and reuses both current diagrams as implementation input", async () => {
+  const app = Fastify();
+  const fixture = registerTestRoutes({ app, outputs: [implementationOutput], renderClient: async () => { throw new Error("Existing diagrams must be reused"); } });
+  const source = buildAcceptedRequirementSnapshot(fixture.state.rules, fixture.state.requirementBaseline);
+  Object.assign(fixture.state, { feasibilityContextModel: JSON.parse(contextOutput), feasibilityContextPlantUml: "@startuml\n@enduml",
+    feasibilityContextSvg: "<svg />", feasibilityContextFingerprint: source.snapshot.fingerprint });
+  const request = { method: "POST" as const, url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: {
+    projectId: "project-1", selectedArtifacts: ["implementation"], providerSettings: { providerConfigId: "provider-1", model: "test-model" },
+  } };
+  assert.equal((await app.inject(request)).statusCode, 409);
+  const flow = createBusinessFlowArtifact(fixture.state.rules, fixture.state.requirementBaseline);
+  fixture.state.feasibilityBusinessFlow = { ...flow, fingerprint: "stale" };
+  assert.equal((await app.inject(request)).statusCode, 409);
+  assert.equal(fixture.prompts.length, 0);
+  fixture.state.feasibilityBusinessFlow = flow;
+  const start = await app.inject(request);
+  assert.equal(start.statusCode, 202, start.body);
+  const snapshot = await waitForTerminal(app, start.json().runId);
+  assert.equal(snapshot.status, "completed", JSON.stringify(snapshot.error));
+  assert.equal(fixture.prompts.length, 1);
+  assert.match(fixture.prompts[0]!, /"businessFlow"/);
+  assert.match(fixture.prompts[0]!, /"actorOrLane": "system"/);
+  assert.match(fixture.prompts[0]!, /"targetId": "process"/);
+  assert.deepEqual(snapshot.businessFlow, flow);
+  await app.close();
+});
+
+test("stops before implementation when a requested business flow fails", async () => {
+  const app = Fastify();
+  const fixture = registerTestRoutes({ app, outputs: [contextOutput, "{}", "{}", "{}", implementationOutput] });
+  const start = await app.inject({ method: "POST", url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: {
+    projectId: "project-1", selectedArtifacts: ["context", "business-flow", "implementation"], providerSettings: { providerConfigId: "provider-1", model: "test-model" },
+  } });
+  const snapshot = await waitForTerminal(app, start.json().runId);
+  assert.equal(snapshot.status, "failed");
+  assert.equal(snapshot.businessFlow, null);
+  assert.equal(snapshot.implementationPlan, null);
+  assert.equal(fixture.prompts.length, 4);
+  assert.ok(!fixture.runs.get(snapshot.runId)?.events.some((event) => event.type === "stage_started" && event.stage === "generate_implementation"));
   await app.close();
 });
 
@@ -159,10 +315,10 @@ test("repairs invalid context once and keeps new context when implementation sti
   let syncedSnapshot: Record<string, unknown> | null = null;
   registerTestRoutes({
     app,
-    outputs: ["{bad", contextOutput, "{}", "{}"],
+    outputs: ["{bad", contextOutput, businessFlowOutput, "{}", "{}"],
     onSync: async (record) => { syncedSnapshot = structuredClone(record.snapshot) as unknown as Record<string, unknown>; },
   });
-  const start = await app.inject({ method: "POST", url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: { projectId: "project-1", selectedArtifacts: ["context", "implementation"], providerSettings: { providerConfigId: "provider-1", model: "test-model" } } });
+  const start = await app.inject({ method: "POST", url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: { projectId: "project-1", selectedArtifacts: ["context", "business-flow", "implementation"], providerSettings: { providerConfigId: "provider-1", model: "test-model" } } });
   const snapshot = await waitForTerminal(app, start.json().runId);
   assert.equal(snapshot.status, "failed");
   assert.ok(snapshot.contextModel);
@@ -212,6 +368,7 @@ test("section repair fixes integrations without overwriting valid economics", as
     app,
     outputs: [
       externalContext,
+      businessFlowOutput,
       JSON.stringify(invalidPlan),
       JSON.stringify(repairedPlan),
       JSON.stringify(repairedPlan),
@@ -224,7 +381,7 @@ test("section repair fixes integrations without overwriting valid economics", as
     headers: { authorization: "Bearer test" },
     payload: {
       projectId: "project-1",
-      selectedArtifacts: ["context", "implementation"],
+      selectedArtifacts: ["context", "business-flow", "implementation"],
       providerSettings: { providerConfigId: "provider-1", model: "test-model" },
     },
   });

@@ -85,7 +85,7 @@ export const PRODUCT_DOC_CATEGORIES: readonly ProductDocCategory[] = [
   {
     id: "feasibility",
     label: "可行性分析",
-    description: "系统上下文图（系统环境图）、候选实现方案、成本收益、风险、结论和研究报告。",
+    description: "系统环境图、业务与系统流程图、候选实现方案、成本收益、风险、结论和研究报告。",
   },
   {
     id: "models",
@@ -310,18 +310,18 @@ const ARTICLE_MANIFEST = [
   },
   {
     id: "feasibility-analysis",
-    title: "可行性分析：系统上下文图（系统环境图）、实现方案与研究报告",
+    title: "可行性分析：系统环境图、业务流程、实现方案与研究报告",
     category: "feasibility",
-    summary: "从已接受规则生成系统上下文图（系统环境图）和可编辑实现方案，并保持研究报告产物有效。",
+    summary: "从已确认需求生成系统环境图和业务流程，以两张图及补充资料形成实现方案，并检查研究报告的依赖有效性。",
     estimatedMinutes: 14,
     recommendedPath: true,
     sourcePath: "../content/feasibility-analysis.md",
-    tags: ["可行性分析", "系统上下文图（系统环境图）", "实现方案", "成本收益", "风险", "五类结论", "可行性研究报告"],
+    tags: ["可行性分析", "系统环境图", "业务与系统流程图", "活动图", "实现方案", "成本收益", "风险", "五类结论", "可行性研究报告"],
     relatedArtifacts: ["FeasibilityContextModel", "ImplementationPlan", "FeasibilityStudy", "TraceabilityMatrix"],
     screenshot: {
       src: "/help/images/docs-feasibility.png",
-      alt: "可行性分析系统上下文图（系统环境图）和实现方案产物概览截图",
-      caption: "可行性分析按系统上下文图（系统环境图）和实现方案的依赖顺序生成，并显示当前有效性。",
+      alt: "可行性分析系统环境图和实现方案产物概览截图",
+      caption: "可行性分析概览展示产物状态；生成实现方案时会自动勾选缺失或过期的系统环境图与业务流程图。",
     },
   },
   {
@@ -597,9 +597,9 @@ const EN_ARTICLE_TEXT: Record<
     relatedArtifacts: ["RequirementBaseline", "QualityReport", "ReviewCandidate"],
   },
   "feasibility-analysis": {
-    title: "Feasibility analysis: System Context Diagram (System Environment Diagram), implementation plan, and report",
-    summary: "Generate a System Context Diagram (System Environment Diagram) and editable implementation options from accepted rules, then keep the feasibility report current.",
-    tags: ["Feasibility analysis", "System Context Diagram (System Environment Diagram)", "Implementation plan", "Cost-benefit", "Risks", "Five conclusions", "Feasibility report"],
+    title: "Feasibility analysis: System Environment Diagram, implementation plan, and report",
+    summary: "Generate a System Environment Diagram and editable implementation options from accepted rules, then keep the feasibility report current.",
+    tags: ["Feasibility analysis", "System Environment Diagram", "Implementation plan", "Cost-benefit", "Risks", "Five conclusions", "Feasibility report"],
     relatedArtifacts: ["FeasibilityContextModel", "ImplementationPlan", "FeasibilityStudy", "TraceabilityMatrix"],
   },
   "uml-models": {

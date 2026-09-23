@@ -11,6 +11,7 @@ type ModelBentoCardProps = {
   label: string;
   english: string;
   description: string;
+  singleLineDescription?: boolean;
   icon: LucideIcon;
   selected: boolean;
   disabled?: boolean;
@@ -30,6 +31,7 @@ export function ModelBentoCard({
   label,
   english,
   description,
+  singleLineDescription = false,
   icon: Icon,
   selected,
   disabled = false,
@@ -124,7 +126,7 @@ export function ModelBentoCard({
         <span title={english} className="block truncate font-mono text-[11px] leading-4 text-muted-foreground sm:text-xs sm:leading-5">
           {english}
         </span>
-        <p title={description} className="mt-2 line-clamp-2 text-xs leading-4 text-muted-foreground sm:leading-5">
+        <p title={description} className={cn("mt-2 text-xs leading-4 text-muted-foreground sm:leading-5", singleLineDescription ? "truncate" : "line-clamp-2")}>
           {description}
         </p>
       </div>

@@ -34,6 +34,7 @@ import {
 import { emitEvent, type RunRecord } from "../records/run-record-store.js";
 import { throwIfRunCancelled } from "../records/run-cancellation.js";
 import { emitOfflineDemoActivity } from "./offline-demo-activity.js";
+import { createStageLifecycle } from "../pipelines/shared/stage-lifecycle.js";
 import { stageProgressValue } from "../pipelines/shared/pipeline-events.js";
 import { librarySeatDemoFixture } from "./fixtures/library-seat-demo-fixture.js";
 import {
@@ -228,11 +229,12 @@ function ensureDesignArtifacts(snapshot: DesignRunSnapshot) {
   snapshot.plantUml = Array.from(plantByKey.values());
 }
 
-async function emitDemoStage(record: RunRecord, stage: RunStage, message: string) {
+async function emitDemoStage(record: RunRecord, stages: ReturnType<typeof createStageLifecycle>, stage: RunStage, message: string) {
   throwIfRunCancelled(record);
+  stages.advance(stage);
   record.snapshot.currentStage = stage;
   record.snapshot.status = "running";
-  emitEvent(record, stageStartedRunEventSchema.parse({ type: "stage_started", stage }));
+  emitEvent(record, stageStartedRunEventSchema.parse({ type: "stage_started", stage, tracksCompletion: true }));
   emitEvent(
     record,
     stageProgressRunEventSchema.parse({
@@ -266,6 +268,7 @@ export async function completeOfflineDemoRequirementRun(
   record: RunRecord,
   input: StartRunRequest,
 ) {
+  const stages = createStageLifecycle(record);
   const snapshot = clone(fixture.requirementSnapshot);
   retargetSnapshotIds(snapshot, record.snapshot.runId);
   const availableKinds = requirementKinds(snapshot);
@@ -303,7 +306,7 @@ export async function completeOfflineDemoRequirementRun(
   }
   snapshot.status = "queued";
   record.snapshot = snapshot;
-  await emitDemoStage(record, "extract_rules", "离线演示：正在整理固定需求规则");
+  await emitDemoStage(record, stages, "extract_rules", "离线演示：正在整理固定需求规则");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -321,7 +324,7 @@ export async function completeOfflineDemoRequirementRun(
     }),
   );
   if (selectedKinds.length > 0) {
-    await emitDemoStage(record, "generate_models", "离线演示：正在并行整理需求模型");
+    await emitDemoStage(record, stages, "generate_models", "离线演示：正在并行整理需求模型");
     emitEvent(
       record,
       artifactReadyRunEventSchema.parse({
@@ -330,7 +333,7 @@ export async function completeOfflineDemoRequirementRun(
         artifactKind: "model",
       }),
     );
-    await emitDemoStage(record, "render_svg", "离线演示：正在准备已保存的图形预览");
+    await emitDemoStage(record, stages, "render_svg", "离线演示：正在准备已保存的图形预览");
     emitEvent(
       record,
       artifactReadyRunEventSchema.parse({
@@ -355,6 +358,7 @@ export async function completeOfflineDemoDesignRun(
   record: RunRecord,
   input: StartDesignRunRequest,
 ) {
+  const stages = createStageLifecycle(record);
   const snapshot = clone(fixture.designSnapshot);
   retargetSnapshotIds(snapshot, record.snapshot.runId);
   const availableKinds = designKinds(snapshot);
@@ -382,8 +386,8 @@ export async function completeOfflineDemoDesignRun(
   snapshot.currentStage = "render_svg";
   snapshot.status = "queued";
   record.snapshot = snapshot;
-  await emitDemoStage(record, "generate_design_sequence", "离线演示：正在整理用例实现设计");
-  await emitDemoStage(record, "generate_design_models", "离线演示：正在并行整理设计模型");
+  await emitDemoStage(record, stages, "generate_design_sequence", "离线演示：正在整理用例实现设计");
+  await emitDemoStage(record, stages, "generate_design_models", "离线演示：正在并行整理设计模型");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -392,7 +396,7 @@ export async function completeOfflineDemoDesignRun(
       artifactKind: "model",
     }),
   );
-  await emitDemoStage(record, "render_svg", "离线演示：正在准备已保存的设计图预览");
+  await emitDemoStage(record, stages, "render_svg", "离线演示：正在准备已保存的设计图预览");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -413,6 +417,7 @@ export async function completeOfflineDemoDesignRun(
 }
 
 export async function completeOfflineDemoCodeRun(record: RunRecord, input: StartCodeRunRequest) {
+  const stages = createStageLifecycle(record);
   const snapshot = clone(fixture.codeSnapshot);
   retargetSnapshotIds(snapshot, record.snapshot.runId);
   snapshot.generationMode = input.generationMode;
@@ -420,7 +425,7 @@ export async function completeOfflineDemoCodeRun(record: RunRecord, input: Start
   snapshot.currentStage = "verify_code_business_assertions";
   snapshot.status = "queued";
   record.snapshot = snapshot;
-  await emitDemoStage(record, "analyze_code_business_logic", "离线演示：正在整理业务逻辑");
+  await emitDemoStage(record, stages, "analyze_code_business_logic", "离线演示：正在整理业务逻辑");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -430,7 +435,7 @@ export async function completeOfflineDemoCodeRun(record: RunRecord, input: Start
       businessLogic: snapshot.businessLogic ?? undefined,
     }),
   );
-  await emitDemoStage(record, "generate_code_spec", "离线演示：正在整理代码规格");
+  await emitDemoStage(record, stages, "generate_code_spec", "离线演示：正在整理代码规格");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -439,7 +444,7 @@ export async function completeOfflineDemoCodeRun(record: RunRecord, input: Start
       artifactKind: "codeSpec",
     }),
   );
-  await emitDemoStage(record, "generate_code_files", "离线演示：正在准备原型文件");
+  await emitDemoStage(record, stages, "generate_code_files", "离线演示：正在准备原型文件");
   emitEvent(
     record,
     artifactReadyRunEventSchema.parse({
@@ -448,7 +453,7 @@ export async function completeOfflineDemoCodeRun(record: RunRecord, input: Start
       artifactKind: "codeFiles",
     }),
   );
-  await emitDemoStage(record, "verify_code_business_assertions", "离线演示：正在读取已保存的业务检查结果");
+  await emitDemoStage(record, stages, "verify_code_business_assertions", "离线演示：正在读取已保存的业务检查结果");
   if (snapshot.businessAssertionResults) {
     emitEvent(
       record,
@@ -464,6 +469,8 @@ export async function completeOfflineDemoCodeRun(record: RunRecord, input: Start
 }
 
 export function createOfflineDemoDocumentInput(input: StartDocumentRunRequest) {
+  // Feasibility has already passed server-side freshness checks; retain its two-diagram solution basis.
+  if (input.documentKind === "feasibilityStudy") return startDocumentRunRequestSchema.parse({ ...input, useAiText: false });
   const requirementSnapshot = clone(fixture.requirementSnapshot);
   ensureRequirementArtifacts(requirementSnapshot);
   const designSnapshot = clone(fixture.designSnapshot);

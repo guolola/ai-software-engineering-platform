@@ -13,6 +13,7 @@ import {
   epayAlipayOnlySql,
   migrationTableName,
   migrations,
+  noneLinearDomesticEndpointSql,
   providerModelCapabilitiesEnforcementSql,
   providerBreakerProbeLeaseSql,
   providerStructuredOutputCapabilitiesEnforcementSql,
@@ -166,6 +167,18 @@ test("provider breaker recovery lease is added for existing databases", () => {
   assert.match(
     migrations.map((migration) => migration.id).join("\n"),
     /025_provider_breaker_probe_lease/,
+  );
+});
+
+test("NoneLinear legacy endpoints migrate to the mainland endpoint", () => {
+  assert.match(
+    noneLinearDomesticEndpointSql,
+    /base_url = 'https:\/\/api\.nonelinear\.com\.cn'/i,
+  );
+  assert.match(noneLinearDomesticEndpointSql, /breaker_state = 'closed'/i);
+  assert.match(
+    migrations.map((migration) => migration.id).join("\n"),
+    /026_nonelinear_domestic_endpoint/,
   );
 });
 

@@ -1,6 +1,8 @@
 // Builds typed run-start payloads from workspace state and persisted user model settings.
 import type {
+  GenerationExecutionMode,
   CoverageMatrix,
+  FeasibilityArtifactKind,
   DesignDiagramModelSpec,
   DesignModelTraceabilityEntry,
   DesignPlantUmlArtifact,
@@ -18,6 +20,7 @@ import type {
 import type { DesignDiagramType, DiagramType } from "../../entities/diagram/model";
 import type { RequirementRule } from "../../entities/requirement-rule/model";
 import { loadUserSettings } from "../../shared/lib/user-settings";
+import { generationModelBlockedReason } from "../../shared/lib/generation-model";
 
 export interface ProviderSettingsInput {
   providerConfigId: string;
@@ -76,7 +79,7 @@ export interface StartDocumentRunInput {
 }
 
 export interface StartFeasibilityRunInput {
-  selectedArtifacts: Array<"context" | "implementation">;
+  selectedArtifacts: FeasibilityArtifactKind[];
   providerSettings: ProviderSettingsInput;
 }
 
@@ -87,8 +90,9 @@ export function createStartRunInput(
   contextModels: DiagramModelSpec[] = [],
   contextRequirementModelTraceability: RequirementModelTraceabilityEntry[] = [],
   analysisTargetUseCaseIds: string[] = [],
+  executionMode: GenerationExecutionMode = "provider",
 ): StartRunInput {
-  const providerSettings = createProviderSettingsInput();
+  const providerSettings = createProviderSettingsInput(executionMode);
   return {
     requirementText,
     selectedDiagrams,
@@ -102,26 +106,16 @@ export function createStartRunInput(
   };
 }
 
-export function createProviderSettingsInput(): ProviderSettingsInput {
+export function createProviderSettingsInput(executionMode: GenerationExecutionMode = "provider"): ProviderSettingsInput {
+  // Only the project access response enables fixed artifacts; settings never imply demo mode.
+  if (executionMode === "offline-demo") {
+    return { providerConfigId: "offline-demo", model: "offline-demo-fixed-artifacts" };
+  }
   const settings = loadUserSettings();
+  const blockedReason = generationModelBlockedReason(executionMode, settings);
+  if (blockedReason) throw new Error(blockedReason);
   const providerConfigId = settings.providerConfigId.trim();
   const model = settings.defaultModel.trim();
-  const providerModelOptions = settings.providerModelOptions
-    .map((option) => option.trim())
-    .filter(Boolean);
-
-  // Offline demo runs are selected by the API from the project scope and do
-  // not call a provider. Keep the request shape valid so the demo can reach
-  // that server-side branch even when local settings have no provider yet.
-  if (!providerConfigId || !model) {
-    return {
-      providerConfigId: providerConfigId || "offline-demo",
-      model: model || "offline-demo-fixed-artifacts",
-    };
-  }
-  if (!providerModelOptions.includes(model)) {
-    throw new Error("默认模型必须来自当前托管 Provider 的模型目录");
-  }
 
   return {
     providerConfigId,
@@ -130,13 +124,14 @@ export function createProviderSettingsInput(): ProviderSettingsInput {
 }
 
 export function createStartFeasibilityRunInput(
-  selectedArtifacts: Array<"context" | "implementation">,
+  selectedArtifacts: FeasibilityArtifactKind[],
+  executionMode: GenerationExecutionMode = "provider",
 ): StartFeasibilityRunInput {
   return {
-    selectedArtifacts: (["context", "implementation"] as const).filter((artifact) =>
+    selectedArtifacts: (["context", "business-flow", "implementation"] as const).filter((artifact) =>
       selectedArtifacts.includes(artifact),
     ),
-    providerSettings: createProviderSettingsInput(),
+    providerSettings: createProviderSettingsInput(executionMode),
   };
 }
 
@@ -150,6 +145,7 @@ export function createStartDesignRunInput(
   existingDesignModelTraceability: DesignModelTraceabilityEntry[] = [],
   existingDesignPlantUml: DesignPlantUmlArtifact[] = [],
   existingDesignSvgArtifacts: DesignSvgArtifact[] = [],
+  executionMode: GenerationExecutionMode = "provider",
 ): StartDesignRunInput {
   return {
     requirementBaseline,
@@ -161,7 +157,7 @@ export function createStartDesignRunInput(
     existingDesignModelTraceability,
     existingDesignPlantUml,
     existingDesignSvgArtifacts,
-    providerSettings: createProviderSettingsInput(),
+    providerSettings: createProviderSettingsInput(executionMode),
   };
 }
 
@@ -170,13 +166,14 @@ export function createStartCodeRunInput(
   designPlantUml: DesignPlantUmlArtifact[] = [],
   existingFiles: Record<string, string> = {},
   generationMode: "continue" | "regenerate" = "continue",
+  executionMode: GenerationExecutionMode = "provider",
 ): StartCodeRunInput {
   return {
     designModels,
     designPlantUml,
     existingFiles: generationMode === "regenerate" ? {} : existingFiles,
     generationMode,
-    providerSettings: createProviderSettingsInput(),
+    providerSettings: createProviderSettingsInput(executionMode),
   };
 }
 
@@ -194,8 +191,8 @@ export function createStartDocumentRunInput(
   documentStyle?: DocumentStyleSettings,
   coverageMatrix: CoverageMatrix | null = null,
   traceabilityMatrix: TraceabilityMatrix | null = null,
+  executionMode: GenerationExecutionMode = "provider",
 ): StartDocumentRunInput {
-  const base = createStartRunInput(requirementText, []);
   return {
     documentKind,
     requirementText,
@@ -209,7 +206,7 @@ export function createStartDocumentRunInput(
     designModels,
     designPlantUml,
     designSvgArtifacts,
-    providerSettings: base.providerSettings,
+    providerSettings: createProviderSettingsInput(executionMode),
     useAiText: true,
     documentStyle,
   };

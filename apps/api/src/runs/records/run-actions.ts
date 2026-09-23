@@ -41,6 +41,8 @@ function createQueuedSnapshotFromSource(
       contextTraceability: source.contextTraceability,
       contextPlantUml: source.contextPlantUml,
       contextSvg: source.contextSvg,
+      businessFlow: source.businessFlow,
+      requirementSource: source.requirementSource,
       implementationPlan: source.implementationPlan,
       contextFingerprint: source.contextFingerprint,
       implementationFingerprint: source.implementationFingerprint,
@@ -194,6 +196,7 @@ export function createQueuedRunFromSource({
     terminal: false,
     metadata: {
       ...(metadata ?? { createdAt: new Date().toISOString() }),
+      offlineDemoFixture: source.metadata?.offlineDemoFixture,
       sourceRunId,
       sourceAction: action,
       sourceRunStatus: displaySourceRunStatus(source),

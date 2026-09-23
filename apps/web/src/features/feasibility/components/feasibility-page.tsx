@@ -3,7 +3,7 @@ import {
   PageContainer,
   PageHeader,
 } from "../../../shared/template/layout/page";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Loader2,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   contextDiagramSpecSchema,
+  readFeasibilityBusinessFlowArtifact,
   type ContextDiagramSpec,
   type FeasibilityArtifactKind,
   type FeasibilityImplementationPlan,
@@ -28,7 +29,7 @@ import {
   type ContextDiagramSection,
 } from "../../diagrams/components/diagram-detail-page";
 import { TraceabilityMatrixPage } from "../../traceability/components/traceability-matrix-page";
-import { acceptedFeasibilityRules, feasibilityArtifactState } from "../lib/feasibility-freshness";
+import { acceptedFeasibilityRules, feasibilityArtifactState, includeFeasibilityDependencies } from "../lib/feasibility-freshness";
 import { buildCrossStageRequirementCoverage } from "../lib/cross-stage-requirement-coverage";
 import { buildContextTraceability } from "../lib/context-traceability";
 import { useWorkspaceSession } from "../../workspace-session/state";
@@ -42,6 +43,7 @@ import {
   loadUserSettings,
   patchUserSettings,
 } from "../../../shared/lib/user-settings";
+import { generationModelBlockedReason as readGenerationModelBlockedReason } from "../../../shared/lib/generation-model";
 import { createStartFeasibilityRunInput } from "../../../services/workspace-repository/start-inputs";
 import { ApiClientError } from "../../../services/api-client";
 import { localizeApiFailure } from "../../../shared/i18n/api-errors";
@@ -53,9 +55,14 @@ import {
 import { generationResultFeedback } from "../../workspace-session/components/generation-dialogs";
 import { failedRunResultDialog } from "../../workspace-session/lib/generation-dialog-actions";
 import { useWorkspaceShell } from "../../workspace-shell/state";
+import { BusinessFlowView } from "./business-flow-view";
 
 export type FeasibilityView =
   | "overview"
+  | "business-flow"
+  | "business-flow-trace"
+  | "business-flow-elements"
+  | "business-flow-relations"
   | "context"
   | "trace"
   | "elements"
@@ -84,13 +91,15 @@ export function FeasibilityPage({
   const { t } = useTranslation();
   const repository = useWorkspaceRepository();
   const { openFeedback } = useFeedbackDialog();
-  const { openSystemRequirements } = useWorkspaceShell();
+  const { openSystemRequirements, openFeasibilityHome } = useWorkspaceShell();
   const {
     syncFeasibilityArtifacts,
     feasibilityContextSaveStatus,
     setFeasibilityContextSaveStatus,
     canUpdateWorkspace,
     canStartRuns,
+    generationExecutionMode,
+    generationModelBlockedReason,
     workspacePermissionReason,
     beginFeasibilityGenerationTask,
     attachFeasibilityGenerationRun,
@@ -110,6 +119,14 @@ export function FeasibilityPage({
     () => initialSelectedArtifacts ?? [],
   );
   const [defaultModel, setDefaultModel] = useState(() => loadUserSettings().defaultModel);
+  const appliedNavigationSelection = useRef<FeasibilityArtifactKind[] | undefined>(undefined);
+
+  // The shell can reuse this page when navigating from solution details to the overview.
+  useEffect(() => {
+    if (!workspace || !initialSelectedArtifacts || appliedNavigationSelection.current === initialSelectedArtifacts) return;
+    appliedNavigationSelection.current = initialSelectedArtifacts;
+    setSelectedArtifacts(includeFeasibilityDependencies(initialSelectedArtifacts, feasibilityArtifactState(workspace)));
+  }, [initialSelectedArtifacts, workspace]);
 
   useEffect(() => {
     const syncSettings = () => setDefaultModel(loadUserSettings().defaultModel);
@@ -120,6 +137,7 @@ export function FeasibilityPage({
   const reload = useCallback(async () => {
     const next = await repository.loadWorkspace();
     setWorkspace(next);
+    setSelectedArtifacts((current) => includeFeasibilityDependencies(current, feasibilityArtifactState(next)));
     syncFeasibilityArtifacts(next);
     setLoading(false);
   }, [repository, syncFeasibilityArtifacts]);
@@ -132,6 +150,19 @@ export function FeasibilityPage({
   }, [reload, t]);
 
   const generate = async (selectedArtifacts: ArtifactKind[]) => {
+    // Mirror the UI prerequisites for every entry point, including detail-view regeneration.
+    if (generating || !workspace) return;
+    const blockedReason = !canUpdateWorkspace || !canStartRuns
+      ? workspacePermissionReason ?? t("feasibility.runPermissionDenied")
+      : acceptedFeasibilityRules(workspace).length === 0 ? t("feasibility.prerequisiteRules")
+        : readGenerationModelBlockedReason(generationExecutionMode) ??
+          (selectedArtifacts.length === 0 ? t("feasibility.noArtifactSelected") : null);
+    if (blockedReason) { setError(blockedReason); return; }
+    if (selectedArtifacts.includes("implementation") &&
+      feasibilityArtifactState(workspace).missingDependencies.some((kind) => !selectedArtifacts.includes(kind))) {
+      setError(t("feasibility.dependencies.required"));
+      return;
+    }
     if (!repository.startFeasibilityRun || !repository.getFeasibilityRunSnapshot) {
       const message = t("feasibility.repositoryUnsupported");
       setError(message);
@@ -154,7 +185,7 @@ export function FeasibilityPage({
     let runId: string | null = null;
     let runFailureMessage: string | null = null;
     try {
-      const input = createStartFeasibilityRunInput(selectedArtifacts);
+      const input = createStartFeasibilityRunInput(selectedArtifacts, generationExecutionMode);
       clientTaskId = beginFeasibilityGenerationTask({
         providerModel: input.providerSettings.model,
         startedAtMs: Date.now(),
@@ -169,9 +200,13 @@ export function FeasibilityPage({
         await repository.subscribeToFeasibilityRun(runId, (event) => {
           if (clientTaskId) updateFeasibilityGenerationTask(clientTaskId, event);
           if (event.type === "stage_started" || event.type === "stage_progress") {
-            currentArtifact = event.stage === "generate_implementation" ? "implementation" : "context";
+            if (event.stage === "generate_implementation") currentArtifact = "implementation";
+            else if (event.stage === "generate_business_flow" || event.stage === "render_business_flow") currentArtifact = "business-flow";
+            else if (event.stage === "generate_context" || event.stage === "render_context") currentArtifact = "context";
             setGenerationMessage(
-              event.stage === "generate_context"
+              currentArtifact === "business-flow"
+                ? t("feasibility.generation.businessFlow")
+                : event.stage === "generate_context"
                 ? t("feasibility.generation.context")
                 : event.stage === "render_context"
                   ? t("feasibility.generation.rendering")
@@ -189,7 +224,9 @@ export function FeasibilityPage({
       } else {
         while (true) {
           const snapshot = await repository.getFeasibilityRunSnapshot(runId);
-          currentArtifact = snapshot.currentStage === "generate_implementation" ? "implementation" : "context";
+          if (snapshot.currentStage === "generate_implementation") currentArtifact = "implementation";
+          else if (snapshot.currentStage === "generate_business_flow" || snapshot.currentStage === "render_business_flow") currentArtifact = "business-flow";
+          else if (snapshot.currentStage === "generate_context" || snapshot.currentStage === "render_context") currentArtifact = "context";
           if (snapshot.status === "completed") break;
           if (snapshot.status === "failed" || snapshot.status === "cancelled") {
             runFailureMessage = snapshot.status === "cancelled"
@@ -274,17 +311,23 @@ export function FeasibilityPage({
 
   const savePlan = async (plan: FeasibilityImplementationPlan, inputs: FeasibilityInputs, planDirty: boolean) => {
     if (!workspace) return;
-    const nextWorkspace = { ...workspace, feasibilityInputs: inputs, feasibilityImplementationPlan: plan };
+    const latestWorkspace = await repository.loadWorkspace();
+    const editBasis = feasibilityArtifactState({ ...latestWorkspace,
+      feasibilityImplementationPlan: workspace.feasibilityImplementationPlan,
+      feasibilityImplementationFingerprint: workspace.feasibilityImplementationFingerprint });
+    const nextWorkspace = { ...latestWorkspace, feasibilityInputs: inputs, feasibilityImplementationPlan: plan };
     const patch: Parameters<NonNullable<typeof repository.updateFeasibility>>[0] = {
       inputs,
       implementationPlan: plan,
     };
-    if (planDirty) {
+    // Editing a stale or legacy plan must not silently certify a new upstream basis.
+    if (planDirty && editBasis.implementationStatus === "ready") {
       patch.implementationFingerprint = feasibilityArtifactState(nextWorkspace).currentImplementationFingerprint;
       nextWorkspace.feasibilityImplementationFingerprint = patch.implementationFingerprint;
     }
     await repository.updateFeasibility?.(patch);
     setWorkspace(nextWorkspace);
+    syncFeasibilityArtifacts(nextWorkspace);
     setGenerationMessage(t("feasibility.workspaceSaved"));
   };
 
@@ -298,21 +341,11 @@ export function FeasibilityPage({
   const implementationExists = states.implementationExists;
   const acceptedRules = acceptedFeasibilityRules(workspace);
   const latestContextExists = contextExists && !states.contextStale;
-  const settings = loadUserSettings();
-  const hasProviderModel = Boolean(
-    settings.providerConfigId.trim() &&
-    defaultModel.trim() &&
-    settings.providerModelOptions.includes(defaultModel),
-  );
-  const generationBlockedReason = !canUpdateWorkspace || !canStartRuns
+  const artifactGenerationBlockedReason = !canUpdateWorkspace || !canStartRuns
     ? workspacePermissionReason ?? t("feasibility.runPermissionDenied")
-    : acceptedRules.length === 0
-      ? t("feasibility.prerequisiteRules")
-      : !hasProviderModel
-        ? t("feasibility.providerRequired")
-        : selectedArtifacts.length === 0
-          ? t("feasibility.noArtifactSelected")
-          : null;
+    : acceptedRules.length === 0 ? t("feasibility.prerequisiteRules") : generationModelBlockedReason;
+  const generationBlockedReason = artifactGenerationBlockedReason ??
+    (selectedArtifacts.length === 0 ? t("feasibility.noArtifactSelected") : null);
   const prerequisiteFeedback: FeedbackDialogState | null =
     acceptedRules.length === 0
       ? {
@@ -327,13 +360,13 @@ export function FeasibilityPage({
           },
           keepReopenEntry: true,
         }
-      : !hasProviderModel
+      : generationModelBlockedReason
         ? {
             dedupeKey: "feasibility:prerequisite:provider",
             revision: defaultModel,
             tone: "warning",
             title: t("feasibility.feedback.prerequisiteTitle"),
-            message: t("feasibility.providerRequired"),
+            message: generationModelBlockedReason,
             keepReopenEntry: true,
           }
         : null;
@@ -379,12 +412,13 @@ export function FeasibilityPage({
       const next = new Set(current);
       if (selected) {
         next.add(artifact);
-        if (artifact === "implementation" && !latestContextExists) next.add("context");
+        if (artifact === "implementation") states.missingDependencies.forEach((kind) => next.add(kind));
       } else {
         next.delete(artifact);
         if (artifact === "context" && !latestContextExists) next.delete("implementation");
+        if (artifact === "business-flow" && states.businessFlowStatus !== "ready") next.delete("implementation");
       }
-      return (["context", "implementation"] as const).filter((item) => next.has(item));
+      return (["context", "business-flow", "implementation"] as const).filter((item) => next.has(item));
     });
   };
   const updateModel = (model: string) => {
@@ -404,6 +438,22 @@ export function FeasibilityPage({
         }}
       />
     );
+  }
+
+  if (view === "business-flow-trace") {
+    return <TraceabilityMatrixPage mode="business-flow" businessFlowData={{
+      artifact: readFeasibilityBusinessFlowArtifact(workspace.feasibilityBusinessFlow),
+      rules: acceptedRules, stale: states.businessFlowStale,
+    }} />;
+  }
+
+  if (view === "business-flow" || view === "business-flow-elements" || view === "business-flow-relations") {
+    const blockedReason = artifactGenerationBlockedReason;
+    return <BusinessFlowView artifact={readFeasibilityBusinessFlowArtifact(workspace.feasibilityBusinessFlow)} rules={acceptedRules}
+      section={view === "business-flow-elements" ? "elements" : view === "business-flow-relations" ? "relations" : "diagram"}
+      highlightedElement={highlightedElement} highlightedRelationshipId={highlightedRelationshipId}
+      stale={states.businessFlowStale} generating={generating} blockedReason={blockedReason}
+      message={generationMessage} error={error} onGenerate={() => void generate(["business-flow"])} />;
   }
 
   if (view === "context" || view === "elements" || view === "relations") {
@@ -427,15 +477,18 @@ export function FeasibilityPage({
           statusMessage: generationMessage,
           errorMessage: error,
           headerAction: (
+            <div className="flex flex-wrap items-center gap-2">
+            {artifactGenerationBlockedReason && <span role="status" className="text-xs text-muted-foreground">{artifactGenerationBlockedReason}</span>}
             <Button
               type="button"
               onClick={() => void generate(["context"])}
-              disabled={generating || acceptedRules.length === 0 || !canUpdateWorkspace || !canStartRuns || !hasProviderModel}
-              title={workspace.rules.length === 0 ? t("feasibility.prerequisiteRules") : undefined}
+              disabled={generating || Boolean(artifactGenerationBlockedReason)}
+              title={artifactGenerationBlockedReason ?? undefined}
             >
               {generating ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
               {contextExists ? t("feasibility.regenerate") : t("feasibility.generate")}
             </Button>
+            </div>
           ),
           onSave: saveContext,
         }}
@@ -452,9 +505,11 @@ export function FeasibilityPage({
           initialCandidateId={initialCandidateId}
           contextExists={contextExists}
           generating={generating}
+          blockedReason={artifactGenerationBlockedReason}
           message={generationMessage}
           errorMessage={error}
           onRegenerate={() => generate(["implementation"])}
+          onCompleteDependencies={() => openFeasibilityHome({ initialSelectedArtifacts: includeFeasibilityDependencies(["implementation"], states) })}
           onSave={savePlan}
         />
       </div>
@@ -482,7 +537,7 @@ export function FeasibilityPage({
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold">{t("feasibility.targetArtifacts")}</h2>
               <Badge variant="secondary" className="font-mono">
-                {selectedArtifacts.length}/2
+                {selectedArtifacts.length}/3
               </Badge>
             </div>
           </div>
@@ -507,10 +562,11 @@ export function FeasibilityPage({
           </div>
         </section>
 
+        {artifactGenerationBlockedReason && <p role="status" className="text-sm text-muted-foreground">{artifactGenerationBlockedReason}</p>}
         <MobileCompactGrid variant="model-targets">
           <ModelBentoCard
             label={t("feasibility.artifact.context")}
-            english="System Context Diagram (System Environment Diagram)"
+            english="System Environment Diagram"
             description={t("feasibility.artifact.contextDescription")}
             icon={Network}
             selected={selectedArtifacts.includes("context")}
@@ -520,6 +576,19 @@ export function FeasibilityPage({
             checkboxLabel={t("feasibility.selection.selectContext")}
             onSelectedChange={(selected) => toggleArtifact("context", selected)}
             status={generationCardStatus({ exists: contextExists, stale: states.contextStale, active: activeArtifacts.includes("context") ? "running" : undefined, failed: failedArtifacts.includes("context") })}
+          />
+          <ModelBentoCard
+            label={t("feasibility.artifact.businessFlow")}
+            english="Business and System Flow"
+            description={t("feasibility.artifact.businessFlowDescription")}
+            icon={Network}
+            selected={selectedArtifacts.includes("business-flow")}
+            disabled={generating || !canUpdateWorkspace || !canStartRuns}
+            countLabel={workspace.feasibilityBusinessFlow?.model.nodes.filter((node) => node.type === "activity").length ?? 0}
+            ariaLabel={t(selectedArtifacts.includes("business-flow") ? "feasibility.selection.deselectBusinessFlow" : "feasibility.selection.selectBusinessFlow")}
+            checkboxLabel={t("feasibility.selection.selectBusinessFlow")}
+            onSelectedChange={(selected) => toggleArtifact("business-flow", selected)}
+            status={generationCardStatus({ exists: states.businessFlowExists, stale: states.businessFlowStale, active: activeArtifacts.includes("business-flow") ? "running" : undefined, failed: failedArtifacts.includes("business-flow") })}
           />
           <ModelBentoCard
             label={t("feasibility.artifact.implementation")}

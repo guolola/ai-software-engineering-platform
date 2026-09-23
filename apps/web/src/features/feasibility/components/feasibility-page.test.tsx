@@ -1,16 +1,24 @@
 // Verifies feasibility overview status and persistence of user-supplied research facts.
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMockWorkspaceRepository } from "../../../services/workspace-repository/mock-repository";
-import { createRule, withWorkspaceProviders } from "../../../test/workspace-test-utils";
+import { createRule, createBusinessFlowArtifact, withWorkspaceProviders } from "../../../test/workspace-test-utils";
 import { i18n } from "../../../shared/i18n/i18n";
 import { LOCALE_PREFERENCE_STORAGE_KEY } from "../../../shared/i18n/types";
 import { FeasibilityPage } from "./feasibility-page";
-import { snapshotInputFingerprint } from "@uml-platform/contracts";
-import { USER_SETTINGS_STORAGE_KEY } from "../../../shared/lib/user-settings";
+import { snapshotInputFingerprint, feasibilityImplementationPlanSchema } from "@uml-platform/contracts";
+import { USER_SETTINGS_STORAGE_KEY, patchUserSettings } from "../../../shared/lib/user-settings";
+import { useWorkspaceShell } from "../../workspace-shell/state";
+import { feasibilityArtifactState } from "../lib/feasibility-freshness";
 
 afterEach(() => localStorage.removeItem(USER_SETTINGS_STORAGE_KEY));
+
+function DependencyNavigationHarness() {
+  const { selection } = useWorkspaceShell();
+  return <FeasibilityPage view={selection.kind === "feasibility-home" ? "overview" : "implementation"}
+    initialSelectedArtifacts={selection.kind === "feasibility-home" ? selection.initialSelectedArtifacts : undefined} />;
+}
 
 function configureProviderModel() {
   localStorage.setItem(
@@ -115,28 +123,80 @@ function stubCompactViewport(matches: boolean) {
 }
 
 describe("FeasibilityPage", () => {
+  it("generates business flow directly from rules without selecting context or implementation", async () => {
+    configureProviderModel();
+    const repository = createMockWorkspaceRepository({ rules: [createRule()] });
+    repository.startFeasibilityRun = vi.fn(async () => ({ runId: "flow-run" }));
+    repository.getFeasibilityRunSnapshot = vi.fn();
+    repository.subscribeToFeasibilityRun = vi.fn(async (_id, onEvent) => {
+      onEvent({ type: "completed", snapshot: {} as never });
+    });
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<FeasibilityPage view="overview" />, repository));
+    await user.click(await screen.findByRole("button", { name: "选择业务与系统流程图" }));
+    expect(screen.getByRole("checkbox", { name: "选择系统环境图" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "选择实现方案" })).not.toBeChecked();
+    await user.click(screen.getByRole("button", { name: "生成可行性分析" }));
+    await screen.findByRole("dialog", { name: "可行性分析已生成" });
+    expect(repository.startFeasibilityRun).toHaveBeenCalledWith(expect.objectContaining({ selectedArtifacts: ["business-flow"] }));
+  });
+
+  it("shows inline prerequisites for an empty business flow", async () => {
+    const repository = createMockWorkspaceRepository({ rules: [] });
+    repository.startFeasibilityRun = vi.fn();
+    render(withWorkspaceProviders(<FeasibilityPage view="business-flow" />, repository));
+    await screen.findByRole("heading", { name: "业务与系统流程图" });
+    expect(screen.getByText("请先在系统需求页确认需求规则")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "生成" })).toBeDisabled();
+    expect(repository.startFeasibilityRun).not.toHaveBeenCalled();
+  });
+
+  it("loads a saved business flow with shared element and relation lists, exports and an outdated notice", async () => {
+    const repository = createMockWorkspaceRepository({
+      rules: [createRule()],
+      feasibilityBusinessFlow: {
+        model: { diagramKind: "activity", modelId: "feasibility-business-flow", title: "业务与系统流程图", summary: "登录处理", notes: ["仅覆盖登录流程"],
+          swimlanes: [{ id: "system", name: "系统" }], nodes: [{ id: "start", type: "start" }, { id: "process", type: "activity", name: "处理登录", actorOrLane: "system", input: [], output: [] }, { id: "end", type: "end" }],
+          relationships: [{ id: "first", type: "control_flow", sourceId: "start", targetId: "process" }, { id: "last", type: "control_flow", sourceId: "process", targetId: "end" }] },
+        traceability: [{ requirementId: "r1", targetKind: "node", targetId: "process" }],
+        plantUml: { modelId: "feasibility-business-flow", diagramKind: "activity", source: "@startuml\nstart\n:处理登录;\nstop\n@enduml" },
+        svg: { modelId: "feasibility-business-flow", diagramKind: "activity", svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><text>登录流程</text></svg>',
+          renderMeta: { engine: "plantuml", generatedAt: "2026-07-19T00:00:00.000Z", sourceLength: 60, durationMs: 1 } },
+        fingerprint: "outdated",
+      },
+    });
+    render(withWorkspaceProviders(<FeasibilityPage view="business-flow" />, repository));
+    await screen.findByRole("heading", { name: "业务与系统流程图" });
+    expect(screen.getByRole("button", { name: "定位元素：处理登录" })).toBeInTheDocument();
+    expect(screen.getByText("仅覆盖登录流程")).toBeInTheDocument();
+    expect(screen.getByText("此图基于旧规则生成，可能已过时。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /PlantUML/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "SVG" })).toBeEnabled();
+  });
+
   it("shows context and implementation as ordered overview artifacts", async () => {
     const user = userEvent.setup();
     const repository = createMockWorkspaceRepository({ rules: [createRule()] });
+    repository.getProjectAccess = async () => ({ capabilities: ["update_project", "start_runs"], generationExecutionMode: "provider" });
     render(withWorkspaceProviders(<FeasibilityPage view="overview" />, repository));
     expect(await screen.findByRole("heading", { name: "可行性分析" })).toBeInTheDocument();
-    expect(screen.getByText("系统上下文图（系统环境图）")).toBeInTheDocument();
+    expect(screen.getByText("系统环境图")).toBeInTheDocument();
     expect(screen.getByText("实现方案")).toBeInTheDocument();
-    expect(screen.getAllByRole("img", { name: /：未生成$/ })).toHaveLength(2);
+    expect(screen.getAllByRole("img", { name: /：未生成$/ })).toHaveLength(3);
     expect(screen.queryByText("未生成")).not.toBeInTheDocument();
-    const card = screen.getByRole("button", { name: "选择系统上下文图（系统环境图）" });
+    const card = screen.getByRole("button", { name: "选择系统环境图" });
     expect(card).toHaveClass("h-[212px]", "sm:h-[236px]");
     expect(card.parentElement).toHaveAttribute("data-mobile-card-density", "model-targets");
     expect(card.parentElement?.className).toContain("min-[1900px]:grid-cols-6");
-    expect(screen.getByText("0/2")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "选择系统上下文图（系统环境图）" })).not.toBeChecked();
+    expect(screen.getByText("0/3")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "选择系统环境图" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "选择实现方案" })).not.toBeChecked();
     expect(screen.getByRole("button", { name: "生成可行性分析" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "有 1 项需要处理" }));
     const dialog = screen.getByRole("dialog", {
       name: "可行性分析暂时无法生成",
     });
-    expect(dialog).toHaveTextContent("请先选择可用的模型供应商和模型");
+    expect(dialog).toHaveTextContent("请先配置并选择模型供应商");
     expect(within(dialog).queryByRole("button", { name: /前往/ })).not.toBeInTheDocument();
   });
 
@@ -207,9 +267,9 @@ describe("FeasibilityPage", () => {
     );
 
     await screen.findByRole("heading", { name: "可行性分析" });
-    expect(screen.getByRole("checkbox", { name: "选择系统上下文图（系统环境图）" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "选择系统环境图" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "选择实现方案" })).toBeChecked();
-    expect(screen.getByText("2/2")).toBeInTheDocument();
+    expect(screen.getByText("3/3")).toBeInTheDocument();
   });
 
   it("selecting implementation links context while no current context exists", async () => {
@@ -218,11 +278,12 @@ describe("FeasibilityPage", () => {
     render(withWorkspaceProviders(<FeasibilityPage view="overview" />, repository));
     await screen.findByRole("heading", { name: "可行性分析" });
     await user.click(screen.getByRole("button", { name: "选择实现方案" }));
-    expect(screen.getByRole("checkbox", { name: "选择系统上下文图（系统环境图）" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "选择系统环境图" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "选择实现方案" })).toBeChecked();
-    expect(screen.getByText("2/2")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "取消选择系统上下文图（系统环境图）" }));
-    expect(screen.getByRole("checkbox", { name: "选择系统上下文图（系统环境图）" })).not.toBeChecked();
+    expect(screen.getByText("3/3")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "选择业务与系统流程图" })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "取消选择系统环境图" }));
+    expect(screen.getByRole("checkbox", { name: "选择系统环境图" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "选择实现方案" })).not.toBeChecked();
   });
 
@@ -230,6 +291,7 @@ describe("FeasibilityPage", () => {
     const context = createContextWorkspace();
     const repository = createMockWorkspaceRepository({
       ...context,
+      feasibilityBusinessFlow: createBusinessFlowArtifact(context.rules),
       feasibilityContextFingerprint: snapshotInputFingerprint({
         rules: context.rules,
         requirementBaseline: null,
@@ -239,9 +301,49 @@ describe("FeasibilityPage", () => {
     render(withWorkspaceProviders(<FeasibilityPage view="overview" />, repository));
     await screen.findByRole("heading", { name: "可行性分析" });
     await user.click(screen.getByRole("button", { name: "选择实现方案" }));
-    expect(screen.getByRole("checkbox", { name: "选择系统上下文图（系统环境图）" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "选择系统环境图" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "选择实现方案" })).toBeChecked();
-    expect(screen.getByText("1/2")).toBeInTheDocument();
+    expect(screen.getByText("1/3")).toBeInTheDocument();
+  });
+
+  it("opens the overview with missing dependencies when the detail page is reused", async () => {
+    const repository = createMockWorkspaceRepository({ rules: [createRule()], ...createImplementationWorkspace() });
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<DependencyNavigationHarness />, repository));
+    await user.click(await screen.findByRole("button", { name: "补齐依赖" }));
+    expect(await screen.findByRole("heading", { name: "可行性分析" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "选择实现方案" })).toBeChecked());
+    expect(screen.getByRole("checkbox", { name: "选择业务与系统流程图" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "选择系统环境图" })).toBeChecked();
+  });
+
+  it("manual plan edits cannot make a legacy plan current without a new generation", async () => {
+    const workspace = createImplementationWorkspace();
+    const plan = feasibilityImplementationPlanSchema.parse(workspace.feasibilityImplementationPlan);
+    for (const candidate of plan.candidates) {
+      const implementation = candidate.implementation!;
+      implementation.analysisPeriodAssumption = { years: 3, basis: "人工确认", provenance: "user-confirmed" };
+      implementation.costEstimates = [{ id: "cost", name: "开发", category: "other-one-time", frequency: "one-time",
+        range: { minimum: 1, maximum: 2, currency: "CNY", basis: "人工确认", confidence: "medium" },
+        sourceRequirementIds: ["r1"], assumption: "", note: "", provenance: "user-edited" }];
+      implementation.benefitEstimates = [{ id: "benefit", name: "效率提升", category: "intangible", frequency: "annual", range: null,
+        outcome: "流程提效", sourceRequirementIds: ["r1"], assumption: "", provenance: "user-edited" }];
+      implementation.risks = [0, 1, 2].map((index) => ({ ...implementation.risks[0]!, id: `risk-${index}` }));
+    }
+    const repository = createMockWorkspaceRepository({ ...workspace, feasibilityImplementationPlan: plan, feasibilityImplementationFingerprint: "legacy-inputs" });
+    const updateFeasibility = vi.spyOn(repository, "updateFeasibility");
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<FeasibilityPage view="implementation" />, repository));
+    await user.click(await screen.findByRole("button", { name: "编辑 概览" }));
+    await user.type(screen.getByLabelText("选择依据"), "人工更新方案说明");
+    await user.click(screen.getByRole("button", { name: "应用" }));
+    await user.click(screen.getByRole("button", { name: "保存方案" }));
+    await waitFor(() => expect(updateFeasibility).toHaveBeenCalled());
+    expect(updateFeasibility.mock.calls[0]![0]).not.toHaveProperty("implementationFingerprint");
+    const saved = await repository.loadWorkspace();
+    expect(saved.feasibilityImplementationPlan!.recommendationRationale).toContain("人工更新方案说明");
+    expect(saved.feasibilityImplementationFingerprint).toBe("legacy-inputs");
+    expect(feasibilityArtifactState(saved).implementationStatus).toBe("stale");
   });
 
   it("persists editable cost and benefit facts without inventing amounts", async () => {
@@ -432,5 +534,100 @@ describe("FeasibilityPage", () => {
       contextPlantUml: expect.stringContaining("@startuml"),
       contextSvg: expect.stringContaining("<svg"),
     })));
+  });
+});
+
+
+describe("feasibility generation model modes", () => {
+  it("generates fixed artifacts without a provider in a confirmed demo project", async () => {
+    const repository = createMockWorkspaceRepository({ rules: [createRule()] });
+    repository.startFeasibilityRun = vi.fn(async () => ({ runId: "demo-feasibility" }));
+    repository.getFeasibilityRunSnapshot = vi.fn();
+    repository.subscribeToFeasibilityRun = vi.fn(async (_runId, onEvent) => {
+      onEvent({ type: "completed", snapshot: {} as never });
+    });
+    render(withWorkspaceProviders(<FeasibilityPage view="overview" initialSelectedArtifacts={["context"]} />, repository));
+    const button = await screen.findByRole("button", { name: "生成可行性分析" });
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.setup().click(button);
+    await waitFor(() => expect(repository.startFeasibilityRun).toHaveBeenCalledWith({
+      selectedArtifacts: ["context"],
+      providerSettings: { providerConfigId: "offline-demo", model: "offline-demo-fixed-artifacts" },
+    }));
+    await screen.findByRole("dialog", { name: "可行性分析已生成" });
+  });
+
+  it("reacts to provider, model and catalog changes while keeping the picker usable", async () => {
+    const repository = createMockWorkspaceRepository({ rules: [createRule()] });
+    repository.getProjectAccess = async () => ({ capabilities: ["update_project", "start_runs"], generationExecutionMode: "provider" });
+    repository.startFeasibilityRun = vi.fn();
+    render(withWorkspaceProviders(<FeasibilityPage view="overview" initialSelectedArtifacts={["context"]} />, repository));
+    const button = await screen.findByRole("button", { name: "生成可行性分析" });
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("供应商"));
+    expect(button).toBeDisabled();
+    expect(screen.getByRole("button", { name: "未选择模型" })).toBeEnabled();
+    act(() => patchUserSettings({ providerConfigId: "provider-1", defaultModel: "", providerModelOptions: ["model-1"] }));
+    expect(screen.getByRole("status")).toHaveTextContent("选择用于生成的模型");
+    expect(button).toBeDisabled();
+    act(() => patchUserSettings({ defaultModel: "model-1" }));
+    expect(button).toBeEnabled();
+    act(() => patchUserSettings({ providerModelOptions: ["model-2"] }));
+    expect(screen.getByRole("status")).toHaveTextContent("已不可用");
+    expect(button).toBeDisabled();
+    await userEvent.setup().click(button);
+    expect(repository.startFeasibilityRun).not.toHaveBeenCalled();
+  });
+
+  it("disables detail regeneration with an inline model reason", async () => {
+    const repository = createMockWorkspaceRepository(createImplementationWorkspace());
+    repository.getProjectAccess = async () => ({ capabilities: ["update_project", "start_runs"], generationExecutionMode: "provider" });
+    repository.startFeasibilityRun = vi.fn();
+    render(withWorkspaceProviders(<FeasibilityPage view="implementation" />, repository));
+    await screen.findByTestId("implementation-plan-dashboard");
+    await waitFor(() => expect(screen.getByText("请先配置并选择模型供应商。")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "重新生成" })).toBeDisabled();
+    expect(repository.startFeasibilityRun).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("business flow shared detail workspace", () => {
+  it("uses the same preview, searchable element list and relationship section as other models", async () => {
+    stubCompactViewport(false);
+    const repository = createMockWorkspaceRepository({ rules: [createRule()], feasibilityBusinessFlow: createBusinessFlowArtifact() });
+    render(withWorkspaceProviders(<FeasibilityPage view="business-flow" />, repository));
+    await screen.findByRole("heading", { name: "业务与系统流程图" });
+    expect(screen.getByRole("heading", { name: "元素清单" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "关系说明" })).toBeInTheDocument();
+    expect(screen.getByLabelText("元素清单工具栏")).toBeInTheDocument();
+    expect(screen.getByLabelText("关系说明工具栏")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "SVG" })).toBeEnabled();
+    await userEvent.setup().click(screen.getByRole("button", { name: "定位元素：处理业务" }));
+    expect(screen.getByRole("button", { name: "定位元素：处理业务" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: "添加关系" })).not.toBeInTheDocument();
+  });
+
+  it("opens business-flow elements and relationships on the matching compact tabs", async () => {
+    stubCompactViewport(true);
+    const repository = createMockWorkspaceRepository({ rules: [createRule()], feasibilityBusinessFlow: createBusinessFlowArtifact() });
+    const { rerender } = render(withWorkspaceProviders(<FeasibilityPage view="business-flow-elements" />, repository));
+    await screen.findByRole("heading", { name: "业务与系统流程图" });
+    await waitFor(() => expect(screen.getByRole("tab", { name: "元素" })).toHaveAttribute("aria-selected", "true"));
+    expect(screen.queryByRole("tab", { name: "编辑" })).not.toBeInTheDocument();
+    rerender(withWorkspaceProviders(<FeasibilityPage view="business-flow-relations" />, repository));
+    await waitFor(() => expect(screen.getByRole("tab", { name: "关系" })).toHaveAttribute("aria-selected", "true"));
+  });
+
+  it("renders a separate matrix from saved flow traces without using requirement activity traces", async () => {
+    const artifact = createBusinessFlowArtifact();
+    artifact.traceability.push({ requirementId: "deleted-rule", targetKind: "relationship", targetId: "e1" });
+    const repository = createMockWorkspaceRepository({ rules: [createRule()], feasibilityBusinessFlow: artifact });
+    render(withWorkspaceProviders(<FeasibilityPage view="business-flow-trace" />, repository));
+    await screen.findByRole("heading", { name: "业务与系统流程图跟踪矩阵" });
+    expect(screen.getByRole("table")).toHaveTextContent("处理业务");
+    expect(screen.getByRole("table")).toHaveTextContent("系统");
+    await userEvent.setup().click(within(screen.getByRole("table")).getByText("处理业务", { exact: true }));
+    expect(screen.getByText(/用户必须登录后才能访问主要功能/)).toBeInTheDocument();
+    expect(screen.queryByText("需求规则已变化，请重新生成业务与系统流程图。")).not.toBeInTheDocument();
   });
 });

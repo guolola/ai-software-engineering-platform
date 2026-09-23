@@ -353,6 +353,7 @@ export function createEmptyWorkspace(): WorkspaceRecord {
       analysisYears: null,
     },
     feasibilityContextModel: null,
+    feasibilityBusinessFlow: null,
     feasibilityContextTraceability: [],
     feasibilityContextPlantUml: "",
     feasibilityContextSvg: "",

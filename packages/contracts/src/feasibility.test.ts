@@ -7,8 +7,47 @@ import {
   feasibilityImplementationPlanSchema,
   documentKindSchema,
   feasibilityInputsSchema,
+  feasibilityRunSnapshotSchema,
+  feasibilityBusinessFlowArtifactSchema,
+  readFeasibilityBusinessFlowArtifact,
+  buildFeasibilityImplementationFingerprint,
   startFeasibilityRunRequestSchema,
 } from "./index.js";
+
+test("historical feasibility snapshots load without a business flow", () => {
+  const snapshot = feasibilityRunSnapshotSchema.parse({
+    runId: "legacy", projectId: "project", selectedArtifacts: ["context", "implementation"],
+    providerSettings: { providerConfigId: "provider", model: "model" }, rules: [], requirementBaseline: null,
+    inputs: {}, contextModel: null, contextPlantUml: null, contextSvg: null, implementationPlan: null,
+    contextFingerprint: null, implementationFingerprint: "legacy-fingerprint", currentStage: null, status: "completed", error: null,
+  });
+  assert.equal(snapshot.businessFlow, null);
+  assert.equal(snapshot.implementationFingerprint, "legacy-fingerprint");
+});
+
+test("business flow availability requires matching complete artifacts and fingerprints ignore renders", () => {
+  const artifact = feasibilityBusinessFlowArtifactSchema.parse({
+    model: { diagramKind: "activity", modelId: "flow", title: "Flow", summary: "Process request", notes: [],
+      swimlanes: [{ id: "system", name: "System" }],
+      nodes: [{ id: "start", type: "start" }, { id: "process", type: "activity", name: "Process", actorOrLane: "system", input: [], output: [] }, { id: "end", type: "end" }],
+      relationships: [{ id: "a", type: "control_flow", sourceId: "start", targetId: "process" }, { id: "b", type: "control_flow", sourceId: "process", targetId: "end" }] },
+    traceability: [{ requirementId: "R1", targetId: "process", targetKind: "node" }],
+    plantUml: { diagramKind: "activity", modelId: "flow", source: "@startuml\nstart\n:Process;\nstop\n@enduml" },
+    svg: { diagramKind: "activity", modelId: "flow", svg: "<svg />", renderMeta: { engine: "test", generatedAt: "2026-01-01T00:00:00.000Z", sourceLength: 30, durationMs: 1 } },
+    fingerprint: "source",
+  });
+  assert.ok(readFeasibilityBusinessFlowArtifact(artifact));
+  assert.equal(readFeasibilityBusinessFlowArtifact({ ...artifact, svg: { ...artifact.svg, modelId: "wrong" } }), null);
+  assert.equal(readFeasibilityBusinessFlowArtifact({ ...artifact, plantUml: { ...artifact.plantUml, source: " " } }), null);
+  assert.equal(readFeasibilityBusinessFlowArtifact({ ...artifact, model: { ...artifact.model, nodes: [] } }), null);
+  const input = { rules: [], requirementBaseline: null, contextModel: null, businessFlow: artifact, inputs: {} };
+  const fingerprint = buildFeasibilityImplementationFingerprint(input);
+  artifact.svg.renderMeta.generatedAt = "2030-01-01T00:00:00.000Z";
+  artifact.plantUml.source += "\n' regenerated";
+  assert.equal(buildFeasibilityImplementationFingerprint(input), fingerprint);
+  artifact.traceability[0]!.targetId = "end";
+  assert.notEqual(buildFeasibilityImplementationFingerprint(input), fingerprint);
+});
 
 test("feasibility inputs default missing facts without inventing values", () => {
   const inputs = feasibilityInputsSchema.parse({ projectName: "维修预约系统" });

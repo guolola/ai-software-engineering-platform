@@ -2,6 +2,9 @@
 import { createRunLlmChunkHandlers } from "./shared/llm-chunk-events.js";
 import {
   artifactReadyRunEventSchema,
+  buildAcceptedRequirementSnapshot,
+  buildFeasibilityImplementationFingerprint,
+  readFeasibilityBusinessFlowArtifact,
   completedRunEventSchema,
   snapshotInputFingerprint,
   stageProgressRunEventSchema,
@@ -16,6 +19,7 @@ import {
 } from "@uml-platform/contracts";
 import {
   buildGenerateFeasibilityContextPrompt,
+  buildGenerateFeasibilityBusinessFlowPrompt,
   buildGenerateFeasibilityImplementationPrompt,
   buildRepairFeasibilityJsonPrompt,
   buildRepairFeasibilitySectionPrompt,
@@ -33,6 +37,8 @@ import {
 } from "../../adapters/llm/response-formats/index.js";
 import { getModelCapability } from "../../model-capabilities.js";
 import { normalizeContextDiagram } from "../../normalizers/feasibility/context-normalizer.js";
+import { normalizeFeasibilityBusinessFlow } from "../../normalizers/feasibility/business-flow-normalizer.js";
+import { GENERATE_FEASIBILITY_BUSINESS_FLOW_RESPONSE_FORMAT } from "../../adapters/llm/response-formats/feasibility-response-formats.js";
 import {
   normalizeFeasibilityImplementationDetailed,
 } from "../../normalizers/feasibility/implementation-normalizer.js";
@@ -74,8 +80,9 @@ function traceabilityFromContext(model: ContextDiagramSpec) {
   ];
 }
 
-function pathSection(path: Array<string | number>, promptStage: "context" | "implementation") {
+function pathSection(path: Array<string | number>, promptStage: "context" | "business-flow" | "implementation") {
   if (promptStage === "context") return "context" as const;
+  if (promptStage === "business-flow") return "business-flow" as const;
   const implementationIndex = path.indexOf("implementation");
   const key = implementationIndex >= 0 ? path[implementationIndex + 1] : path[2];
   if (
@@ -113,7 +120,7 @@ function chineseIssueReason(message: string) {
 
 function validationIssuesFromError(
   error: unknown,
-  promptStage: "context" | "implementation",
+  promptStage: "context" | "business-flow" | "implementation",
 ): FeasibilityValidationIssue[] {
   const rawIssues = (error as {
     issues?: Array<{ path?: Array<string | number>; message?: string }>;
@@ -122,7 +129,7 @@ function validationIssuesFromError(
     return [{
       path: "",
       candidateIndex: null,
-      section: promptStage === "context" ? "context" : "plan",
+      section: promptStage === "implementation" ? "plan" : promptStage,
       reason: chineseIssueReason(formatParseError(error)),
     }];
   }
@@ -142,18 +149,19 @@ function validationIssuesFromError(
 }
 
 function responseFormatFor(
-  stage: "context" | "implementation",
+  stage: "context" | "business-flow" | "implementation",
   diagnostics: FeasibilityGenerationDiagnostics,
 ): ChatCompletionResponseFormat | null {
   if (diagnostics.effectiveMode === "compatible") return null;
   if (diagnostics.effectiveMode === "json_object") return { type: "json_object" };
+  if (stage === "business-flow") return GENERATE_FEASIBILITY_BUSINESS_FLOW_RESPONSE_FORMAT;
   return stage === "context"
     ? GENERATE_FEASIBILITY_CONTEXT_RESPONSE_FORMAT
     : GENERATE_FEASIBILITY_IMPLEMENTATION_RESPONSE_FORMAT;
 }
 
 function sectionResponseFormatFor(
-  section: Exclude<FeasibilityRepairSection, "context" | "plan">,
+  section: Exclude<FeasibilityRepairSection, "context" | "business-flow" | "plan">,
   diagnostics: FeasibilityGenerationDiagnostics,
 ): ChatCompletionResponseFormat | null {
   if (diagnostics.effectiveMode === "compatible") return null;
@@ -195,7 +203,7 @@ function copyKeys(
 }
 
 function sectionKeys(
-  section: Exclude<FeasibilityRepairSection, "context" | "plan">,
+  section: Exclude<FeasibilityRepairSection, "context" | "business-flow" | "plan">,
 ) {
   if (section === "technical") return TECHNICAL_KEYS;
   if (section === "delivery") return DELIVERY_KEYS;
@@ -206,7 +214,7 @@ function sectionKeys(
 function sectionPatchFromOutput(
   value: unknown,
   candidateIndex: number,
-  section: Exclude<FeasibilityRepairSection, "context" | "plan">,
+  section: Exclude<FeasibilityRepairSection, "context" | "business-flow" | "plan">,
 ) {
   if (isRecord(value) && isRecord(value.patch)) return value.patch;
   if (!isRecord(value) || !Array.isArray(value.candidates)) return null;
@@ -218,7 +226,7 @@ function sectionPatchFromOutput(
 function applySectionPatch(
   value: unknown,
   candidateIndex: number,
-  section: Exclude<FeasibilityRepairSection, "context" | "plan">,
+  section: Exclude<FeasibilityRepairSection, "context" | "business-flow" | "plan">,
   patch: UnknownRecord,
 ) {
   if (!isRecord(value) || !Array.isArray(value.candidates)) return value;
@@ -306,7 +314,7 @@ function mergeImplementationRepair(
 async function generateFeasibilityJson<T>(input: {
   record: RunRecord;
   stage: RunStage;
-  promptStage: "context" | "implementation";
+  promptStage: "context" | "business-flow" | "implementation";
   prompt: string;
   providerSettings: ProviderSettings;
   llmTransport: LlmTransport;
@@ -438,11 +446,12 @@ async function generateFeasibilityJson<T>(input: {
       const targetedGroups = [...groups.values()].filter(
         (issue): issue is FeasibilityValidationIssue & {
           candidateIndex: number;
-          section: Exclude<FeasibilityRepairSection, "context" | "plan">;
+          section: Exclude<FeasibilityRepairSection, "context" | "business-flow" | "plan">;
         } =>
           input.promptStage === "implementation" &&
           issue.candidateIndex !== null &&
           issue.section !== "context" &&
+          issue.section !== "business-flow" &&
           issue.section !== "plan",
       );
       if (targetedGroups.length === groups.size) {
@@ -522,7 +531,7 @@ async function generateFeasibilityJson<T>(input: {
 
   throwRunError(createRunError(
     "RUN_STRUCTURED_OUTPUT_INVALID",
-    `所选模型返回的${input.promptStage === "context" ? "系统上下文图（系统环境图）" : "实现方案"}结构不符合要求，定点修复后仍未通过校验。`,
+    `所选模型返回的${input.promptStage === "context" ? "系统环境图" : input.promptStage === "business-flow" ? "业务与系统流程图" : "实现方案"}结构不符合要求，定点修复后仍未通过校验。`,
     {
       details: {
         validationIssues: lastIssues,
@@ -584,9 +593,9 @@ export async function runFeasibilityStagePipeline(
     snapshot.contextModel = contextModel;
     snapshot.contextTraceability = traceabilityFromContext(contextModel);
 
-    updateStage("render_context", "正在生成并渲染系统上下文图（系统环境图）");
+    updateStage("render_context", "正在生成并渲染系统环境图");
     const artifact = generatePlantUmlArtifacts([contextModel])[0];
-    if (!artifact) throw new Error("系统上下文图（系统环境图）未生成有效的 PlantUML");
+    if (!artifact) throw new Error("系统环境图未生成有效的 PlantUML");
     snapshot.contextPlantUml = artifact;
     emitEvent(record, artifactReadyRunEventSchema.parse({
       type: "artifact_ready",
@@ -594,7 +603,7 @@ export async function runFeasibilityStagePipeline(
       artifactKind: "feasibilityContext",
       modelId: artifact.modelId ?? "context",
       subtaskId: "context",
-      subtaskLabel: "系统上下文图（系统环境图）",
+      subtaskLabel: "系统环境图",
       subtaskStatus: "rendering",
     }));
     const renderResult = await renderArtifactWithRepair(
@@ -627,17 +636,56 @@ export async function runFeasibilityStagePipeline(
       artifactKind: "feasibilityContext",
       modelId: artifact.modelId ?? "context",
       subtaskId: "context",
-      subtaskLabel: "系统上下文图（系统环境图）",
+      subtaskLabel: "系统环境图",
       subtaskStatus: "completed",
     }));
   }
 
+  if (snapshot.selectedArtifacts.includes("business-flow")) {
+    updateStage("generate_business_flow", "正在根据需求规则生成业务与系统流程图");
+    const result = await generateFeasibilityJson({
+      record,
+      stage: "generate_business_flow",
+      promptStage: "business-flow",
+      prompt: buildGenerateFeasibilityBusinessFlowPrompt({ rules: snapshot.rules, requirementBaseline: snapshot.requirementBaseline }),
+      providerSettings,
+      llmTransport,
+      diagnostics,
+      parse: (value) => ({ value: normalizeFeasibilityBusinessFlow(value, validRequirementIds) }),
+    });
+    updateStage("render_business_flow", "正在渲染业务与系统流程图");
+    const artifact = generatePlantUmlArtifacts([result.model])[0];
+    if (!artifact) throw new Error("业务与系统流程图未生成有效的 PlantUML");
+    const rendered = await renderArtifactWithRepair(record, providerSettings, llmTransport, renderClient, result.model, artifact);
+    throwIfRunCancelled(record);
+    if (rendered.status === "failed") {
+      throwRunError(createRunError("RUN_RENDER_FAILED", rendered.errorMessage));
+    }
+    // Keep the previous workspace artifact until model, traceability and SVG all succeed.
+    snapshot.businessFlow = {
+      ...result,
+      plantUml: rendered.artifact as typeof artifact,
+      svg: rendered.svgArtifact as NonNullable<FeasibilityRunSnapshot["contextSvg"]>,
+      fingerprint: snapshotInputFingerprint({ rules: snapshot.rules, requirementBaseline: snapshot.requirementBaseline }),
+    };
+    emitEvent(record, artifactReadyRunEventSchema.parse({
+      type: "artifact_ready", stage: "render_business_flow", artifactKind: "feasibilityBusinessFlow",
+      modelId: result.model.modelId, subtaskId: "business-flow", subtaskLabel: "业务与系统流程图", subtaskStatus: "completed",
+    }));
+  }
+
   if (snapshot.selectedArtifacts.includes("implementation")) {
-    if (!snapshot.contextModel || !snapshot.contextPlantUml || !snapshot.contextSvg) {
+    const requirementFingerprint = buildAcceptedRequirementSnapshot(snapshot.rules, snapshot.requirementBaseline).snapshot.fingerprint;
+    if (!snapshot.contextModel || !snapshot.contextPlantUml?.source || !snapshot.contextSvg?.svg ||
+      snapshot.contextFingerprint !== requirementFingerprint) {
       throwRunError(createRunError(
         "RUN_DEPENDENCY_MISSING",
-        "请先生成最新有效的系统上下文图（系统环境图）。",
+        "请先生成最新有效的系统环境图。",
       ));
+    }
+    const businessFlow = readFeasibilityBusinessFlowArtifact(snapshot.businessFlow);
+    if (!businessFlow || businessFlow.fingerprint !== requirementFingerprint) {
+      throwRunError(createRunError("RUN_DEPENDENCY_MISSING", "请先生成最新有效的业务与系统流程图。"));
     }
     updateStage("generate_implementation", "正在使用所选模型生成实现方案");
     const contextExternalSystems = snapshot.contextModel.externalSystems.map(({ id, name }) => ({
@@ -653,6 +701,7 @@ export async function runFeasibilityStagePipeline(
         requirementBaseline: snapshot.requirementBaseline,
         inputs: snapshot.inputs,
         contextModel: snapshot.contextModel,
+        businessFlow: { model: businessFlow.model, traceability: businessFlow.traceability },
       }),
       providerSettings,
       llmTransport,
@@ -669,9 +718,11 @@ export async function runFeasibilityStagePipeline(
         };
       },
     });
-    snapshot.implementationFingerprint = snapshotInputFingerprint({
+    snapshot.implementationFingerprint = buildFeasibilityImplementationFingerprint({
       rules: snapshot.rules,
+      requirementBaseline: snapshot.requirementBaseline,
       contextModel: snapshot.contextModel,
+      businessFlow,
       inputs: snapshot.inputs,
     });
     emitEvent(record, artifactReadyRunEventSchema.parse({

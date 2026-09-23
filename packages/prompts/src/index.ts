@@ -45,3 +45,4 @@ export {
   buildRepairFeasibilitySectionPrompt,
 } from "./feasibility-prompts.js";
 export { FEASIBILITY_IMPLEMENTATION_EXAMPLE } from "./feasibility-example.js";
+export { buildGenerateFeasibilityBusinessFlowPrompt } from "./feasibility-business-flow-prompt.js";

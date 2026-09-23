@@ -1,5 +1,6 @@
 // Defines the workspace repository contract shared by HTTP, mock, and React provider adapters.
 import type {
+  GenerationExecutionMode,
   CodeRunSnapshot,
   DesignDiagramModelSpec,
   DesignRunSnapshot,
@@ -57,7 +58,10 @@ export interface RequirementRulesUpdateMetadata {
 
 export interface WorkspaceRepository {
   loadWorkspace(): Promise<WorkspaceRecord>;
-  getProjectCapabilities?(): Promise<string[]>;
+  getProjectAccess?(): Promise<{
+    capabilities: string[];
+    generationExecutionMode?: GenerationExecutionMode;
+  }>;
   updateRequirementText(text: string): Promise<void>;
   updateFeasibility?(patch: Partial<{
     inputs: FeasibilityInputs;

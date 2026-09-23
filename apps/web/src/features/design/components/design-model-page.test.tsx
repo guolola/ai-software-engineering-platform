@@ -1,5 +1,7 @@
 // Verifies design model page generation controls, traceability views, and stale diagram handling.
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { createMockWorkspaceRepository } from "../../../services/workspace-repository/mock-repository";
+import { patchUserSettings } from "../../../shared/lib/user-settings";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DesignRunSnapshot } from "@uml-platform/contracts";
@@ -89,6 +91,22 @@ function storeManagedUserSettings() {
 }
 
 describe("DesignModelPage", () => {
+  it("shows real model eligibility independently of design prerequisites", async () => {
+    localStorage.clear();
+    const repository = createMockWorkspaceRepository({ requirementText: "生成设计", rules: [createRule()], models: { usecase: useCaseModel }, selectedDesignDiagramTypes: ["sequence"] });
+    repository.getProjectAccess = async () => ({ capabilities: ["update_project", "start_runs"], generationExecutionMode: "provider" });
+    repository.startDesignRun = vi.fn();
+    render(withWorkspaceProviders(<DesignModelPage />, repository));
+    const button = await screen.findByRole("button", { name: /生成设计模型/ });
+    expect(button).toBeDisabled();
+    expect(screen.getByText("请先配置并选择模型供应商。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "未选择模型" })).toBeEnabled();
+    await userEvent.setup().click(button);
+    expect(repository.startDesignRun).not.toHaveBeenCalled();
+    act(() => patchUserSettings({ providerConfigId: "provider-1", defaultModel: "model-1", providerModelOptions: ["model-1"] }));
+    expect(screen.queryByText("请先配置并选择模型供应商。")).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
     storeManagedUserSettings();
   });

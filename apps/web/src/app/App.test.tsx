@@ -2641,11 +2641,11 @@ describe("App shell routes", () => {
     authSessionMode = "authenticated";
     const repository: WorkspaceRepository = {
       ...createRepository(),
-      getProjectCapabilities: vi.fn(async () => [
+      getProjectAccess: vi.fn(async () => ({ capabilities: [
         "view_project",
         "view_runs",
         "view_documents",
-      ]),
+      ] })),
     };
     window.history.pushState({}, "", "/projects/library-booking");
 

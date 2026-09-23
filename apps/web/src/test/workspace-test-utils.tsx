@@ -8,7 +8,7 @@ import type {
   RequirementBaseline,
   RunSnapshot,
 } from "@uml-platform/contracts";
-import { feasibilityInputsSchema } from "@uml-platform/contracts";
+import { feasibilityInputsSchema, buildAcceptedRequirementSnapshot, feasibilityBusinessFlowArtifactSchema } from "@uml-platform/contracts";
 import type { RequirementRule } from "../entities/requirement-rule/model";
 import type { WorkspaceRecord } from "../entities/workspace/model";
 import { WorkspaceShellProvider } from "../features/workspace-shell/state";
@@ -18,6 +18,21 @@ import type { WorkspaceRepository } from "../services/workspace-repository";
 import type { DiagramType } from "../entities/diagram/model";
 import { DEFAULT_USER_SETTINGS, USER_SETTINGS_STORAGE_KEY } from "../shared/lib/user-settings";
 import { FeedbackDialogProvider } from "../shared/ui/feedback-dialog";
+
+export function createBusinessFlowArtifact(rules: unknown = [createRule()], baseline: unknown = null) {
+  const source = buildAcceptedRequirementSnapshot(rules, baseline);
+  return feasibilityBusinessFlowArtifactSchema.parse({
+    model: { diagramKind: "activity", modelId: "feasibility-business-flow", title: "业务与系统流程图", summary: "处理业务规则", notes: [],
+      swimlanes: [{ id: "system", name: "系统" }],
+      nodes: [{ id: "start", type: "start" }, { id: "process", type: "activity", name: "处理业务", actorOrLane: "system", input: [], output: [] }, { id: "end", type: "end" }],
+      relationships: [{ id: "e1", type: "control_flow", sourceId: "start", targetId: "process" }, { id: "e2", type: "control_flow", sourceId: "process", targetId: "end" }] },
+    traceability: [{ requirementId: source.rules[0]!.id, targetId: "process", targetKind: "node" }],
+    plantUml: { diagramKind: "activity", modelId: "feasibility-business-flow", source: "@startuml\nstart\n:处理业务;\nstop\n@enduml" },
+    svg: { diagramKind: "activity", modelId: "feasibility-business-flow", svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><text>业务流程</text></svg>',
+      renderMeta: { engine: "test", generatedAt: "2026-07-19T00:00:00.000Z", sourceLength: 45, durationMs: 1 } },
+    fingerprint: source.snapshot.fingerprint,
+  });
+}
 
 export function createWorkspaceRecord(
   overrides: Partial<WorkspaceRecord> = {},
@@ -64,6 +79,7 @@ export function createWorkspaceRecord(
     designInputFingerprints: {},
     feasibilityInputs: feasibilityInputsSchema.parse({}),
     feasibilityContextModel: null,
+    feasibilityBusinessFlow: null,
     feasibilityContextTraceability: [],
     feasibilityContextPlantUml: "",
     feasibilityContextSvg: "",

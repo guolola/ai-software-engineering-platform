@@ -162,6 +162,21 @@ function countRunRecordWrites(db: FakeRunDb) {
   ).length;
 }
 
+test("postgres run store restores offline execution metadata without exposing it in snapshots", async () => {
+  const db = new FakeRunDb();
+  const runs = await createPostgresRunRecordStore(db);
+  const snapshot = createEmptySnapshot("offline-run", "演示需求", [], []);
+  attachManagedProviderSettings(snapshot);
+  snapshot.status = "completed";
+  runs.set(snapshot.runId, { snapshot, events: [], listeners: new Set(), terminal: true,
+    metadata: { projectId: "project-1", createdAt: "2026-09-23T00:00:00.000Z", offlineDemoFixture: "library-seat" } });
+  await runs.flush();
+  assert.equal(db.runRows.get(snapshot.runId)?.provider_config_id, null);
+  const restored = (await createPostgresRunRecordStore(db)).get(snapshot.runId)!;
+  assert.equal(restored.metadata?.offlineDemoFixture, "library-seat");
+  assert.equal("_offlineDemoFixture" in restored.snapshot, false);
+});
+
 test("postgres run store persists records and emitted events", async () => {
   const db = new FakeRunDb();
   const runs = await createPostgresRunRecordStore(db);

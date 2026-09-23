@@ -7,6 +7,7 @@ import { feasibilityImplementationPlanSchema } from "@uml-platform/contracts";
 import type { WorkspaceRepository } from "../../../services/workspace-repository";
 import {
   createRequirementBaseline,
+  createBusinessFlowArtifact,
   createRule,
   createWorkspaceRecord,
   withWorkspaceProviders,
@@ -26,6 +27,19 @@ function TabsProbe() {
       ))}
     </div>
   );
+}
+
+function BusinessFlowMenuHarness() {
+  const { syncFeasibilityArtifacts } = useWorkspaceSession();
+  return <><SidebarMenu /><button onClick={() => syncFeasibilityArtifacts(createWorkspaceRecord({
+    rules: [createRule()], feasibilityBusinessFlow: createBusinessFlowArtifact(),
+  }))}>保存流程图</button></>;
+}
+
+function BusinessFlowNavigationProbe() {
+  const { selection, openTabs } = useWorkspaceShell();
+  return <><SidebarMenu /><output data-testid="flow-selection">{JSON.stringify(selection)}</output>
+    <output data-testid="flow-tabs">{openTabs.map((tab) => tab.id).join(",")}</output></>;
 }
 
 const { toastMessage } = vi.hoisted(() => ({
@@ -111,6 +125,30 @@ function SidebarSequenceGenerationHarness() {
 }
 
 describe("SidebarMenu", () => {
+  it("navigates business-flow traceability, element groups and relationships with their own tab identities", async () => {
+    const user = userEvent.setup();
+    const repository = createSidebarRepository(createWorkspaceRecord({ rules: [createRule()], feasibilityBusinessFlow: createBusinessFlowArtifact() }));
+    render(withWorkspaceProviders(<BusinessFlowNavigationProbe />, repository));
+    await user.click(await screen.findByRole("button", { name: "展开 可行性分析" }));
+    await user.click(screen.getByRole("button", { name: "展开 业务与系统流程图" }));
+    await user.click(screen.getByRole("button", { name: "跟踪矩阵" }));
+    expect(screen.getByTestId("flow-selection")).toHaveTextContent('"kind":"feasibility-business-flow-trace"');
+    await user.click(screen.getByRole("button", { name: /^元素/ }));
+    expect(screen.getByTestId("flow-selection")).toHaveTextContent('"kind":"feasibility-business-flow-elements"');
+    await user.click(screen.getByRole("button", { name: "展开 元素" }));
+    await user.click(screen.getByRole("button", { name: "展开 活动" }));
+    await user.click(screen.getByRole("button", { name: "处理业务" }));
+    expect(screen.getByTestId("flow-selection")).toHaveTextContent('"kind":"feasibility-business-flow-element"');
+    expect(screen.getByTestId("flow-selection")).toHaveTextContent('"elementId":"process"');
+    await user.click(screen.getByRole("button", { name: /^关系/ }));
+    expect(screen.getByTestId("flow-selection")).toHaveTextContent('"kind":"feasibility-business-flow-relations"');
+    await user.click(screen.getByRole("button", { name: "展开 关系" }));
+    await user.click(screen.getByRole("button", { name: /开始.*处理业务/ }));
+    expect(screen.getByTestId("flow-selection")).toHaveTextContent('"kind":"feasibility-business-flow-relationship"');
+    expect(screen.getByTestId("flow-tabs")).toHaveTextContent("feasibility:business-flow");
+    expect(screen.getByTestId("flow-tabs")).not.toHaveTextContent("requirements:");
+  });
+
   beforeEach(() => {
     storeManagedUserSettings();
     vi.mocked(toast.message).mockClear();
@@ -153,8 +191,44 @@ describe("SidebarMenu", () => {
         .filter(Boolean),
     ).toEqual(["系统需求", "可行性分析", "需求模型", "设计模型", "代码", "测试", "说明书"]);
     expect(screen.queryByRole("button", { name: "展开 可行性分析" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "系统上下文图（系统环境图）" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "业务与系统流程图" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "系统环境图" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "实现方案" })).not.toBeInTheDocument();
+  });
+
+  it("shows business flow only after complete persistence, retains it on reload, and clears it on project switch", async () => {
+    const user = userEvent.setup();
+    const partial = createBusinessFlowArtifact();
+    partial.svg.svg = "";
+    const repository = createSidebarRepository(createWorkspaceRecord({ feasibilityBusinessFlow: partial }));
+    const { rerender } = render(<div key="project-a">{withWorkspaceProviders(<BusinessFlowMenuHarness />, repository)}</div>);
+    await screen.findByRole("navigation", { name: "项目导航" });
+    expect(screen.queryByRole("button", { name: "展开 可行性分析" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "保存流程图" }));
+    await user.click(await screen.findByRole("button", { name: "展开 可行性分析" }));
+    expect(screen.getByRole("button", { name: "业务与系统流程图" })).toBeInTheDocument();
+
+    const persisted = createWorkspaceRecord({ rules: [createRule()], feasibilityBusinessFlow: createBusinessFlowArtifact() });
+    persisted.feasibilityBusinessFlow!.fingerprint = "stale";
+    rerender(<div key="project-a-reloaded">{withWorkspaceProviders(<SidebarMenu />, createSidebarRepository(persisted))}</div>);
+    await user.click(await screen.findByRole("button", { name: "展开 可行性分析" }));
+    expect(screen.getByRole("button", { name: /^业务与系统流程图/u })).toHaveTextContent("已过时");
+
+    rerender(<div key="project-b">{withWorkspaceProviders(<SidebarMenu />, createSidebarRepository())}</div>);
+    await screen.findByRole("navigation", { name: "项目导航" });
+    expect(screen.queryByRole("button", { name: /^业务与系统流程图/u })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "展开 可行性分析" })).not.toBeInTheDocument();
+  });
+
+  it("keeps an existing flow visible with a failed regeneration status", async () => {
+    const user = userEvent.setup();
+    const repository = createSidebarRepository(createWorkspaceRecord({ rules: [createRule()], feasibilityBusinessFlow: createBusinessFlowArtifact() }));
+    render(withWorkspaceProviders(<SidebarMenu projectRuns={[{
+      runId: "failed-flow", runKind: "feasibility", status: "failed", stage: "render_business_flow", createdAt: "2026-09-23T00:00:00.000Z",
+    }]} />, repository));
+    await user.click(await screen.findByRole("button", { name: "展开 可行性分析" }));
+    expect(screen.getByRole("button", { name: /^业务与系统流程图/u })).toBeInTheDocument();
+    expect(screen.getByLabelText(/业务与系统流程图.*失败/u)).toBeInTheDocument();
   });
 
   it("reveals feasibility artifact menus only after the corresponding artifacts exist", async () => {
@@ -186,7 +260,7 @@ describe("SidebarMenu", () => {
         feasibilityContextModel: {
           diagramKind: "context",
           modelId: "context",
-          title: "系统上下文图（系统环境图）",
+          title: "系统环境图",
           summary: "系统边界",
           notes: [],
           system: { id: "system", name: "目标系统", sourceRequirementIds: [] },
@@ -209,15 +283,15 @@ describe("SidebarMenu", () => {
     await user.click(feasibilityMenu);
     expect(feasibilityMenu).toHaveAttribute("data-active");
     expect(feasibilityToggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("button", { name: "系统上下文图（系统环境图）" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "系统环境图" })).not.toBeInTheDocument();
 
     await user.click(feasibilityToggle);
     expect(feasibilityToggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: "系统上下文图（系统环境图）" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "系统环境图" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "实现方案" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "跟踪矩阵" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "展开 系统上下文图（系统环境图）" }));
+    await user.click(screen.getByRole("button", { name: "展开 系统环境图" }));
     expect(screen.getByRole("button", { name: "跟踪矩阵" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "元素" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "关系" })).toBeInTheDocument();

@@ -661,6 +661,7 @@ export const platformApi = {
   getProject(projectId: string) {
     return requestJson<{
       project: PlatformProject;
+      generationExecutionMode?: "offline-demo" | "provider";
       membership?: PlatformProjectMember | null;
     }>(`/api/projects/${projectId}`);
   },

@@ -80,6 +80,28 @@ async function createProject(input: {
   return response.json().project as { id: string; name: string };
 }
 
+test("project execution mode is read-only and reflects server demo configuration", async (t) => {
+  for (const key of ["UML_DEMO_OFFLINE_PROJECT_IDS", "UML_DEMO_OFFLINE_PROJECT_NAME_PATTERNS"]) {
+    const previous = process.env[key];
+    delete process.env[key];
+    t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
+  }
+  const { app, authStore } = await createTestApp();
+  t.after(() => app.close());
+  const { cookie } = await registerUser({ authStore, email: "mode@example.edu", displayName: "Mode" });
+  const project = await createProject({ app, cookie, name: "Library Demo", payload: { generationExecutionMode: "offline-demo" } });
+  const read = () => app.inject({ method: "GET", url: `/api/projects/${project.id}`, headers: { cookie } });
+  assert.equal((await read()).json().generationExecutionMode, "provider");
+  process.env.UML_DEMO_OFFLINE_PROJECT_IDS = project.id;
+  assert.equal((await read()).json().generationExecutionMode, "offline-demo");
+  delete process.env.UML_DEMO_OFFLINE_PROJECT_IDS;
+  process.env.UML_DEMO_OFFLINE_PROJECT_NAME_PATTERNS = "Library Demo";
+  assert.equal((await read()).json().generationExecutionMode, "offline-demo");
+  const updated = await app.inject({ method: "PATCH", url: `/api/projects/${project.id}`, headers: { cookie }, payload: { name: "Real Project", generationExecutionMode: "offline-demo" } });
+  assert.equal(updated.json().generationExecutionMode, "provider");
+  assert.equal((await read()).json().generationExecutionMode, "provider");
+});
+
 test("project governance actions archive restore retention and transfer ownership with audit", async () => {
   const { app, authStore } = await createTestApp();
   const owner = await registerUser({

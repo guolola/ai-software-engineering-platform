@@ -81,6 +81,7 @@ export function ModelEditPanel({
   visibleSection = "all",
   focusSection,
   sourceRuleOptions = [],
+  readOnly = false,
 }: {
   draft: Record<string, unknown> | null;
   setDraft: Dispatch<SetStateAction<Record<string, unknown> | null>>;
@@ -88,6 +89,7 @@ export function ModelEditPanel({
   onSelectElement: (element: DiagramDetailItem) => void;
   selectedElement?: { kind: string; id: string } | null;
   saving: boolean;
+  readOnly?: boolean;
   visibleSection?: "all" | "elements" | "relationships";
   focusSection?: "elements" | "relationships" | null;
   sourceRuleOptions?: Array<{ id: string; label: string }>;
@@ -495,9 +497,9 @@ export function ModelEditPanel({
           editableItemsById={editableItemsById}
           selectedElement={selectedElement}
           saving={saving}
-          onCreateElement={createElement}
-          onEditElement={editElement}
-          onDeleteElement={deleteElement}
+          onCreateElement={readOnly ? undefined : createElement}
+          onEditElement={readOnly ? undefined : editElement}
+          onDeleteElement={readOnly ? undefined : deleteElement}
           onSelectElement={onSelectElement}
         /><ModelListPagination page={effectiveElementPage} pageSize={elementPageSize} total={filteredElements.length} onPageChange={setElementPage} onPageSizeChange={(value) => { setElementPageSize(value); setElementPage(1); }} /></div> : null}
 
@@ -512,9 +514,9 @@ export function ModelEditPanel({
           endpointOptionsCount={endpointOptions.length}
           relationshipOrderIds={relationshipOrderIds}
           saving={saving}
-          onCreateRelation={createRelation}
-          onEditRelation={editRelation}
-          onDeleteRelation={deleteRelation}
+          onCreateRelation={readOnly ? undefined : createRelation}
+          onEditRelation={readOnly ? undefined : editRelation}
+          onDeleteRelation={readOnly ? undefined : deleteRelation}
         /><ModelListPagination page={effectiveRelationPage} pageSize={relationPageSize} total={filteredRelationships.length} onPageChange={setRelationPage} onPageSizeChange={(value) => { setRelationPageSize(value); setRelationPage(1); }} /></div> : null}
       </div>
 

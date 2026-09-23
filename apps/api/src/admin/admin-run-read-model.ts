@@ -207,6 +207,8 @@ const RUN_STAGE_LABELS: Record<RunStage, string> = {
   generate_plantuml: "生成 PlantUML",
   render_svg: "渲染模型图",
   generate_context: "生成可行性上下文",
+  generate_business_flow: "生成业务与系统流程图",
+  render_business_flow: "渲染业务与系统流程图",
   render_context: "整理可行性证据",
   generate_implementation: "生成实施方案",
 };

@@ -87,6 +87,7 @@ const RUN_STATUS_LABEL = {
 type RunKind = "requirements" | "design" | "code" | "document" | "feasibility";
 
 const STAGE_LABELS: Record<RunStage, string> = {
+  generate_business_flow: "generate_business_flow", render_business_flow: "render_business_flow",
   extract_rules: "extract_rules", generate_models: "generate_models", generate_design_sequence: "generate_design_sequence",
   generate_design_models: "generate_design_models", generate_tests: "generate_tests", analyze_code_business_logic: "analyze_code_business_logic",
   analyze_code_product: "analyze_code_product", plan_code_ui: "plan_code_ui", generate_code_ui_mockup: "generate_code_ui_mockup",
@@ -127,6 +128,8 @@ const STAGES_BY_KIND: Record<RunKind, RunStage[]> = {
   feasibility: [
     "generate_context",
     "render_context",
+    "generate_business_flow",
+    "render_business_flow",
     "generate_implementation",
   ],
 };

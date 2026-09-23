@@ -29,6 +29,7 @@ import {
   normalizeRunError,
 } from "./shared/errors.js";
 import { runFeasibilityStagePipeline } from "./feasibility-pipeline.js";
+import { offlineFeasibilityAdapters } from "../demo/offline-feasibility.js";
 import type { AdminAnalyticsStore } from "../../admin/admin-analytics-store.js";
 
 type RequirementPipeline = (
@@ -408,11 +409,12 @@ export function startFeasibilityRecordPipeline({
   void (async () => {
     let terminalError: RunError | null = null;
     try {
+      const demo = offlineFeasibilityAdapters(record);
       await runFeasibilityStagePipeline(
         record,
         providerSettings,
-        entitlementTransport,
-        renderClient,
+        demo?.llmTransport ?? entitlementTransport,
+        demo?.renderClient ?? renderClient,
       );
     } catch (error) {
       terminalError = handleRunPipelineError(record, error, () => undefined);
@@ -489,13 +491,14 @@ export async function runRunRecordPipeline({
     billingEntitlements,
   });
 
+  const demo = taskType === "feasibility_analysis" ? offlineFeasibilityAdapters(record) : null;
   const runPromise =
     taskType === "feasibility_analysis"
       ? runFeasibilityStagePipeline(
           record,
           providerSettings,
-          entitlementTransport,
-          renderClient,
+          demo?.llmTransport ?? entitlementTransport,
+          demo?.renderClient ?? renderClient,
         )
       : taskType === "document_generation"
       ? runDocumentStagePipeline(

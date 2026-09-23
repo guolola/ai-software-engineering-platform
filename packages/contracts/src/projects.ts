@@ -276,8 +276,12 @@ export const projectListResponseSchema = z.object({
 });
 export type ProjectListResponse = z.infer<typeof projectListResponseSchema>;
 
+export const generationExecutionModeSchema = z.enum(["offline-demo", "provider"]);
+export type GenerationExecutionMode = z.infer<typeof generationExecutionModeSchema>;
+
 export const projectResponseSchema = z.object({
   project: projectDtoSchema,
+  generationExecutionMode: generationExecutionModeSchema.default("provider"),
   membership: projectMemberDtoSchema.optional(),
   currentUserRole: projectMemberRoleSchema.optional(),
   capabilities: z.array(projectPermissionSchema).optional(),

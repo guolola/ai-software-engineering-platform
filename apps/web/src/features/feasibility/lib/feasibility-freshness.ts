@@ -1,7 +1,8 @@
 // Centralizes accepted-rule selection and freshness checks for feasibility artifacts and reports.
 import {
   buildAcceptedRequirementSnapshot,
-  snapshotInputFingerprint,
+  buildFeasibilityImplementationFingerprint,
+  readFeasibilityBusinessFlowArtifact,
   type FeasibilityArtifactKind,
 } from "@uml-platform/contracts";
 import type { WorkspaceRecord } from "../../../entities/workspace/model";
@@ -22,6 +23,10 @@ export function feasibilityArtifactState(workspace: WorkspaceRecord) {
   );
   const rules = requirementSource.rules;
   const currentContextFingerprint = requirementSource.snapshot.fingerprint;
+  const businessFlow = readFeasibilityBusinessFlowArtifact(workspace.feasibilityBusinessFlow);
+  const businessFlowExists = Boolean(businessFlow);
+  const businessFlowStale = businessFlowExists &&
+    workspace.feasibilityBusinessFlow?.fingerprint !== requirementSource.snapshot.fingerprint;
   const contextExists = Boolean(
     workspace.feasibilityContextModel &&
       workspace.feasibilityContextPlantUml &&
@@ -31,9 +36,11 @@ export function feasibilityArtifactState(workspace: WorkspaceRecord) {
     contextExists &&
       workspace.feasibilityContextFingerprint !== currentContextFingerprint,
   );
-  const currentImplementationFingerprint = snapshotInputFingerprint({
+  const currentImplementationFingerprint = buildFeasibilityImplementationFingerprint({
     rules,
+    requirementBaseline: requirementSource.baseline,
     contextModel: workspace.feasibilityContextModel,
+    businessFlow,
     inputs: workspace.feasibilityInputs,
   });
   const implementationPlan = workspace.feasibilityImplementationPlan;
@@ -44,8 +51,8 @@ export function feasibilityArtifactState(workspace: WorkspaceRecord) {
     implementationPlan && recommendedImplementation,
   );
   const implementationStale = Boolean(
-    implementationExists &&
-      workspace.feasibilityImplementationFingerprint !== currentImplementationFingerprint,
+    implementationExists && (!contextExists || contextStale || !businessFlowExists || businessFlowStale ||
+      workspace.feasibilityImplementationFingerprint !== currentImplementationFingerprint),
   );
   const contextStatus: FeasibilityArtifactStatus = !contextExists
     ? "missing"
@@ -57,14 +64,17 @@ export function feasibilityArtifactState(workspace: WorkspaceRecord) {
     : implementationStale
       ? "stale"
       : "ready";
-  // Refreshing context invalidates the implementation input, so guide users to update both.
-  const requiredArtifacts: FeasibilityArtifactKind[] =
-    contextStatus !== "ready"
-      ? ["context", "implementation"]
-      : implementationStatus !== "ready"
-        ? ["implementation"]
-        : [];
+  const businessFlowStatus: FeasibilityArtifactStatus = !businessFlowExists ? "missing" : businessFlowStale ? "stale" : "ready";
+  const missingDependencies: FeasibilityArtifactKind[] = [];
+  if (contextStatus !== "ready") missingDependencies.push("context");
+  if (businessFlowStatus !== "ready") missingDependencies.push("business-flow");
+  const requiredArtifacts: FeasibilityArtifactKind[] = implementationStatus !== "ready" || missingDependencies.length
+    ? [...missingDependencies, "implementation"] : [];
   return {
+    businessFlowExists,
+    businessFlowStale,
+    businessFlowStatus,
+    missingDependencies,
     contextExists,
     contextStale,
     contextStatus,
@@ -72,10 +82,19 @@ export function feasibilityArtifactState(workspace: WorkspaceRecord) {
     implementationStale,
     implementationStatus,
     reportReady:
-      contextStatus === "ready" && implementationStatus === "ready",
+      contextStatus === "ready" && businessFlowStatus === "ready" && implementationStatus === "ready",
     requiredArtifacts,
     currentContextFingerprint,
     currentImplementationFingerprint,
     requirementSource: requirementSource.snapshot,
   };
+}
+
+export function includeFeasibilityDependencies(
+  selected: FeasibilityArtifactKind[],
+  state: ReturnType<typeof feasibilityArtifactState>,
+): FeasibilityArtifactKind[] {
+  const next = new Set(selected);
+  if (next.has("implementation")) state.missingDependencies.forEach((kind) => next.add(kind));
+  return (["context", "business-flow", "implementation"] as const).filter((kind) => next.has(kind));
 }

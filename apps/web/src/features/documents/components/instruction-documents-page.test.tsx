@@ -1,5 +1,6 @@
 // Verifies the instruction document library keeps each generated DOCX visible.
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { patchUserSettings } from "../../../shared/lib/user-settings";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -7,13 +8,13 @@ import type {
   DocumentLibraryItem,
   DocumentRunSnapshot,
 } from "@uml-platform/contracts";
-import { feasibilityInputsSchema, snapshotInputFingerprint } from "@uml-platform/contracts";
+import { feasibilityInputsSchema, snapshotInputFingerprint, buildFeasibilityImplementationFingerprint } from "@uml-platform/contracts";
 import { useTheme } from "../../../shared/ui/theme-provider";
 import {
   createMockWorkspaceRepository,
   type WorkspaceRepository,
 } from "../../../services/workspace-repository";
-import { withWorkspaceProviders } from "../../../test/workspace-test-utils";
+import { withWorkspaceProviders, createBusinessFlowArtifact } from "../../../test/workspace-test-utils";
 import { designInputFingerprintFor } from "../../workspace-session/lib/workspace-context";
 import { useWorkspaceShell } from "../../workspace-shell/state";
 import { InstructionDocumentsPage } from "./instruction-documents-page";
@@ -331,8 +332,11 @@ function createReadyFeasibilityWorkspace() {
       requirementBaseline: null,
     }),
     feasibilityImplementationPlan,
-    feasibilityImplementationFingerprint: snapshotInputFingerprint({
+    feasibilityBusinessFlow: createBusinessFlowArtifact(rules),
+    feasibilityImplementationFingerprint: buildFeasibilityImplementationFingerprint({
       rules,
+      requirementBaseline: null,
+      businessFlow: createBusinessFlowArtifact(rules),
       contextModel,
       inputs: feasibilityInputs,
     }),
@@ -355,6 +359,24 @@ function storeManagedUserSettings() {
 }
 
 describe("InstructionDocumentsPage", () => {
+  it("requires a model for a real report after its artifact dependencies are satisfied", async () => {
+    localStorage.clear();
+    const repository = createMockWorkspaceRepository(createReadyFeasibilityWorkspace());
+    repository.getProjectAccess = async () => ({ capabilities: ["update_project", "start_runs"], generationExecutionMode: "provider" });
+    repository.listDocuments = vi.fn(async () => []);
+    repository.startDocumentRun = vi.fn();
+    render(withWorkspaceProviders(<InstructionDocumentsPage />, repository));
+    await screen.findByRole("heading", { name: "已生成说明书" });
+    const card = templateCard("可行性研究报告");
+    const button = within(card).getByRole("button", { name: /生成并打开/ });
+    expect(button).toBeDisabled();
+    expect(within(card).getByText("请先配置并选择模型供应商。")).toBeInTheDocument();
+    await userEvent.setup().click(button);
+    expect(repository.startDocumentRun).not.toHaveBeenCalled();
+    act(() => patchUserSettings({ providerConfigId: "provider-1", defaultModel: "model-1", providerModelOptions: ["model-1"] }));
+    expect(button).toBeEnabled();
+  });
+
   const clearDialogSideEffects = () => {
     document.body.style.pointerEvents = "";
     document.body.removeAttribute("data-scroll-locked");
@@ -546,13 +568,13 @@ describe("InstructionDocumentsPage", () => {
       name: "可行性研究报告暂时无法生成",
     });
     expect(guidance).toHaveTextContent(
-      "需求规则已更新，系统上下文图（系统环境图）和实现方案需要重新生成",
+      "需求规则已更新，系统环境图和实现方案需要重新生成",
     );
     await user.click(
       within(guidance).getByRole("button", { name: "前往可行性分析" }),
     );
     expect(screen.getByTestId("active-selection")).toHaveTextContent(
-      "feasibility-home:context,implementation",
+      "feasibility-home:context,business-flow,implementation",
     );
   });
 

@@ -1,5 +1,6 @@
 // Implements the browser HTTP workspace repository and project-scoped persistence adapter.
 import type {
+  GenerationExecutionMode,
   DesignSvgArtifact,
   OnlyOfficeUiTheme,
   RepairRequirementRuleRequest,
@@ -98,6 +99,7 @@ type ProjectWorkspaceResponse = {
 
 type ProjectAccessResponse = {
   capabilities?: string[];
+  generationExecutionMode?: GenerationExecutionMode;
 };
 
 export function createHttpWorkspaceRepository(
@@ -315,8 +317,8 @@ export function createHttpWorkspaceRepository(
   }
 
   return {
-    async getProjectCapabilities() {
-      if (!projectId) return ["update_project", "start_runs"];
+    async getProjectAccess() {
+      if (!projectId) return { capabilities: ["update_project", "start_runs"], generationExecutionMode: "provider" };
       const scopedProjectId = requireProjectScope(projectId);
       const response = await requestJson<ProjectAccessResponse>(
         `/api/projects/${encodeURIComponent(scopedProjectId)}`,
@@ -324,7 +326,10 @@ export function createHttpWorkspaceRepository(
           errorKey: "errors.operations.loadPermissions",
         }),
       );
-      return response.capabilities ?? [];
+      return {
+        capabilities: response.capabilities ?? [],
+        generationExecutionMode: response.generationExecutionMode === "offline-demo" ? "offline-demo" : "provider",
+      };
     },
 
     async loadWorkspace() {

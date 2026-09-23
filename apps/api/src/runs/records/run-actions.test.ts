@@ -4,6 +4,7 @@ import test from "node:test";
 import type {
   CodeRunSnapshot,
   DesignRunSnapshot,
+  FeasibilityRunSnapshot,
   RunSnapshot,
 } from "@uml-platform/contracts";
 import { buildRequirementBaseline } from "../baselines/requirement-baseline.js";
@@ -12,9 +13,12 @@ import type { RunRecord, RunRecordStore } from "./run-record-store.js";
 import {
   createEmptyCodeSnapshot,
   createEmptyDesignSnapshot,
+  createEmptyFeasibilitySnapshot,
   createEmptySnapshot,
 } from "./snapshots.js";
 import { createRunError } from "../pipelines/shared/errors.js";
+import { feasibilityInputsSchema } from "@uml-platform/contracts";
+import { createBusinessFlowArtifact } from "../../test-fixtures/feasibility/business-flow.js";
 
 const rule = {
   id: "REQ-001",
@@ -32,6 +36,22 @@ function createSourceRecord(snapshot: RunRecord["snapshot"]): RunRecord {
     metadata: { createdAt: "2026-06-21T00:00:00.000Z" },
   };
 }
+
+test("feasibility retries preserve the completed business flow used as implementation input", () => {
+  const runs: RunRecordStore = new Map();
+  const businessFlow = createBusinessFlowArtifact([rule]);
+  const sourceSnapshot = createEmptyFeasibilitySnapshot("source-feasibility", {
+    projectId: "project-a", selectedArtifacts: ["implementation"],
+    providerSettings: { providerConfigId: "provider-a", model: "model-a" },
+    rules: [rule], requirementBaseline: null, inputs: feasibilityInputsSchema.parse({}), businessFlow,
+  });
+  sourceSnapshot.status = "failed";
+  createQueuedRunFromSource({ runs, source: createSourceRecord(sourceSnapshot), action: "retry", sourceRunId: sourceSnapshot.runId, runId: "retry-feasibility" });
+  const retry = runs.get("retry-feasibility")!.snapshot as FeasibilityRunSnapshot;
+  assert.deepEqual(retry.businessFlow, businessFlow);
+  assert.deepEqual(retry.selectedArtifacts, ["implementation"]);
+  assert.equal(retry.status, "queued");
+});
 
 test("createQueuedRunFromSource preserves requirement analysis target ids", () => {
   const runs: RunRecordStore = new Map();
