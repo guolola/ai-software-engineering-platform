@@ -51,7 +51,7 @@ export function failedRunResultDialog(input: {
   stageLabel: string;
 }): GenerationResultDialogState {
   const taskDetailsAvailable = Boolean(input.runId || input.clientTaskId);
-  const diagnosticId = input.runId ?? input.clientTaskId ?? null;
+  const diagnosticId = input.failure?.requestId ?? input.runId ?? input.clientTaskId ?? null;
   const target = input.failure?.actionTarget;
   const primaryAction = target === "pending-rules"
     ? {
@@ -99,7 +99,8 @@ export function failedRunResultDialog(input: {
     message: [
       input.failure?.message ?? input.message ?? i18n.t("errors.codes.RUN_INTERNAL_ERROR"),
       diagnosticId &&
-      (input.failure?.code === "INTERNAL_ERROR" ||
+      (Boolean(input.failure?.requestId) ||
+        input.failure?.code === "INTERNAL_ERROR" ||
         input.failure?.code === "RUN_INTERNAL_ERROR")
         ? i18n.t("errors.diagnosticId", { id: diagnosticId })
         : null,

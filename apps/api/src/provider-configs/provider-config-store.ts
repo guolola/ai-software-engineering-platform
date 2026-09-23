@@ -32,6 +32,22 @@ export interface ProviderBreakerView {
   lastFailureAt: string | null;
 }
 
+export type ProviderBreakerProbeStatus = "cooldown" | "in_progress";
+
+export type ProviderBreakerProbeDecision =
+  | {
+      acquired: true;
+      providerConfig: ProviderConfigView;
+      retryAfterSeconds: 0;
+      leaseStartedAt: string;
+    }
+  | {
+      acquired: false;
+      providerConfig: ProviderConfigView | null;
+      retryAfterSeconds: number;
+      status: ProviderBreakerProbeStatus;
+    };
+
 export interface ProviderConfigView {
   id: string;
   name: string;
@@ -72,6 +88,7 @@ interface StoredProviderConfig {
   view: ProviderConfigView;
   apiKeyCiphertext: string;
   apiKeyHash: string;
+  breakerProbeStartedAt: string | null;
 }
 
 export interface ProviderConfigStore {
@@ -113,6 +130,18 @@ export interface ProviderConfigStore {
   markUsed(id: string): ProviderConfigView | null;
   recordFailure?(id: string): ProviderConfigView | null;
   resetBreaker?(id: string): ProviderConfigView | null;
+  tryAcquireBreakerProbe(input: {
+    id: string;
+    now: Date;
+    cooldownMs: number;
+    leaseMs: number;
+  }): ProviderBreakerProbeDecision | Promise<ProviderBreakerProbeDecision>;
+  getSecretForBreakerProbe(id: string): string | null | Promise<string | null>;
+  completeBreakerProbe(
+    id: string,
+    outcome: "success" | "failure",
+    leaseStartedAt: string,
+  ): ProviderConfigView | null | Promise<ProviderConfigView | null>;
   recordAudit?(input: {
     actor: string;
     action: string;
@@ -281,6 +310,11 @@ export function createProviderConfigStore({
     view.breakerLastFailureAt = null;
   }
 
+  function millisecondsUntil(timestamp: string | null, durationMs: number, now: Date) {
+    const startedAt = timestamp ? Date.parse(timestamp) : now.getTime();
+    return Math.max(0, startedAt + durationMs - now.getTime());
+  }
+
   function requireAllowedModels(
     defaultModel: string,
     allowedModels: string[] | undefined,
@@ -346,6 +380,7 @@ export function createProviderConfigStore({
         view,
         apiKeyCiphertext: encryptSecret(input.apiKey.trim(), secretKey),
         apiKeyHash: hashSecret(input.apiKey.trim()),
+        breakerProbeStartedAt: null,
       });
       audit({
         actor: input.createdBy,
@@ -387,6 +422,7 @@ export function createProviderConfigStore({
         record.view.maskedKey = maskApiKey(apiKey);
         record.view.status = "active";
         closeBreaker(record.view);
+        record.breakerProbeStartedAt = null;
       }
       record.view.name = input.name?.trim() || record.view.name;
       record.view.provider = provider;
@@ -420,6 +456,7 @@ export function createProviderConfigStore({
       record.view.status = "active";
       record.view.updatedAt = new Date().toISOString();
       closeBreaker(record.view);
+      record.breakerProbeStartedAt = null;
       audit({
         actor,
         action: "rotate_provider_key",
@@ -488,6 +525,7 @@ export function createProviderConfigStore({
       if (record.view.breakerFailureCount >= breakerFailureThreshold) {
         record.view.breakerState = "open";
         record.view.breakerOpenedAt = record.view.breakerOpenedAt ?? now;
+        record.breakerProbeStartedAt = null;
       }
       record.view.updatedAt = now;
       return cloneView(record.view);
@@ -496,7 +534,71 @@ export function createProviderConfigStore({
       const record = records.get(id);
       if (!record) return null;
       closeBreaker(record.view);
+      record.breakerProbeStartedAt = null;
       record.view.updatedAt = new Date().toISOString();
+      return cloneView(record.view);
+    },
+    tryAcquireBreakerProbe({ id, now, cooldownMs, leaseMs }) {
+      const record = records.get(id);
+      if (!record || record.view.breakerState !== "open") {
+        return {
+          acquired: false,
+          providerConfig: record ? cloneView(record.view) : null,
+          retryAfterSeconds: 0,
+          status: "cooldown",
+        };
+      }
+
+      const cooldownRemainingMs = millisecondsUntil(
+        record.view.breakerOpenedAt ?? record.view.breakerLastFailureAt,
+        cooldownMs,
+        now,
+      );
+      const leaseRemainingMs = record.breakerProbeStartedAt
+        ? millisecondsUntil(record.breakerProbeStartedAt, leaseMs, now)
+        : 0;
+      if (cooldownRemainingMs > 0 || leaseRemainingMs > 0) {
+        return {
+          acquired: false,
+          providerConfig: cloneView(record.view),
+          retryAfterSeconds: Math.max(
+            1,
+            Math.ceil(Math.max(cooldownRemainingMs, leaseRemainingMs) / 1_000),
+          ),
+          status: leaseRemainingMs > 0 ? "in_progress" : "cooldown",
+        };
+      }
+
+      record.breakerProbeStartedAt = now.toISOString();
+      return {
+        acquired: true,
+        providerConfig: cloneView(record.view),
+        retryAfterSeconds: 0,
+        leaseStartedAt: record.breakerProbeStartedAt,
+      };
+    },
+    getSecretForBreakerProbe(id) {
+      const record = records.get(id);
+      if (!record || record.view.status !== "active" || !record.breakerProbeStartedAt) {
+        return null;
+      }
+      return decryptSecret(record.apiKeyCiphertext, secretKey);
+    },
+    completeBreakerProbe(id, outcome, leaseStartedAt) {
+      const record = records.get(id);
+      if (!record || record.breakerProbeStartedAt !== leaseStartedAt) return null;
+      const now = new Date().toISOString();
+      record.breakerProbeStartedAt = null;
+      if (outcome === "success") {
+        closeBreaker(record.view);
+        record.view.lastUsedAt = now;
+      } else {
+        record.view.breakerState = "open";
+        record.view.breakerFailureCount += 1;
+        record.view.breakerOpenedAt = now;
+        record.view.breakerLastFailureAt = now;
+      }
+      record.view.updatedAt = now;
       return cloneView(record.view);
     },
     recordAudit(input) {

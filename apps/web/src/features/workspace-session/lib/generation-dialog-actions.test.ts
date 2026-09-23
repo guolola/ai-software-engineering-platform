@@ -47,4 +47,18 @@ describe("documentRunCompletionDialog", () => {
 
     expect(dialog.primaryAction).toBeUndefined();
   });
+
+  it("shows the API request ID for a provider circuit rejection", () => {
+    const dialog = failedRunResultDialog({
+      failure: {
+        ...operationFailureForCode("PROVIDER_CIRCUIT_OPEN"),
+        requestId: "req-provider-9",
+      },
+      runId: null,
+      stageLabel: "需求规则",
+    });
+
+    expect(dialog.message).toContain("req-provider-9");
+    expect(dialog.primaryAction?.label).toBe("查看连接配置");
+  });
 });

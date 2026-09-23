@@ -30,11 +30,12 @@ describe("operationFailurePresentation", () => {
   it("shows only safe breaker diagnostics when provider testing is paused", () => {
     const failure = operationFailurePresentation(
       new ApiClientError("fallback", 503, {
+        requestId: "req-provider-9",
         error: {
           code: "PROVIDER_CIRCUIT_OPEN",
           category: "provider",
-          retryable: false,
-          params: { failureCount: 3 },
+          retryable: true,
+          params: { failureCount: 3, retryAfterSeconds: 240 },
           details: {
             breaker: {
               state: "open",
@@ -46,16 +47,21 @@ describe("operationFailurePresentation", () => {
       }),
     );
 
-    expect(failure.title).toBe("连接测试已暂停");
+    expect(failure.title).toBe("模型服务暂时受保护");
     expect(failure.message).toContain("3");
+    expect(failure.message).toContain("4 分钟");
+    expect(failure.message).toContain("自动探测");
     expect(failure.message).not.toContain("{{lastFailureAt}}");
+    expect(failure.message).not.toContain("PROVIDER_CIRCUIT_OPEN");
+    expect(failure.requestId).toBe("req-provider-9");
     expect(failure.actionTarget).toBe("provider-settings");
+    expect(failure.retryable).toBe(true);
   });
 
   it("uses a safe breaker fallback when diagnostics are unavailable", () => {
     const failure = operationFailureForCode("PROVIDER_CIRCUIT_OPEN");
 
-    expect(failure.message).toContain("暂停");
+    expect(failure.message).toContain("自动探测");
     expect(failure.message).not.toContain("{{failureCount}}");
   });
 });

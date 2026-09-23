@@ -21,6 +21,7 @@ import {
   recordGenerationUsage,
   recordProviderUsage,
   rememberProviderSettings,
+  providerResolutionFailureResponse,
   resolveProviderConfigIdForRun,
   resolveProviderSettingsForRun,
   snapshotProviderSettings,
@@ -115,18 +116,17 @@ export async function createProjectRunAction({
     createdAt: new Date().toISOString(),
   };
   const providerSettingsInput = snapshotProviderSettings(source);
-  const providerSettings = await resolveProviderSettingsForRun({
+  const providerResolution = await resolveProviderSettingsForRun({
     providerSettings: providerSettingsInput,
     metadata,
     providerConfigs,
     request,
     reply,
   });
-  if (!providerSettings) {
-    return {
-      message: "Runs must use an admin-managed provider config with an allowed model.",
-    };
+  if (!providerResolution.ok) {
+    return providerResolutionFailureResponse(reply, providerResolution);
   }
+  const providerSettings = providerResolution.providerSettings;
   const providerConfigId = await resolveProviderConfigIdForRun({
     providerSettings: providerSettingsInput,
   });

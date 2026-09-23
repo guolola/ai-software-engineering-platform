@@ -1058,6 +1058,57 @@ test("project run snapshots reject unauthenticated and cross-project users", asy
   await app.close();
 });
 
+test("open provider circuit returns retry timing and safe breaker diagnostics", async () => {
+  const providerConfigs = createProviderConfigStore({
+    secret: "open-circuit-route-test",
+    breakerFailureThreshold: 3,
+  });
+  const provider = providerConfigs.create({
+    name: "Platform Provider",
+    baseUrl: "https://api.openai.com/v1",
+    apiKey: "sk-open-circuit-route-test",
+    defaultModel: "gpt-4.1",
+    allowedModels: ["gpt-4.1"],
+    createdBy: "admin-user",
+  });
+  providerConfigs.recordFailure?.(provider.id);
+  providerConfigs.recordFailure?.(provider.id);
+  providerConfigs.recordFailure?.(provider.id);
+  const app = await createRunRouteTestApp({
+    providerConfigs,
+    runAccessGuard: createTestRunAccessGuard({
+      "user-a": { start_runs: ["project-a"] },
+    }),
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/runs",
+    headers: { "x-test-user-id": "user-a" },
+    payload: {
+      projectId: "project-a",
+      requirementText: "生成需求规则",
+      selectedDiagrams: [],
+      providerSettings: {
+        providerConfigId: provider.id,
+        model: "gpt-4.1",
+      },
+    },
+  });
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.json().error.code, "PROVIDER_CIRCUIT_OPEN");
+  assert.equal(response.json().error.retryable, true);
+  assert.equal(response.json().error.params.failureCount, 3);
+  assert.ok(response.json().error.params.retryAfterSeconds >= 299);
+  assert.equal(typeof response.json().error.params.openedAt, "string");
+  assert.equal(typeof response.json().error.params.lastFailureAt, "string");
+  assert.equal(response.json().error.params.probeStatus, "cooldown");
+  assert.equal(response.json().error.details.breaker.probeStatus, "cooldown");
+  assert.doesNotMatch(response.body, /sk-open-circuit-route-test/);
+  await app.close();
+});
+
 test("project run starts reject frontend plaintext provider credentials", async () => {
   const app = await createRunRouteTestApp({
     runAccessGuard: createTestRunAccessGuard({
@@ -1594,7 +1645,7 @@ test("project run starts reject managed provider models not allowed by the confi
   });
 
   assert.equal(response.statusCode, 400);
-  assert.equal(response.json().error.code, "PROVIDER_CONFIG_INVALID");
+  assert.equal(response.json().error.code, "PROVIDER_MODEL_NOT_ALLOWED");
   assert.equal(pipelineCalls, 0);
 
   await app.close();

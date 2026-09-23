@@ -25,7 +25,9 @@ import {
 import { createBillingService } from "../billing/billing-service.js";
 import { createPaymentProviderRegistry } from "../adapters/payments/payment-adapter-registry.js";
 import type { ProviderConfigStore } from "../provider-configs/provider-config-store.js";
+import { resolveProviderCircuitAccess } from "../provider-configs/provider-circuit-recovery.js";
 import type { RunRecord } from "../runs/records/run-record-store.js";
+import { createRunError, throwRunError } from "../runs/pipelines/shared/errors.js";
 
 function positiveInteger(value: string | undefined, fallback: number) {
   const parsed = Number.parseInt(value ?? "", 10);
@@ -59,17 +61,25 @@ async function resolveWorkerProviderSettings({
   if (config.status !== "active") {
     throw new Error("Queued run provider config is not active");
   }
-  if (config.breakerState === "open") {
-    throw new Error("Queued run provider circuit breaker is open");
-  }
   if (!config.allowedModels.includes(input.model)) {
     throw new Error("Queued run model is not allowed by provider config");
   }
-  const apiKey = await providerConfigs.getSecret(input.providerConfigId);
-  if (!apiKey) {
-    throw new Error("Queued run provider config has no usable secret");
+  const circuit = await resolveProviderCircuitAccess({
+    providerConfigs,
+    providerConfig: config,
+    model: input.model,
+  });
+  if (!circuit.ok) {
+    throwRunError(
+      createRunError(
+        circuit.statusCode === 503
+          ? "PLATFORM_PROVIDER_UNAVAILABLE"
+          : "PLATFORM_PROVIDER_AUTH_FAILED",
+        undefined,
+        { details: { providerError: circuit.error } },
+      ),
+    );
   }
-  const modelCapability = config.modelCapabilities[input.model];
   const billingRequired = !(
     config.scopeType === "user" &&
     record.metadata?.userId &&
@@ -78,12 +88,7 @@ async function resolveWorkerProviderSettings({
   return {
     providerConfigId: input.providerConfigId,
     billingRequired,
-    providerSettings: {
-      apiBaseUrl: config.baseUrl,
-      apiKey,
-      model: input.model,
-      ...(modelCapability ? { modelCapability } : {}),
-    },
+    providerSettings: circuit.providerSettings,
   };
 }
 

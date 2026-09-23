@@ -52,15 +52,20 @@ export function localizeApiFailure(
       ? breaker as Record<string, unknown>
       : null;
     const failureCount = error.params?.failureCount;
+    const retryAfterSeconds = error.params?.retryAfterSeconds;
+    const retryAfterMinutes = typeof retryAfterSeconds === "number"
+      ? Math.max(1, Math.ceil(retryAfterSeconds / 60))
+      : null;
     const lastFailureAt = typeof breakerRecord?.lastFailureAt === "string"
       ? new Date(breakerRecord.lastFailureAt).toLocaleString(i18n.language)
       : null;
-    if (failureCount === undefined || !lastFailureAt) {
+    if (failureCount === undefined || !lastFailureAt || retryAfterMinutes === null) {
       return i18n.t("errors.providerCircuitGeneric");
     }
     return i18n.t("errors.codes.PROVIDER_CIRCUIT_OPEN", {
       ...error.params,
       lastFailureAt,
+      retryAfterMinutes,
       defaultValue: fallback,
     });
   }

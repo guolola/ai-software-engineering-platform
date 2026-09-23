@@ -48,6 +48,7 @@ type ProviderConfigRow = {
   breaker_failure_count: string | number;
   breaker_opened_at: string | Date | null;
   breaker_last_failure_at: string | Date | null;
+  breaker_probe_started_at: string | Date | null;
 };
 
 type SecretRow = {
@@ -212,7 +213,8 @@ const providerViewColumns = `
   breaker_state,
   breaker_failure_count,
   breaker_opened_at,
-  breaker_last_failure_at
+  breaker_last_failure_at,
+  breaker_probe_started_at
 `;
 
 export function createPostgresProviderConfigRepository({
@@ -488,6 +490,7 @@ export function createPostgresProviderConfigRepository({
             breaker_failure_count = case when $12 then 0 else breaker_failure_count end,
             breaker_opened_at = case when $12 then null else breaker_opened_at end,
             breaker_last_failure_at = case when $12 then null else breaker_last_failure_at end,
+            breaker_probe_started_at = case when $12 then null else breaker_probe_started_at end,
             scope_type = $13,
             scope_id = $14,
             updated_at = now()
@@ -700,6 +703,7 @@ export function createPostgresProviderConfigRepository({
               when breaker_failure_count + 1 >= 3 then coalesce(breaker_opened_at, now())
               else breaker_opened_at
             end,
+            breaker_probe_started_at = null,
             updated_at = now()
           where id = $1
           returning ${providerViewColumns}
@@ -718,11 +722,138 @@ export function createPostgresProviderConfigRepository({
             breaker_failure_count = 0,
             breaker_opened_at = null,
             breaker_last_failure_at = null,
+            breaker_probe_started_at = null,
             updated_at = now()
           where id = $1
           returning ${providerViewColumns}
         `,
         [id],
+      );
+      return result.rows[0] ? mapProviderRow(result.rows[0]) : null;
+    },
+
+    async tryAcquireBreakerProbe({ id, now, cooldownMs, leaseMs }: {
+      id: string;
+      now: Date;
+      cooldownMs: number;
+      leaseMs: number;
+    }) {
+      const nowIso = now.toISOString();
+      const acquired = await db.query<ProviderConfigRow>(
+        `
+          update provider_configs
+          set breaker_probe_started_at = $2
+          where id = $1
+            and breaker_state = 'open'
+            and coalesce(breaker_opened_at, breaker_last_failure_at, updated_at)
+              <= $2::timestamptz - ($3 * interval '1 millisecond')
+            and (
+              breaker_probe_started_at is null
+              or breaker_probe_started_at
+                <= $2::timestamptz - ($4 * interval '1 millisecond')
+            )
+          returning ${providerViewColumns}
+        `,
+        [id, nowIso, cooldownMs, leaseMs],
+      );
+      if (acquired.rows[0]) {
+        return {
+          acquired: true as const,
+          providerConfig: mapProviderRow(acquired.rows[0]),
+          retryAfterSeconds: 0 as const,
+          leaseStartedAt: new Date(
+            acquired.rows[0].breaker_probe_started_at!,
+          ).toISOString(),
+        };
+      }
+
+      const current = await db.query<ProviderConfigRow>(
+        `select ${providerViewColumns} from provider_configs where id = $1 limit 1`,
+        [id],
+      );
+      const row = current.rows[0];
+      if (!row || row.breaker_state !== "open") {
+        return {
+          acquired: false as const,
+          providerConfig: row ? mapProviderRow(row) : null,
+          retryAfterSeconds: 0,
+          status: "cooldown" as const,
+        };
+      }
+      const openedAt = row.breaker_opened_at ?? row.breaker_last_failure_at ?? row.updated_at;
+      const cooldownRemainingMs = Math.max(
+        0,
+        new Date(openedAt).getTime() + cooldownMs - now.getTime(),
+      );
+      const probeStartedAt = row.breaker_probe_started_at;
+      const leaseRemainingMs = probeStartedAt
+        ? Math.max(0, new Date(probeStartedAt).getTime() + leaseMs - now.getTime())
+        : 0;
+      return {
+        acquired: false as const,
+        providerConfig: mapProviderRow(row),
+        retryAfterSeconds: Math.max(
+          1,
+          Math.ceil(Math.max(cooldownRemainingMs, leaseRemainingMs) / 1_000),
+        ),
+        status: leaseRemainingMs > 0 ? "in_progress" as const : "cooldown" as const,
+      };
+    },
+
+    async getSecretForBreakerProbe(id: string) {
+      const result = await db.query<SecretRow>(
+        `
+          select s.secret_ciphertext
+          from provider_secrets s
+          join provider_configs c on c.id = s.provider_config_id
+          where s.provider_config_id = $1
+            and s.status = 'active'
+            and c.status = 'active'
+            and c.breaker_state = 'open'
+            and c.breaker_probe_started_at is not null
+          order by s.created_at desc
+          limit 1
+        `,
+        [id],
+      );
+      return result.rows[0]
+        ? decryptSecret(result.rows[0].secret_ciphertext, secretKey)
+        : null;
+    },
+
+    async completeBreakerProbe(
+      id: string,
+      outcome: "success" | "failure",
+      leaseStartedAt: string,
+    ) {
+      const result = await db.query<ProviderConfigRow>(
+        outcome === "success"
+          ? `
+              update provider_configs
+              set
+                breaker_state = 'closed',
+                breaker_failure_count = 0,
+                breaker_opened_at = null,
+                breaker_last_failure_at = null,
+                breaker_probe_started_at = null,
+                last_used_at = now(),
+                updated_at = now()
+              where id = $1 and breaker_probe_started_at = $2::timestamptz
+              returning ${providerViewColumns}
+            `
+          : `
+              update provider_configs
+              set
+                breaker_state = 'open',
+                breaker_failure_count = breaker_failure_count + 1,
+                breaker_opened_at = now(),
+                breaker_last_failure_at = now(),
+                breaker_probe_started_at = null,
+                updated_at = now()
+              where id = $1 and breaker_probe_started_at = $2::timestamptz
+              returning ${providerViewColumns}
+            `,
+        [id, leaseStartedAt],
       );
       return result.rows[0] ? mapProviderRow(result.rows[0]) : null;
     },

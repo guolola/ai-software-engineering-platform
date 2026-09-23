@@ -210,6 +210,7 @@ create table if not exists provider_configs (
   breaker_failure_count integer not null default 0,
   breaker_opened_at timestamptz,
   breaker_last_failure_at timestamptz,
+  breaker_probe_started_at timestamptz,
   scope_type text not null default 'system',
   scope_id text,
   created_by_user_id text references users(id) on delete set null,

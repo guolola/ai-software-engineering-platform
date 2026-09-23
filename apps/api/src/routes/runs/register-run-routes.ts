@@ -67,6 +67,7 @@ import {
   recordGenerationUsage,
   recordProviderUsage,
   rememberProviderSettings,
+  providerResolutionFailureResponse,
   resolveProviderConfigIdForRun,
   resolveProviderSettingsForRun,
 } from "../../runs/providers/run-provider-gates.js";
@@ -143,28 +144,6 @@ function isActiveRunRecord(record: RunRecord) {
 function documentWorkspaceIdForRun(record: RunRecord) {
   const projectId = record.metadata?.projectId;
   return projectId ? projectDocumentWorkspaceId(projectId) : null;
-}
-
-function unresolvedProviderSettingsResponse(reply: FastifyReply) {
-  const statusCode = reply.statusCode;
-  const code = statusCode === 401
-    ? "AUTHENTICATION_REQUIRED"
-    : statusCode === 503
-      ? "PROVIDER_CIRCUIT_OPEN"
-      : statusCode >= 500
-        ? "INTERNAL_ERROR"
-        : "PROVIDER_CONFIG_INVALID";
-  return apiErrorResponseSchema.parse({
-    error: {
-      code,
-      category: statusCode === 401
-        ? "authentication"
-        : statusCode >= 500 && statusCode !== 503
-          ? "internal"
-          : "provider",
-      retryable: statusCode >= 500 && statusCode !== 503,
-    },
-  });
 }
 
 function requirementRepairFailure(error: unknown) {
@@ -437,16 +416,17 @@ export function registerRunRoutes({
     if (await isOfflineDemoRun(input.projectId ?? metadata?.projectId)) {
       return createOfflineDemoRequirementRuleRepair(input);
     }
-    const providerSettings = await resolveProviderSettingsForRun({
+    const providerResolution = await resolveProviderSettingsForRun({
       providerSettings: input.providerSettings,
       metadata,
       providerConfigs,
       request,
       reply,
     });
-    if (!providerSettings) {
-      return unresolvedProviderSettingsResponse(reply);
+    if (!providerResolution.ok) {
+      return providerResolutionFailureResponse(reply, providerResolution);
     }
+    const providerSettings = providerResolution.providerSettings;
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
     });
@@ -502,16 +482,17 @@ export function registerRunRoutes({
     if (await isOfflineDemoRun(input.projectId ?? metadata?.projectId)) {
       return createOfflineDemoRequirementRulesRepair(input);
     }
-    const providerSettings = await resolveProviderSettingsForRun({
+    const providerResolution = await resolveProviderSettingsForRun({
       providerSettings: input.providerSettings,
       metadata,
       providerConfigs,
       request,
       reply,
     });
-    if (!providerSettings) {
-      return unresolvedProviderSettingsResponse(reply);
+    if (!providerResolution.ok) {
+      return providerResolutionFailureResponse(reply, providerResolution);
     }
+    const providerSettings = providerResolution.providerSettings;
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
     });
@@ -662,16 +643,17 @@ export function registerRunRoutes({
       reply.code(202);
       return startRunResponseSchema.parse({ runId });
     }
-    const providerSettings = await resolveProviderSettingsForRun({
+    const providerResolution = await resolveProviderSettingsForRun({
       providerSettings: input.providerSettings,
       metadata,
       providerConfigs,
       request,
       reply,
     });
-    if (!providerSettings) {
-      return unresolvedProviderSettingsResponse(reply);
+    if (!providerResolution.ok) {
+      return providerResolutionFailureResponse(reply, providerResolution);
     }
+    const providerSettings = providerResolution.providerSettings;
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
     });
@@ -795,16 +777,17 @@ export function registerRunRoutes({
       reply.code(202);
       return startDesignRunResponseSchema.parse({ runId });
     }
-    const providerSettings = await resolveProviderSettingsForRun({
+    const providerResolution = await resolveProviderSettingsForRun({
       providerSettings: input.providerSettings,
       metadata,
       providerConfigs,
       request,
       reply,
     });
-    if (!providerSettings) {
-      return unresolvedProviderSettingsResponse(reply);
+    if (!providerResolution.ok) {
+      return providerResolutionFailureResponse(reply, providerResolution);
     }
+    const providerSettings = providerResolution.providerSettings;
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
     });
@@ -915,16 +898,17 @@ export function registerRunRoutes({
       reply.code(202);
       return startCodeRunResponseSchema.parse({ runId });
     }
-    const providerSettings = await resolveProviderSettingsForRun({
+    const providerResolution = await resolveProviderSettingsForRun({
       providerSettings: input.providerSettings,
       metadata,
       providerConfigs,
       request,
       reply,
     });
-    if (!providerSettings) {
-      return unresolvedProviderSettingsResponse(reply);
+    if (!providerResolution.ok) {
+      return providerResolutionFailureResponse(reply, providerResolution);
     }
+    const providerSettings = providerResolution.providerSettings;
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
     });
@@ -1069,16 +1053,17 @@ export function registerRunRoutes({
       reply.code(202);
       return startDocumentRunResponseSchema.parse({ runId });
     }
-    const providerSettings = await resolveProviderSettingsForRun({
+    const providerResolution = await resolveProviderSettingsForRun({
       providerSettings: input.providerSettings,
       metadata,
       providerConfigs,
       request,
       reply,
     });
-    if (!providerSettings) {
-      return unresolvedProviderSettingsResponse(reply);
+    if (!providerResolution.ok) {
+      return providerResolutionFailureResponse(reply, providerResolution);
     }
+    const providerSettings = providerResolution.providerSettings;
     const providerConfigId = await resolveProviderConfigIdForRun({
       providerSettings: input.providerSettings,
     });

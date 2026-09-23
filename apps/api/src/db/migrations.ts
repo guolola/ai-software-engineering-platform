@@ -216,6 +216,7 @@ create table if not exists provider_configs (
   breaker_failure_count integer not null default 0,
   breaker_opened_at timestamptz,
   breaker_last_failure_at timestamptz,
+  breaker_probe_started_at timestamptz,
   scope_type text not null default 'system',
   scope_id text,
   created_by_user_id text references users(id) on delete set null,
@@ -426,6 +427,7 @@ alter table provider_configs add column if not exists breaker_state text not nul
 alter table provider_configs add column if not exists breaker_failure_count integer not null default 0;
 alter table provider_configs add column if not exists breaker_opened_at timestamptz;
 alter table provider_configs add column if not exists breaker_last_failure_at timestamptz;
+alter table provider_configs add column if not exists breaker_probe_started_at timestamptz;
 alter table provider_secrets add column if not exists secret_hash text not null default '';
 
 create table if not exists provider_usage_events (
@@ -1106,6 +1108,11 @@ alter table admin_invitations
   check (status in ('pending', 'accepted', 'revoked', 'expired'));
 `;
 
+export const providerBreakerProbeLeaseSql = `
+alter table provider_configs
+  add column if not exists breaker_probe_started_at timestamptz;
+`;
+
 export const migrations = [
   {
     id: "001_user_admin_platform_base",
@@ -1202,6 +1209,10 @@ export const migrations = [
   {
     id: "024_billing_credit_provenance",
     sql: billingCreditProvenanceSql,
+  },
+  {
+    id: "025_provider_breaker_probe_lease",
+    sql: providerBreakerProbeLeaseSql,
   },
 ] as const;
 

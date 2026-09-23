@@ -37,6 +37,7 @@ import {
   checkProviderUsageLimit,
   recordGenerationUsage,
   recordProviderUsage,
+  providerResolutionFailureResponse,
   resolveProviderConfigIdForRun,
   resolveProviderSettingsForRun,
 } from "../../runs/providers/run-provider-gates.js";
@@ -151,16 +152,17 @@ export function registerFeasibilityRoutes({
       model: input.providerSettings.model,
       createdAt: new Date().toISOString(),
     };
-    const providerSettings = await resolveProviderSettingsForRun({
+    const providerResolution = await resolveProviderSettingsForRun({
       providerSettings: input.providerSettings,
       metadata,
       providerConfigs,
       request,
       reply,
     });
-    if (!providerSettings) {
-      return { message: "请选择有权限的 Provider 和模型。" };
+    if (!providerResolution.ok) {
+      return providerResolutionFailureResponse(reply, providerResolution);
     }
+    const providerSettings = providerResolution.providerSettings;
     const providerConfigId = await resolveProviderConfigIdForRun({ providerSettings: input.providerSettings });
     const generationCheck = await checkGenerationUsageLimit({
       generationUsage,

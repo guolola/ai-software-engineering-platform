@@ -1,7 +1,13 @@
 // Centralizes run provider config resolution, rate-limit gates, and usage accounting.
 import type { FastifyReply, FastifyRequest } from "fastify";
-import type { ProviderSettings, ProviderSettingsInput } from "@uml-platform/contracts";
+import {
+  apiErrorResponseSchema,
+  type ApiError,
+  type ProviderSettings,
+  type ProviderSettingsInput,
+} from "@uml-platform/contracts";
 import type { GenerationUsageService } from "../../generation/generation-usage.js";
+import { resolveProviderCircuitAccess } from "../../provider-configs/provider-circuit-recovery.js";
 import type {
   ProviderConfigStore,
   ProviderConfigView,
@@ -61,68 +67,71 @@ export async function resolveProviderSettingsForRun({
   providerSettings,
   metadata,
   providerConfigs,
-  request,
-  reply,
 }: {
   providerSettings: ProviderSettingsInput | undefined;
   metadata: RunRecordMetadata | undefined;
   providerConfigs?: ProviderConfigStore;
-  request: FastifyRequest;
-  reply: FastifyReply;
-}): Promise<ProviderSettings | null> {
+  request?: FastifyRequest;
+  reply?: FastifyReply;
+}): Promise<
+  | { ok: true; providerSettings: ProviderSettings }
+  | { ok: false; statusCode: number; error: ApiError }
+> {
   const isProjectRun = Boolean(metadata?.projectId);
+  const failure = (
+    statusCode: number,
+    code: string,
+    category: ApiError["category"] = "provider",
+    retryable = false,
+  ) => ({
+    ok: false as const,
+    statusCode,
+    error: { code, category, retryable },
+  });
 
   if (!providerSettings) {
-    reply.code(400);
-    return null;
+    return failure(400, "PROVIDER_CONFIG_INVALID");
   }
 
   if (isManagedProviderSettings(providerSettings)) {
     if (!isProjectRun) {
-      reply.code(401);
-      return null;
+      return failure(401, "AUTHENTICATION_REQUIRED", "authentication");
     }
     if (!providerConfigs) {
-      reply.code(500);
-      return null;
+      return failure(500, "INTERNAL_ERROR", "internal", true);
     }
     const providerConfig = await providerConfigs.get(providerSettings.providerConfigId);
     if (!providerConfig || !canRunWithProviderConfig(providerConfig, metadata)) {
-      reply.code(400);
-      return null;
+      return failure(400, "PROVIDER_CONFIG_INVALID");
     }
     if (!providerConfig.allowlisted) {
-      reply.code(400);
-      return null;
+      return failure(400, "PROVIDER_BASE_URL_NOT_ALLOWED", "validation");
     }
     if (providerConfig.status !== "active") {
-      reply.code(400);
-      return null;
-    }
-    if (providerConfig.breakerState === "open") {
-      reply.code(503);
-      return null;
+      return failure(400, "PROVIDER_CONFIG_INACTIVE");
     }
     if (!providerConfig.allowedModels.includes(providerSettings.model)) {
-      reply.code(400);
-      return null;
+      return failure(400, "PROVIDER_MODEL_NOT_ALLOWED", "validation");
     }
-    const apiKey = await providerConfigs.getSecret(providerSettings.providerConfigId);
-    if (!apiKey) {
-      reply.code(400);
-      return null;
-    }
-    const modelCapability = providerConfig.modelCapabilities[providerSettings.model];
-    return {
-      apiBaseUrl: providerConfig.baseUrl,
-      apiKey,
+    const circuit = await resolveProviderCircuitAccess({
+      providerConfigs,
+      providerConfig,
       model: providerSettings.model,
-      ...(modelCapability ? { modelCapability } : {}),
-    };
+    });
+    return circuit.ok
+      ? { ok: true, providerSettings: circuit.providerSettings }
+      : circuit;
   }
 
-  reply.code(400);
-  return null;
+  return failure(400, "PROVIDER_CONFIG_INVALID");
+}
+
+export function providerResolutionFailureResponse(
+  reply: FastifyReply,
+  resolution: { ok: false; statusCode: number; error: ApiError },
+) {
+  reply.code(resolution.statusCode);
+  return apiErrorResponseSchema.parse({ error: resolution.error });
 }
 
 function providerConfigIdFromSettings(providerSettings: ProviderSettingsInput | undefined) {

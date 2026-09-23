@@ -14,6 +14,7 @@ import {
   migrationTableName,
   migrations,
   providerModelCapabilitiesEnforcementSql,
+  providerBreakerProbeLeaseSql,
   providerStructuredOutputCapabilitiesEnforcementSql,
   providerConfigStoreSql,
   runMigrations,
@@ -147,6 +148,7 @@ test("provider config migration includes secure view fields and usage dimensions
     "risk_state",
     "quota",
     "last_used_at",
+    "breaker_probe_started_at",
     "secret_hash",
   ]) {
     assert.match(providerConfigStoreSql, new RegExp(column, "i"));
@@ -154,6 +156,17 @@ test("provider config migration includes secure view fields and usage dimensions
 
   assert.match(providerConfigStoreSql, /create table if not exists provider_usage_events/i);
   assert.match(providerConfigStoreSql, /user_id.*project_id.*provider_config_id.*task_type/is);
+});
+
+test("provider breaker recovery lease is added for existing databases", () => {
+  assert.match(
+    providerBreakerProbeLeaseSql,
+    /add column if not exists breaker_probe_started_at timestamptz/i,
+  );
+  assert.match(
+    migrations.map((migration) => migration.id).join("\n"),
+    /025_provider_breaker_probe_lease/,
+  );
 });
 
 test("provider model capabilities enforcement deletes incompatible legacy provider rows", () => {

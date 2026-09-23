@@ -19,6 +19,7 @@ export interface OperationFailurePresentation {
   details?: Record<string, unknown>;
   message: string;
   params?: Record<string, string | number | boolean | null>;
+  requestId?: string;
   retryable: boolean;
   title: string;
 }
@@ -102,7 +103,19 @@ function nestedRunError(error: unknown): RunError | null {
     : null;
 }
 
-function fromApiError(error: ApiError, localizedMessage: string): OperationFailurePresentation {
+function safeRequestId(payload: unknown) {
+  if (!payload || typeof payload !== "object" || !("requestId" in payload)) return undefined;
+  const requestId = (payload as { requestId?: unknown }).requestId;
+  return typeof requestId === "string" && /^[A-Za-z0-9._:-]{1,128}$/u.test(requestId)
+    ? requestId
+    : undefined;
+}
+
+function fromApiError(
+  error: ApiError,
+  localizedMessage: string,
+  requestId?: string,
+): OperationFailurePresentation {
   const breaker = error.details?.breaker;
   const breakerRecord = breaker && typeof breaker === "object"
     ? breaker as Record<string, unknown>
@@ -110,10 +123,15 @@ function fromApiError(error: ApiError, localizedMessage: string): OperationFailu
   const lastFailureAt = typeof breakerRecord?.lastFailureAt === "string"
     ? new Date(breakerRecord.lastFailureAt).toLocaleString(i18n.language)
     : undefined;
-  const params = lastFailureAt
-    ? { ...error.params, lastFailureAt }
+  const retryAfterSeconds = error.params?.retryAfterSeconds;
+  const retryAfterMinutes = typeof retryAfterSeconds === "number"
+    ? Math.max(1, Math.ceil(retryAfterSeconds / 60))
+    : undefined;
+  const params = lastFailureAt && retryAfterMinutes !== undefined
+    ? { ...error.params, lastFailureAt, retryAfterMinutes }
     : error.params;
-  const message = error.code === "PROVIDER_CIRCUIT_OPEN" && !lastFailureAt
+  const message = error.code === "PROVIDER_CIRCUIT_OPEN" &&
+      (!lastFailureAt || retryAfterMinutes === undefined)
     ? i18n.t("errors.providerCircuitGeneric")
     : i18n.t(`errors.codes.${error.code}`, {
         ...params,
@@ -125,6 +143,7 @@ function fromApiError(error: ApiError, localizedMessage: string): OperationFailu
     details: error.details,
     message,
     params,
+    requestId,
     retryable: error.retryable,
     title: titleForCode(error.code),
   };
@@ -149,7 +168,9 @@ export function operationFailurePresentation(
 ): OperationFailurePresentation {
   if (error instanceof PresentedOperationError) return error.presentation;
   if (error instanceof ApiClientError) {
-    if (error.apiError) return fromApiError(error.apiError, error.message);
+    if (error.apiError) {
+      return fromApiError(error.apiError, error.message, safeRequestId(error.payload));
+    }
     if (error.error) return fromRunError(error.error);
   }
   const runError = nestedRunError(error);

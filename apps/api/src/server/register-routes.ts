@@ -23,6 +23,7 @@ import type { RunAccessContext } from "../routes/runs/run-access.js";
 import type { DocumentLibrary } from "../documents/library/document-library.js";
 import type { MailAdapter } from "../mail/mail-adapter.js";
 import type { ProviderConfigStore } from "../provider-configs/provider-config-store.js";
+import { resolveProviderCircuitAccess } from "../provider-configs/provider-circuit-recovery.js";
 import type { ProviderUsageTracker } from "../provider-configs/provider-usage-tracker.js";
 import type { BillingService } from "../billing/billing-service.js";
 import type { RunRecord, RunRecordStore } from "../runs/records/run-record-store.js";
@@ -158,25 +159,22 @@ export function registerApiRoutes({
       !config ||
       !config.allowlisted ||
       config.status !== "active" ||
-      config.breakerState === "open" ||
       !config.allowedModels.includes(input.model)
     ) {
       return { input, resolved: null, providerConfigId: input.providerConfigId };
     }
-    const apiKey = await providerConfigs.getSecret(input.providerConfigId);
-    if (!apiKey) {
+    const circuit = await resolveProviderCircuitAccess({
+      providerConfigs,
+      providerConfig: config,
+      model: input.model,
+    });
+    if (!circuit.ok) {
       return { input, resolved: null, providerConfigId: input.providerConfigId };
     }
-    const modelCapability = config.modelCapabilities[input.model];
     return {
       input,
       providerConfigId: input.providerConfigId,
-      resolved: {
-        apiBaseUrl: config.baseUrl,
-        apiKey,
-        model: input.model,
-        ...(modelCapability ? { modelCapability } : {}),
-      },
+      resolved: circuit.providerSettings,
     };
   };
 

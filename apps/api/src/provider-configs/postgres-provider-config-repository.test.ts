@@ -44,6 +44,7 @@ const createdRow = {
   breaker_failure_count: 0,
   breaker_opened_at: null,
   breaker_last_failure_at: null,
+  breaker_probe_started_at: null,
 };
 
 test("postgres provider repository creates managed configs without storing plaintext keys", async () => {
@@ -296,4 +297,51 @@ test("postgres provider repository maps views and never includes secret cipherte
     },
   ]);
   assert.doesNotMatch(client.calls[0]?.sql ?? "", /secret_ciphertext/i);
+});
+
+test("postgres provider recovery lease is acquired with one atomic conditional update", async () => {
+  const client = new ScriptedClient();
+  const probeStartedAt = "2026-09-22T12:10:00.000Z";
+  const openRow = {
+    ...createdRow,
+    breaker_state: "open" as const,
+    breaker_failure_count: 3,
+    breaker_opened_at: "2026-09-22T12:00:00.000Z",
+    breaker_last_failure_at: "2026-09-22T12:00:00.000Z",
+    breaker_probe_started_at: probeStartedAt,
+  };
+  client.queueRows([openRow]);
+  client.queueRows([]);
+  client.queueRows([openRow]);
+  const repository = createPostgresProviderConfigRepository({
+    db: client,
+    secret: "test-secret",
+  });
+  const now = new Date(probeStartedAt);
+
+  const acquired = await repository.tryAcquireBreakerProbe({
+    id: "provider-1",
+    now,
+    cooldownMs: 300_000,
+    leaseMs: 60_000,
+  });
+  const concurrent = await repository.tryAcquireBreakerProbe({
+    id: "provider-1",
+    now,
+    cooldownMs: 300_000,
+    leaseMs: 60_000,
+  });
+
+  assert.equal(acquired.acquired, true);
+  if (acquired.acquired) {
+    assert.equal(acquired.leaseStartedAt, probeStartedAt);
+  }
+  assert.equal(concurrent.acquired, false);
+  if (!concurrent.acquired) {
+    assert.equal(concurrent.status, "in_progress");
+    assert.equal(concurrent.retryAfterSeconds, 60);
+  }
+  assert.match(client.calls[0]?.sql ?? "", /update provider_configs/i);
+  assert.match(client.calls[0]?.sql ?? "", /breaker_probe_started_at is null/i);
+  assert.match(client.calls[0]?.sql ?? "", /breaker_state = 'open'/i);
 });
