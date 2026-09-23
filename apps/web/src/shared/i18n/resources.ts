@@ -261,6 +261,7 @@ export const resources = {
         },
       },
       errors: {
+        affectedRules: "涉及规则：{{ids}}。",
         diagnosticId: "任务或请求编号：{{id}}。",
         providerCircuitGeneric: "平台模型服务已触发保护，请稍后重试；系统会在冷却结束后自动探测恢复。",
         titles: {
@@ -320,7 +321,7 @@ export const resources = {
           ACCESS_DENIED: "当前账号没有执行此操作的权限。",
           RESOURCE_NOT_FOUND: "请求的内容不存在或已被删除。",
           RESOURCE_CONFLICT: "当前状态不允许执行此操作，请刷新后重试。",
-          REQUIREMENT_REVIEWS_PENDING: "有 {{count}} 条需求规则修复结果仍待确认，确认后再继续生成。",
+          REQUIREMENT_REVIEWS_PENDING: "有 {{count}} 条需求规则尚未确认，确认后再继续生成。",
           REQUIREMENT_SOURCE_MISSING: "需求文本为空，请先填写需求后再启动生成。",
           REQUIREMENT_MODELS_MISSING: "缺少需求模型，请先生成需求模型后再启动下游生成。",
           REQUIREMENT_MODELS_STALE: "有 {{count}} 个需求模型已过期，请先更新需求模型。",
@@ -1763,6 +1764,7 @@ export const resources = {
         },
       },
       errors: {
+        affectedRules: "Affected rules: {{ids}}.",
         diagnosticId: "Task or request ID: {{id}}.",
         providerCircuitGeneric: "The platform model service is temporarily protected. Try again later; an automatic recovery probe will run after cooldown.",
         titles: {
@@ -1822,7 +1824,7 @@ export const resources = {
           ACCESS_DENIED: "Your account does not have permission for this action.",
           RESOURCE_NOT_FOUND: "The requested content does not exist or was removed.",
           RESOURCE_CONFLICT: "This action is not allowed in the current state. Refresh and try again.",
-          REQUIREMENT_REVIEWS_PENDING: "{{count}} requirement-rule repair results still need confirmation before generation can continue.",
+          REQUIREMENT_REVIEWS_PENDING: "{{count}} requirement rules still need confirmation before generation can continue.",
           REQUIREMENT_SOURCE_MISSING: "The requirement text is empty. Add requirements before starting generation.",
           REQUIREMENT_MODELS_MISSING: "Requirement models are missing. Generate them before starting downstream work.",
           REQUIREMENT_MODELS_STALE: "{{count}} requirement models are stale. Update them first.",

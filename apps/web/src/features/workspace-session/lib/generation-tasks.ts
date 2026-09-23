@@ -830,22 +830,31 @@ export function updateTaskFromEvent(
     updateSubtasksFromEvent(task.subtasks, event),
     event,
   );
-  const nextStatus = taskStatusFromEventAndSubtasks(event, subtasks);
-  const nextMessage = taskMessageFromEvent(task, event, messages, subtasks);
+  // Rule repair is a client-owned continuation after the extraction run completes.
+  const repairContinues = event.type === "completed" && Boolean(event.snapshot.requirementBaseline) && subtasks.some(
+    (subtask) => subtask.id === "repair_rules" &&
+      ["queued", "running", "repairing"].includes(subtask.status),
+  );
+  const nextStatus = repairContinues ? "running" : taskStatusFromEventAndSubtasks(event, subtasks);
+  const nextMessage = repairContinues
+    ? "正在修复需求规则"
+    : taskMessageFromEvent(task, event, messages, subtasks);
   return {
     ...task,
     title: titleWithSubtaskSummary(task, subtasks),
     status: nextStatus,
-    progress: progress ?? task.progress,
+    progress: repairContinues ? 85 : progress ?? task.progress,
     previewReady:
       task.previewReady || (task.kind === "code" && event.type === "code_file_changed"),
-    phaseSummary: taskPhaseSummaryFromEvent(event, subtasks, task.phaseSummary),
+    phaseSummary: repairContinues
+      ? "正在修复需求规则"
+      : taskPhaseSummaryFromEvent(event, subtasks, task.phaseSummary),
     message: nextMessage,
     messageCode:
       event.type === "failed"
         ? event.error.code
         : event.type === "completed"
-          ? nextStatus === "failed" ? "RUN_PARTIAL_FAILURE" : "RUN_COMPLETED"
+          ? repairContinues ? "RUN_RUNNING" : nextStatus === "failed" ? "RUN_PARTIAL_FAILURE" : "RUN_COMPLETED"
           : event.type === "cancelled"
             ? "RUN_CANCELLED"
             : event.type === "queued"
@@ -859,7 +868,7 @@ export function updateTaskFromEvent(
           ? nextMessage
           : task.errorMessage,
     finishedAt:
-      event.type === "completed" || event.type === "failed" || event.type === "cancelled"
+      (event.type === "completed" && !repairContinues) || event.type === "failed" || event.type === "cancelled"
         ? new Date().toISOString()
         : task.finishedAt,
     diagnostics: updateDiagnosticsFromEvent(task.diagnostics, event),

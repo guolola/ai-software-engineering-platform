@@ -253,6 +253,10 @@ export function useRequirementReviewActions({
         (item) => item.sourceRuleId === ruleId,
       );
       if (!requirement) return;
+      // A stale reject click must not put an already reviewed requirement back into review.
+      if (decision === "reject" && !Object.values(requirement.fieldProvenance).some(
+        (item) => item?.source === "ai-suggested" && item.status === "pending-review",
+      )) return;
       const targetLabel =
         rules.find((rule) => rule.id === ruleId)?.text ?? "当前需求规则";
 
@@ -717,7 +721,12 @@ export function useRequirementReviewActions({
         decision === "accepted" && candidate.afterRequirement
           ? candidate.afterRequirement
           : candidate.beforeRequirement;
-      const reviewedRequirement = markRequirementReviewed(selectedRequirement);
+      const hasHardBlock = decision === "rejected" && requirementBaseline.qualityReport.issues.some(
+        (issue) => issue.requirementId === selectedRequirement.id && issue.blocksDownstream,
+      );
+      const reviewedRequirement = hasHardBlock
+        ? selectedRequirement
+        : markRequirementReviewed(selectedRequirement);
       const nextBaseline = mergeReviewedRequirement(
         requirementBaseline,
         reviewedRequirement,

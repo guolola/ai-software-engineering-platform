@@ -246,6 +246,10 @@ export function useGenerationTaskActions() {
           if (!task.runId || !isTaskActive(task)) return task;
           const terminalRun = terminalRunsById.get(task.runId);
           if (!terminalRun) return task;
+          // The server run ends before the browser's rule-repair review pass.
+          if (terminalRun.status === "completed" && task.subtasks.some(
+            (subtask) => subtask.id === "repair_rules",
+          )) return task;
           changed = true;
           return settleTaskFromTerminalRun(
             task,

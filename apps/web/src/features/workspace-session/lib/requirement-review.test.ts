@@ -10,6 +10,16 @@ import {
   rebuildRequirementReviewQualityReport,
   resolveSafeRequirementReviewCandidates,
 } from "./requirement-review";
+import { reviewCandidateStateLabel } from "../../requirements/lib/requirement-review-view-model";
+import type { WorkspaceRecord } from "../../../entities/workspace/model";
+
+describe("requirement review row state", () => {
+  it("does not hide a pending baseline behind a rejected repair decision", () => {
+    const rejected = { status: "rejected" } as WorkspaceRecord["requirementReviewCandidates"][string];
+    expect(reviewCandidateStateLabel(rejected, "有待确认提示")).toBe("有待确认提示");
+    expect(reviewCandidateStateLabel(rejected, "已生成")).toBe("已确认");
+  });
+});
 
 function notificationRequirement(): AtomicRequirement {
   return {

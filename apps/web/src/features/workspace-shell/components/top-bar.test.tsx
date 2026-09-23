@@ -1479,7 +1479,7 @@ describe("TopBar", () => {
       );
     });
 
-    expect(screen.getByText("生成中 50%")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("生成中 50%")).toBeInTheDocument());
     expect(
       within(screen.getByTestId("generation-transcript")).getByText(
         "已生成 0 个图形预览。",
@@ -2145,7 +2145,7 @@ describe("TopBar", () => {
               id: "r1",
               category: "功能需求",
               text: "系统生成 UML。",
-              relatedDiagrams: ["usecase"],
+              relatedDiagrams: ["usecase", "class", "activity"],
             },
           ],
         }),
@@ -2172,7 +2172,7 @@ describe("TopBar", () => {
         });
         throw new Error(longToken);
       }),
-      getRunSnapshot: vi.fn(async () => createRunSnapshot()),
+      getRunSnapshot: vi.fn(async () => createRunSnapshot({ selectedDiagrams: ["usecase", "class", "activity"] })),
       renderPlantUml: vi.fn(),
       testProviderSettings: vi.fn(),
       saveRunHistory: vi.fn(),
@@ -2188,6 +2188,7 @@ describe("TopBar", () => {
     await user.click(await screen.findByRole("button", { name: "开始模型任务" }));
     await user.click(await screen.findByRole("button", { name: "确认生成" }));
 
+    expect(repository.startRun).toHaveBeenCalled();
     const transcript = screen.getByTestId("generation-transcript");
     expect(transcript).toHaveClass("min-w-0");
     expect(transcript.querySelector('[data-slot="card"]')).toBeNull();

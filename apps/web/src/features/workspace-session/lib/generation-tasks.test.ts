@@ -7,8 +7,41 @@ import {
   updateTaskFromEvent,
 } from "./generation-tasks";
 import { createEmptyDiagnostics } from "./diagnostics";
+import { createRequirementBaseline, createRunSnapshot } from "../../../test/workspace-test-utils";
 
 describe("workspace-session generation task helpers", () => {
+  it("keeps a rules-only task running after extraction until local repair completes", () => {
+    const task = createGenerationTask({
+      clientTaskId: "rules-1", kind: "requirements", title: "需求规则生成",
+      providerModel: "fake-model", startedAt: "2026-09-23T00:00:00.000Z",
+      message: "排队中", subtasks: [
+        { id: "extract_rules", label: "抽取需求规则", status: "completed", message: null, errorMessage: null },
+        { id: "repair_rules", label: "修复需求规则", status: "queued", message: null, errorMessage: null },
+      ],
+    });
+    const next = updateTaskFromEvent(task, {
+      type: "completed", snapshot: createRunSnapshot({ selectedDiagrams: [], requirementBaseline: createRequirementBaseline(), status: "completed" }),
+    }, { queued: "排队中", completed: "生成完成" });
+    expect(next.status).toBe("running");
+    expect(next.message).toBe("正在修复需求规则");
+    expect(next.finishedAt).toBeNull();
+    expect(next.subtasks.find((subtask) => subtask.id === "repair_rules")?.status).toBe("queued");
+  });
+  it("completes extraction when no requirement baseline requires a repair pass", () => {
+    const task = createGenerationTask({
+      clientTaskId: "rules-empty", kind: "requirements", title: "需求规则生成",
+      providerModel: "fake-model", startedAt: "2026-09-23T00:00:00.000Z",
+      message: "排队中", subtasks: [
+        { id: "extract_rules", label: "抽取需求规则", status: "completed", message: null, errorMessage: null },
+        { id: "repair_rules", label: "修复需求规则", status: "queued", message: null, errorMessage: null },
+      ],
+    });
+    const next = updateTaskFromEvent(task, {
+      type: "completed", snapshot: createRunSnapshot({ selectedDiagrams: [], requirementBaseline: null }),
+    }, { queued: "排队中", completed: "生成完成" });
+    expect(next.status).toBe("completed");
+    expect(next.finishedAt).not.toBeNull();
+  });
   it("ignores blank llm chunks in user-visible diagnostics", () => {
     const diagnostics = createEmptyDiagnostics();
     const blankEvent = {

@@ -145,7 +145,7 @@ describe("FeasibilityPage", () => {
     const repository = createMockWorkspaceRepository({ rules: [] });
     repository.startFeasibilityRun = vi.fn();
     render(withWorkspaceProviders(<FeasibilityPage view="business-flow" />, repository));
-    await screen.findByRole("heading", { name: "业务与系统流程图" });
+    await screen.findByRole("heading", { name: "业务流程图" });
     expect(screen.getByText("请先在系统需求页确认需求规则")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "生成" })).toBeDisabled();
     expect(repository.startFeasibilityRun).not.toHaveBeenCalled();

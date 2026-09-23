@@ -1,6 +1,7 @@
 // Verifies requirement authoring, rule editing, quality checks, and generation action guards.
 import { createMockWorkspaceRepository } from "../../../services/workspace-repository/mock-repository";
 import { patchUserSettings } from "../../../shared/lib/user-settings";
+import { requestOpenRequirementRule } from "../../../shared/lib/app-navigation";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -150,6 +151,27 @@ describe("TextRequirementView", () => {
       ...overrides,
     };
   }
+
+  it("opens the rule named by a generation blocker even when the page mounts afterward", async () => {
+    const rules = [
+      createRule({ id: "r1", text: "系统应允许用户提交订单。" }),
+      createRule({ id: "r2", text: "系统应显示公开活动。" }),
+    ];
+    const requirement = createAtomicRequirement({ id: "REQ-002", sourceRuleId: "r2" });
+    const baseline = createRequirementBaseline([requirement]);
+    const repository = createBaseRepository({
+      loadWorkspace: vi.fn(async () => createWorkspaceRecord({
+        rules, rulesVersion: 1, requirementBaseline: baseline,
+        requirementQualityReport: baseline.qualityReport,
+      })),
+    });
+    act(() => requestOpenRequirementRule("r2"));
+    render(withWorkspaceProviders(<TextRequirementView view="system" />, repository));
+    const table = await screen.findByRole("table");
+    await waitFor(() => expect(within(table).getByText("r2")).toBeInTheDocument());
+    expect(within(table).queryByText("r1")).not.toBeInTheDocument();
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
 
   it("renders the empty state with input guidance and clears requirement text", async () => {
     const updateRequirementText = vi.fn(async () => {});
