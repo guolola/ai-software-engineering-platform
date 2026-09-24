@@ -20,6 +20,11 @@ export interface RunRecord {
   documentBuffer?: Buffer;
   metadata?: RunRecordMetadata;
   persist?: (record: RunRecord, event?: RunEvent) => void | Promise<void>;
+  /** Ephemeral chat context; validated artifacts remain in the persisted snapshot. */
+  conversationContext?: {
+    forkBranches(ids: string[]): void;
+    commitValidatedBranch(id: string, summary: string): void;
+  };
 }
 
 export type RunRecordStore = Map<string, RunRecord> & {

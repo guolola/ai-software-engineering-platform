@@ -57,6 +57,9 @@ import {
   throwIfRunCancelled,
 } from "../records/run-cancellation.js";
 import { renderArtifactWithRepair } from "./render/render-artifact-with-repair.js";
+import { reviewRenderedArtifact } from "./render/review-rendered-artifact.js";
+import type { PngRenderClient } from "../../adapters/render/png-render-client.js";
+import { withConversationBranch } from "./shared/conversation-context.js";
 import { stageProgressValue } from "./shared/pipeline-events.js";
 import { createMessages } from "./shared/llm-messages.js";
 import {
@@ -1272,6 +1275,7 @@ export async function runDesignStagePipeline(
   providerSettings: ProviderSettings,
   llmTransport: LlmTransport,
   renderClient: RenderClient,
+  pngRenderClient?: PngRenderClient,
 ) {
   const snapshot = record.snapshot as DesignRunSnapshot;
   throwIfRunCancelled(record);
@@ -1354,7 +1358,7 @@ export async function runDesignStagePipeline(
           subtaskStatus: "rendering",
         }),
       );
-      const rendered = await renderArtifactWithRepair(
+      let rendered = await renderArtifactWithRepair(
         record,
         providerSettings,
         llmTransport,
@@ -1363,6 +1367,18 @@ export async function runDesignStagePipeline(
         artifact,
       );
       throwIfRunCancelled(record);
+      if (rendered.status === "success") {
+        svgArtifacts = replaceDesignSvgArtifact(svgArtifacts, rendered.svgArtifact as DesignSvgArtifact);
+        snapshot.svgArtifacts = svgArtifacts;
+        emitEvent(record, artifactReadyRunEventSchema.parse({
+          type: "artifact_ready", stage: "render_svg", artifactKind: "svg",
+          diagramKind: artifact.diagramKind, modelId: artifact.modelId,
+          subtaskId: artifact.modelId ?? artifact.diagramKind, subtaskStatus: "completed",
+        }));
+        const checked = await reviewRenderedArtifact({ record, providerSettings, llmTransport, renderClient, pngRenderClient, model, rendered });
+        rendered = checked.rendered;
+        snapshot.visualReviews[artifact.modelId ?? artifact.diagramKind] = checked.review;
+      }
       plantUml = replaceDesignPlantUmlArtifact(
         plantUml,
         rendered.artifact as DesignPlantUmlArtifact,
@@ -1377,18 +1393,6 @@ export async function runDesignStagePipeline(
         delete diagramErrors[artifact.modelId ?? artifact.diagramKind];
         delete diagramErrors[artifact.diagramKind];
         snapshot.diagramErrors = diagramErrors;
-        emitEvent(
-          record,
-          artifactReadyRunEventSchema.parse({
-            type: "artifact_ready",
-            stage: "render_svg",
-            artifactKind: "svg",
-            diagramKind: artifact.diagramKind,
-            modelId: artifact.modelId,
-            subtaskId: artifact.modelId ?? artifact.diagramKind,
-            subtaskStatus: "completed",
-          }),
-        );
         continue;
       }
 
@@ -1442,10 +1446,11 @@ export async function runDesignStagePipeline(
     }
     updateStage("generate_design_sequence", "正在生成用例实现设计");
     const sequenceRunErrors: ReturnType<typeof normalizeRunError>[] = [];
+    record.conversationContext?.forkBranches(useCasesFromModel(useCaseModel).map((useCase) => `design:${sequenceModelIdForUseCase(useCase)}`));
     const sequenceResults = await mapWithConcurrency(
       useCasesFromModel(useCaseModel),
       readDesignSequenceConcurrency(),
-      async (useCase) => {
+      (useCase) => withConversationBranch(`design:${sequenceModelIdForUseCase(useCase)}`, async () => {
         throwIfRunCancelled(record);
         const modelId = sequenceModelIdForUseCase(useCase);
         const scopedUseCaseModel = useCaseModelForSingleUseCase(
@@ -1532,6 +1537,7 @@ export async function runDesignStagePipeline(
               }),
             );
             await Promise.all(result.models.map(renderDesignModelArtifact));
+            record.conversationContext?.commitValidatedBranch(`design:${modelId}`, JSON.stringify(result.models));
             return result;
           } catch (error) {
             throwIfRunCancelled(record);
@@ -1564,7 +1570,7 @@ export async function runDesignStagePipeline(
           }),
         );
         return null;
-      },
+      }),
     );
     throwIfRunCancelled(record);
     sequenceModels = sequenceResults.flatMap((result) => result?.models ?? []).filter(
@@ -1750,6 +1756,7 @@ export async function runDesignStagePipeline(
           }),
         );
         await Promise.all(result.models.map(renderDesignModelArtifact));
+        record.conversationContext?.commitValidatedBranch(`design:${diagram}`, JSON.stringify(result.models));
         return result;
       } catch (error) {
         throwIfRunCancelled(record);
@@ -1796,7 +1803,7 @@ export async function runDesignStagePipeline(
       diagram: Exclude<DesignDiagramKind, "sequence">,
       designContextModels: DesignDiagramModelSpec[] = [],
     ) => {
-      const result = await generateDownstreamDiagram(diagram, designContextModels);
+      const result = await withConversationBranch(`design:${diagram}`, () => generateDownstreamDiagram(diagram, designContextModels));
       throwIfRunCancelled(record);
       const resultModels = result?.models.filter(
         (model) => model.diagramKind === diagram,
@@ -1923,7 +1930,8 @@ export async function runDesignStagePipeline(
   stages.finish("generate_design_models");
   stages.finish("generate_plantuml");
   stages.finish("render_svg");
-  snapshot.currentStage = "render_svg";
+  stages.finish("verify_diagram_visual");
+  snapshot.currentStage = "verify_diagram_visual";
   throwIfRunCancelled(record);
   snapshot.status = "completed";
   snapshot.error = null;

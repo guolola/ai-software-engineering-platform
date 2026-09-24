@@ -1,3 +1,4 @@
+import { applyPublishedInstructions, getPinnedPromptRuntimeSnapshot } from "../../../prompt-runtime/store.js";
 // Coordinates code UI mockup, visual reference, UI IR, and fidelity verification stages.
 
 import { createRunLlmChunkHandlers } from "../shared/llm-chunk-events.js";
@@ -206,11 +207,11 @@ export async function generateCodeUiMockup(
   appBlueprint: CodeAppBlueprint,
   uiBlueprint: CodeUiBlueprint,
 ): Promise<CodeUiMockup> {
-  const prompt = buildGenerateCodeUiMockupPrompt(
+  const prompt = applyPublishedInstructions(buildGenerateCodeUiMockupPrompt(
     buildCodeContext(snapshot),
     appBlueprint,
     uiBlueprint,
-  );
+  ), getPinnedPromptRuntimeSnapshot(record));
   const summary = summarizeUiMockupIntent(appBlueprint, uiBlueprint);
 
   try {

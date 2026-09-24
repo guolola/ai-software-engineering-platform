@@ -188,6 +188,8 @@ function DiagramDetailView({
     designPlantUml,
     designSvgArtifacts,
     designDiagramErrors,
+    generationTasks,
+    visualReviews,
     rulesForDiagram,
     staleDiagrams,
     manualModelEditStatus,
@@ -248,6 +250,26 @@ function DiagramDetailView({
       ? designSvgArtifacts[designArtifactId]?.svg ?? ""
       : svgArtifacts[requirementArtifactId]?.svg ?? svgArtifacts[requirementType]?.svg ?? "";
   const normalizedSvgMarkup = useMemo(() => sanitizeSvgMarkup(svgMarkup), [svgMarkup]);
+  const visualId = isFeasibility
+    ? contextData?.model?.modelId ?? (isBusinessFlow ? "business-flow" : "context")
+    : isDesign ? designArtifactId : requirementArtifactId;
+  const visualTaskKind = isFeasibility ? "feasibility" : isDesign ? "design" : "requirements";
+  const visualSubtask = generationTasks
+    .filter((task) => task.kind === visualTaskKind)
+    .flatMap((task) => task.subtasks)
+    .find((subtask) => subtask.id === `verify_diagram_visual:${visualId}`);
+  const savedVisualReview = visualReviews[`${visualTaskKind}:${visualId}`];
+  const visualStatus = visualSubtask?.status === "pending_review"
+    ? `视觉检查待确认：${visualSubtask.message ?? "请查看生成任务"}`
+    : visualSubtask?.status === "completed"
+      ? `视觉检查：${visualSubtask.message ?? "已通过"}`
+      : visualSubtask && visualSubtask.status !== "failed"
+        ? "视觉检查中"
+        : savedVisualReview?.status === "pending_review"
+          ? `视觉检查待确认：${savedVisualReview.issues.join("；") || savedVisualReview.reason}`
+          : savedVisualReview
+            ? `视觉检查：${savedVisualReview.reason}`
+            : svgMarkup ? "视觉检查：未复核" : null;
   const diagramError = isFeasibility
     ? null
     : isDesign
@@ -615,6 +637,12 @@ function DiagramDetailView({
           {isFeasibility && contextData?.statusMessage ? (
             <Card aria-live="polite" className="gap-0 py-0 px-4 py-2 text-xs text-muted-foreground">
               {contextData.statusMessage}
+            </Card>
+          ) : null}
+
+          {visualStatus ? (
+            <Card aria-label="视觉检查状态" className="gap-0 py-0 px-4 py-2 text-xs text-muted-foreground">
+              {visualStatus}
             </Card>
           ) : null}
 

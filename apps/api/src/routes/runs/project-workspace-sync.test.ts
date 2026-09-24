@@ -142,11 +142,17 @@ test("business flow is published atomically and preserved after failed or cancel
     requirementBaseline: null, providerSettings: { providerConfigId: "provider-a", model: "model-a" },
     inputs: feasibilityInputsSchema.parse({}), businessFlow,
   });
+  snapshot.visualReviews[businessFlow.model.modelId ?? "business-flow"] = {
+    status: "pending_review", issues: ["标签不可读"], reason: "请人工确认", attempts: 3, checkedAt: new Date().toISOString(),
+  };
   const record: RunRecord = { snapshot, events: [], listeners: new Set(), terminal: true,
     metadata: { projectId: project.id, userId: user.id, createdAt: "2026-09-01T00:00:00.000Z" } };
   snapshot.status = "completed";
   await syncProjectWorkspace(record);
   assert.deepEqual((await authStore.getProjectWorkspace(project.id)).state.feasibilityBusinessFlow, businessFlow);
+  assert.deepEqual((await authStore.getProjectWorkspace(project.id)).state.visualReviews, {
+    [`feasibility:${businessFlow.model.modelId ?? "business-flow"}`]: snapshot.visualReviews[businessFlow.model.modelId ?? "business-flow"],
+  });
   for (const status of ["failed", "cancelled"] as const) {
     snapshot.status = status;
     snapshot.businessFlow = null;

@@ -29,4 +29,5 @@ export * from "./requirements.js";
 export * from "./requirement-semantics.js";
 export * from "./runs.js";
 export * from "./render.js";
+export * from "./visual-review.js";
 export * from "./system-notices.js";

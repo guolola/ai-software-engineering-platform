@@ -1945,12 +1945,7 @@ test("api runs a design sequence pipeline from the requirement usecase model", a
 
   assert.equal(startResponse.statusCode, 202);
   const { runId } = startResponse.json();
-  const snapshotResponse = await app.inject({
-    method: "GET",
-    url: `/api/design-runs/${runId}`,
-  });
-  assert.equal(snapshotResponse.statusCode, 200);
-  const snapshot = snapshotResponse.json();
+  const snapshot = await waitForRunSnapshot(app, `/api/design-runs/${runId}`);
   assert.equal(snapshot.status, "completed");
   assert.deepEqual(snapshot.selectedDiagrams, ["sequence"]);
   assert.equal(snapshot.models[0].diagramKind, "sequence");
@@ -2017,12 +2012,7 @@ test("api auto-fills empty design sequence traceability without extra LLM repair
   });
 
   assert.equal(startResponse.statusCode, 202);
-  const snapshot = (
-    await app.inject({
-      method: "GET",
-      url: `/api/design-runs/${startResponse.json().runId}`,
-    })
-  ).json();
+  const snapshot = await waitForRunSnapshot(app, `/api/design-runs/${startResponse.json().runId}`);
 
   assert.equal(snapshot.status, "completed");
   assert.equal(prompts.length, 1);
@@ -2596,12 +2586,7 @@ test("api records design PlantUML repair trace", async () => {
 
   assert.equal(startResponse.statusCode, 202);
   const { runId } = startResponse.json();
-  const snapshot = (
-    await app.inject({
-      method: "GET",
-      url: `/api/design-runs/${runId}`,
-    })
-  ).json();
+  const snapshot = await waitForRunSnapshot(app, `/api/design-runs/${runId}`);
 
   assert.equal(snapshot.status, "completed");
   assert.equal(renderAttempts, 2);
@@ -2838,12 +2823,7 @@ test("api normalizes common design model shape issues before validation", async 
 
   assert.equal(startResponse.statusCode, 202);
   const { runId } = startResponse.json();
-  const snapshot = (
-    await app.inject({
-      method: "GET",
-      url: `/api/design-runs/${runId}`,
-    })
-  ).json();
+  const snapshot = await waitForRunSnapshot(app, `/api/design-runs/${runId}`);
 
   assert.equal(snapshot.status, "completed");
   assert.deepEqual(snapshot.models[0].notes, ["由用例推导"]);
@@ -3004,12 +2984,7 @@ test("api generates an explicit sequence dependency for downstream design diagra
 
   assert.equal(startResponse.statusCode, 202);
   const { runId } = startResponse.json();
-  const snapshot = (
-    await app.inject({
-      method: "GET",
-      url: `/api/design-runs/${runId}`,
-    })
-  ).json();
+  const snapshot = await waitForRunSnapshot(app, `/api/design-runs/${runId}`);
   assert.equal(snapshot.status, "completed");
   assert.deepEqual(snapshot.selectedDiagrams, ["sequence", "activity"]);
   assert.deepEqual(snapshot.requestedDiagrams, ["activity"]);
@@ -3144,12 +3119,7 @@ test("api generates explicit sequence and class dependencies for design table di
 
   assert.equal(startResponse.statusCode, 202);
   const { runId } = startResponse.json();
-  const snapshot = (
-    await app.inject({
-      method: "GET",
-      url: `/api/design-runs/${runId}`,
-    })
-  ).json();
+  const snapshot = await waitForRunSnapshot(app, `/api/design-runs/${runId}`);
 
   assert.equal(snapshot.status, "completed");
   assert.deepEqual(snapshot.selectedDiagrams, ["sequence", "class", "table"]);
@@ -4058,7 +4028,7 @@ test("api code run repairs unresolved local preview modules before completion", 
         }
         if (prompt.includes("ui-ux-pro-max 主设计执行器")) {
           operationCalls += 1;
-          if (prompt.includes("无法解析导入 ../pages/MissingPage")) {
+          if (operationCalls > 1) {
             yield JSON.stringify({
               operations: [
                 {
@@ -4112,6 +4082,7 @@ test("api code run repairs unresolved local preview modules before completion", 
   });
   assert.equal(startResponse.statusCode, 202);
   const runId = startResponse.json().runId;
+  await waitForRunSnapshot(app, `/api/code-runs/${runId}`);
   const events = await app.inject({
     method: "GET",
     url: `/api/code-runs/${runId}/events`,

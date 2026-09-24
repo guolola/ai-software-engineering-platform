@@ -302,6 +302,54 @@ test("createRealLlmTransport forwards json_schema response_format when provided"
   }
 });
 
+test("createRealLlmTransport forwards provider reasoning fragments separately from answer and summary", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => createResponseFromSse([
+    'data: {"choices":[{"delta":{"reasoning_content":"先判断"}}]}\n\n',
+    'data: {"choices":[{"delta":{"reasoning":"条件。","reasoning_summary":"正在分析。"}}]}\n\n',
+    'data: {"choices":[{"delta":{"content":"最终答案"}}]}\n\n',
+    "data: [DONE]\n\n",
+  ])) as typeof fetch;
+  try {
+    const reasoning: string[] = [];
+    const summaries: string[] = [];
+    const output: string[] = [];
+    const transport = createRealLlmTransport({ resolveHostname: resolvePublicHostname });
+    for await (const chunk of transport.streamChatCompletion({
+      providerSettings: { apiBaseUrl: "https://ai.comfly.org", apiKey: "sk-test", model: "reasoning-model" },
+      messages: [{ role: "user", content: "test" }],
+      onReasoningChunk: (chunk) => reasoning.push(chunk),
+      onReasoningSummary: (chunk) => summaries.push(chunk),
+    })) output.push(chunk);
+    assert.deepEqual(reasoning, ["先判断", "条件。"]);
+    assert.deepEqual(summaries, ["正在分析。"]);
+    assert.deepEqual(output, ["最终答案"]);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("createRealLlmTransport keeps a reasoning-only stream alive across the idle window", async () => {
+  const reasoning: string[] = [];
+  const output: string[] = [];
+  const clientFactory: OpenAiCompatibleClientFactory = () => ({
+    chat: { completions: { create: async () => (async function* () {
+      yield { choices: [{ delta: { reasoning_content: "第一步" } }] };
+      await new Promise((resolve) => setTimeout(resolve, 65));
+      yield { choices: [{ delta: { reasoning_content: "第二步" } }] };
+      await new Promise((resolve) => setTimeout(resolve, 65));
+      yield { choices: [{ delta: { content: "结论" } }] };
+    })() as never } },
+    models: { list: async () => ({ data: [] }) },
+  });
+  const transport = createRealLlmTransport({ clientFactory, responseTimeoutMs: 110, resolveHostname: resolvePublicHostname });
+  for await (const chunk of transport.streamChatCompletion({
+    providerSettings: { apiBaseUrl: "https://ai.comfly.org", apiKey: "sk-test", model: "reasoning-model" },
+    messages: [{ role: "user", content: "test" }],
+    onReasoningChunk: (chunk) => reasoning.push(chunk),
+  })) output.push(chunk);
+  assert.deepEqual(reasoning, ["第一步", "第二步"]);
+  assert.deepEqual(output, ["结论"]);
+});
+
 test("createRealLlmTransport retries unsupported json_schema requests with JSON mode", async () => {
   const originalFetch = globalThis.fetch;
   const originalWarn = console.warn;

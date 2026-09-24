@@ -23,7 +23,9 @@ import type { ProviderTaskType } from "../../provider-configs/provider-usage-tra
 import { emitEvent, type RunRecord } from "../records/run-record-store.js";
 import { isRunCancelled, isRunCancelledError } from "../records/run-cancellation.js";
 import { stageProgressValue } from "./shared/pipeline-events.js";
+import { createContextualLlmTransport } from "./shared/conversation-context.js";
 import type { BillingService } from "../../billing/billing-service.js";
+import { getPromptRuntimeStore, pinPromptRuntimeSnapshot, withPinnedPrompts } from "../../prompt-runtime/store.js";
 import {
   isPlatformProviderRunError,
   normalizeRunError,
@@ -37,6 +39,7 @@ type RequirementPipeline = (
   providerSettings: ProviderSettings,
   llmTransport: LlmTransport,
   renderClient: RenderClient,
+  pngRenderClient?: PngRenderClient,
 ) => Promise<void>;
 
 type DesignPipeline = (
@@ -44,6 +47,7 @@ type DesignPipeline = (
   providerSettings: ProviderSettings,
   llmTransport: LlmTransport,
   renderClient: RenderClient,
+  pngRenderClient?: PngRenderClient,
 ) => Promise<void>;
 
 type CodePipeline = (
@@ -377,6 +381,7 @@ export function startFeasibilityRecordPipeline({
   llmTransport,
   llmScheduler,
   renderClient,
+  pngRenderClient,
   billingEntitlements,
   analyticsStore,
 }: {
@@ -387,6 +392,7 @@ export function startFeasibilityRecordPipeline({
   llmScheduler?: LlmScheduler;
   analyticsStore?: Pick<AdminAnalyticsStore, "recordTelemetry">;
   renderClient: RenderClient;
+  pngRenderClient?: PngRenderClient;
   billingEntitlements?: Pick<
     BillingService,
     "confirmRunUsage" | "releaseRunUsage" | "compensateRunUsage"
@@ -410,11 +416,15 @@ export function startFeasibilityRecordPipeline({
     let terminalError: RunError | null = null;
     try {
       const demo = offlineFeasibilityAdapters(record);
+      const promptVersions = await getPromptRuntimeStore().publishedSnapshot();
+      const conversation = createContextualLlmTransport(demo?.llmTransport ?? withPinnedPrompts(entitlementTransport, promptVersions));
+      record.conversationContext = conversation;
       await runFeasibilityStagePipeline(
         record,
         providerSettings,
-        demo?.llmTransport ?? entitlementTransport,
+        conversation.transport,
         demo?.renderClient ?? renderClient,
+        pngRenderClient,
       );
     } catch (error) {
       terminalError = handleRunPipelineError(record, error, () => undefined);
@@ -491,38 +501,45 @@ export async function runRunRecordPipeline({
     billingEntitlements,
   });
 
-  const demo = taskType === "feasibility_analysis" ? offlineFeasibilityAdapters(record) : null;
-  const runPromise =
-    taskType === "feasibility_analysis"
-      ? runFeasibilityStagePipeline(
-          record,
-          providerSettings,
-          demo?.llmTransport ?? entitlementTransport,
-          demo?.renderClient ?? renderClient,
-        )
-      : taskType === "document_generation"
-      ? runDocumentStagePipeline(
-          record,
-          documentInput ?? documentInputFromSnapshot(record),
-          documentLibrary,
-          projectDocumentWorkspaceId(record.metadata?.projectId ?? "default"),
-          providerSettings,
-          entitlementTransport,
-          pngRenderClient,
-        )
-      : taskType === "code_generation"
-        ? runCodeStagePipeline(record, providerSettings, entitlementTransport)
-        : taskType === "design_modeling"
-          ? runDesignStagePipeline(
-              record,
-              providerSettings,
-              entitlementTransport,
-              renderClient,
-            )
-          : runStagePipeline(record, providerSettings, entitlementTransport, renderClient);
-
   let terminalError: RunError | null = null;
   try {
+    const demo = taskType === "feasibility_analysis" ? offlineFeasibilityAdapters(record) : null;
+    const promptVersions = await getPromptRuntimeStore().publishedSnapshot();
+    pinPromptRuntimeSnapshot(record, promptVersions);
+    const promptTransport = withPinnedPrompts(entitlementTransport, promptVersions);
+    const conversation = createContextualLlmTransport(demo?.llmTransport ?? promptTransport);
+    record.conversationContext = conversation;
+    const runPromise =
+      taskType === "feasibility_analysis"
+        ? runFeasibilityStagePipeline(
+            record,
+            providerSettings,
+            conversation.transport,
+            demo?.renderClient ?? renderClient,
+            pngRenderClient,
+          )
+        : taskType === "document_generation"
+        ? runDocumentStagePipeline(
+            record,
+            documentInput ?? documentInputFromSnapshot(record),
+            documentLibrary,
+            projectDocumentWorkspaceId(record.metadata?.projectId ?? "default"),
+            providerSettings,
+            conversation.transport,
+            pngRenderClient,
+          )
+        : taskType === "code_generation"
+          ? runCodeStagePipeline(record, providerSettings, conversation.transport)
+          : taskType === "design_modeling"
+            ? runDesignStagePipeline(
+                record,
+                providerSettings,
+                conversation.transport,
+                renderClient,
+                pngRenderClient,
+              )
+            : runStagePipeline(record, providerSettings, conversation.transport, renderClient, pngRenderClient);
+
     await runPromise;
   } catch (error) {
     terminalError = handleRunPipelineError(record, error, addCodeDiagnostic);

@@ -66,6 +66,22 @@ function mergeFeasibilitySnapshot(
   return next;
 }
 
+function mergeVisualReviews(state: Record<string, unknown>, snapshot: RunSnapshot | DesignRunSnapshot | FeasibilityRunSnapshot) {
+  const kind = snapshotIsFeasibility(snapshot)
+    ? "feasibility"
+    : "designModelTraceability" in snapshot ? "design" : "requirements";
+  const existing = state.visualReviews && typeof state.visualReviews === "object" && !Array.isArray(state.visualReviews)
+    ? state.visualReviews as Record<string, unknown>
+    : {};
+  return {
+    ...state,
+    visualReviews: {
+      ...existing,
+      ...Object.fromEntries(Object.entries(snapshot.visualReviews ?? {}).map(([id, review]) => [`${kind}:${id}`, review])),
+    },
+  };
+}
+
 function inferRestorableRunKind(snapshot: RestorableSnapshot): RestorableRunKind {
   if ("files" in snapshot) return "code";
   if ("designModelTraceability" in snapshot) return "design";
@@ -144,7 +160,7 @@ export function createProjectWorkspaceSync(
         });
         return;
       }
-      const state = snapshotIsFeasibility(record.snapshot)
+      const restoredState = snapshotIsFeasibility(record.snapshot)
         ? mergeFeasibilitySnapshot(current.state, record.snapshot)
         : restoreRunSnapshotToWorkspaceState({
             currentState: current.state,
@@ -155,6 +171,9 @@ export function createProjectWorkspaceSync(
               "rules" in record.snapshot &&
               (record.snapshot.rules?.length ?? 0) > 0,
           });
+      const state = "files" in record.snapshot
+        ? restoredState
+        : mergeVisualReviews(restoredState, record.snapshot);
       const result = await authStore.saveProjectWorkspace({
         projectId,
         baseVersion: current.version,

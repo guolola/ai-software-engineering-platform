@@ -258,6 +258,13 @@ function applySnapshotToWorkspaceState(
   const isCodeSnapshot = isCodeRunSnapshot(snapshot);
   const isDesignSnapshot = isDesignRunSnapshot(snapshot);
   const isRequirementSnapshot = !isCodeSnapshot && !isDesignSnapshot;
+  if (!isCodeSnapshot) {
+    const kind = isDesignSnapshot ? "design" : "requirements";
+    next.visualReviews = {
+      ...recordValue(next.visualReviews),
+      ...Object.fromEntries(Object.entries(snapshot.visualReviews ?? {}).map(([id, review]) => [`${kind}:${id}`, review])),
+    };
+  }
   const snapshotRequirementFingerprint = isCodeSnapshot
     ? ""
     : snapshotInputFingerprint({

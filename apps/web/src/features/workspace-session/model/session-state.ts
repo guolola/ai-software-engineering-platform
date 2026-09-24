@@ -223,6 +223,7 @@ export interface WorkspaceSessionState {
   billingGenerationBlock: BillingEntitlementErrorResponse | null;
   clearBillingGenerationBlock: () => void;
   generationTasks: GenerationTask[];
+  visualReviews: NonNullable<WorkspaceRecord["visualReviews"]>;
   visibleGenerationTask: GenerationTask | null;
   selectedGenerationTaskId: string | null;
   selectGenerationTask: (id: string) => void;

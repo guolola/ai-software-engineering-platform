@@ -23,6 +23,7 @@ type WorkspaceRecordAppliers = {
   setPlantUml: Setter<WorkspaceRecord["plantUml"]>;
   setSvgArtifacts: Setter<WorkspaceRecord["svgArtifacts"]>;
   setDiagramErrors: Setter<WorkspaceRecord["diagramErrors"]>;
+  setVisualReviews: Setter<NonNullable<WorkspaceRecord["visualReviews"]>>;
   setSelectedDesignDiagrams: Setter<WorkspaceRecord["selectedDesignDiagramTypes"]>;
   setDesignModels: Setter<WorkspaceRecord["designModels"]>;
   setDesignModelTraceability: Setter<WorkspaceRecord["designModelTraceability"]>;
@@ -87,6 +88,7 @@ export function applyWorkspaceRecordToSessionState(
   appliers.setPlantUml(workspace.plantUml);
   appliers.setSvgArtifacts(workspace.svgArtifacts);
   appliers.setDiagramErrors(workspace.diagramErrors);
+  appliers.setVisualReviews(workspace.visualReviews ?? {});
   appliers.setSelectedDesignDiagrams([]);
   appliers.setDesignModels(workspace.designModels);
   appliers.setDesignModelTraceability(workspace.designModelTraceability ?? []);

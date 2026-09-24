@@ -14,6 +14,7 @@ export interface TranscriptCall {
   startedAt?: string;
   finishedAt?: string;
   output: string;
+  reasoning?: string;
   summary: string;
   thinking: boolean;
   technical: boolean;
@@ -32,7 +33,7 @@ export interface TranscriptStep {
 
 const order: RunStage[] = [
   "extract_rules", "generate_models", "generate_design_sequence", "generate_design_models",
-  "generate_plantuml", "render_svg", "analyze_code_business_logic", "analyze_code_product",
+  "generate_plantuml", "render_svg", "verify_diagram_visual", "analyze_code_business_logic", "analyze_code_product",
   "plan_code_ui", "generate_code_ui_mockup", "analyze_code_ui_mockup", "generate_code_ui_ir",
   "load_web_design_skill", "select_code_skills", "plan_code_files", "generate_code_spec", "plan_code",
   "generate_code_files", "write_code_files", "audit_code_quality", "verify_code_ui_fidelity",
@@ -61,7 +62,7 @@ function label(stage: RunStage) {
   const overrides: Partial<Record<RunStage, string>> = {
     generate_code_ui_ir: "整理界面结构", load_web_design_skill: "准备界面设计规范",
     select_code_skills: "选择界面设计规范", generate_plantuml: "生成图形描述",
-    render_svg: "生成图形预览", render_document_file: "排版并生成文档",
+    render_svg: "生成图形预览", verify_diagram_visual: "视觉检查", render_document_file: "排版并生成文档",
     verify_code_business_assertions: "检查业务功能", verify_code_ui_fidelity: "检查页面与需求是否一致",
   };
   return overrides[stage] ?? formatStageForDiagnostics(stage);
@@ -74,7 +75,7 @@ function callTitle(stage: RunStage, subtaskId?: string, subtaskLabel?: string) {
 }
 
 function newCall(id: string, title: string, at?: string, subtaskId?: string): TranscriptCall {
-  return { id, title, subtaskId, startedAt: at, status: "running", output: "", summary: "", thinking: false, technical: true };
+  return { id, title, subtaskId, startedAt: at, status: "running", output: "", reasoning: "", summary: "", thinking: false, technical: true };
 }
 
 // Surface a real natural-language summary while JSON is arriving, without displaying its wire structure.
@@ -157,6 +158,7 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       const call = getCall(step, event.callId, at, event.subtaskId, event.subtaskLabel);
       call.technical = event.format === "technical";
       if (event.phase === "output") { call.output += event.text ?? ""; call.thinking = false; }
+      if (event.phase === "reasoning") { call.reasoning = (call.reasoning ?? "") + (event.text ?? ""); call.thinking = true; }
       if (event.phase === "summary") call.summary += event.text ?? "";
       if (event.phase === "thinking") call.thinking = true;
       if (event.phase === "completed" || event.phase === "failed") {
@@ -165,6 +167,14 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       continue;
     }
     if (event.type === "stage_started") {
+      if (event.stage === "verify_diagram_visual" && lastStage && lastStage !== event.stage) {
+        const previousVisual = currentSteps.get(event.stage);
+        if (previousVisual && !previousVisual.finished) {
+          previousVisual.finished = true;
+          previousVisual.status = "completed";
+          currentSteps.delete(event.stage);
+        }
+      }
       // Older feasibility runs have no stage_finished events; the next sequential
       // stage start is the completion boundary for the previous stage.
       if (lastStage && lastStage !== event.stage &&
@@ -269,7 +279,12 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       if (failures) { status = "failed"; finalMessage = `生成结束，${failures} 个模型未完成，可重试失败项。`; }
       else if ("files" in snapshot) finalMessage = `已生成 ${Object.keys(snapshot.files).length} 个代码文件，可以查看原型。`;
       else if ("documentKind" in snapshot) finalMessage = `文档已生成${snapshot.fileName ? `：${snapshot.fileName}` : ""}。`;
-      else if ("svgArtifacts" in snapshot) finalMessage = `已生成 ${snapshot.svgArtifacts.length} 个图形预览。`;
+      else if ("svgArtifacts" in snapshot) {
+        const visualReviews = "visualReviews" in snapshot ? Object.values(snapshot.visualReviews ?? {}) : [];
+        const pending = visualReviews.filter((review) => review.status === "pending_review").length;
+        const skipped = visualReviews.filter((review) => review.status === "skipped").length;
+        finalMessage = `已生成 ${snapshot.svgArtifacts.length} 个图形预览。${pending ? `${pending} 个视觉检查待确认。` : ""}${skipped ? `${skipped} 个视觉检查已跳过。` : ""}`;
+      }
       else finalMessage = "生成完成，可以查看结果。";
     } else if (event.type === "failed" || event.type === "cancelled") {
       terminalAt = at;
@@ -342,7 +357,7 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       const call = getCall(step, `${step.stage}:${rawId}`, undefined, rawId, subtask.label);
       call.title = readableTaskText(subtask.label);
       call.status = ["repairing", "rendering"].includes(subtask.status) ? "running" : subtask.status as TranscriptStatus;
-      if (subtask.status === "pending_review") call.message = `有 ${subtask.pendingReviewCount ?? 1} 条追踪关系需复核`;
+      if (subtask.status === "pending_review") call.message = subtask.message ?? `有 ${subtask.pendingReviewCount ?? 1} 条追踪关系需复核`;
       else if (subtask.status === "failed") {
         call.message = subtask.messageCode
           ? localizeRunFailure(

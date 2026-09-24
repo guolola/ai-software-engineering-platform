@@ -39,11 +39,29 @@ describe("generation transcript", () => {
       expect(result.visibleSteps.slice(0, -1).every((step) => step.finished)).toBe(true);
     }
   });
+  it("keeps the two feasibility image reviews in separate chronological steps", () => {
+    const events: RunEvent[] = [
+      { type: "stage_started", stage: "render_context" },
+      { type: "stage_started", stage: "verify_diagram_visual" },
+      { type: "stage_progress", stage: "verify_diagram_visual", progress: 98, subtaskId: "context", subtaskStatus: "completed", message: "系统环境图已通过" },
+      { type: "stage_started", stage: "generate_business_flow" },
+      { type: "stage_started", stage: "render_business_flow" },
+      { type: "stage_started", stage: "verify_diagram_visual" },
+      { type: "stage_progress", stage: "verify_diagram_visual", progress: 98, subtaskId: "business-flow", subtaskStatus: "pending_review", message: "流程图待确认" },
+    ];
+    const result = projectGenerationTranscript(events);
+    expect(result.steps.map((step) => step.stage)).toEqual([
+      "render_context", "verify_diagram_visual", "generate_business_flow", "render_business_flow", "verify_diagram_visual",
+    ]);
+    expect(result.steps[1].calls.map((call) => call.subtaskId)).toEqual(["context"]);
+    expect(result.steps[4].calls.map((call) => call.subtaskId)).toEqual(["business-flow"]);
+  });
   it("switches from analysis to output while retaining the received thinking summary", () => {
-    const events = [activity("start", "a", "started"), activity("think", "a", "thinking"), activity("summary", "a", "summary", "正在核对需求。")];
+    const events = [activity("start", "a", "started"), activity("think", "a", "thinking"), activity("reasoning", "a", "reasoning", "先检查需求。"), activity("summary", "a", "summary", "正在核对需求。")];
     expect(projectGenerationTranscript(events).steps[0].calls[0].thinking).toBe(true);
     const call = projectGenerationTranscript([...events, activity("out", "a", "output", "正文片段")]).steps[0].calls[0];
     expect(call.thinking).toBe(false);
+    expect(call.reasoning).toBe("先检查需求。");
     expect(call.summary).toBe("正在核对需求。");
     expect(call.status).toBe("running");
   });
@@ -58,6 +76,18 @@ describe("generation transcript", () => {
     const merged = mergeTranscriptEvents(events, [...events, activity("a3", "usecase", "output", "图")]);
     const result = projectGenerationTranscript(merged);
     expect(result.steps[0].calls.map((call) => call.output)).toEqual(["用例图", "流程"]);
+  });
+
+  it("restores raw reasoning per call without mixing it with answers or provider summaries", () => {
+    const events = [
+      activity("a1", "usecase", "reasoning", "先列出"), activity("b1", "activity", "reasoning", "分析流程"),
+      activity("a2", "usecase", "reasoning", "角色"), activity("a3", "usecase", "summary", "正在分析角色"),
+      activity("a4", "usecase", "output", "用例答案"), activity("b2", "activity", "output", "活动答案"),
+    ];
+    const result = projectGenerationTranscript(mergeTranscriptEvents(events, events));
+    expect(result.steps[0].calls.map((call) => [call.reasoning, call.summary, call.output])).toEqual([
+      ["先列出角色", "正在分析角色", "用例答案"], ["分析流程", "", "活动答案"],
+    ]);
   });
 
   it("keeps failed attempts and actual summaries separate from retries", () => {

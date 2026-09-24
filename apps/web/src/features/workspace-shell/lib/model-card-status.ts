@@ -17,7 +17,7 @@ export function generationCardStatus({ active, failed, stale, exists }: {
 }
 
 export function modelTargetMatches(id: string, diagram: string, kind: "requirements" | "design") {
-  const modelId = id.replace(/^(?:generate_models|generate_design_models|generate_design_sequence|generate_plantuml|render_svg):/, "");
+  const modelId = id.replace(/^(?:generate_models|generate_design_models|generate_design_sequence|generate_plantuml|render_svg|verify_diagram_visual):/, "");
   return modelId === diagram || modelId.startsWith(`${diagram}:`) ||
     (kind === "design" && designDiagramKindFromRecordKey(modelId) === diagram);
 }
@@ -30,12 +30,12 @@ export function modelCardTaskStatus(tasks: GenerationTask[], kind: "requirements
   if (statuses.includes("running")) return "running";
   if (statuses.includes("queued")) return "queued";
   if (statuses.includes("failed")) return "failed";
-  // A completed model/PlantUML stage is still generating until its SVG stage completes.
-  const awaitingSvg = subtasks.some(subtask => {
+  // A rendered SVG remains in progress until its visual review settles.
+  const awaitingVisual = subtasks.some(subtask => {
     if (!/^(generate_models|generate_design_models|generate_design_sequence|generate_plantuml):/.test(subtask.id)) return false;
     const modelId = subtask.id.slice(subtask.id.indexOf(":") + 1);
-    return !subtasks.some(item => item.id === `render_svg:${modelId}` && item.status === "completed");
+    return !subtasks.some(item => item.id === `verify_diagram_visual:${modelId}` && ["completed", "pending_review"].includes(item.status));
   });
-  if (awaitingSvg) return "running";
+  if (awaitingVisual) return "running";
   return undefined;
 }

@@ -1364,9 +1364,9 @@ test("read-only admin gap endpoints require admin role and expose v1 admin data"
       .json()
       .promptRuntimeItems.some(
         (item: { id: string; kind: string; status: string }) =>
-          item.id === "requirements-modeling-prompt" &&
+          item.id === "requirements.extract" &&
           item.kind === "prompt" &&
-          item.status === "stable",
+          item.activeStatus === "default",
       ),
   );
   assert.equal(systemConfig.statusCode, 200);
@@ -1385,56 +1385,45 @@ test("read-only admin gap endpoints require admin role and expose v1 admin data"
   await app.close();
 });
 
-test("admin prompt runtime governance actions update state and write audit logs", async () => {
+test("admin prompt runtime drafts publish, restore and audit changes", async () => {
   const { app, cookie } = await createAdminSessionApp();
-  const before = await app.inject({
-    method: "GET",
-    url: "/api/admin/prompt-runtime",
-    headers: { cookie },
+  const itemId = "requirements.extract";
+  const detail = await app.inject({ method: "GET", url: "/api/admin/prompt-runtime/" + itemId, headers: { cookie } });
+  assert.equal(detail.statusCode, 200);
+  assert.equal(detail.json().editable, true);
+  const draft = await app.inject({
+    method: "POST", url: "/api/admin/prompt-runtime/" + itemId + "/drafts",
+    headers: { cookie }, payload: { content: "新的需求规则抽取指令" },
   });
-  assert.equal(before.statusCode, 200);
-  const itemId = before.json().promptRuntimeItems[0].id;
-
+  assert.equal(draft.statusCode, 200);
+  const versionId = draft.json().version.id as string;
+  const conflict = await app.inject({
+    method: "PUT", url: "/api/admin/prompt-runtime/" + itemId + "/drafts/" + versionId,
+    headers: { cookie }, payload: { content: "冲突", revision: 5 },
+  });
+  assert.equal(conflict.statusCode, 409);
   const submitted = await app.inject({
-    method: "POST",
-    url: `/api/admin/prompt-runtime/${itemId}/submit`,
+    method: "POST", url: "/api/admin/prompt-runtime/" + itemId + "/versions/" + versionId + "/submit",
     headers: { cookie },
   });
   assert.equal(submitted.statusCode, 200);
-  assert.equal(submitted.json().promptRuntimeItem.status, "canary");
-  assert.equal(submitted.json().auditLog.action, "admin.prompt_runtime.submit");
-
+  assert.equal(submitted.json().version.status, "pending");
   const approved = await app.inject({
-    method: "POST",
-    url: `/api/admin/prompt-runtime/${itemId}/approve`,
+    method: "POST", url: "/api/admin/prompt-runtime/" + itemId + "/versions/" + versionId + "/approve",
     headers: { cookie },
   });
   assert.equal(approved.statusCode, 200);
-  assert.equal(approved.json().promptRuntimeItem.status, "stable");
-
-  const rolledBack = await app.inject({
-    method: "POST",
-    url: `/api/admin/prompt-runtime/${itemId}/rollback`,
-    headers: { cookie },
-  });
-  assert.equal(rolledBack.statusCode, 200);
-  assert.equal(rolledBack.json().promptRuntimeItem.status, "rollback-ready");
-
+  assert.equal(approved.json().version.status, "published");
+  const active = await app.inject({ method: "GET", url: "/api/admin/prompt-runtime/" + itemId, headers: { cookie } });
+  assert.equal(active.json().activeInstruction, "新的需求规则抽取指令");
   const disabled = await app.inject({
-    method: "POST",
-    url: `/api/admin/prompt-runtime/${itemId}/disable`,
+    method: "POST", url: "/api/admin/prompt-runtime/" + itemId + "/disable",
     headers: { cookie },
   });
   assert.equal(disabled.statusCode, 200);
-  assert.equal(disabled.json().promptRuntimeItem.status, "disabled");
-
-  const audit = await app.inject({
-    method: "GET",
-    url: "/api/admin/audit-logs",
-    headers: { cookie },
-  });
+  assert.equal(disabled.json().defaultRestored, true);
+  const audit = await app.inject({ method: "GET", url: "/api/admin/audit-logs", headers: { cookie } });
   assert.match(audit.body, /admin\.prompt_runtime\.disable/);
-
   await app.close();
 });
 
@@ -1506,8 +1495,9 @@ test("admin prompt runtime governance actions require write permission", async (
 
   const submitted = await app.inject({
     method: "POST",
-    url: `/api/admin/prompt-runtime/${itemId}/submit`,
+    url: "/api/admin/prompt-runtime/" + itemId + "/drafts",
     headers: { cookie: auditorCookie },
+    payload: { content: "不允许的编辑" },
   });
   assert.equal(submitted.statusCode, 403);
   assertApiErrorCode(submitted, "ACCESS_DENIED");

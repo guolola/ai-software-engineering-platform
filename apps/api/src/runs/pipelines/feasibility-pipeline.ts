@@ -51,6 +51,9 @@ import { collectTextResult, logFailedStructuredOutput } from "./shared/structure
 import { stageProgressValue } from "./shared/pipeline-events.js";
 import { createRunError, throwRunError } from "./shared/errors.js";
 import { renderArtifactWithRepair } from "./render/render-artifact-with-repair.js";
+import { reviewRenderedArtifact } from "./render/review-rendered-artifact.js";
+import { withConversationBranch } from "./shared/conversation-context.js";
+import type { PngRenderClient } from "../../adapters/render/png-render-client.js";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -456,6 +459,7 @@ async function generateFeasibilityJson<T>(input: {
           issue.section !== "plan",
       );
       if (targetedGroups.length === groups.size) {
+        input.record.conversationContext?.forkBranches(targetedGroups.map((issue) => `feasibility:${input.stage}:${issue.candidateIndex}:${issue.section}`));
         const patches = await Promise.all(targetedGroups.map(async (issue) => {
           const sectionPrompt = buildRepairFeasibilitySectionPrompt({
             candidateIndex: issue.candidateIndex,
@@ -468,7 +472,8 @@ async function generateFeasibilityJson<T>(input: {
               .map((item) => `${item.path}: ${item.reason}`),
             originalPrompt: input.prompt,
           });
-          const sectionRaw = await collectTextResult(
+          const branchId = `feasibility:${input.stage}:${issue.candidateIndex}:${issue.section}`;
+          const sectionRaw = await withConversationBranch(branchId, () => collectTextResult(
             input.llmTransport,
             input.providerSettings,
             [
@@ -482,15 +487,17 @@ async function generateFeasibilityJson<T>(input: {
             sectionResponseFormatFor(issue.section, input.diagnostics),
             undefined,
             fallback,
-          );
+          ));
           try {
+            const patch = sectionPatchFromOutput(
+              parseJson(sectionRaw),
+              issue.candidateIndex,
+              issue.section,
+            );
+            input.record.conversationContext?.commitValidatedBranch(branchId, JSON.stringify(patch));
             return {
               issue,
-              patch: sectionPatchFromOutput(
-                parseJson(sectionRaw),
-                issue.candidateIndex,
-                issue.section,
-              ),
+              patch,
             };
           } catch (error) {
             logFailedStructuredOutput(
@@ -552,6 +559,7 @@ export async function runFeasibilityStagePipeline(
   providerSettings: ProviderSettings,
   llmTransport: LlmTransport,
   renderClient: RenderClient,
+  pngRenderClient?: PngRenderClient,
 ) {
   const snapshot = record.snapshot as FeasibilityRunSnapshot;
   const validRequirementIds = new Set(snapshot.rules.map((rule) => rule.id));
@@ -631,8 +639,11 @@ export async function runFeasibilityStagePipeline(
         },
       }));
     }
-    snapshot.contextPlantUml = renderResult.artifact as typeof artifact;
-    snapshot.contextSvg = renderResult.svgArtifact as NonNullable<
+    updateStage("verify_diagram_visual", "正在检查系统环境图的图面");
+    const checked = await reviewRenderedArtifact({ record, providerSettings, llmTransport, renderClient, pngRenderClient, model: contextModel, rendered: renderResult });
+    snapshot.visualReviews[artifact.modelId ?? "context"] = checked.review;
+    snapshot.contextPlantUml = checked.rendered.artifact as typeof artifact;
+    snapshot.contextSvg = checked.rendered.svgArtifact as NonNullable<
       FeasibilityRunSnapshot["contextSvg"]
     >;
     snapshot.contextFingerprint = snapshotInputFingerprint({
@@ -671,10 +682,13 @@ export async function runFeasibilityStagePipeline(
       throwRunError(createRunError("RUN_RENDER_FAILED", rendered.errorMessage));
     }
     // Keep the previous workspace artifact until model, traceability and SVG all succeed.
+    updateStage("verify_diagram_visual", "正在检查业务与系统流程图的图面");
+    const checked = await reviewRenderedArtifact({ record, providerSettings, llmTransport, renderClient, pngRenderClient, model: result.model, rendered });
+    snapshot.visualReviews[artifact.modelId ?? "business-flow"] = checked.review;
     snapshot.businessFlow = {
       ...result,
-      plantUml: rendered.artifact as typeof artifact,
-      svg: rendered.svgArtifact as NonNullable<FeasibilityRunSnapshot["contextSvg"]>,
+      plantUml: checked.rendered.artifact as typeof artifact,
+      svg: checked.rendered.svgArtifact as NonNullable<FeasibilityRunSnapshot["contextSvg"]>,
       fingerprint: snapshotInputFingerprint({ rules: snapshot.rules, requirementBaseline: snapshot.requirementBaseline }),
     };
     emitEvent(record, artifactReadyRunEventSchema.parse({

@@ -1,4 +1,5 @@
 // Registers run endpoints and delegates lifecycle work to pipelines and record stores.
+import { getPromptRuntimeStore, withPinnedPrompts } from "../../prompt-runtime/store.js";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import {
@@ -56,6 +57,7 @@ import {
 import { registerRunEventsRoute } from "../../runs/records/run-events.js";
 import { assertRequirementBaselineAllowsDownstream } from "../../runs/baselines/requirement-baseline.js";
 import { stageProgressValue } from "../../runs/pipelines/shared/pipeline-events.js";
+import { createContextualLlmTransport, withConversationBranch } from "../../runs/pipelines/shared/conversation-context.js";
 import { normalizeRunError } from "../../runs/pipelines/shared/errors.js";
 import {
   handleRunPipelineError,
@@ -443,8 +445,9 @@ export function registerRunRoutes({
 
     let rawOutput = "";
     try {
+      const conversation = createContextualLlmTransport(withPinnedPrompts(llmTransport, await getPromptRuntimeStore().publishedSnapshot()));
       rawOutput = await collectTextResult(
-        llmTransport,
+        conversation.transport,
         providerSettings,
         buildRequirementRuleRepairMessages(input),
         () => undefined,
@@ -509,8 +512,9 @@ export function registerRunRoutes({
 
     let rawOutput = "";
     try {
+      const conversation = createContextualLlmTransport(withPinnedPrompts(llmTransport, await getPromptRuntimeStore().publishedSnapshot()));
       rawOutput = await collectTextResult(
-        llmTransport,
+        conversation.transport,
         providerSettings,
         buildRequirementRulesRepairMessages(input),
         () => undefined,
@@ -538,13 +542,13 @@ export function registerRunRoutes({
             baseline: input.baseline,
             providerSettings: input.providerSettings,
           });
-          const singleRawOutput = await collectTextResult(
-            llmTransport,
+          const singleRawOutput = await withConversationBranch(`rule:${failure.ruleId}`, () => collectTextResult(
+            conversation.transport,
             providerSettings,
             buildRequirementRuleRepairMessages(singleInput),
             () => undefined,
             getRepairRequirementRuleResponseFormat(providerSettings),
-          );
+          ));
           const singleResult = applyRequirementRepairSuggestion(
             singleInput,
             singleRawOutput,
@@ -563,6 +567,7 @@ export function registerRunRoutes({
             ruleId: failure.ruleId,
             ...singleResult,
           });
+          conversation.commitValidatedBranch(`rule:${failure.ruleId}`, JSON.stringify(singleResult.requirement));
         } catch (error) {
           const repairFailure = requirementRepairFailure(error);
           request.log.warn(

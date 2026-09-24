@@ -13,7 +13,7 @@ import type { RunDiagnostics } from "../../workspace-session/model/session-state
 import { projectGenerationTranscript, readableTaskText } from "../lib/generation-transcript";
 import { useFrameValue } from "../lib/use-frame-value";
 import { useRunTranscript } from "../lib/use-run-transcript";
-import { GenerationTranscript } from "./generation-transcript";
+import { GenerationTranscript, type GenerationQueueDetails } from "./generation-transcript";
 import { useOptionalWorkspaceShell } from "../state";
 import { operationFailurePresentation } from "../../workspace-session/lib/operation-failure";
 import { useFloatingAlert } from "../../../shared/ui/floating-alert";
@@ -75,6 +75,23 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
   const displayedEvents = useFrameValue(events, live && !restored.loading, taskKey);
   const transcript = useMemo(() => projectGenerationTranscript(displayedEvents, fallbackStatus, selectedLocal?.subtasks), [displayedEvents, fallbackStatus, selectedLocal?.subtasks]);
   const active = ["queued", "running"].includes(transcript.status);
+  const queuedEvent = [...displayedEvents].reverse().find((event) => event.type === "queued");
+  const queuedItems = active ? (selectedLocal?.subtasks ?? []).filter((subtask) =>
+    subtask.status === "queued" && (
+      subtask.queuePosition !== undefined || subtask.queueAhead !== undefined ||
+      subtask.estimatedWaitMs !== undefined || subtask.queueReason !== undefined
+    ),
+  ) : [];
+  const queue: GenerationQueueDetails | null = transcript.status === "queued" || queuedItems.length > 0 ? {
+    position: queuedEvent?.type === "queued" && transcript.status === "queued" ? queuedEvent.queuePosition : undefined,
+    ahead: queuedEvent?.type === "queued" && transcript.status === "queued" ? queuedEvent.queueAhead : undefined,
+    estimatedWaitMs: queuedEvent?.type === "queued" && transcript.status === "queued" ? queuedEvent.estimatedWaitMs : undefined,
+    reason: queuedEvent?.type === "queued" && transcript.status === "queued" ? queuedEvent.queueReason : undefined,
+    items: queuedItems.map((subtask) => ({
+      id: subtask.id, label: readableTaskText(subtask.label), ahead: subtask.queueAhead,
+      estimatedWaitMs: subtask.estimatedWaitMs, reason: subtask.queueReason,
+    })),
+  } : null;
   const title = t(`generation.taskKinds.${kind ?? "unknown"}`);
   const perform = async (action: () => Promise<void>) => {
     if (actionBusy) return;
@@ -91,12 +108,12 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
   };
   const retrySubtask = (id: string) => {
     if (active || actionBusy) return;
-    const diagram = id.replace(/^(generate_models|generate_design_models|generate_design_sequence|generate_plantuml|render_svg):/, "").split(":")[0];
+    const diagram = id.replace(/^(generate_models|generate_design_models|generate_design_sequence|generate_plantuml|render_svg|verify_diagram_visual):/, "").split(":")[0];
     if (kind === "requirements" && ["function", "usecase", "class", "activity", "deployment", "prototype", "analysis"].includes(diagram)) void session.generateDiagrams([diagram as DiagramKind]);
     if (kind === "design" && ["architecture", "sequence", "class", "activity", "component", "deployment", "table"].includes(diagram)) void session.generateDesignDiagrams([diagram as DesignDiagramKind]);
   };
   const completed = transcript.completed?.snapshot;
-  return <GenerationTranscript key={taskKey} taskKey={taskKey} steps={transcript.visibleSteps} active={active}
+  return <GenerationTranscript key={taskKey} taskKey={taskKey} steps={transcript.visibleSteps} active={active} status={transcript.status} queue={queue}
     introduction={runId || selectedLocal ? title : "暂无生成任务。发起生成后，执行过程会在这里逐段显示。"}
     finalMessage={transcript.finalMessage || (!active && runId ? t(`generation.status.${transcript.status === "interrupted" ? "interruptedDetail" : transcript.status}`) : "")}
     onRetry={kind === "requirements" || kind === "design" ? retrySubtask : undefined}>

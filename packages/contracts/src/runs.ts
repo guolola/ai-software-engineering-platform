@@ -1,5 +1,6 @@
 // Owns run request, snapshot, event, and action contracts shared by API pipelines and web clients.
 import { z } from "zod";
+import { diagramVisualReviewSchema } from "./visual-review.js";
 import {
   designDiagramModelSpecSchema,
   designModelTraceabilityEntrySchema,
@@ -297,6 +298,7 @@ export const runStageSchema = z.enum([
   "render_document_file",
   "generate_plantuml",
   "render_svg",
+  "verify_diagram_visual",
   "generate_context",
   "generate_business_flow",
   "render_business_flow",
@@ -458,6 +460,7 @@ export const runSnapshotSchema = z.object({
   requirementModelTraceability: z.array(requirementModelTraceabilityEntrySchema),
   plantUml: z.array(plantUmlArtifactSchema),
   svgArtifacts: z.array(svgArtifactSchema),
+  visualReviews: z.record(z.string().min(1), diagramVisualReviewSchema).default({}),
   diagramErrors: z.record(diagramKindSchema, diagramErrorSchema).default({}),
   requirementTrace: z.array(requirementTraceEntrySchema).default([]),
   currentStage: runStageSchema.nullable(),
@@ -481,6 +484,7 @@ export const designRunSnapshotSchema = z.object({
   designModelTraceability: z.array(designModelTraceabilityEntrySchema),
   plantUml: z.array(designPlantUmlArtifactSchema),
   svgArtifacts: z.array(designSvgArtifactSchema),
+  visualReviews: z.record(z.string().min(1), diagramVisualReviewSchema).default({}),
   diagramErrors: z.record(z.string().min(1), diagramErrorSchema).default({}),
   designTrace: z.array(designTraceEntrySchema).default([]),
   currentStage: runStageSchema.nullable(),
@@ -765,7 +769,7 @@ export const runActivityEventSchema = z.object({
   callId: z.string().min(1),
   subtaskId: z.string().optional(),
   subtaskLabel: z.string().optional(),
-  phase: z.enum(["started", "output", "thinking", "summary", "completed", "failed"]),
+  phase: z.enum(["started", "output", "thinking", "reasoning", "summary", "completed", "failed"]),
   format: z.enum(["text", "technical"]).default("technical"),
   text: z.string().optional(),
 });

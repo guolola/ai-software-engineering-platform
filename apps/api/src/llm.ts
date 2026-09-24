@@ -55,8 +55,8 @@ export interface StreamChatCompletionInput {
   abortSignal?: AbortSignal;
   onResponseFormatFallback?: (event: ResponseFormatFallbackEvent) => void;
   onTokenUsage?: (usage: StreamTokenUsage) => void;
-  onReasoningChunk?: () => void;
-  // Only explicitly public summaries are forwarded; raw provider reasoning is activity only.
+  onReasoningChunk?: (chunk: string) => void;
+  // The provider's raw reasoning and its optional public summary remain separate streams.
   onReasoningSummary?: (chunk: string) => void;
   onUsageUnavailable?: (reason: string) => void;
 }
@@ -566,6 +566,8 @@ export function normalizeStreamTokenUsage(value: unknown): StreamTokenUsage | nu
   return { inputTokens, outputTokens, cachedInputTokens, reasoningTokens, totalTokens };
 }
 
+const providerActivityHeartbeat = Symbol("provider-activity-heartbeat");
+
 async function* extractChatCompletionText(
   stream: AsyncIterable<ChatCompletionChunk>,
   observer: Pick<StreamChatCompletionInput, "onTokenUsage" | "onReasoningChunk" | "onReasoningSummary" | "onUsageUnavailable"> = {},
@@ -585,9 +587,16 @@ async function* extractChatCompletionText(
         }
       | undefined;
     const reasoning = choice?.delta?.reasoning_content ?? choice?.delta?.reasoning;
-    if (typeof reasoning === "string" && reasoning) observer.onReasoningChunk?.();
+    if (typeof reasoning === "string" && reasoning) {
+      observer.onReasoningChunk?.(reasoning);
+      // Reasoning-only chunks still count as provider activity for the idle timeout.
+      yield providerActivityHeartbeat;
+    }
     const summary = choice?.delta?.reasoning_summary;
-    if (typeof summary === "string" && summary) observer.onReasoningSummary?.(summary);
+    if (typeof summary === "string" && summary) {
+      observer.onReasoningSummary?.(summary);
+      yield providerActivityHeartbeat;
+    }
     const text = choice?.delta?.content ?? choice?.message?.content ?? "";
     if (typeof text === "string" && text) {
       yield text;
@@ -774,6 +783,7 @@ export async function probeOpenAiCompatibleStreamingChat({
       responseTimeoutMs,
       () => abortController.abort(),
     )) {
+      if (text === providerActivityHeartbeat) continue;
       content += text;
       if (content.length > 4096) break;
     }
@@ -961,6 +971,7 @@ export function createRealLlmTransport(
           responseTimeoutMs,
           () => activeAbortController.abort(),
         )) {
+          if (text === providerActivityHeartbeat) continue;
           yield text;
         }
       } finally {

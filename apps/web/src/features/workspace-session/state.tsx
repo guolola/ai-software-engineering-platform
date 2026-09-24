@@ -364,6 +364,7 @@ export function WorkspaceSessionProvider({
   const [manualModelEditStatus, setManualModelEditStatus] = useState<
     WorkspaceRecord["manualModelEditStatus"]
   >({});
+  const [visualReviews, setVisualReviews] = useState<NonNullable<WorkspaceRecord["visualReviews"]>>({});
   const [feasibilityContextArtifact, setFeasibilityContextArtifact] = useState<
     Pick<
       WorkspaceRecord,
@@ -386,6 +387,7 @@ export function WorkspaceSessionProvider({
   const [feasibilityImplementationPlan, setFeasibilityImplementationPlan] =
     useState<WorkspaceRecord["feasibilityImplementationPlan"]>(null);
   const syncFeasibilityArtifacts = useCallback((workspace: WorkspaceRecord) => {
+    setVisualReviews(workspace.visualReviews ?? {});
     setFeasibilityBusinessFlow(workspace.feasibilityBusinessFlow ?? null);
     setFeasibilityContextArtifact(
       workspace.feasibilityContextModel
@@ -679,6 +681,7 @@ export function WorkspaceSessionProvider({
       setPlantUml,
       setSvgArtifacts,
       setDiagramErrors,
+      setVisualReviews,
       setSelectedDesignDiagrams,
       setDesignModels,
       setDesignModelTraceability,
@@ -753,6 +756,10 @@ export function WorkspaceSessionProvider({
         ? rulesVersion + 1
         : rulesVersion || 1;
       const mapped = snapshotToMaps(snapshot);
+      setVisualReviews((current) => ({
+        ...current,
+        ...Object.fromEntries(Object.entries(snapshot.visualReviews ?? {}).map(([id, review]) => [`requirements:${id}`, review])),
+      }));
       const snapshotDiagrams = diagramsFromRequirementSnapshot(snapshot);
       const successfulSnapshotDiagrams =
         successfulRequirementDiagramsFromSnapshot(snapshot);
@@ -906,6 +913,10 @@ export function WorkspaceSessionProvider({
       generatedOverride?: DesignDiagramType[],
     ) => {
       const mapped = designSnapshotToMaps(snapshot);
+      setVisualReviews((current) => ({
+        ...current,
+        ...Object.fromEntries(Object.entries(snapshot.visualReviews ?? {}).map(([id, review]) => [`design:${id}`, review])),
+      }));
       const successfulAffectedDesignDiagrams =
         snapshot.status !== "running"
           ? successfulDesignDiagramsFromSnapshot(snapshot)
@@ -1065,6 +1076,12 @@ export function WorkspaceSessionProvider({
 
   const applyRestoredSnapshot = useCallback(
     (snapshot: RunHistorySnapshot) => {
+      if ("visualReviews" in snapshot) {
+        const kind = "designModelTraceability" in snapshot ? "design" : "requirements";
+        setVisualReviews(Object.fromEntries(Object.entries(snapshot.visualReviews ?? {}).map(([id, review]) => [`${kind}:${id}`, review])));
+      } else {
+        setVisualReviews({});
+      }
       const plan = createRestoredSnapshotPlan({
         snapshot,
         rulesVersion,
@@ -3512,6 +3529,7 @@ export function WorkspaceSessionProvider({
       billingGenerationBlock,
       clearBillingGenerationBlock,
       generationTasks,
+      visualReviews,
       visibleGenerationTask,
       selectedGenerationTaskId,
       selectGenerationTask,
@@ -3629,6 +3647,7 @@ export function WorkspaceSessionProvider({
       billingGenerationBlock,
       clearBillingGenerationBlock,
       generationTasks,
+      visualReviews,
       visibleGenerationTask,
       selectedGenerationTaskId,
       selectGenerationTask,

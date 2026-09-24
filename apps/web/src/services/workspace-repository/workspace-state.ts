@@ -304,6 +304,7 @@ export function createEmptyWorkspace(): WorkspaceRecord {
     plantUml: {},
     svgArtifacts: {},
     diagramErrors: {},
+    visualReviews: {},
     selectedDesignDiagramTypes: [],
     designModels: {},
     designModelTraceability: [],
@@ -752,6 +753,13 @@ export function applySnapshotToWorkspace(
 
   const isRequirementSnapshot =
     !isCodeRunSnapshot(snapshot) && !isDesignRunSnapshot(snapshot);
+  if (isRequirementSnapshot || isDesignRunSnapshot(snapshot)) {
+    const kind = isDesignRunSnapshot(snapshot) ? "design" : "requirements";
+    next.visualReviews = {
+      ...next.visualReviews,
+      ...Object.fromEntries(Object.entries(snapshot.visualReviews ?? {}).map(([id, review]) => [`${kind}:${id}`, review])),
+    };
+  }
   if (isRequirementSnapshot || isDesignRunSnapshot(snapshot)) {
     next.testGenerationResult = null;
   }

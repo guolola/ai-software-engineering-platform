@@ -206,7 +206,7 @@ test("persists the run before syncing context and implementation from the select
   const generationStages = runs.get(snapshot.runId)!.events
     .filter((event) => event.type === "stage_started")
     .map((event) => "stage" in event ? event.stage : null);
-  assert.deepEqual(generationStages, ["generate_context", "render_context", "generate_business_flow", "render_business_flow", "generate_implementation"]);
+  assert.deepEqual(generationStages, ["generate_context", "render_context", "verify_diagram_visual", "generate_business_flow", "render_business_flow", "verify_diagram_visual", "generate_implementation"]);
   const lifecycleEvents = runs.get(snapshot.runId)!.events.filter((event) =>
     event.type === "stage_started" || event.type === "stage_finished",
   );

@@ -9,6 +9,7 @@ import type {
   DesignSvgArtifact,
   DiagramError,
   DiagramModelSpec,
+  DiagramVisualReview,
   RequirementModelTraceabilityEntry,
   RequirementBaseline,
   RequirementQualityReport,
@@ -81,6 +82,7 @@ export interface WorkspaceRecord {
     Record<string, SvgArtifact | undefined>;
   diagramErrors: Partial<Record<DiagramType, DiagramError>> &
     Record<string, DiagramError | undefined>;
+  visualReviews?: Record<string, DiagramVisualReview>;
   selectedDesignDiagramTypes: DesignDiagramType[];
   designModels: Record<string, DesignDiagramModelSpec>;
   designModelTraceability: DesignModelTraceabilityEntry[];

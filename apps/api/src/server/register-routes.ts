@@ -371,6 +371,7 @@ export function registerApiRoutes({
     app,
     runs,
     renderClient,
+    pngRenderClient,
     llmTransport,
     llmScheduler,
     runQueue,

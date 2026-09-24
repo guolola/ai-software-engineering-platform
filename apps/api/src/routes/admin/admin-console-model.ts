@@ -1,4 +1,4 @@
-// Builds admin console display models for roles, prompt runtime status, and system summaries.
+// Builds admin console display models for roles and system summaries.
 import {
   adminRoleDataScopes,
   adminRolePermissions,
@@ -16,18 +16,6 @@ const ADMIN_ROLE_NAMES: Record<AdminRole, string> = {
   security_admin: "安全管理员",
   model_admin: "模型管理员",
   teacher_assistant: "教师/助教",
-};
-
-export type PromptRuntimeKind = "prompt" | "skill";
-export type PromptRuntimeStatus = "stable" | "canary" | "rollback-ready" | "disabled";
-export type PromptRuntimeItem = {
-  id: string;
-  name: string;
-  kind: PromptRuntimeKind;
-  version: string;
-  status: PromptRuntimeStatus;
-  approver: string;
-  updatedAt: string;
 };
 
 export function buildRolePermissions() {
@@ -51,80 +39,6 @@ export function buildRolePermissionsView() {
   return {
     generatedAt: new Date().toISOString(),
     roles: buildRolePermissions(),
-  };
-}
-
-function buildPromptRuntimeItems(): Array<Omit<PromptRuntimeItem, "updatedAt">> {
-  return [
-    {
-      id: "requirements-modeling-prompt",
-      name: "需求建模 Prompt 包",
-      kind: "prompt",
-      version: "v1",
-      status: "stable" as const,
-      approver: "system",
-    },
-    {
-      id: "design-modeling-prompt",
-      name: "设计建模 Prompt 包",
-      kind: "prompt",
-      version: "v1",
-      status: "stable" as const,
-      approver: "system",
-    },
-    {
-      id: "ui-ux-pro-max-skill",
-      name: "代码生成 UI/UX Skill",
-      kind: "skill",
-      version: "v1",
-      status: "stable" as const,
-      approver: "system",
-    },
-  ];
-}
-
-export function createPromptRuntimeItems(): PromptRuntimeItem[] {
-  const now = new Date().toISOString();
-  return buildPromptRuntimeItems().map((item) => ({ ...item, updatedAt: now }));
-}
-
-export function buildPromptRuntimeListView(
-  promptRuntimeItems: PromptRuntimeItem[],
-) {
-  return {
-    generatedAt: new Date().toISOString(),
-    promptRuntimeItems,
-  };
-}
-
-export function getPromptRuntimeVersionsView(
-  promptRuntimeItems: PromptRuntimeItem[],
-  promptRuntimeItemId: string,
-) {
-  const item = promptRuntimeItems.find(
-    (entry) => entry.id === promptRuntimeItemId,
-  );
-  if (!item) {
-    return {
-      statusCode: 404,
-      body: { message: "Prompt runtime item not found" },
-    };
-  }
-
-  return {
-    statusCode: 200,
-    body: {
-      generatedAt: new Date().toISOString(),
-      versions: [
-        {
-          id: `${item.id}-${item.version}`,
-          itemId: item.id,
-          version: item.version,
-          status: item.status,
-          createdAt: item.updatedAt,
-        },
-      ],
-    },
   };
 }
 

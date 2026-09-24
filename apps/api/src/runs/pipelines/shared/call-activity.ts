@@ -15,7 +15,7 @@ export function createCallActivity(input: {
   let ended = false;
   let thinking = false;
   let pending = "";
-  let summary = "";
+  let pendingPhase: "output" | "reasoning" | "summary" | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const emit = (phase: RunActivityEvent["phase"], text?: string) => {
     emitEvent(input.record, {
@@ -33,11 +33,21 @@ export function createCallActivity(input: {
   const flush = () => {
     clearTimeout(timer);
     timer = undefined;
-    if (pending) { emit("output", pending); pending = ""; }
-    if (summary) { emit("summary", summary); summary = ""; }
+    if (pending && pendingPhase) emit(pendingPhase, pending);
+    pending = "";
+    pendingPhase = null;
+  };
+  // Flush on phase switches so replay keeps the provider's reasoning, summary,
+  // and answer fragments in the same order as the live stream.
+  const append = (phase: "output" | "reasoning" | "summary", chunk: string) => {
+    if (!chunk) return;
+    if (pendingPhase && pendingPhase !== phase) flush();
+    pendingPhase = phase;
+    pending += chunk;
+    schedule();
   };
   const schedule = () => {
-    if (pending.length + summary.length >= 4096) flush();
+    if (pending.length >= 4096) flush();
     else timer ??= setTimeout(flush, 100);
   };
   const finish = (phase: "completed" | "failed") => {
@@ -55,15 +65,17 @@ export function createCallActivity(input: {
     onStart: start,
     onChunk(chunk: string) {
       if (ended || input.record.terminal) return;
-      start(); pending += chunk; schedule();
+      start(); append("output", chunk);
     },
-    onReasoningChunk() {
-      if (ended || thinking || input.record.terminal) return;
-      start(); thinking = true; emit("thinking");
+    onReasoningChunk(chunk: string) {
+      if (ended || input.record.terminal || !chunk) return;
+      start();
+      if (!thinking) { thinking = true; emit("thinking"); }
+      append("reasoning", chunk);
     },
     onReasoningSummary(chunk: string) {
       if (ended || input.record.terminal) return;
-      start(); summary += chunk; schedule();
+      start(); append("summary", chunk);
     },
     onComplete: () => finish("completed"),
     onError: () => finish("failed"),

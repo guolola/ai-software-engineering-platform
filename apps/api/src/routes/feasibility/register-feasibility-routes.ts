@@ -13,6 +13,7 @@ import {
   type ProviderSettings,
 } from "@uml-platform/contracts";
 import type { RenderClient } from "../../adapters/render/render-client.js";
+import type { PngRenderClient } from "../../adapters/render/png-render-client.js";
 import type { LlmScheduler } from "../../adapters/llm/llm-scheduler.js";
 import type { LlmTransport } from "../../llm.js";
 import type { ProviderConfigStore } from "../../provider-configs/provider-config-store.js";
@@ -100,6 +101,7 @@ export function registerFeasibilityRoutes({
   app,
   runs,
   renderClient,
+  pngRenderClient,
   llmTransport,
   llmScheduler,
   providerConfigs,
@@ -118,6 +120,7 @@ export function registerFeasibilityRoutes({
   app: FastifyInstance;
   runs: RunRecordStore;
   renderClient: RenderClient;
+  pngRenderClient?: PngRenderClient;
   llmTransport: LlmTransport;
   llmScheduler?: LlmScheduler;
   providerConfigs?: ProviderConfigStore;
@@ -278,6 +281,7 @@ export function registerFeasibilityRoutes({
         llmTransport,
         llmScheduler,
         renderClient,
+        pngRenderClient,
         billingEntitlements: runBillingEntitlements,
         analyticsStore,
       });

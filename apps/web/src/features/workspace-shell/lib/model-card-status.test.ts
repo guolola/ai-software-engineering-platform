@@ -38,10 +38,12 @@ describe("modelCardTaskStatus", () => {
     expect(modelCardTaskStatus([task("running")], "design", "class")).toBeUndefined();
     expect(modelCardTaskStatus([{ ...task("failed"), status: "failed" }], "design", "sequence")).toBeUndefined();
   });
-  it("waits for the SVG stage even when an earlier stage completed", () => {
+  it("waits for visual review after the SVG stage", () => {
     const current = task("completed", "generate_models:sequence:uc-1");
     expect(modelCardTaskStatus([current], "design", "sequence")).toBe("running");
     current.subtasks.push({ ...current.subtasks[0], id: "render_svg:sequence:uc-1" });
+    expect(modelCardTaskStatus([current], "design", "sequence")).toBe("running");
+    current.subtasks.push({ ...current.subtasks[0], id: "verify_diagram_visual:sequence:uc-1" });
     expect(modelCardTaskStatus([current], "design", "sequence")).toBeUndefined();
   });
 });

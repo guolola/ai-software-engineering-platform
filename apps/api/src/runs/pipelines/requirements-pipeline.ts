@@ -59,6 +59,9 @@ import {
   throwIfRunCancelled,
 } from "../records/run-cancellation.js";
 import { renderArtifactWithRepair } from "./render/render-artifact-with-repair.js";
+import { reviewRenderedArtifact } from "./render/review-rendered-artifact.js";
+import type { PngRenderClient } from "../../adapters/render/png-render-client.js";
+import { withConversationBranch } from "./shared/conversation-context.js";
 import { stageProgressValue } from "./shared/pipeline-events.js";
 import { createMessages } from "./shared/llm-messages.js";
 import {
@@ -1072,6 +1075,7 @@ export async function runStagePipeline(
   providerSettings: ProviderSettings,
   llmTransport: LlmTransport,
   renderClient: RenderClient,
+  pngRenderClient?: PngRenderClient,
 ) {
   const snapshot = record.snapshot as RunSnapshot;
 
@@ -1145,7 +1149,7 @@ export async function runStagePipeline(
           subtaskStatus: "rendering",
         }),
       );
-      const rendered = await renderArtifactWithRepair(
+      let rendered = await renderArtifactWithRepair(
         record,
         providerSettings,
         llmTransport,
@@ -1154,6 +1158,18 @@ export async function runStagePipeline(
         artifact,
       );
       throwIfRunCancelled(record);
+      if (rendered.status === "success") {
+        svgArtifacts = replaceRequirementSvgArtifact(svgArtifacts, rendered.svgArtifact as SvgArtifact);
+        snapshot.svgArtifacts = svgArtifacts;
+        emitEvent(record, artifactReadyRunEventSchema.parse({
+          type: "artifact_ready", stage: "render_svg", artifactKind: "svg",
+          diagramKind: artifact.diagramKind, modelId: artifact.modelId,
+          subtaskId: artifact.modelId ?? artifact.diagramKind, subtaskStatus: "completed",
+        }));
+        const checked = await reviewRenderedArtifact({ record, providerSettings, llmTransport, renderClient, pngRenderClient, model, rendered });
+        rendered = checked.rendered;
+        snapshot.visualReviews[artifact.modelId ?? artifact.diagramKind] = checked.review;
+      }
       plantUml = replaceRequirementPlantUmlArtifact(
         plantUml,
         rendered.artifact as PlantUmlArtifact,
@@ -1167,18 +1183,6 @@ export async function runStagePipeline(
         snapshot.svgArtifacts = svgArtifacts;
         delete diagramErrors[artifact.diagramKind];
         snapshot.diagramErrors = diagramErrors;
-        emitEvent(
-          record,
-          artifactReadyRunEventSchema.parse({
-            type: "artifact_ready",
-            stage: "render_svg",
-            artifactKind: "svg",
-            diagramKind: artifact.diagramKind,
-            modelId: artifact.modelId,
-            subtaskId: artifact.modelId ?? artifact.diagramKind,
-            subtaskStatus: "completed",
-          }),
-        );
         continue;
       }
 
@@ -1384,6 +1388,7 @@ export async function runStagePipeline(
         );
         throwIfRunCancelled(record);
         await Promise.all(result.models.map(renderRequirementModelArtifact));
+        record.conversationContext?.commitValidatedBranch(`requirement:${diagram}`, JSON.stringify(result.models));
         return { diagram, result };
       } catch (error) {
         throwIfRunCancelled(record);
@@ -1429,10 +1434,11 @@ export async function runStagePipeline(
       ] as DiagramKind[];
     }
 
+    record.conversationContext?.forkBranches(prerequisiteDiagrams.map((diagram) => `requirement:${diagram}`));
     const prerequisiteTasks = new Map(
       prerequisiteDiagrams.map((diagram) => [
         diagram,
-        generateRequirementDiagram(diagram),
+        withConversationBranch(`requirement:${diagram}`, () => generateRequirementDiagram(diagram)),
       ] as const),
     );
     if (needsAnalysis && prerequisiteTasks.has("usecase")) {
@@ -1577,6 +1583,7 @@ export async function runStagePipeline(
             }),
           );
           await Promise.all(result.models.map(renderRequirementModelArtifact));
+          record.conversationContext?.commitValidatedBranch(`requirement:${modelId}`, JSON.stringify(result.models));
           return result;
         } catch (error) {
           throwIfRunCancelled(record);
@@ -1606,10 +1613,11 @@ export async function runStagePipeline(
         }
       };
 
+      record.conversationContext?.forkBranches(analysisUseCases.map((useCase) => `requirement:${analysisModelIdForUseCase(useCase)}`));
       let analysisResults = await mapWithConcurrency(
         analysisUseCases,
         readRequirementAnalysisConcurrency(),
-        generateAnalysisForUseCase,
+        (useCase) => withConversationBranch(`requirement:${analysisModelIdForUseCase(useCase)}`, () => generateAnalysisForUseCase(useCase)),
       );
       throwIfRunCancelled(record);
       let analysisModels = analysisResults
@@ -1647,10 +1655,11 @@ export async function runStagePipeline(
             subtaskStatus: "running",
           }),
         );
+        record.conversationContext?.forkBranches(missingUseCases.map((useCase) => `requirement:${analysisModelIdForUseCase(useCase)}`));
         const retryResults = await mapWithConcurrency(
           missingUseCases,
           readRequirementAnalysisConcurrency(),
-          generateAnalysisForUseCase,
+          (useCase) => withConversationBranch(`requirement:${analysisModelIdForUseCase(useCase)}`, () => generateAnalysisForUseCase(useCase)),
         );
         analysisResults = [...analysisResults, ...retryResults];
         analysisModels = analysisResults
@@ -1747,7 +1756,8 @@ export async function runStagePipeline(
   stages.finish("generate_models");
   stages.finish("generate_plantuml");
   stages.finish("render_svg");
-  snapshot.currentStage = "render_svg";
+  stages.finish("verify_diagram_visual");
+  snapshot.currentStage = "verify_diagram_visual";
   throwIfRunCancelled(record);
   snapshot.status = "completed";
   snapshot.error = null;

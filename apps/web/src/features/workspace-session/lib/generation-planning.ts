@@ -292,7 +292,8 @@ type DiagramGenerationStage =
   | "generate_design_sequence"
   | "generate_design_models"
   | "generate_plantuml"
-  | "render_svg";
+  | "render_svg"
+  | "verify_diagram_visual";
 
 function scopedGenerationSubtask(input: {
   stage: DiagramGenerationStage;
@@ -327,6 +328,11 @@ function stagedDiagramSubtasks(input: {
     }),
     scopedGenerationSubtask({
       stage: "render_svg",
+      id: input.id,
+      label: input.label,
+    }),
+    scopedGenerationSubtask({
+      stage: "verify_diagram_visual",
       id: input.id,
       label: input.label,
     }),

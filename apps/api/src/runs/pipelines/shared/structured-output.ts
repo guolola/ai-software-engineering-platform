@@ -15,7 +15,7 @@ export interface LlmChunkHandlers {
   onStart?: () => void;
   onComplete?: () => void;
   onError?: () => void;
-  onReasoningChunk?: () => void;
+  onReasoningChunk?: (chunk: string) => void;
   onReasoningSummary?: (chunk: string) => void;
   onBlankChunk?: (chunk: string) => void;
   startNoVisibleChunkHeartbeat?: () => () => void;

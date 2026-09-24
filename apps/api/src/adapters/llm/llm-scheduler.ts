@@ -404,9 +404,9 @@ export function createScheduledLlmTransport({
               input.onTokenUsage?.(value);
             },
             onReasoningSummary: input.onReasoningSummary,
-            onReasoningChunk() {
+            onReasoningChunk(chunk) {
               firstReasoningAt ??= Date.now();
-              input.onReasoningChunk?.();
+              input.onReasoningChunk?.(chunk);
             },
             onUsageUnavailable(reason) {
               usageUnavailableReason ??= reason;

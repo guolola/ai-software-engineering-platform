@@ -4,6 +4,7 @@ import { activityDiagramSpecSchema, contextDiagramSpecSchema, plantUmlArtifactSc
 import { requirementBaselineSchema, requirementRulesSchema } from "./requirements.js";
 import { providerSettingsSchema } from "./provider-configs.js";
 import { snapshotInputFingerprint } from "./fingerprints.js";
+import { diagramVisualReviewSchema } from "./visual-review.js";
 
 const optionalText = z.string().trim().default("");
 const optionalNumber = z.number().nonnegative().nullable().default(null);
@@ -515,6 +516,7 @@ export const feasibilityRunStageSchema = z.enum([
   "render_business_flow",
   "generate_context",
   "render_context",
+  "verify_diagram_visual",
   "generate_implementation",
 ]);
 export type FeasibilityRunStage = z.infer<typeof feasibilityRunStageSchema>;
@@ -598,6 +600,7 @@ export const feasibilityRunSnapshotSchema = z.object({
   contextTraceability: z.array(contextTraceRowSchema).default([]),
   contextPlantUml: plantUmlArtifactSchema.nullable(),
   contextSvg: svgArtifactSchema.nullable(),
+  visualReviews: z.record(z.string().min(1), diagramVisualReviewSchema).default({}),
   implementationPlan: feasibilityImplementationPlanSchema.nullable(),
   contextFingerprint: z.string().nullable(),
   implementationFingerprint: z.string().nullable(),

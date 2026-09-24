@@ -14,3 +14,11 @@ test("stage completion is additive and preserves the existing event envelope", (
   }
   assert.equal(runEventSchema.safeParse({ type: "stage_finished", stage: "generate_models", status: "running" }).success, false);
 });
+
+test("run activity accepts replayable reasoning text without changing older events", () => {
+  const base = { type: "run_activity", eventId: "event-1", createdAt: "2026-09-23T00:00:00.000Z", runId: "run-1", stage: "generate_models", callId: "call-1", format: "technical" };
+  const reasoning = { ...base, phase: "reasoning", text: "先核对条件" };
+  const historical = { ...base, phase: "thinking" };
+  assert.deepEqual(runEventSchema.parse(reasoning), reasoning);
+  assert.deepEqual(runEventSchema.parse(historical), historical);
+});

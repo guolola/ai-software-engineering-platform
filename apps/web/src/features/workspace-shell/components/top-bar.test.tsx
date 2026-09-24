@@ -1413,7 +1413,7 @@ describe("TopBar", () => {
       ),
     );
 
-    expect(screen.getByText("生成中 50%")).toBeInTheDocument();
+    expect(screen.getByText("生成中 40%")).toBeInTheDocument();
     expect(screen.getAllByText("生成需求模型").length).toBeGreaterThan(0);
     expect(screen.queryByText("server-run-active")).not.toBeInTheDocument();
     expect(screen.queryByText(/模型 gpt-5\.5/)).not.toBeInTheDocument();
@@ -1479,7 +1479,7 @@ describe("TopBar", () => {
       );
     });
 
-    await waitFor(() => expect(screen.getByText("生成中 50%")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("生成中 40%")).toBeInTheDocument());
     expect(
       within(screen.getByTestId("generation-transcript")).getByText(
         "已生成 0 个图形预览。",
@@ -1978,9 +1978,11 @@ describe("TopBar", () => {
     expect(within(stageSection as HTMLElement).queryByText("生成图形预览")).not.toBeInTheDocument();
     expect(within(stageSection as HTMLElement).getAllByText("用例模型")).toHaveLength(1);
     expect(within(stageSection as HTMLElement).getAllByText("领域概念模型")).toHaveLength(1);
-    expect(within(stageSection as HTMLElement).getByText(/有 1 条追踪关系需复核/)).toBeInTheDocument();
+    expect(within(stageSection as HTMLElement).getByText(/领域概念模型存在待确认追踪关系/)).toBeInTheDocument();
     expect(screen.queryByText("模型子任务")).not.toBeInTheDocument();
-    const queuedCall = within(stageSection as HTMLElement).getByText("界面关系").closest('[data-slot="generation-call"]')!;
+    const queuedCall = within(stageSection as HTMLElement).getAllByText("界面关系")
+      .map((label) => label.closest('[data-slot="generation-call"]'))
+      .find(Boolean)!;
     expect(within(queuedCall as HTMLElement).getByText("排队中")).toBeInTheDocument();
 
     completeRun();

@@ -10,6 +10,26 @@ import { createEmptyDiagnostics } from "./diagnostics";
 import { createRequirementBaseline, createRunSnapshot } from "../../../test/workspace-test-utils";
 
 describe("workspace-session generation task helpers", () => {
+  it("keeps each diagram in visual review after SVG completion", () => {
+    let task = createGenerationTask({
+      clientTaskId: "visual-parallel", kind: "requirements", title: "需求模型生成",
+      providerModel: "vision-model", startedAt: "2026-09-23T00:00:00.000Z", message: "生成中",
+      subtasks: ["usecase", "class"].flatMap((id) => [
+        { id: `render_svg:${id}`, label: id, status: "queued" as const, message: null, errorMessage: null },
+        { id: `verify_diagram_visual:${id}`, label: id, status: "queued" as const, message: null, errorMessage: null },
+      ]),
+    });
+    const labels = { queued: "排队中", completed: "生成完成" };
+    task = updateTaskFromEvent(task, { type: "artifact_ready", stage: "render_svg", artifactKind: "svg", diagramKind: "usecase", subtaskId: "usecase", subtaskStatus: "completed" } satisfies RunEvent, labels);
+    expect(task.subtasks.find((item) => item.id === "verify_diagram_visual:usecase")?.status).toBe("queued");
+    expect(task.subtasks.find((item) => item.id === "verify_diagram_visual:class")?.status).toBe("queued");
+    task = updateTaskFromEvent(task, { type: "stage_progress", stage: "verify_diagram_visual", progress: 98, diagramKind: "usecase", subtaskId: "usecase", subtaskStatus: "running", message: "正在检查图面" } satisfies RunEvent, labels);
+    expect(task.subtasks.find((item) => item.id === "verify_diagram_visual:usecase")).toEqual(expect.objectContaining({ status: "running", message: "正在检查图面" }));
+    expect(task.subtasks.find((item) => item.id === "verify_diagram_visual:class")?.status).toBe("queued");
+    task = updateTaskFromEvent(task, { type: "stage_progress", stage: "verify_diagram_visual", progress: 98, diagramKind: "usecase", subtaskId: "usecase", subtaskStatus: "pending_review", message: "视觉检查仍有问题：标签不可读" } satisfies RunEvent, labels);
+    expect(task.subtasks.find((item) => item.id === "verify_diagram_visual:usecase")).toEqual(expect.objectContaining({ status: "pending_review", message: "视觉检查仍有问题：标签不可读" }));
+    expect(task.subtasks.find((item) => item.id === "verify_diagram_visual:class")?.status).toBe("queued");
+  });
   it("keeps a rules-only task running after extraction until local repair completes", () => {
     const task = createGenerationTask({
       clientTaskId: "rules-1", kind: "requirements", title: "需求规则生成",

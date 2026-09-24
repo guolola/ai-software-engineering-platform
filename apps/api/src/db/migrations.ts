@@ -1134,6 +1134,25 @@ where lower(base_url) in (
 );
 `;
 
+export const promptRuntimeSql = `
+create table if not exists prompt_runtime_versions (
+  id uuid primary key,
+  prompt_id text not null,
+  content text not null,
+  status text not null check (status in ('draft','pending','published','superseded')),
+  revision integer not null default 1,
+  author text not null,
+  approver text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists prompt_runtime_versions_prompt_idx on prompt_runtime_versions(prompt_id, created_at desc);
+create table if not exists prompt_runtime_active (
+  prompt_id text primary key,
+  version_id uuid not null references prompt_runtime_versions(id)
+);
+`;
+
 export const migrations = [
   {
     id: "001_user_admin_platform_base",
@@ -1238,6 +1257,10 @@ export const migrations = [
   {
     id: "026_nonelinear_domestic_endpoint",
     sql: noneLinearDomesticEndpointSql,
+  },
+  {
+    id: "027_prompt_runtime_versions",
+    sql: promptRuntimeSql,
   },
 ] as const;
 

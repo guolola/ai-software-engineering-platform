@@ -59,6 +59,8 @@ export function stageProgressValue(stage: RunStage) {
       return 80;
     case "render_svg":
       return 95;
+    case "verify_diagram_visual":
+      return 98;
     case "generate_context":
       return 35;
     case "generate_business_flow":

@@ -4,26 +4,6 @@ import type { AdminActor } from "../security/admin-guard.js";
 import { actorLabel } from "./admin-route-presenters.js";
 import { recordAdminAction } from "./admin-route-security.js";
 
-export type AdminPromptRuntimeStatus =
-  | "stable"
-  | "canary"
-  | "rollback-ready"
-  | "disabled";
-export type AdminPromptRuntimeAction =
-  | "submit"
-  | "approve"
-  | "rollback"
-  | "disable";
-
-type PromptRuntimeItem = {
-  id: string;
-  name: string;
-  version: string;
-  status: AdminPromptRuntimeStatus;
-  approver: string;
-  updatedAt: string;
-};
-
 type RolePermissionReview = {
   id: string;
   highRisk: boolean;
@@ -70,49 +50,6 @@ export async function reviewAdminRoleHighRiskPermissions({
       auditLog,
       auditMessage: "审计已记录：高危角色权限已复核",
       role,
-    },
-  };
-}
-
-export async function mutateAdminPromptRuntime({
-  authStore,
-  actor,
-  promptRuntimeItems,
-  promptRuntimeItemId,
-  nextStatus,
-  action,
-}: {
-  authStore: AuthStore;
-  actor: AdminActor;
-  promptRuntimeItems: PromptRuntimeItem[];
-  promptRuntimeItemId: string;
-  nextStatus: AdminPromptRuntimeStatus;
-  action: AdminPromptRuntimeAction;
-}): AdminGovernanceActionResult {
-  const item = promptRuntimeItems.find(
-    (entry) => entry.id === promptRuntimeItemId,
-  );
-  if (!item) {
-    return { statusCode: 404, body: { message: "Prompt runtime item not found" } };
-  }
-
-  item.status = nextStatus;
-  item.approver = actor.name;
-  item.updatedAt = new Date().toISOString();
-  const auditLog = await recordAdminAction(authStore, {
-    actor,
-    action: `admin.prompt_runtime.${action}`,
-    targetType: "prompt_runtime",
-    targetId: promptRuntimeItemId,
-    outcome: "success",
-    message: `Actor ${actorLabel(actor)} changed prompt runtime ${item.name} (${promptRuntimeItemId}) to ${nextStatus}`,
-  });
-  return {
-    statusCode: 200,
-    body: {
-      message: `Prompt runtime ${action} completed`,
-      promptRuntimeItem: item,
-      auditLog,
     },
   };
 }

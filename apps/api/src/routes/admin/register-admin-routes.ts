@@ -1,5 +1,7 @@
 // Registers admin endpoints and delegates provider key handling to secure storage.
 import { timingSafeEqual } from "node:crypto";
+import { getPromptRuntimeStore, PromptRuntimeError } from "../../prompt-runtime/store.js";
+import { recordAdminAction } from "../../admin/admin-route-security.js";
 import { z } from "zod";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
@@ -84,10 +86,7 @@ import {
   resetAdminUserMfa,
 } from "../../admin/admin-user-project-actions.js";
 import {
-  mutateAdminPromptRuntime,
   reviewAdminRoleHighRiskPermissions,
-  type AdminPromptRuntimeAction,
-  type AdminPromptRuntimeStatus,
 } from "../../admin/admin-governance-actions.js";
 import {
   createAdminRateLimitPolicy,
@@ -137,15 +136,12 @@ import {
   getAdminUserProjectsView,
 } from "../../admin/admin-user-project-read-model.js";
 import {
-  buildPromptRuntimeListView,
   buildRolePermissionsView,
   buildSystemConfigView,
   buildSystemHealthView,
   buildSystemLogsView,
   buildSystemReleasesView,
-  createPromptRuntimeItems,
   findRolePermission,
-  getPromptRuntimeVersionsView,
 } from "./admin-console-model.js";
 import {
   hasAcademicRead,
@@ -328,7 +324,7 @@ export function registerAdminRoutes({
   const rateLimitPolicyStore =
     createRateLimitPolicyStoreWithFallback(providerUsageTracker);
   const academicStore = providedAcademicStore ?? createAcademicAdminRepository(app);
-  const promptRuntimeItems = createPromptRuntimeItems();
+  const promptRuntimeStore = getPromptRuntimeStore();
 
   async function requireAcademicRead(request: FastifyRequest, reply: FastifyReply) {
     const actor = await requireScopedAdminActor(request, reply, authStore);
@@ -991,72 +987,97 @@ export function registerAdminRoutes({
     return result.body;
   });
 
-  sendAdminOnly(app, "/api/admin/prompt-runtime", async (request, reply) => {
-    const actor = await requireAdminPermission(
-      request,
-      reply,
-      authStore,
-      "admin.system_health.read",
-    );
-    if ("message" in actor) return actor;
-    return buildPromptRuntimeListView(promptRuntimeItems);
-  });
 
-  app.get("/api/admin/prompt-runtime/:id/versions", async (request, reply) => {
-    const actor = await requireAdminPermission(
-      request,
-      reply,
-      authStore,
-      "admin.system_health.read",
-    );
-    if ("message" in actor) return actor;
-    const { id } = request.params as { id: string };
-    const result = getPromptRuntimeVersionsView(promptRuntimeItems, id);
-    reply.code(result.statusCode);
-    return result.body;
-  });
-
-  async function mutatePromptRuntime(
-    request: FastifyRequest,
-    reply: FastifyReply,
-    nextStatus: AdminPromptRuntimeStatus,
-    action: AdminPromptRuntimeAction,
-  ) {
-    const { id } = request.params as { id: string };
-    const actor = await requireHighRiskAdmin(
-      request,
-      reply,
-      authStore,
-      `admin.prompt_runtime.${action}`,
-      "prompt_runtime",
-      id,
-      "admin.prompt_runtime.write",
-    );
-    if ("message" in actor) return actor;
-    const result = await mutateAdminPromptRuntime({
-      authStore,
-      actor,
-      promptRuntimeItems,
-      promptRuntimeItemId: id,
-      nextStatus,
-      action,
-    });
-    reply.code(result.statusCode);
-    return result.body;
+  // Prompt transitions are checked and audited because publication affects future model calls.
+  async function promptRead(request: FastifyRequest, reply: FastifyReply) {
+    return requireAdminPermission(request, reply, authStore, "admin.system_health.read");
   }
-
-  app.post("/api/admin/prompt-runtime/:id/submit", (request, reply) =>
-    mutatePromptRuntime(request, reply, "canary", "submit"),
-  );
-  app.post("/api/admin/prompt-runtime/:id/approve", (request, reply) =>
-    mutatePromptRuntime(request, reply, "stable", "approve"),
-  );
-  app.post("/api/admin/prompt-runtime/:id/rollback", (request, reply) =>
-    mutatePromptRuntime(request, reply, "rollback-ready", "rollback"),
-  );
-  app.post("/api/admin/prompt-runtime/:id/disable", (request, reply) =>
-    mutatePromptRuntime(request, reply, "disabled", "disable"),
-  );
+  async function promptWrite(request: FastifyRequest, reply: FastifyReply, id: string, action: string) {
+    return requireHighRiskAdmin(request, reply, authStore,
+      "admin.prompt_runtime." + action, "prompt_runtime", id, "admin.prompt_runtime.write");
+  }
+  async function promptResponse(reply: FastifyReply, operation: () => Promise<unknown>) {
+    try { return await operation(); }
+    catch (error) {
+      if (error instanceof PromptRuntimeError) {
+        reply.code(error.statusCode); return { message: error.message };
+      }
+      throw error;
+    }
+  }
+  sendAdminOnly(app, "/api/admin/prompt-runtime", async (request, reply) => {
+    const actor = await promptRead(request, reply);
+    if ("message" in actor) return actor;
+    return { generatedAt: new Date().toISOString(), promptRuntimeItems: await promptRuntimeStore.list() };
+  });
+  app.get("/api/admin/prompt-runtime/:id", async (request, reply) => {
+    const actor = await promptRead(request, reply);
+    if ("message" in actor) return actor;
+    const { id } = request.params as { id: string };
+    return promptResponse(reply, () => promptRuntimeStore.detail(id));
+  });
+  app.get("/api/admin/prompt-runtime/:id/versions", async (request, reply) => {
+    const actor = await promptRead(request, reply);
+    if ("message" in actor) return actor;
+    const { id } = request.params as { id: string };
+    return promptResponse(reply, async () => ({ versions: await promptRuntimeStore.versions(id) }));
+  });
+  app.post("/api/admin/prompt-runtime/:id/drafts", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const actor = await promptWrite(request, reply, id, "draft.create");
+    if ("message" in actor) return actor;
+    const { content } = z.object({ content: z.string() }).parse(request.body);
+    return promptResponse(reply, async () => {
+      const version = await promptRuntimeStore.createDraft(id, content, actor.name);
+      await recordAdminAction(authStore, { actor, action: "admin.prompt_runtime.draft.create",
+        targetType: "prompt_runtime", targetId: id, outcome: "success",
+        message: "Created prompt draft " + version.id });
+      return { version };
+    });
+  });
+  app.put("/api/admin/prompt-runtime/:id/drafts/:versionId", async (request, reply) => {
+    const { id, versionId } = request.params as { id: string; versionId: string };
+    const actor = await promptWrite(request, reply, id, "draft.update");
+    if ("message" in actor) return actor;
+    const { content, revision } = z.object({ content: z.string(), revision: z.number().int() }).parse(request.body);
+    return promptResponse(reply, async () => {
+      const version = await promptRuntimeStore.updateDraft(id, versionId, content, revision, actor.name);
+      await recordAdminAction(authStore, { actor, action: "admin.prompt_runtime.draft.update",
+        targetType: "prompt_runtime", targetId: id, outcome: "success",
+        message: "Updated prompt draft " + version.id });
+      return { version };
+    });
+  });
+  for (const action of ["submit", "approve", "rollback"] as const) {
+    app.post("/api/admin/prompt-runtime/:id/versions/:versionId/" + action, async (request, reply) => {
+      const { id, versionId } = request.params as { id: string; versionId: string };
+      const actor = await promptWrite(request, reply, id, action);
+      if ("message" in actor) return actor;
+      return promptResponse(reply, async () => {
+        const version = action === "submit"
+          ? await promptRuntimeStore.submit(id, versionId, actor.name)
+          : action === "approve"
+          ? await promptRuntimeStore.approve(id, versionId, actor.name)
+          : await promptRuntimeStore.rollback(id, versionId);
+        await recordAdminAction(authStore, { actor, action: "admin.prompt_runtime." + action,
+          targetType: "prompt_runtime", targetId: id, outcome: "success",
+          message: action + " prompt version " + versionId });
+        return { version };
+      });
+    });
+  }
+  app.post("/api/admin/prompt-runtime/:id/disable", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const actor = await promptWrite(request, reply, id, "disable");
+    if ("message" in actor) return actor;
+    return promptResponse(reply, async () => {
+      const result = await promptRuntimeStore.disable(id);
+      await recordAdminAction(authStore, { actor, action: "admin.prompt_runtime.disable",
+        targetType: "prompt_runtime", targetId: id, outcome: "success",
+        message: "Restored code default prompt instruction" });
+      return result;
+    });
+  });
 
   sendAdminOnly(app, "/api/admin/documents", async (request, reply) => {
     const actor = await requireAdminPermission(

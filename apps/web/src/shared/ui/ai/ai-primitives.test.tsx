@@ -1,29 +1,42 @@
 // Verifies the shadcn.io/ai-style reasoning and agent turn primitives.
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CpuIcon } from "lucide-react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AgentTurn } from "./agent-turn";
-import { Reasoning } from "./reasoning";
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "./reasoning";
 
 describe("Reasoning", () => {
   it("collapses and expands streaming stage output", async () => {
-    render(<Reasoning title="思考过程">正在补齐依赖</Reasoning>);
+    render(<Reasoning><ReasoningTrigger>思考过程</ReasoningTrigger><ReasoningContent>正在补齐依赖</ReasoningContent></Reasoning>);
 
     const trigger = screen.getByRole("button", { name: /思考过程/u });
-    expect(screen.queryByText("正在补齐依赖")).not.toBeVisible();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(trigger);
     expect(screen.getByText("正在补齐依赖")).toBeVisible();
   });
 
   it("opens by default for running stages", () => {
     render(
-      <Reasoning title="思考过程" defaultOpen>
-        流式输出
-      </Reasoning>,
+      <Reasoning isStreaming><ReasoningTrigger /><ReasoningContent>流式输出</ReasoningContent></Reasoning>,
     );
 
     expect(screen.getByText("流式输出")).toBeVisible();
+    expect(screen.getByText("正在思考…")).toBeInTheDocument();
+  });
+
+  it("closes after streaming ends while preserving a manual reopen", () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(<Reasoning isStreaming><ReasoningTrigger /><ReasoningContent>真实推理</ReasoningContent></Reasoning>);
+      rerender(<Reasoning isStreaming={false}><ReasoningTrigger /><ReasoningContent>真实推理</ReasoningContent></Reasoning>);
+      act(() => vi.advanceTimersByTime(1000));
+      const trigger = screen.getByRole("button", { name: /思考过程|思考了/u });
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+      fireEvent.click(trigger);
+      expect(trigger).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText("真实推理")).toBeVisible();
+    } finally { vi.useRealTimers(); }
   });
 });
 

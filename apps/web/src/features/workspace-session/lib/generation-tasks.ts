@@ -121,6 +121,7 @@ const STAGE_SCOPED_SUBTASK_STAGES = [
   "generate_design_models",
   "generate_plantuml",
   "render_svg",
+  "verify_diagram_visual",
 ] as const satisfies readonly RunStage[];
 
 type StageScopedSubtaskStage = (typeof STAGE_SCOPED_SUBTASK_STAGES)[number];
@@ -225,11 +226,15 @@ function diagramPipelineSummarySubtasks(task: GenerationTask, subtasks: Generati
     svg: subtasks.filter(
       (subtask) => splitScopedSubtaskId(subtask.id)?.stage === "render_svg",
     ),
+    visual: subtasks.filter(
+      (subtask) => splitScopedSubtaskId(subtask.id)?.stage === "verify_diagram_visual",
+    ),
   };
   if (
     phases.model.length === 0 &&
     phases.plantuml.length === 0 &&
-    phases.svg.length === 0
+    phases.svg.length === 0 &&
+    phases.visual.length === 0
   ) {
     return null;
   }
@@ -352,7 +357,7 @@ function updateSubtasksFromEvent(
       return "已完成";
     }
     if (event.type === "stage_progress") {
-      return eventFailureMessage(event) ?? previousMessage;
+      return event.message ?? eventFailureMessage(event) ?? previousMessage;
     }
     return previousMessage;
   };
@@ -427,14 +432,17 @@ function failDownstreamRenderSubtasksForModelFailure(
     !rawSubtaskId ||
     (event.stage !== "generate_models" &&
       event.stage !== "generate_design_sequence" &&
-      event.stage !== "generate_design_models")
+      event.stage !== "generate_design_models" &&
+      event.stage !== "render_svg")
   ) {
     return subtasks;
   }
   return subtasks.map((subtask) => {
     const scoped = splitScopedSubtaskId(subtask.id);
     if (
-      (scoped?.stage !== "generate_plantuml" && scoped?.stage !== "render_svg") ||
+      (event.stage === "render_svg"
+        ? scoped?.stage !== "verify_diagram_visual"
+        : scoped?.stage !== "generate_plantuml" && scoped?.stage !== "render_svg" && scoped?.stage !== "verify_diagram_visual") ||
       scoped.rawId !== rawSubtaskId ||
       subtask.status === "completed"
     ) {
@@ -443,7 +451,7 @@ function failDownstreamRenderSubtasksForModelFailure(
     return {
       ...subtask,
       status: "failed" as const,
-      message: "前置模型生成失败，未执行",
+      message: event.stage === "render_svg" ? "图像渲染失败，未执行视觉检查" : "前置模型生成失败，未执行",
       errorMessage: event.error
         ? localizeRunFailure(event.error, "前置模型生成失败")
         : event.message ?? "前置模型生成失败",
@@ -490,6 +498,9 @@ function collectCompletedSubtaskIds(snapshot: unknown) {
       addCompletedId("render_svg", artifact.diagramKind);
       addCompletedId("render_svg", artifact.modelId);
     }
+  }
+  if (isRecord(snapshot.visualReviews)) {
+    for (const id of Object.keys(snapshot.visualReviews)) addCompletedId("verify_diagram_visual", id);
   }
   return ids;
 }
@@ -576,6 +587,14 @@ function updateSubtasksFromCompletedSnapshot(
       };
     }
     if (completedIds.has(subtask.id) && subtask.status !== "failed") {
+      const visual = splitScopedSubtaskId(subtask.id)?.stage === "verify_diagram_visual"
+        ? (snapshot.visualReviews as Record<string, { status?: string; reason?: string }> | undefined)?.[splitScopedSubtaskId(subtask.id)?.rawId ?? ""]
+        : undefined;
+      if (visual) return {
+        ...subtask,
+        status: visual.status === "pending_review" ? "pending_review" as const : "completed" as const,
+        message: visual.reason ?? "视觉检查已完成",
+      };
       const pendingReviewCount = pendingReviewByDiagram.get(subtask.id) ?? 0;
       const status =
         pendingReviewCount > 0 ? ("pending_review" as const) : ("completed" as const);
@@ -618,24 +637,28 @@ function titleWithSubtaskSummary(task: GenerationTask, subtasks: GenerationSubta
     const modelDone = phaseDoneCount(pipeline.model);
     const plantUmlDone = phaseDoneCount(pipeline.plantuml);
     const svgDone = phaseDoneCount(pipeline.svg);
+    const visualDone = phaseDoneCount(pipeline.visual);
     const failed = pipelineFailedModelCount([
       ...pipeline.model,
       ...pipeline.plantuml,
       ...pipeline.svg,
+      ...pipeline.visual,
     ]);
-    const pendingReview = pipeline.model.filter(
+    const pendingReview = [...pipeline.model, ...pipeline.visual].filter(
       (subtask) => subtask.status === "pending_review",
     ).length;
     const svgTotal = pipeline.svg.length;
+    const visualTotal = pipeline.visual.length;
+    const visualSummary = visualTotal > 0 ? `，视觉 ${visualDone}/${visualTotal}` : "";
     if (failed > 0) {
-      return `${baseTitle}：模型 ${modelDone}/${pipeline.model.length}，图源码 ${plantUmlDone}/${pipeline.plantuml.length}，SVG ${svgDone}/${svgTotal}，${failed} 个失败`;
+      return `${baseTitle}：模型 ${modelDone}/${pipeline.model.length}，图源码 ${plantUmlDone}/${pipeline.plantuml.length}，SVG ${svgDone}/${svgTotal}${visualSummary}，${failed} 个失败`;
     }
-    if (svgTotal > 0 && svgDone === svgTotal) {
+    if (visualTotal > 0 && visualDone === visualTotal) {
       return pendingReview > 0
-        ? `${baseTitle}：${svgDone}/${svgTotal} 可查看，${pendingReview} 个待确认`
-        : `${baseTitle}：${svgDone}/${svgTotal} 可查看`;
+        ? `${baseTitle}：${visualDone}/${visualTotal} 可查看，${pendingReview} 个待确认`
+        : `${baseTitle}：${visualDone}/${visualTotal} 已检查`;
     }
-    return `${baseTitle}：模型 ${modelDone}/${pipeline.model.length}，图源码 ${plantUmlDone}/${pipeline.plantuml.length}，SVG ${svgDone}/${svgTotal}`;
+    return `${baseTitle}：模型 ${modelDone}/${pipeline.model.length}，图源码 ${plantUmlDone}/${pipeline.plantuml.length}，SVG ${svgDone}/${svgTotal}${visualSummary}`;
   }
   const summarySubtasks = primarySummarySubtasks(task, subtasks);
   const completed = summarySubtasks.filter((subtask) => subtask.status === "completed").length;

@@ -98,6 +98,7 @@ const STAGE_LABELS: Record<RunStage, string> = {
   verify_code_business_assertions: "verify_code_business_assertions", verify_code_preview: "verify_code_preview", repair_code_files: "repair_code_files",
   generate_document_text: "generate_document_text", render_document_file: "render_document_file", generate_plantuml: "generate_plantuml",
   render_svg: "render_svg", generate_context: "generate_context", render_context: "render_context", generate_implementation: "generate_implementation",
+  verify_diagram_visual: "verify_diagram_visual",
 };
 
 const STAGES_BY_KIND: Record<RunKind, RunStage[]> = {
@@ -106,12 +107,14 @@ const STAGES_BY_KIND: Record<RunKind, RunStage[]> = {
     "generate_models",
     "generate_plantuml",
     "render_svg",
+    "verify_diagram_visual",
   ],
   design: [
     "generate_design_sequence",
     "generate_design_models",
     "generate_plantuml",
     "render_svg",
+    "verify_diagram_visual",
   ],
   code: [
     "analyze_code_business_logic",
@@ -128,6 +131,7 @@ const STAGES_BY_KIND: Record<RunKind, RunStage[]> = {
   feasibility: [
     "generate_context",
     "render_context",
+    "verify_diagram_visual",
     "generate_business_flow",
     "render_business_flow",
     "generate_implementation",
