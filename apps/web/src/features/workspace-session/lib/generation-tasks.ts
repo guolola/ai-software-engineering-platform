@@ -1,5 +1,5 @@
 // Maintains per-run task state so concurrent generation jobs keep separate progress and logs.
-import type { RunEvent, RunStage } from "@uml-platform/contracts";
+import type { DiagramVisualReview, RunEvent, RunStage } from "@uml-platform/contracts";
 import type {
   GenerationTask,
   GenerationTaskKind,
@@ -16,7 +16,7 @@ import {
   summarizeEvent,
 } from "./diagnostics";
 import { appendTranscriptEvent } from "./run-transcript";
-import { visualReviewDetail } from "./visual-review-message";
+import { isConfirmedVisualReview, visualReviewDetail } from "./visual-review-message";
 import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 
 function runFailureMessage(event: RunEvent) {
@@ -685,6 +685,21 @@ export function taskStatusFromEvent(event: RunEvent): RunStatus {
   if (event.type === "cancelled") return "cancelled";
   if (event.type === "completed") return "completed";
   return "running";
+}
+
+export function applyVisualReviewConfirmations(task: GenerationTask, currentReviews: Record<string, DiagramVisualReview>): GenerationTask {
+  const completed = [...(task.diagnostics.transcript ?? [])].reverse().find((event) => event.type === "completed");
+  if (!completed || !("visualReviews" in completed.snapshot)) return task;
+  const snapshotReviews = completed.snapshot.visualReviews;
+  let changed = false;
+  const subtasks = task.subtasks.map((subtask) => {
+    if (subtask.status !== "pending_review" || !subtask.id.startsWith("verify_diagram_visual:")) return subtask;
+    const id = subtask.id.slice("verify_diagram_visual:".length);
+    if (!isConfirmedVisualReview(snapshotReviews?.[id], currentReviews[`${task.kind}:${id}`])) return subtask;
+    changed = true;
+    return { ...subtask, status: "completed" as const, message: "已人工确认当前图" };
+  });
+  return changed ? { ...task, subtasks, title: titleWithSubtaskSummary(task, subtasks) } : task;
 }
 
 function failedSubtaskCount(subtasks: GenerationSubtask[]) {

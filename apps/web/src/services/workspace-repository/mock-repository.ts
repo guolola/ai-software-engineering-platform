@@ -240,6 +240,7 @@ export function createMockWorkspaceRepository(
         feasibilityContextTraceability: patch.contextTraceability ?? workspace.feasibilityContextTraceability,
         feasibilityContextPlantUml: patch.contextPlantUml ?? workspace.feasibilityContextPlantUml,
         feasibilityContextSvg: patch.contextSvg ?? workspace.feasibilityContextSvg,
+        visualReviews: patch.contextSvg === undefined ? workspace.visualReviews : Object.fromEntries(Object.entries(workspace.visualReviews ?? {}).filter(([key]) => !key.startsWith("feasibility:"))),
         feasibilityContextFingerprint: patch.contextFingerprint === undefined ? workspace.feasibilityContextFingerprint : patch.contextFingerprint,
         feasibilityImplementationPlan: patch.implementationPlan === undefined ? workspace.feasibilityImplementationPlan : patch.implementationPlan,
         feasibilityImplementationFingerprint: patch.implementationFingerprint === undefined ? workspace.feasibilityImplementationFingerprint : patch.implementationFingerprint,
@@ -736,6 +737,16 @@ export function createMockWorkspaceRepository(
       };
     },
 
+    async confirmVisualReview(key, checkedAt) {
+      const review = workspace.visualReviews?.[key];
+      if (!review || review.status !== "pending_review" || review.checkedAt !== checkedAt) {
+        throw new Error("视觉检查结果已更新，请刷新后重试。");
+      }
+      const confirmed = { ...review, confirmedAt: review.confirmedAt ?? new Date().toISOString() };
+      workspace = { ...workspace, visualReviews: { ...workspace.visualReviews, [key]: confirmed } };
+      return confirmed;
+    },
+
     async saveRequirementModelEdit(_diagramKind, model, status, traceability) {
       const modelKey = getRequirementModelId(model);
       workspace = {
@@ -773,6 +784,7 @@ export function createMockWorkspaceRepository(
       const isDesign = key in workspace.designModels;
       workspace = {
         ...workspace,
+        visualReviews: Object.fromEntries(Object.entries(workspace.visualReviews ?? {}).filter(([reviewKey]) => reviewKey !== `${isDesign ? "design" : "requirements"}:${key}`)),
         manualModelEditStatus: {
           ...workspace.manualModelEditStatus,
           [key]: status,

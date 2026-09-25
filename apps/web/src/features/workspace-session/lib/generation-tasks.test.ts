@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { RunEvent } from "@uml-platform/contracts";
 import {
+  applyVisualReviewConfirmations,
   createGenerationTask,
   updateDiagnosticsFromEvent,
   updateTaskFromEvent,
@@ -10,6 +11,18 @@ import { createEmptyDiagnostics } from "./diagnostics";
 import { createRequirementBaseline, createRunSnapshot } from "../../../test/workspace-test-utils";
 
 describe("workspace-session generation task helpers", () => {
+  it("clears only the confirmed visual subtask from the task summary", () => {
+    const review = { status: "pending_review" as const, issues: ["标签不可读"], reason: "请人工确认", attempts: 3, checkedAt: "check-1" };
+    const task = createGenerationTask({ clientTaskId: "confirm-visual", kind: "requirements", title: "需求模型生成", providerModel: null, startedAt: "now", message: "已完成", subtasks: [
+      { id: "verify_diagram_visual:usecase", label: "用例图", status: "pending_review", message: review.reason, errorMessage: null },
+    ] });
+    task.diagnostics.transcript = [{ type: "completed", snapshot: createRunSnapshot({ status: "completed", visualReviews: { usecase: review } }) }];
+    const confirmed = applyVisualReviewConfirmations(task, { "requirements:usecase": { ...review, confirmedAt: "confirmed" } });
+    expect(confirmed.subtasks[0]).toEqual(expect.objectContaining({ status: "completed", message: "已人工确认当前图" }));
+    expect(confirmed.title).not.toContain("待确认");
+    expect(applyVisualReviewConfirmations(task, { "requirements:usecase": { ...review, checkedAt: "check-2", confirmedAt: "confirmed" } }).subtasks[0].status).toBe("pending_review");
+  });
+
   it("keeps each diagram in visual review after SVG completion", () => {
     let task = createGenerationTask({
       clientTaskId: "visual-parallel", kind: "requirements", title: "需求模型生成",

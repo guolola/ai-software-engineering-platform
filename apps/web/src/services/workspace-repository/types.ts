@@ -5,6 +5,7 @@ import type {
   DesignDiagramModelSpec,
   DesignRunSnapshot,
   DesignSvgArtifact,
+  DiagramVisualReview,
   DiagramModelSpec,
   DocumentLibraryItem,
   DocumentRunSnapshot,
@@ -100,6 +101,8 @@ export interface WorkspaceRepository {
     baseline: RequirementBaseline,
     candidates: WorkspaceRecord["requirementReviewCandidates"],
   ): Promise<void>;
+  confirmVisualReview?(key: string, checkedAt: string): Promise<DiagramVisualReview>;
+  confirmVisualReview?(key: string, checkedAt: string): Promise<DiagramVisualReview>;
   repairRequirementRule?(
     input: RepairRequirementRuleRequest,
   ): Promise<RepairRequirementRuleResponse>;

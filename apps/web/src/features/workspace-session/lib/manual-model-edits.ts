@@ -50,6 +50,7 @@ interface ManualModelEditActionsInput {
     SetStateAction<WorkspaceRecord["requirementModelTraceability"]>
   >;
   setSvgArtifacts: Dispatch<SetStateAction<WorkspaceRecord["svgArtifacts"]>>;
+  setVisualReviews: Dispatch<SetStateAction<NonNullable<WorkspaceRecord["visualReviews"]>>>;
 }
 
 export function useManualModelEditActions({
@@ -71,6 +72,7 @@ export function useManualModelEditActions({
   setPlantUml,
   setRequirementModelTraceability,
   setSvgArtifacts,
+  setVisualReviews,
 }: ManualModelEditActionsInput) {
   const { t } = useTranslation();
   const createManualEditStatus = useCallback(
@@ -199,6 +201,11 @@ export function useManualModelEditActions({
         ...current,
         [modelKey]: status,
       }));
+      setVisualReviews((current) => {
+        const next = { ...current };
+        delete next[`requirements:${modelKey}`];
+        return next;
+      });
       await repository.saveManualModelRerender?.(modelKey, status, {
         plantUmlSource: rendered.plantUmlSource,
         svgArtifact,
@@ -216,6 +223,7 @@ export function useManualModelEditActions({
       setManualModelEditStatus,
       setPlantUml,
       setSvgArtifacts,
+      setVisualReviews,
     ],
   );
 
@@ -262,6 +270,11 @@ export function useManualModelEditActions({
         ...current,
         [modelId]: status,
       }));
+      setVisualReviews((current) => {
+        const next = { ...current };
+        delete next[`design:${modelId}`];
+        return next;
+      });
       await repository.saveManualModelRerender?.(modelId, status, {
         plantUmlSource: rendered.plantUmlSource,
         svgArtifact,
@@ -277,6 +290,7 @@ export function useManualModelEditActions({
       setDesignDiagramErrors,
       setDesignPlantUml,
       setDesignSvgArtifacts,
+      setVisualReviews,
       setGeneratedDesignDiagrams,
       setManualModelEditStatus,
     ],

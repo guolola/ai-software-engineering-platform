@@ -7,3 +7,10 @@ export function visualReviewDetail(review: {
   const issues = review.issues?.map((issue) => issue.trim()).filter(Boolean) ?? [];
   return issues.length > 0 ? issues.join("；") : review.reason?.trim() || null;
 }
+
+export function isConfirmedVisualReview(
+  review: { checkedAt?: string; status?: string } | null | undefined,
+  current: { checkedAt?: string; confirmedAt?: string } | null | undefined,
+) {
+  return review?.status === "pending_review" && Boolean(review.checkedAt && current?.confirmedAt && current.checkedAt === review.checkedAt);
+}

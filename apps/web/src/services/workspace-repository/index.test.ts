@@ -1727,6 +1727,29 @@ describe("createHttpWorkspaceRepository", () => {
     ).toBe("第二次需求");
   });
 
+  it("does not confirm an obsolete visual check after a workspace conflict", async () => {
+    let reads = 0;
+    let writes = 0;
+    const fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
+      if (!url.endsWith("/api/projects/library-booking/workspace")) return new Response("not found", { status: 404 });
+      if (options?.method === "PUT") {
+        writes += 1;
+        return new Response(JSON.stringify({ message: "项目已由其他成员更新" }), { status: 409, headers: { "Content-Type": "application/json" } });
+      }
+      reads += 1;
+      return new Response(JSON.stringify({ projectId: "library-booking", version: reads, state: {
+        requirementText: "预约需求",
+        visualReviews: { "requirements:usecase": { status: "pending_review", issues: ["标签不可读"], reason: "请人工确认", attempts: 3, checkedAt: reads === 1 ? "check-old" : "check-new" } },
+      } }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const repository = createHttpWorkspaceRepository({ projectId: "library-booking" });
+    await repository.loadWorkspace();
+    await expect(repository.confirmVisualReview!("requirements:usecase", "check-old")).rejects.toThrow("视觉检查结果已更新");
+    expect(reads).toBe(2);
+    expect(writes).toBe(1);
+  });
+
   it("retries requirement review state saves after a project workspace conflict", async () => {
     const reviewedRequirement = createAtomicRequirement({
       actor: "用户",

@@ -1143,9 +1143,6 @@ export const resources = {
           saveFailed: "失败",
           savedToast: "修改已保存，当前图已更新",
           saveFailedToast: "保存失败，请稍后重试",
-          editWarningMapped: "模型已手动修改，可能与前置需求映射不一致。保存后会自动更新当前图。",
-          editWarningDefault:
-            "手动修改会更新当前模型结构，可能不再完全对应原始需求或上游用例。修改保存后会基于当前结构自动更新此图。",
           elementsTitle: "元素清单",
           elementsDescription: "按类型浏览模型元素，点击卡片可定位到对应元素。",
           gridView: "网格视图",
@@ -2650,10 +2647,6 @@ export const resources = {
           saveFailed: "Failed",
           savedToast: "Changes saved. The current diagram has been updated.",
           saveFailedToast: "Save failed. Try again later.",
-          editWarningMapped:
-            "This model was edited manually and may no longer match upstream requirement mappings. Saving will update the current diagram.",
-          editWarningDefault:
-            "Manual edits update the current model structure and may no longer fully match the original requirements or upstream use cases. Saving will rerender this diagram from the current structure.",
           elementsTitle: "Element list",
           elementsDescription: "Browse model elements by type. Select a card to focus the matching element.",
           gridView: "Grid view",

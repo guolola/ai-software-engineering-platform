@@ -1,8 +1,8 @@
 // Projects ordered run events into user-readable steps, keeping parallel calls and retries separate.
-import type { RunEvent, RunStage } from "@uml-platform/contracts";
+import type { DiagramVisualReview, RunEvent, RunStage } from "@uml-platform/contracts";
 import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 import { formatStageForDiagnostics, sanitizeDiagnosticText } from "../../workspace-session/lib/diagnostics";
-import { visualReviewDetail } from "../../workspace-session/lib/visual-review-message";
+import { isConfirmedVisualReview, visualReviewDetail } from "../../workspace-session/lib/visual-review-message";
 import type { GenerationSubtask } from "../../workspace-session/model/session-state";
 
 export type TranscriptStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "pending_review";
@@ -108,7 +108,7 @@ export function readableOutput(call: TranscriptCall) {
   catch { return ""; }
 }
 
-export function projectGenerationTranscript(events: RunEvent[], fallbackStatus = "running", subtasks: GenerationSubtask[] = []) {
+export function projectGenerationTranscript(events: RunEvent[], fallbackStatus = "running", subtasks: GenerationSubtask[] = [], currentVisualReviews: Record<string, DiagramVisualReview> = {}) {
   const repairSubtask = subtasks.find((subtask) => subtask.id === "repair_rules");
   const rulesOnly = Boolean(repairSubtask) || events.some((event) =>
     event.type === "completed" && "selectedDiagrams" in event.snapshot &&
@@ -287,9 +287,9 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       else if ("files" in snapshot) finalMessage = `已生成 ${Object.keys(snapshot.files).length} 个代码文件，可以查看原型。`;
       else if ("documentKind" in snapshot) finalMessage = `文档已生成${snapshot.fileName ? `：${snapshot.fileName}` : ""}。`;
       else if ("svgArtifacts" in snapshot) {
-        const visualReviews = "visualReviews" in snapshot ? Object.values(snapshot.visualReviews ?? {}) : [];
-        const pending = visualReviews.filter((review) => review.status === "pending_review").length;
-        const skipped = visualReviews.filter((review) => review.status === "skipped").length;
+        const visualReviews = "visualReviews" in snapshot ? Object.entries(snapshot.visualReviews ?? {}) : [];
+        const pending = visualReviews.filter(([id, review]) => review.status === "pending_review" && !isConfirmedVisualReview(review, currentVisualReviews[id])).length;
+        const skipped = visualReviews.filter(([, review]) => review.status === "skipped").length;
         finalMessage = `已生成 ${snapshot.svgArtifacts.length} 个图形预览。${pending ? `${pending} 个视觉检查待确认。` : ""}${skipped ? `${skipped} 个视觉检查已跳过。` : ""}`;
       }
       else finalMessage = "生成完成，可以查看结果。";
@@ -380,11 +380,19 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       }
     }
     for (const call of step.calls) {
+      if (step.stage === "verify_diagram_visual" && call.subtaskId && completed && "visualReviews" in completed.snapshot &&
+        isConfirmedVisualReview(completed.snapshot.visualReviews?.[call.subtaskId], currentVisualReviews[call.subtaskId])) {
+        call.status = "completed";
+        call.message = "已人工确认当前图";
+      }
       if (terminal && ["running", "queued"].includes(call.status)) {
         call.status = status === "completed" ? "completed" : status === "cancelled" ? "cancelled" : "failed";
         call.finishedAt = terminalAt;
         call.thinking = false;
       }
+    }
+    if (step.stage === "verify_diagram_visual" && step.status === "pending_review" && step.calls.every((call) => call.status !== "pending_review")) {
+      step.status = "completed";
     }
     // Fold lifecycle mirrors into the latest actual attempt; keep earlier failed attempts intact.
     const redundant = new Set<string>();

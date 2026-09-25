@@ -42,8 +42,8 @@ function progress(record: RunRecord, rendered: Rendered, message: string, status
   }));
 }
 
-function result(status: DiagramVisualReview["status"], issues: string[], reason: string, attempts: number) {
-  return diagramVisualReviewSchema.parse({ status, issues, reason, attempts, checkedAt: new Date().toISOString() });
+function result(status: DiagramVisualReview["status"], issues: string[], reason: string, attempts: number, repairAttempts: number) {
+  return diagramVisualReviewSchema.parse({ status, issues, reason, attempts, repairAttempts, checkedAt: new Date().toISOString() });
 }
 
 export async function reviewRenderedArtifact(input: {
@@ -59,13 +59,14 @@ export async function reviewRenderedArtifact(input: {
   let rendered = input.rendered;
   progress(record, rendered, "正在检查图面与结构化模型是否一致", "running", model.title);
   if (!pngRenderClient) {
-    const review = result("skipped", [], "当前运行环境无法生成检查所需的 PNG，已跳过视觉检查", 0);
+    const review = result("skipped", [], "当前运行环境无法生成检查所需的 PNG，已跳过视觉检查", 0, 0);
     progress(record, rendered, review.reason, "completed", model.title);
     return { rendered, review };
   }
 
   let issues: string[] = [];
   let checks = 0;
+  let repairs = 0;
   for (let attempt = 0; attempt <= MAX_VISUAL_REPAIRS; attempt += 1) {
     try {
       const image = await pngRenderClient(rendered.artifact);
@@ -87,13 +88,14 @@ export async function reviewRenderedArtifact(input: {
       const raw = await collectTextResult(llmTransport, providerSettings, messages, () => undefined, { type: "json_object" });
       const judgment = judgmentSchema.parse(parseJson(raw));
       if (judgment.passed && judgment.issues.length === 0) {
-        const review = result("passed", [], "图面与结构化模型一致", checks);
+        const review = result("passed", [], "图面与结构化模型一致", checks, repairs);
         progress(record, rendered, review.reason, "completed", model.title);
         return { rendered, review };
       }
       issues = judgment.issues.length ? judgment.issues : ["视觉模型未确认图面正确"];
       if (attempt === MAX_VISUAL_REPAIRS) break;
       progress(record, rendered, `视觉检查发现问题，正在修复（${attempt + 1}/${MAX_VISUAL_REPAIRS}）`, "repairing", model.title);
+      repairs += 1;
       const repairPrompt = `${buildRepairPlantUmlPrompt(rendered.artifact.diagramKind, model, rendered.artifact.source, issues.join("；"))}\n视觉检查问题：${issues.join("；")}\n只修改 PlantUML 源码，不修改结构化模型。`;
       const repairedRaw = await collectTextResult(
         llmTransport,
@@ -114,7 +116,7 @@ export async function reviewRenderedArtifact(input: {
       rendered = candidate;
     } catch (error) {
       if (unsupportedImage(error)) {
-        const review = result("skipped", [], "本次模型不支持图片输入，已跳过视觉检查", checks);
+        const review = result("skipped", [], "本次模型不支持图片输入，已跳过视觉检查", checks, repairs);
         progress(record, rendered, review.reason, "completed", model.title);
         return { rendered, review };
       }
@@ -123,7 +125,7 @@ export async function reviewRenderedArtifact(input: {
       break;
     }
   }
-  const review = result("pending_review", issues, "视觉检查仍有问题，请人工确认", checks);
+  const review = result("pending_review", issues, "视觉检查仍有问题，请人工确认", checks, repairs);
   progress(record, rendered, `${review.reason}：${issues.join("；")}`, "pending_review", model.title);
   return { rendered, review };
 }

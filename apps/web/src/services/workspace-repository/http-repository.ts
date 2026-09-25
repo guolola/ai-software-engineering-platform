@@ -447,6 +447,9 @@ export function createHttpWorkspaceRepository(
         if (patch.contextTraceability !== undefined) current.feasibilityContextTraceability = patch.contextTraceability;
         if (patch.contextPlantUml !== undefined) current.feasibilityContextPlantUml = patch.contextPlantUml;
         if (patch.contextSvg !== undefined) current.feasibilityContextSvg = patch.contextSvg;
+        if (patch.contextSvg !== undefined) {
+          current.visualReviews = Object.fromEntries(Object.entries(current.visualReviews ?? {}).filter(([key]) => !key.startsWith("feasibility:")));
+        }
         if (patch.contextFingerprint !== undefined) current.feasibilityContextFingerprint = patch.contextFingerprint;
         if (patch.implementationPlan !== undefined) current.feasibilityImplementationPlan = patch.implementationPlan;
         if (patch.implementationFingerprint !== undefined) current.feasibilityImplementationFingerprint = patch.implementationFingerprint;
@@ -668,6 +671,20 @@ export function createHttpWorkspaceRepository(
       return renderStructuredModelRequest(model, projectId);
     },
 
+    async confirmVisualReview(key, checkedAt) {
+      const saved = await updateProjectWorkspace((workspace) => {
+        const review = workspace.visualReviews?.[key];
+        if (!review || review.status !== "pending_review" || review.checkedAt !== checkedAt) {
+          throw new Error("视觉检查结果已更新，请刷新后重试。");
+        }
+        workspace.visualReviews = {
+          ...workspace.visualReviews,
+          [key]: { ...review, confirmedAt: review.confirmedAt ?? new Date().toISOString() },
+        };
+      });
+      return saved.visualReviews![key];
+    },
+
     async saveRequirementModelEdit(_diagramKind, model, status, traceability) {
       const modelKey = getRequirementModelId(model);
       await updateProjectWorkspace((workspace) => {
@@ -704,6 +721,7 @@ export function createHttpWorkspaceRepository(
           [key]: status,
         };
         if (key in workspace.designModels) {
+          if (workspace.visualReviews) delete workspace.visualReviews[`design:${key}`];
           workspace.designPlantUml = {
             ...workspace.designPlantUml,
             [key]: artifact.plantUmlSource,
@@ -713,6 +731,7 @@ export function createHttpWorkspaceRepository(
             [key]: artifact.svgArtifact as DesignSvgArtifact,
           };
         } else {
+          if (workspace.visualReviews) delete workspace.visualReviews[`requirements:${key}`];
           const diagramKind = key as DiagramType;
           workspace.plantUml = {
             ...workspace.plantUml,

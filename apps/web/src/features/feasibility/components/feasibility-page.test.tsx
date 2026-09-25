@@ -169,7 +169,11 @@ describe("FeasibilityPage", () => {
     await screen.findByRole("heading", { name: "业务与系统流程图" });
     expect(screen.getByRole("button", { name: "定位元素：处理登录" })).toBeInTheDocument();
     expect(screen.getByText("仅覆盖登录流程")).toBeInTheDocument();
-    expect(screen.getByText("此图基于旧规则生成，可能已过时。")).toBeInTheDocument();
+    expect(screen.queryByText("此图基于旧规则生成，可能已过时。")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /提示（\d+）/ }));
+    const notice = await screen.findByRole("dialog", { name: "模型提示" });
+    expect(within(notice).getByText("此图基于旧规则生成，可能已过时。")).toBeInTheDocument();
+    await userEvent.click(within(notice).getByRole("button", { name: "知道了" }));
     expect(screen.getByRole("button", { name: /PlantUML/ })).toBeEnabled();
     expect(screen.getByRole("button", { name: "SVG" })).toBeEnabled();
   });

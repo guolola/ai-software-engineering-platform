@@ -224,6 +224,7 @@ export interface WorkspaceSessionState {
   clearBillingGenerationBlock: () => void;
   generationTasks: GenerationTask[];
   visualReviews: NonNullable<WorkspaceRecord["visualReviews"]>;
+  confirmVisualReview: (key: string, checkedAt: string) => Promise<void>;
   visibleGenerationTask: GenerationTask | null;
   selectedGenerationTaskId: string | null;
   selectGenerationTask: (id: string) => void;

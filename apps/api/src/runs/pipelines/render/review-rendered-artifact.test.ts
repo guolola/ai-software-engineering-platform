@@ -50,6 +50,7 @@ test("repairs PlantUML and rerenders before accepting the second visual judgment
   const result = await reviewRenderedArtifact({ record: run, providerSettings: settings, llmTransport: transport, renderClient, pngRenderClient, model, rendered: await rendered(run) });
   assert.equal(result.review.status, "passed");
   assert.equal(calls, 3);
+  assert.equal(result.review.repairAttempts, 1);
   assert.match(result.rendered.artifact.source, /A --> B/);
   assert.deepEqual(model.relationships, []);
 });
@@ -82,6 +83,7 @@ test("keeps the last compilable source and issues when visual repairs are exhaus
   const result = await reviewRenderedArtifact({ record: run, providerSettings: settings, llmTransport: transport, renderClient, pngRenderClient, model, rendered: await rendered(run) });
   assert.equal(result.review.status, "pending_review");
   assert.equal(result.review.attempts, 3);
+  assert.equal(result.review.repairAttempts, 2);
   assert.deepEqual(result.review.issues, ["标签不可读"]);
   assert.match(result.rendered.artifact.source, /A --> B : 4/);
 });

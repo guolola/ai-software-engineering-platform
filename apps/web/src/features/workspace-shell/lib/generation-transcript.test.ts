@@ -95,6 +95,18 @@ describe("generation transcript", () => {
     ], "completed", [{ id: "verify_diagram_visual:usecase", label: "用例模型", status: "pending_review", message: "视觉检查仍有问题，请人工确认", errorMessage: null }]);
     expect(result.visibleSteps[0].calls[0].message).toBe("标签不可读；连线交叉");
   });
+  it("shows human acceptance for the matching historical visual check", () => {
+    const review = { status: "pending_review" as const, issues: ["标签不可读"], reason: "请人工确认", attempts: 3, checkedAt: "check-1" };
+    const events: RunEvent[] = [
+      { type: "stage_progress", stage: "verify_diagram_visual", progress: 98, subtaskId: "usecase", subtaskStatus: "pending_review", message: review.reason },
+      { type: "completed", snapshot: createRunSnapshot({ status: "completed", visualReviews: { usecase: review } }) },
+    ];
+    const accepted = projectGenerationTranscript(events, "completed", [], { usecase: { ...review, confirmedAt: "confirmed" } });
+    expect(accepted.visibleSteps[0].calls[0]).toEqual(expect.objectContaining({ status: "completed", message: "已人工确认当前图" }));
+    expect(accepted.finalMessage).not.toContain("待确认");
+    const regenerated = projectGenerationTranscript(events, "completed", [], { usecase: { ...review, checkedAt: "check-2", confirmedAt: "confirmed" } });
+    expect(regenerated.visibleSteps[0].calls[0].status).toBe("pending_review");
+  });
   it("streams document paragraphs without leaking JSON keys or inventing prose", () => {
     const item = { ...activity("doc", "doc", "output", '{"sections":[{"title":"概述","body":["第一段。","正在生成'), stage: "generate_document_text" as const };
     const call = projectGenerationTranscript([item]).steps[0].calls[0];

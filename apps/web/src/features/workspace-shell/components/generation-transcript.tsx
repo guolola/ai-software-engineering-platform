@@ -66,7 +66,7 @@ function ProcessCall({ call }: { call: TranscriptCall }) {
       <ReasoningTrigger aria-label={`思考过程 · ${call.title}`} />
       <ReasoningContent>{call.reasoning}</ReasoningContent>
     </Reasoning>}
-    {call.message && !["failed", "pending_review"].includes(call.status) && /修复|重试|补跑/.test(call.message) && <p className="ml-5 break-words">{call.message}</p>}
+    {call.message && !["failed", "pending_review"].includes(call.status) && /修复|重试|补跑|人工确认/.test(call.message) && <p className="ml-5 break-words">{call.message}</p>}
     {call.technical && call.output && <details className="ml-5">
       <summary className="w-fit cursor-pointer text-xs leading-6">查看技术原文 · {call.title}</summary>
       <pre className="mt-2 whitespace-pre-wrap break-all font-mono text-xs leading-6">{call.output}</pre>

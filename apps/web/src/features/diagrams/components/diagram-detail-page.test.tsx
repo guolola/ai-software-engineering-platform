@@ -118,7 +118,7 @@ describe("DiagramView", () => {
     };
   }
 
-  it("shows a clear error card when a diagram finished without SVG output", async () => {
+  it("shows a generation error in the notice dialog when a diagram has no SVG", async () => {
     const repository = createRepository(
       createWorkspaceRecord({
           generatedDiagramTypes: ["activity"],
@@ -138,9 +138,13 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DiagramView type="activity" />, repository));
 
-    expect(await screen.findByText("总体业务流程 生成失败")).toBeInTheDocument();
+    const noticeButton = await screen.findByRole("button", { name: /提示（\d+）/ });
+    expect(screen.queryByText("总体业务流程 生成失败")).not.toBeInTheDocument();
+    await userEvent.click(noticeButton);
+    const notice = await screen.findByRole("dialog", { name: "模型提示" });
+    expect(within(notice).getByText("总体业务流程 生成失败")).toBeInTheDocument();
     expect(
-      screen.getByText("图形渲染失败，请检查模型结果后重试。"),
+      within(notice).getByText("图形渲染失败，请检查模型结果后重试。"),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(/PlantUML repair failed|Syntax Error/u),
@@ -148,7 +152,7 @@ describe("DiagramView", () => {
   });
 
   it("shows a saved visual judgment after loading the workspace", async () => {
-    const repository = createRepository(createWorkspaceRecord({
+    const workspace = createWorkspaceRecord({
       generatedDiagramTypes: ["usecase"],
       models: { usecase: {
         diagramKind: "usecase", title: "用例模型", summary: "用例模型", notes: [],
@@ -162,9 +166,63 @@ describe("DiagramView", () => {
       visualReviews: { "requirements:usecase": {
         status: "pending_review", issues: ["标签不可读", "连线交叉"], reason: "视觉检查仍有问题，请人工确认", attempts: 3, checkedAt: new Date().toISOString(),
       } },
+    });
+    const repository = createRepository(workspace);
+    repository.confirmVisualReview = vi.fn(async (key, checkedAt) => {
+      const review = workspace.visualReviews?.[key];
+      if (!review || review.checkedAt !== checkedAt) throw new Error("视觉检查结果已更新");
+      const saved = { ...review, confirmedAt: new Date().toISOString() };
+      workspace.visualReviews = { ...workspace.visualReviews, [key]: saved };
+      return saved;
+    });
+    const { unmount } = render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
+    const noticeButton = await screen.findByRole("button", { name: /提示（\d+）/ });
+    expect(screen.queryByText("标签不可读")).not.toBeInTheDocument();
+    await userEvent.click(noticeButton);
+    const notice = await screen.findByRole("dialog", { name: "模型提示" });
+    expect(within(notice).getByText("标签不可读")).toBeInTheDocument();
+    expect(within(notice).getByText("连线交叉")).toBeInTheDocument();
+    expect(within(notice).getByText(/已检查 3 次/)).toBeInTheDocument();
+    await userEvent.click(within(notice).getByRole("button", { name: "确认当前图" }));
+    expect(await within(notice).findByText("已人工确认当前图")).toBeInTheDocument();
+    const saved = await repository.loadWorkspace();
+    expect(saved.visualReviews?.["requirements:usecase"]).toEqual(expect.objectContaining({ status: "pending_review", confirmedAt: expect.any(String) }));
+    unmount();
+    render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
+    await userEvent.click(await screen.findByRole("button", { name: /提示（\d+）/ }));
+    expect(within(await screen.findByRole("dialog", { name: "模型提示" })).getByText("已人工确认当前图")).toBeVisible();
+  });
+
+  it("shows the successful visual review reason in the notice dialog", async () => {
+    const repository = createRepository(createWorkspaceRecord({
+      generatedDiagramTypes: ["usecase"],
+      models: { usecase: { diagramKind: "usecase", title: "用例模型", summary: "用例模型", notes: [], actors: [], useCases: [], systemBoundaries: [], relationships: [] } },
+      svgArtifacts: { usecase: { diagramKind: "usecase", svg: "<svg />", renderMeta: { engine: "test", generatedAt: "now", sourceLength: 1, durationMs: 1 } } },
+      visualReviews: { "requirements:usecase": { status: "passed", issues: [], reason: "图形清晰可读", attempts: 1, checkedAt: "check-passed" } },
     }));
     render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
-    expect(await screen.findByText("视觉检查待确认：标签不可读；连线交叉")).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /提示（\d+）/ }));
+    expect(within(await screen.findByRole("dialog", { name: "模型提示" })).getByText("图形清晰可读")).toBeVisible();
+  });
+
+  it("uses the same notice dialog in the compact model layout", async () => {
+    const restoreViewport = stubCompactViewport(true);
+    try {
+      const repository = createRepository(createWorkspaceRecord({
+        generatedDiagramTypes: ["usecase"],
+        models: { usecase: { diagramKind: "usecase", title: "用例模型", summary: "用例模型", notes: [], actors: [], useCases: [], systemBoundaries: [], relationships: [] } },
+        svgArtifacts: { usecase: { diagramKind: "usecase", svg: "<svg />", renderMeta: { engine: "test", generatedAt: "now", sourceLength: 1, durationMs: 1 } } },
+        visualReviews: { "requirements:usecase": { status: "pending_review", issues: ["标签不可读"], reason: "请人工确认", attempts: 3, checkedAt: "check-mobile" } },
+      }));
+      render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
+      const button = await screen.findByRole("button", { name: /提示（\d+）/ });
+      expect(screen.queryByText("标签不可读")).not.toBeInTheDocument();
+      await userEvent.click(button);
+      expect(within(await screen.findByRole("dialog", { name: "模型提示" })).getByText("标签不可读")).toBeVisible();
+      expect(screen.queryByText(/手动修改会更新当前模型结构/)).not.toBeInTheDocument();
+    } finally {
+      restoreViewport();
+    }
   });
 
   it("offers PlantUML export without exposing source tabs or inline source", async () => {
@@ -1732,7 +1790,7 @@ describe("DiagramView", () => {
 
     expect(await screen.findByLabelText("模型标题")).toHaveValue("用例图");
     expect(screen.getByLabelText("模型摘要")).toHaveValue("教师登录系统");
-    expect(screen.getByText(/手动修改会更新当前模型结构/)).toBeInTheDocument();
+    expect(screen.queryByText(/手动修改会更新当前模型结构/)).not.toBeInTheDocument();
     expect(screen.queryByText("编辑模型")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "重新生成此图" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /元素/ })).not.toBeInTheDocument();

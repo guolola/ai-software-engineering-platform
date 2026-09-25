@@ -1,5 +1,4 @@
 // Renders the diagram detail workspace, including diagram selection, trace highlights, export actions, and model/SVG views.
-import { Alert } from '../../../shared/ui/alert';
 import { Card } from "../../../shared/ui/card";
 import { SpotlightCard } from "../../../shared/ui/interactive-card";
 import { Checkbox } from "../../../shared/ui/checkbox";
@@ -15,7 +14,6 @@ import {
 } from "@uml-platform/contracts";
 import { floatingAlert } from "../../../shared/ui/floating-alert";
 import {
-  AlertTriangle,
   Search,
   LayoutGrid,
   List,
@@ -24,6 +22,7 @@ import { Button } from "../../../shared/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../shared/ui/tabs";
 import { Badge } from "../../../shared/ui/badge";
 import { DiagramDetailHeader } from "./diagram-detail-header";
+import { ModelNotices, type ModelNotice } from "./model-notices";
 import { DiagramPreviewPanel } from "./diagram-preview-panel";
 import { ModelEditPanel } from "./model-edit-panel";
 import { sanitizeSvgMarkup } from "../lib/svg-sanitizer";
@@ -191,9 +190,10 @@ function DiagramDetailView({
     designDiagramErrors,
     generationTasks,
     visualReviews,
+    confirmVisualReview,
+    canUpdateWorkspace,
     rulesForDiagram,
     staleDiagrams,
-    manualModelEditStatus,
     saveRequirementModelEdit,
     saveDesignModelEdit,
     rerenderRequirementModel,
@@ -255,20 +255,29 @@ function DiagramDetailView({
     ? contextData?.model?.modelId ?? (isBusinessFlow ? "business-flow" : "context")
     : isDesign ? designArtifactId : requirementArtifactId;
   const visualTaskKind = isFeasibility ? "feasibility" : isDesign ? "design" : "requirements";
-  const visualSubtask = generationTasks
-    .filter((task) => task.kind === visualTaskKind)
-    .flatMap((task) => task.subtasks)
-    .find((subtask) => subtask.id === `verify_diagram_visual:${visualId}`);
-  const savedVisualReview = visualReviews[`${visualTaskKind}:${visualId}`];
+  const visualTask = generationTasks.find((task) => task.kind === visualTaskKind &&
+    task.subtasks.some((subtask) => subtask.id === `verify_diagram_visual:${visualId}`));
+  const visualSubtask = visualTask?.subtasks.find((subtask) => subtask.id === `verify_diagram_visual:${visualId}`);
+  const completedVisualTask = [...(visualTask?.diagnostics.transcript ?? [])].reverse().find((event) => event.type === "completed");
+  const taskVisualReview = completedVisualTask && "visualReviews" in completedVisualTask.snapshot
+    ? completedVisualTask.snapshot.visualReviews?.[visualId]
+    : undefined;
+  const savedReview = visualReviews[`${visualTaskKind}:${visualId}`];
+  // A newer task may already be inspecting another render while the old workspace review is still loaded.
+  const savedVisualReview = !visualTask || taskVisualReview?.checkedAt === savedReview?.checkedAt ? savedReview : undefined;
   const subtaskVisualMessage = visualSubtask?.message?.trim();
   const savedVisualDetail = visualReviewDetail(savedVisualReview);
+  const visualConfirmed = savedVisualReview?.status === "pending_review" && Boolean(savedVisualReview.confirmedAt) &&
+    (!visualSubtask || visualSubtask.message === "已人工确认当前图");
   // An older task may retain only the generic reason; the saved review carries its findings.
   const pendingVisualDetail = subtaskVisualMessage &&
     subtaskVisualMessage !== savedVisualReview?.reason &&
     subtaskVisualMessage !== "请查看生成任务"
       ? subtaskVisualMessage
       : savedVisualDetail ?? subtaskVisualMessage ?? "请查看生成任务";
-  const visualStatus = visualSubtask?.status === "pending_review"
+  const visualStatus = visualConfirmed
+    ? "视觉检查：已人工确认当前图"
+    : visualSubtask?.status === "pending_review"
     ? `视觉检查待确认：${pendingVisualDetail}`
     : visualSubtask?.status === "completed"
       ? `视觉检查：${visualSubtask.message ?? "已通过"}`
@@ -285,7 +294,6 @@ function DiagramDetailView({
     ? designDiagramErrors[designType] ?? null
     : diagramErrors[requirementArtifactId] ?? diagramErrors[requirementType] ?? null;
   const statusKey = isBusinessFlow ? "feasibility-business-flow" : isFeasibility ? "context" : isDesign ? designArtifactId : requirementArtifactId;
-  const editStatus = isFeasibility ? undefined : manualModelEditStatus[statusKey];
   const compactViewport = useCompactViewport();
   const [activeTab, setActiveTab] = useState<"diagram" | "elements" | "relations" | "edit">(
     "diagram",
@@ -518,9 +526,19 @@ function DiagramDetailView({
       : effectiveSaveStatus === "saved"
         ? t("diagrams.detail.saveSaved")
         : t("diagrams.detail.saveFailed");
-  const editWarningText = editStatus?.warning
-    ? t("diagrams.detail.editWarningMapped")
-    : t("diagrams.detail.editWarningDefault");
+  const notices: ModelNotice[] = [];
+  if (isStale) notices.push({ id: "stale", title: "模型已过期", detail: t("diagrams.detail.stale") });
+  if (contextData?.errorMessage) notices.push({ id: "context-error", title: "可行性分析失败", detail: contextData.errorMessage });
+  if (contextData?.statusMessage) notices.push({ id: "context-status", title: "可行性分析状态", detail: contextData.statusMessage });
+  if (diagramError) notices.push({ id: "diagram-error", title: t("diagrams.detail.generatedFailed", { label: metaLabel }), detail: localizeRunFailure(diagramError.error, t("errors.codes.RUN_INTERNAL_ERROR")) });
+  if (visualStatus) notices.push({
+    id: "visual", title: visualStatus.split("：")[0] ?? "视觉检查", detail: visualConfirmed ? "已人工确认当前图" : visualSubtask?.status === "pending_review" || savedVisualReview?.status === "pending_review" ? pendingVisualDetail : savedVisualReview?.reason ?? visualSubtask?.message ?? visualStatus,
+    issues: savedVisualReview?.status === "pending_review" ? savedVisualReview.issues.filter((issue) => issue.trim()) : undefined,
+    checks: savedVisualReview?.attempts,
+    repairs: savedVisualReview?.repairAttempts,
+    reviewCheckedAt: savedVisualReview?.status === "pending_review" && !visualConfirmed ? savedVisualReview.checkedAt : undefined,
+    confirmed: visualConfirmed,
+  });
   const overviewPanelId = `model-overview-${stage}-${statusKey}`.replace(/[^A-Za-z0-9_-]/g, "-");
   const openOverviewPanel = useCallback(() => {
     overviewPanelDismissedRef.current = false;
@@ -596,64 +614,20 @@ function DiagramDetailView({
             {isFeasibility && contextData?.headerAction ? (
               <div className="flex justify-end">{contextData.headerAction}</div>
             ) : null}
-            {isFeasibility && contextData?.errorMessage ? (
-              <Alert variant="destructive" role="alert" className="flex items-center gap-2 border px-4 py-3 text-sm">
-                <AlertTriangle className="size-4 shrink-0" />
-                {contextData.errorMessage}
-              </Alert>
-            ) : null}
-            {diagramError ? (
-              <Card className="gap-0 py-0 border-destructive/40 px-5 py-8 text-sm">
-                <div className="flex items-center gap-2 font-medium text-destructive">
-                  <AlertTriangle className="size-4 shrink-0" />
-                  {t("diagrams.detail.generatedFailed", { label: metaLabel })}
-                </div>
-                <div className="mt-2 leading-relaxed text-foreground">
-                  {localizeRunFailure(
-                    diagramError.error,
-                    t("errors.codes.RUN_INTERNAL_ERROR"),
-                  )}
-                </div>
-              </Card>
-            ) : (
-              <Card className="gap-0 py-0 border-dashed px-4 py-12 text-center text-sm text-muted-foreground">
-                {t("diagrams.detail.notGenerated", {
-                  stage: isFeasibility
-                    ? "可行性分析"
-                    : t(`diagrams.stage.${isDesign ? "design" : "requirements"}`),
-                })}
-              </Card>
-            )}
+            <ModelNotices notices={notices} canConfirm={canUpdateWorkspace} onConfirm={(checkedAt) => confirmVisualReview(`${visualTaskKind}:${visualId}`, checkedAt)} />
+            <Card className="gap-0 py-0 border-dashed px-4 py-12 text-center text-sm text-muted-foreground">
+              {t("diagrams.detail.notGenerated", {
+                stage: isFeasibility
+                  ? "可行性分析"
+                  : t(`diagrams.stage.${isDesign ? "design" : "requirements"}`),
+              })}
+            </Card>
           </div>
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col py-4 lg:py-6">
           <div className="mx-auto flex min-h-0 w-[calc(100%-2rem)] max-w-348 flex-1 flex-col gap-4 sm:w-[calc(100%-3rem)]">
-          {isStale && (
-            <Alert className="flex flex-wrap items-center gap-2 border px-4 py-3 text-sm">
-              <AlertTriangle className="size-4 shrink-0 text-warning" />
-              <span>{t("diagrams.detail.stale")}</span>
-            </Alert>
-          )}
-
-          {isFeasibility && contextData?.errorMessage ? (
-            <Alert variant="destructive" role="alert" className="flex flex-wrap items-center gap-2 border px-4 py-3 text-sm">
-              <AlertTriangle className="size-4 shrink-0" />
-              <span>{contextData.errorMessage}</span>
-            </Alert>
-          ) : null}
-
-          {isFeasibility && contextData?.statusMessage ? (
-            <Card aria-live="polite" className="gap-0 py-0 px-4 py-2 text-xs text-muted-foreground">
-              {contextData.statusMessage}
-            </Card>
-          ) : null}
-
-          {visualStatus ? (
-            <Card aria-label="视觉检查状态" className="gap-0 py-0 px-4 py-2 text-xs text-muted-foreground">
-              {visualStatus}
-            </Card>
-          ) : null}
+          <ModelNotices notices={notices} canConfirm={canUpdateWorkspace} onConfirm={(checkedAt) => confirmVisualReview(`${visualTaskKind}:${visualId}`, checkedAt)} />
 
           <DiagramDetailHeader
             draft={readOnly ? null : draft}
@@ -768,10 +742,6 @@ function DiagramDetailView({
                       {model.notes.map((note, index) => <li key={index}>{note}</li>)}
                     </ul>
                   )}
-                  {!readOnly && <Alert className="mb-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap border px-3 py-2 text-xs text-foreground">
-                    <AlertTriangle className="size-3.5 shrink-0 text-warning" />
-                    <span>{editWarningText}</span>
-                  </Alert>}
                   <ModelEditPanel
                     readOnly={readOnly}
                     draft={draft}
@@ -792,10 +762,6 @@ function DiagramDetailView({
             {compactViewport && draft && !readOnly ? (
             <TabsContent value="edit" className="m-0 p-0">
               <div className="px-3 pb-3 pt-3 sm:px-5 sm:pb-5 sm:pt-5">
-                <Alert className="mb-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap border px-3 py-2 text-xs text-foreground">
-                  <AlertTriangle className="size-3.5 shrink-0 text-warning" />
-                  <span>{editWarningText}</span>
-                </Alert>
                 <ModelEditPanel
                   draft={draft}
                   setDraft={setDraft}
