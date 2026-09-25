@@ -65,6 +65,36 @@ describe("generation transcript", () => {
     expect(call.summary).toBe("正在核对需求。");
     expect(call.status).toBe("running");
   });
+  it("does not treat a bare thinking marker as model reasoning", () => {
+    const markerOnly = projectGenerationTranscript([activity("start", "a", "started"), activity("think", "a", "thinking")]).steps[0].calls[0];
+    expect(markerOnly.reasoning).toBe("");
+    expect(markerOnly.summary).toBe("");
+    expect(markerOnly.thinking).toBe(false);
+    const summaryOnly = projectGenerationTranscript([activity("summary", "a", "summary", "模型返回的摘要")]).steps[0].calls[0];
+    expect(summaryOnly.summary).toBe("模型返回的摘要");
+    expect(summaryOnly.thinking).toBe(true);
+  });
+  it("hides platform-authored summaries when restoring older offline demo events", () => {
+    const events = [
+      { ...activity("start", "demo", "started"), format: "text" as const },
+      { ...activity("summary-a", "demo", "summary", "演示思考摘要：固定演示产物"), format: "text" as const },
+      { ...activity("summary-b", "demo", "summary", "继续整理模型"), format: "text" as const },
+      { ...activity("output", "demo", "output", "已读取演示模型"), format: "text" as const },
+    ];
+    const call = projectGenerationTranscript(events).steps[0].calls[0];
+    expect(call.summary).toBe("");
+    expect(call.reasoning).toBe("");
+    expect(call.output).toBe("已读取演示模型");
+  });
+  it("uses saved visual findings over a generic local subtask message", () => {
+    const result = projectGenerationTranscript([
+      { type: "stage_progress", stage: "verify_diagram_visual", progress: 98, subtaskId: "usecase", subtaskStatus: "pending_review", message: "视觉检查仍有问题，请人工确认" },
+      { type: "completed", snapshot: createRunSnapshot({ status: "completed", visualReviews: {
+        usecase: { status: "pending_review", issues: ["标签不可读", "连线交叉"], reason: "视觉检查仍有问题，请人工确认", attempts: 3, checkedAt: "2026-09-23T00:00:00.000Z" },
+      } }) },
+    ], "completed", [{ id: "verify_diagram_visual:usecase", label: "用例模型", status: "pending_review", message: "视觉检查仍有问题，请人工确认", errorMessage: null }]);
+    expect(result.visibleSteps[0].calls[0].message).toBe("标签不可读；连线交叉");
+  });
   it("streams document paragraphs without leaking JSON keys or inventing prose", () => {
     const item = { ...activity("doc", "doc", "output", '{"sections":[{"title":"概述","body":["第一段。","正在生成'), stage: "generate_document_text" as const };
     const call = projectGenerationTranscript([item]).steps[0].calls[0];
@@ -135,20 +165,31 @@ describe("business stage presentation queue", () => {
   const started = (stage: "generate_models" | "generate_plantuml" | "render_svg"): RunEvent => ({ type: "stage_started", stage, tracksCompletion: true });
   const finished = (stage: "generate_models" | "generate_plantuml" | "render_svg"): RunEvent => ({ type: "stage_finished", stage, status: "completed" });
 
-  it("buffers downstream output while parallel models and repairs are still running", () => {
+  it("shows downstream output while parallel models and repairs are still running", () => {
     const events: RunEvent[] = [started("generate_models"), activity("a", "usecase", "started"), activity("b", "activity", "started"),
       { ...activity("early", "render", "output", "提前返回的预览"), stage: "render_svg" },
       activity("c", "usecase", "completed"),
       { type: "artifact_ready", stage: "generate_models", artifactKind: "model" },
     ];
-    expect(projectGenerationTranscript(events).visibleSteps.map((step) => step.stage)).toEqual(["generate_models"]);
+    expect(projectGenerationTranscript(events).visibleSteps.map((step) => step.stage)).toEqual(["generate_models", "render_svg"]);
     events.push(activity("d", "activity", "failed"), activity("e", "retry", "started"), activity("f", "retry", "completed"));
-    expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(1);
+    expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(2);
     events.push(finished("generate_models"));
     const result = projectGenerationTranscript(events);
     expect(result.visibleSteps.map((step) => step.stage)).toEqual(["generate_models", "render_svg"]);
     expect(result.visibleSteps[1].calls[0].output).toBe("提前返回的预览");
     expect(result.steps[0].status).toBe("completed");
+  });
+
+  it("shows each started diagram stage without adding unstarted placeholders", () => {
+    const events: RunEvent[] = [started("generate_models")];
+    expect(projectGenerationTranscript(events).visibleSteps.map((step) => step.stage)).toEqual(["generate_models"]);
+    for (const stage of ["generate_plantuml", "render_svg", "verify_diagram_visual"] as const) {
+      events.push({ type: "stage_progress", stage, progress: 75, subtaskId: "usecase", subtaskStatus: "running" });
+      expect(projectGenerationTranscript(events).visibleSteps.at(-1)?.stage).toBe(stage);
+    }
+    expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(4);
+    expect(projectGenerationTranscript(events).visibleSteps.every((step) => !step.finished)).toBe(true);
   });
 
   it("does not let stale failure mirrors mark a new retry failed and deduplicates successful artifacts", () => {
@@ -182,12 +223,12 @@ describe("business stage presentation queue", () => {
     }
   });
 
-  it("restores old history directly and advances old live runs only at aggregate artifacts", () => {
+  it("restores old history and shows only stages with received events", () => {
     const events: RunEvent[] = [{ type: "stage_started", stage: "generate_models" }, { type: "stage_started", stage: "render_svg" }];
     expect(projectGenerationTranscript(events, "completed").visibleSteps).toHaveLength(2);
-    expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(1);
+    expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(2);
     events.push({ type: "artifact_ready", stage: "generate_models", artifactKind: "model", subtaskId: "usecase" });
-    expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(1);
+    expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(2);
     events.push({ type: "artifact_ready", stage: "generate_models", artifactKind: "model" });
     expect(projectGenerationTranscript(events).visibleSteps).toHaveLength(2);
   });

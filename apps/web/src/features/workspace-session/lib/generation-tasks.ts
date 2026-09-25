@@ -16,6 +16,7 @@ import {
   summarizeEvent,
 } from "./diagnostics";
 import { appendTranscriptEvent } from "./run-transcript";
+import { visualReviewDetail } from "./visual-review-message";
 import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 
 function runFailureMessage(event: RunEvent) {
@@ -588,12 +589,12 @@ function updateSubtasksFromCompletedSnapshot(
     }
     if (completedIds.has(subtask.id) && subtask.status !== "failed") {
       const visual = splitScopedSubtaskId(subtask.id)?.stage === "verify_diagram_visual"
-        ? (snapshot.visualReviews as Record<string, { status?: string; reason?: string }> | undefined)?.[splitScopedSubtaskId(subtask.id)?.rawId ?? ""]
+        ? (snapshot.visualReviews as Record<string, { status?: string; reason?: string; issues?: string[] }> | undefined)?.[splitScopedSubtaskId(subtask.id)?.rawId ?? ""]
         : undefined;
       if (visual) return {
         ...subtask,
         status: visual.status === "pending_review" ? "pending_review" as const : "completed" as const,
-        message: visual.reason ?? "视觉检查已完成",
+        message: visualReviewDetail(visual) ?? "视觉检查已完成",
       };
       const pendingReviewCount = pendingReviewByDiagram.get(subtask.id) ?? 0;
       const status =

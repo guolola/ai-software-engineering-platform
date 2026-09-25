@@ -11,7 +11,7 @@ const steps: TranscriptStep[] = [{ stage: "generate_models", title: "生成模�
 describe("stage reading surface", () => {
   it("retains the user's disclosure choice when prose starts and the stage finishes", () => {
     const { rerender } = render(<GenerationTranscript taskKey="a" steps={steps} active introduction="开始生成。" finalMessage="" />);
-    const toggle = screen.getByRole("button", { name: "思考与执行过程" });
+    const toggle = screen.getByRole("button", { name: "执行过程" });
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     const output = [{ ...steps[0], calls: [{ ...steps[0].calls[0], thinking: false, output: "开始输出正文" }] }];
     rerender(<GenerationTranscript taskKey="a" steps={output} active introduction="开始生成。" finalMessage="" />);
@@ -19,7 +19,7 @@ describe("stage reading surface", () => {
     fireEvent.click(toggle);
     rerender(<GenerationTranscript taskKey="a" steps={[{ ...output[0], finished: true, status: "completed" }]} active={false} introduction="开始生成。" finalMessage="完成" />);
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByText("核对参与者")).not.toBeVisible();
+    expect(screen.getByText("模型推理摘要：核对参与者")).not.toBeVisible();
     expect(screen.getByText("开始输出正文")).toBeVisible();
   });
 
@@ -40,7 +40,7 @@ describe("stage reading surface", () => {
 
   it("keeps failures and retry controls visible when the process is folded", () => {
     render(<GenerationTranscript taskKey="a" steps={[{ ...steps[0], status: "failed", calls: [{ ...steps[0].calls[0], status: "failed", subtaskId: "usecase", message: "关系缺失，需要修复。" }] }]} active={false} introduction="生成需求" finalMessage="" onRetry={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "思考与执行过程" }));
+    fireEvent.click(screen.getByRole("button", { name: "执行过程" }));
     expect(screen.getByText(/关系缺失，需要修复/)).toBeVisible();
     expect(screen.getByRole("button", { name: "重试此模型" })).toBeVisible();
     expect(document.querySelector('[data-slot="spinner"]')).toBeNull();
@@ -72,6 +72,18 @@ describe("stage reading surface", () => {
     fireEvent.click(trigger);
     expect(screen.getByText("先检查参与者。")).toBeVisible();
     expect(screen.getAllByText("模型正文").length).toBeGreaterThan(0);
+  });
+
+  it("shows provider summaries without inventing reasoning for calls without it", () => {
+    render(<GenerationTranscript taskKey="summary-only" steps={[{ ...steps[0], calls: [{ ...steps[0].calls[0], reasoning: "", summary: "核对参与者", thinking: false }] }]} active introduction="生成模型" finalMessage="" />);
+    expect(screen.getByText("模型推理摘要：核对参与者")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /思考过程/ })).not.toBeInTheDocument();
+  });
+
+  it("marks all unfinished parallel stages as active", () => {
+    render(<GenerationTranscript taskKey="parallel" steps={[steps[0], { ...steps[0], stage: "render_svg", title: "生成图形预览", messages: [], calls: [] }]} active status="running" introduction="生成模型" finalMessage="" />);
+    expect(screen.getByText("任务状态：生成中 · 进行中：生成模型、生成图形预览")).toBeVisible();
+    expect(document.querySelectorAll('[data-slot="spinner"]')).toHaveLength(2);
   });
 
   it("shows real queue metadata and collapses queued items", () => {

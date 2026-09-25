@@ -61,7 +61,7 @@ function ProcessCall({ call }: { call: TranscriptCall }) {
       <span className="min-w-0 flex-1 break-words">{call.title}</span>
       <span className="shrink-0 text-xs leading-6">{statusText[call.status]}</span>
     </div>
-    {call.summary && <p className="ml-5 whitespace-pre-wrap break-words">{call.summary}</p>}
+    {call.summary && <p className="ml-5 whitespace-pre-wrap break-words">模型推理摘要：{call.summary}</p>}
     {call.reasoning && <Reasoning isStreaming={call.thinking && call.status === "running"} className="ml-5 rounded-md border border-border/70 bg-muted/20 px-3 py-2" data-slot="generation-reasoning">
       <ReasoningTrigger aria-label={`思考过程 · ${call.title}`} />
       <ReasoningContent>{call.reasoning}</ReasoningContent>
@@ -89,7 +89,7 @@ function Stage({ step, active, canRetry, onRetry }: { step: TranscriptStep; acti
     </h3>
     {(step.calls.length > 0 || messages.length > 0) && <div className="text-sm leading-6 text-muted-foreground">
       <Button type="button" variant="ghost" aria-expanded={expanded} onClick={() => setExpanded(!expanded)} className="h-auto gap-2 px-0 py-0 text-sm font-normal text-muted-foreground hover:bg-transparent hover:text-foreground">
-        思考与执行过程<ChevronDown aria-hidden="true" className={cn("size-3.5 transition-transform motion-reduce:transition-none", expanded && "rotate-180")} />
+        执行过程<ChevronDown aria-hidden="true" className={cn("size-3.5 transition-transform motion-reduce:transition-none", expanded && "rotate-180")} />
       </Button>
       <div hidden={!expanded} className="mt-3 space-y-3 border-l border-border/70 pl-4">
         {messages.map((message) => <p key={message} className="whitespace-pre-wrap break-words">{message}</p>)}
@@ -112,17 +112,17 @@ export function GenerationTranscript({ taskKey, steps, active, status, queue, in
   children?: ReactNode; onRetry?: (id: string) => void;
 }) {
   const { viewportRef, contentRef, away, returnToLatest } = useTranscriptScroll(taskKey, steps);
-  const current = active ? steps.findIndex((step) => !step.finished) : -1;
+  const activeSteps = active ? steps.filter((step) => !step.finished) : [];
   return <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" data-testid="generation-transcript">
     <ScrollArea className="min-h-0 flex-1" viewportRef={viewportRef} viewportClassName="[overflow-anchor:none]" contentClassName="!block">
       <div ref={contentRef} data-slot="ai-conversation" className="min-w-0 space-y-8 pb-12 pr-4 text-base leading-7">
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Bot className="size-4" aria-hidden="true" />Agent</div>
           <p className="text-lg font-medium">{introduction}</p>
-          {status && <p role="status" className="text-sm text-muted-foreground">任务状态：{taskStatusText[status] ?? status}{active && steps[current] ? ` · 当前阶段：${steps[current].title}` : ""}</p>}
+          {status && <p role="status" className="text-sm text-muted-foreground">任务状态：{taskStatusText[status] ?? status}{activeSteps.length > 0 ? ` · 进行中：${activeSteps.map((step) => step.title).join("、")}` : ""}</p>}
         </div>
         {queue && <QueueProgress queue={queue} />}
-        {steps.map((step, index) => <Stage key={step.id ?? step.stage} step={step} active={index === current} canRetry={!active} onRetry={onRetry} />)}
+        {steps.map((step) => <Stage key={step.id ?? step.stage} step={step} active={active && !step.finished} canRetry={!active} onRetry={onRetry} />)}
         {active && steps.length === 0 && !queue && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner aria-hidden="true" className="size-3.5" /><Shimmer>等待任务开始，执行过程会在这里逐段显示。</Shimmer></p>}
         {finalMessage && <p role="status" className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{finalMessage}</p>}
         {children}

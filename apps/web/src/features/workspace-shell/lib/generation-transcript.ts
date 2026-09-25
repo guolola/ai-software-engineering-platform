@@ -2,6 +2,7 @@
 import type { RunEvent, RunStage } from "@uml-platform/contracts";
 import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 import { formatStageForDiagnostics, sanitizeDiagnosticText } from "../../workspace-session/lib/diagnostics";
+import { visualReviewDetail } from "../../workspace-session/lib/visual-review-message";
 import type { GenerationSubtask } from "../../workspace-session/model/session-state";
 
 export type TranscriptStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "pending_review";
@@ -145,6 +146,10 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
   const activityStages = new Set(events.flatMap((event) => event.type === "run_activity" ? [event.stage] : []));
   const lifecycleStages = new Set(events.flatMap((event) => event.type === "stage_finished" || (event.type === "stage_started" && event.tracksCompletion) ? [event.stage] : []));
   const activityIds = new Set(events.flatMap((event) => event.type === "run_activity" ? [event.callId] : []));
+  const legacyDemoSummaryCalls = new Set(events.flatMap((event) =>
+    event.type === "run_activity" && event.phase === "summary" && event.format === "text" &&
+    event.text?.includes("演示思考摘要") ? [event.callId] : [],
+  ));
   for (const event of events) {
     eventIndex++;
     if (event.eventId && seen.has(event.eventId)) continue;
@@ -159,8 +164,10 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       call.technical = event.format === "technical";
       if (event.phase === "output") { call.output += event.text ?? ""; call.thinking = false; }
       if (event.phase === "reasoning") { call.reasoning = (call.reasoning ?? "") + (event.text ?? ""); call.thinking = true; }
-      if (event.phase === "summary") call.summary += event.text ?? "";
-      if (event.phase === "thinking") call.thinking = true;
+      if (event.phase === "summary" && !legacyDemoSummaryCalls.has(event.callId)) {
+        call.summary += event.text ?? ""; call.thinking = true;
+      }
+      // A thinking marker alone contains no provider reasoning to display.
       if (event.phase === "completed" || event.phase === "failed") {
         call.status = event.phase; call.finishedAt = at; call.thinking = false;
       }
@@ -357,7 +364,12 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       const call = getCall(step, `${step.stage}:${rawId}`, undefined, rawId, subtask.label);
       call.title = readableTaskText(subtask.label);
       call.status = ["repairing", "rendering"].includes(subtask.status) ? "running" : subtask.status as TranscriptStatus;
-      if (subtask.status === "pending_review") call.message = subtask.message ?? `有 ${subtask.pendingReviewCount ?? 1} 条追踪关系需复核`;
+      if (subtask.status === "pending_review") {
+        const savedReview = step.stage === "verify_diagram_visual" && completed && "visualReviews" in completed.snapshot
+          ? completed.snapshot.visualReviews?.[rawId]
+          : undefined;
+        call.message = visualReviewDetail(savedReview) ?? subtask.message ?? `有 ${subtask.pendingReviewCount ?? 1} 条追踪关系需复核`;
+      }
       else if (subtask.status === "failed") {
         call.message = subtask.messageCode
           ? localizeRunFailure(
@@ -395,7 +407,6 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
   // passes, on the other hand, retain their actual sequence (check -> repair -> recheck).
   const diagramFlow = steps.some((step) => ["extract_rules", "generate_models", "generate_design_sequence", "generate_design_models"].includes(step.stage));
   if (diagramFlow) steps.sort((a, b) => order.indexOf(a.stage) - order.indexOf(b.stage));
-  const currentIndex = steps.findIndex((step) => !step.finished);
-  const visibleSteps = terminal || currentIndex < 0 ? steps : steps.slice(0, currentIndex + 1);
-  return { steps, visibleSteps, status, finalMessage, completed };
+  // Parallel model/render stages already have events, even while an earlier stage is open.
+  return { steps, visibleSteps: steps, status, finalMessage, completed };
 }

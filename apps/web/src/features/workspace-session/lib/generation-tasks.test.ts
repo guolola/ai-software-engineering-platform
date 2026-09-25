@@ -30,6 +30,24 @@ describe("workspace-session generation task helpers", () => {
     expect(task.subtasks.find((item) => item.id === "verify_diagram_visual:usecase")).toEqual(expect.objectContaining({ status: "pending_review", message: "视觉检查仍有问题：标签不可读" }));
     expect(task.subtasks.find((item) => item.id === "verify_diagram_visual:class")?.status).toBe("queued");
   });
+  it("keeps concrete visual findings when a completed snapshot reconciles subtasks", () => {
+    const task = createGenerationTask({
+      clientTaskId: "visual-findings", kind: "requirements", title: "需求模型生成",
+      providerModel: "vision-model", startedAt: "2026-09-23T00:00:00.000Z", message: "生成中",
+      subtasks: ["usecase", "class"].map((id) => ({
+        id: `verify_diagram_visual:${id}`, label: id, status: "running" as const, message: null, errorMessage: null,
+      })),
+    });
+    const next = updateTaskFromEvent(task, {
+      type: "completed",
+      snapshot: createRunSnapshot({ status: "completed", visualReviews: {
+        usecase: { status: "pending_review", issues: ["标签不可读", "连线交叉"], reason: "视觉检查仍有问题，请人工确认", attempts: 3, checkedAt: "2026-09-23T00:00:00.000Z" },
+        class: { status: "pending_review", issues: [], reason: "需要人工核对", attempts: 1, checkedAt: "2026-09-23T00:00:00.000Z" },
+      } }),
+    }, { queued: "排队中", completed: "生成完成" });
+    expect(next.subtasks.find((item) => item.id === "verify_diagram_visual:usecase")?.message).toBe("标签不可读；连线交叉");
+    expect(next.subtasks.find((item) => item.id === "verify_diagram_visual:class")?.message).toBe("需要人工核对");
+  });
   it("keeps a rules-only task running after extraction until local repair completes", () => {
     const task = createGenerationTask({
       clientTaskId: "rules-1", kind: "requirements", title: "需求规则生成",

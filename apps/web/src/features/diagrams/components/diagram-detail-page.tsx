@@ -42,6 +42,7 @@ import { useSvgPanZoom } from "../hooks/use-svg-pan-zoom";
 import { mobileTouchTargetClass } from "../../workspace-shell/components/mobile-density";
 import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 import { useWorkspaceSession } from "../../workspace-session/state";
+import { visualReviewDetail } from "../../workspace-session/lib/visual-review-message";
 import {
   buildDiagramDetailModel,
   type DiagramDetailItem,
@@ -259,14 +260,22 @@ function DiagramDetailView({
     .flatMap((task) => task.subtasks)
     .find((subtask) => subtask.id === `verify_diagram_visual:${visualId}`);
   const savedVisualReview = visualReviews[`${visualTaskKind}:${visualId}`];
+  const subtaskVisualMessage = visualSubtask?.message?.trim();
+  const savedVisualDetail = visualReviewDetail(savedVisualReview);
+  // An older task may retain only the generic reason; the saved review carries its findings.
+  const pendingVisualDetail = subtaskVisualMessage &&
+    subtaskVisualMessage !== savedVisualReview?.reason &&
+    subtaskVisualMessage !== "请查看生成任务"
+      ? subtaskVisualMessage
+      : savedVisualDetail ?? subtaskVisualMessage ?? "请查看生成任务";
   const visualStatus = visualSubtask?.status === "pending_review"
-    ? `视觉检查待确认：${visualSubtask.message ?? "请查看生成任务"}`
+    ? `视觉检查待确认：${pendingVisualDetail}`
     : visualSubtask?.status === "completed"
       ? `视觉检查：${visualSubtask.message ?? "已通过"}`
       : visualSubtask && visualSubtask.status !== "failed"
         ? "视觉检查中"
         : savedVisualReview?.status === "pending_review"
-          ? `视觉检查待确认：${savedVisualReview.issues.join("；") || savedVisualReview.reason}`
+          ? `视觉检查待确认：${savedVisualDetail ?? "请查看生成任务"}`
           : savedVisualReview
             ? `视觉检查：${savedVisualReview.reason}`
             : svgMarkup ? "视觉检查：未复核" : null;

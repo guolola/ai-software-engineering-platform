@@ -160,11 +160,11 @@ describe("DiagramView", () => {
         renderMeta: { engine: "plantuml", generatedAt: new Date().toISOString(), sourceLength: 1, durationMs: 1 },
       } },
       visualReviews: { "requirements:usecase": {
-        status: "pending_review", issues: ["标签不可读"], reason: "视觉检查仍有问题，请人工确认", attempts: 3, checkedAt: new Date().toISOString(),
+        status: "pending_review", issues: ["标签不可读", "连线交叉"], reason: "视觉检查仍有问题，请人工确认", attempts: 3, checkedAt: new Date().toISOString(),
       } },
     }));
     render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
-    expect(await screen.findByText(/视觉检查待确认：标签不可读/)).toBeInTheDocument();
+    expect(await screen.findByText("视觉检查待确认：标签不可读；连线交叉")).toBeInTheDocument();
   });
 
   it("offers PlantUML export without exposing source tabs or inline source", async () => {

@@ -14,7 +14,7 @@ function record(): RunRecord {
 }
 function activities(run: RunRecord) { return run.events.filter((e): e is RunActivityEvent => e.type === "run_activity"); }
 
-test("demo generation emits ordered summaries and text for parallel models and persists all fragments", async (t) => {
+test("demo generation emits output without invented reasoning for parallel models", async (t) => {
   const previous = process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS;
   process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS = "0";
   t.after(() => { if (previous === undefined) delete process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS; else process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS = previous; });
@@ -30,18 +30,15 @@ test("demo generation emits ordered summaries and text for parallel models and p
   for (const id of new Set(events.map((e) => e.callId))) {
     const call = events.filter((e) => e.callId === id);
     assert.equal(call[0].phase, "started");
-    assert.equal(call[1].phase, "thinking");
-    assert.ok(call.filter((e) => e.phase === "summary").length > 1);
     assert.ok(call.filter((e) => e.phase === "output").length > 1);
-    assert.ok(call.findIndex((e) => e.phase === "summary") < call.findIndex((e) => e.phase === "output"));
+    assert.ok(call.every((event) => !["thinking", "reasoning", "summary"].includes(event.phase)));
     assert.equal(call.at(-1)?.phase, "completed");
-    assert.match(call.filter((e) => e.phase === "summary").map((e) => e.text).join(""), /演示思考摘要/);
   }
   const store = createRunRecordStore(); store.set(run.snapshot.runId, run);
   assert.deepEqual(createRunRecordStore(serializeRunRecordStore(store)).get(run.snapshot.runId)?.events, run.events);
 });
 
-test("default demo pacing exposes analysis before output and stops promptly when cancelled", async (t) => {
+test("default demo pacing waits before output and stops promptly when cancelled", async (t) => {
   const previous = process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS;
   delete process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS;
   t.after(() => { if (previous !== undefined) process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS = previous; });
@@ -51,7 +48,7 @@ test("default demo pacing exposes analysis before output and stops promptly when
   const rejected = assert.rejects(done, { name: "RunCancelledError" });
   assert.deepEqual(activities(run).map((e) => e.phase), ["started"]);
   for (let i = 0; i < 7; i++) { t.mock.timers.tick(100); await new Promise<void>((resolve) => setImmediate(resolve)); }
-  assert.deepEqual(activities(run).map((e) => e.phase), ["started", "thinking"]);
+  assert.deepEqual(activities(run).map((e) => e.phase), ["started"]);
   emitEvent(run, { type: "cancelled", stage: "extract_rules", message: "已停止" });
   const count = run.events.length;
   t.mock.timers.tick(100);
@@ -71,5 +68,5 @@ test("demo document output comes from the prepared document sections", async (t)
   await emitOfflineDemoActivity(run, "generate_document_text");
   const text = activities(run).filter((e) => e.phase === "output").map((e) => e.text).join("");
   assert.ok(text.includes(snapshot.sections[0].title));
-  assert.ok(activities(run).some((e) => e.phase === "summary"));
+  assert.ok(activities(run).every((e) => !["thinking", "reasoning", "summary"].includes(e.phase)));
 });

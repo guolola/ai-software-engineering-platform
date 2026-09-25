@@ -28,22 +28,22 @@ for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as 
       await page.goto(`/projects/${projectId}`);
       await page.getByRole("button", { name: "生成任务", exact: true }).click();
       const transcript = page.getByTestId("generation-transcript");
-      await expect(transcript.getByText(/正在分析/)).toBeVisible();
+      await expect(transcript.getByRole("button", { name: "思考过程 · 整理用例图" })).toHaveCount(0);
       await page.waitForFunction(() => typeof (window as unknown as { emitDemoEvent?: unknown }).emitDemoEvent === "function");
       const emit = async (phase: string, text: string) => {
         const event = { ...base, eventId: `fragment-${events.length}`, phase, text };
         events.push(event);
         await page.evaluate((event) => (window as unknown as { emitDemoEvent: (event: unknown) => void }).emitDemoEvent(event), event);
       };
-      await emit("summary", "演示思考摘要：正在核对参与者。");
-      await expect(transcript.getByText("演示思考摘要：正在核对参与者。", { exact: true })).toBeVisible();
-      await page.screenshot({ path: info.outputPath("demo-thinking.png") });
-      await emit("summary", "然后整理预约关系。");
-      await expect(transcript.getByText("演示思考摘要：正在核对参与者。然后整理预约关系。", { exact: true })).toBeVisible();
+      await emit("reasoning", "先核对参与者。");
+      await expect(transcript.getByText("先核对参与者。", { exact: true })).toBeVisible();
+      await page.screenshot({ path: info.outputPath("provider-reasoning.png") });
+      await emit("reasoning", "然后整理预约关系。");
+      await expect(transcript.getByText("先核对参与者。然后整理预约关系。", { exact: true })).toBeVisible();
       await emit("output", "已读取学生");
       await expect(transcript.getByText("已读取学生", { exact: true })).toBeVisible();
       await expect(transcript.getByText("正在生成", { exact: true })).toBeVisible();
-      const summary = transcript.getByRole("button", { name: "思考与执行过程" });
+      const summary = transcript.getByRole("button", { name: "执行过程" });
       await expect(summary).toHaveAttribute("aria-expanded", "true");
       await emit("output", "与管理员的用例。");
       await expect(transcript.getByText("已读取学生与管理员的用例。", { exact: true })).toBeVisible();
@@ -112,7 +112,7 @@ for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as 
       await expect(transcript.getByText("正在生成", { exact: true })).toBeVisible();
     });
 
-    test("stages reveal in order and long streaming prose leaves scroll control with the reader", async ({ page }, info) => {
+    test("started stages appear immediately and long streaming prose leaves scroll control with the reader", async ({ page }, info) => {
       await mockProjectApi(page);
       const runId = "run-stage-reading";
       const createdAt = new Date().toISOString();
@@ -152,8 +152,8 @@ for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as 
       const transcript = page.getByTestId("generation-transcript");
       const viewport = transcript.locator('[data-slot="scroll-area-viewport"]').first();
       await emit({ ...base, stage: "render_svg", callId: "render", phase: "output", text: "预览已在后台准备好。" });
-      await expect(transcript.getByTestId("generation-task-step")).toHaveCount(1);
-      await expect(transcript.getByText("预览已在后台准备好。")).toHaveCount(0);
+      await expect(transcript.getByTestId("generation-task-step")).toHaveCount(2);
+      await expect(transcript.getByText("预览已在后台准备好。")).toBeVisible();
       const longText = "## 预约流程\n\n![流程示意](/reading-test.svg)\n\n" + Array.from({ length: 45 }, (_, i) => `第 ${i + 1} 段：学生选择空闲座位，系统校验预约时间与可用状态，再确认预约结果。`).join("\n\n");
       await emit({ ...base, phase: "output", text: longText });
       await expect(transcript.getByRole("button", { name: "回到最新" })).toBeVisible();
@@ -189,7 +189,7 @@ for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as 
       const scrollers = await drawer.evaluate((element) => [...element.querySelectorAll("*")].filter((node) => node.scrollHeight > node.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(node).overflowY)).length);
       expect(scrollers).toBe(1);
       await viewport.evaluate((element) => { element.scrollTop = 0; });
-      const process = transcript.getByRole("button", { name: "思考与执行过程" }).first();
+      const process = transcript.getByRole("button", { name: "执行过程" }).first();
       await process.click();
       await expect(process).toHaveAttribute("aria-expanded", "false");
       await emit({ ...base, stage: "render_svg", callId: "render", phase: "output", text: "后续预览内容。" });
