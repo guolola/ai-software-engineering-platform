@@ -454,7 +454,8 @@ describe("FeasibilityPage", () => {
     const repository = createMockWorkspaceRepository(createContextWorkspace());
     render(withWorkspaceProviders(<FeasibilityPage view="context" />, repository));
 
-    expect(await screen.findByLabelText("模型标题")).toHaveValue("登录系统上下文");
+    await waitFor(() => expect(screen.getByRole("heading", { name: "登录系统上下文", level: 1 })).toBeInTheDocument());
+    expect(screen.queryByLabelText("模型标题")).not.toBeInTheDocument();
     expect(screen.getByTestId("diagram-preview-section")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "打开模型概览" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "SVG" })).toBeInTheDocument();

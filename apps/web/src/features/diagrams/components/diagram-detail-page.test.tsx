@@ -139,6 +139,10 @@ describe("DiagramView", () => {
     render(withWorkspaceProviders(<DiagramView type="activity" />, repository));
 
     const noticeButton = await screen.findByRole("button", { name: /提示（\d+）/ });
+    const heading = screen.getByRole("heading", { name: "总体业务流程", level: 1 });
+    expect(heading.parentElement).toContainElement(noticeButton);
+    expect(noticeButton).toHaveClass("w-auto", "shrink-0");
+    expect(screen.queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
     expect(screen.queryByText("总体业务流程 生成失败")).not.toBeInTheDocument();
     await userEvent.click(noticeButton);
     const notice = await screen.findByRole("dialog", { name: "模型提示" });
@@ -177,6 +181,12 @@ describe("DiagramView", () => {
     });
     const { unmount } = render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
     const noticeButton = await screen.findByRole("button", { name: /提示（\d+）/ });
+    const heading = screen.getByRole("heading", { name: "用例模型", level: 1 });
+    expect(heading).toHaveClass("font-display", "font-bold", "text-3xl", "leading-9");
+    expect(heading.closest("header")?.querySelector("p.text-muted-foreground")).toHaveClass("mt-2", "max-w-3xl", "text-sm", "leading-6");
+    expect(heading.parentElement).toContainElement(noticeButton);
+    expect(heading.parentElement).toContainElement(screen.getByRole("button", { name: "编辑" }));
+    expect(noticeButton).toHaveClass("w-auto", "shrink-0");
     expect(screen.queryByText("标签不可读")).not.toBeInTheDocument();
     await userEvent.click(noticeButton);
     const notice = await screen.findByRole("dialog", { name: "模型提示" });
@@ -216,6 +226,11 @@ describe("DiagramView", () => {
       }));
       render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
       const button = await screen.findByRole("button", { name: /提示（\d+）/ });
+      const heading = screen.getByRole("heading", { name: "用例模型", level: 1 });
+      expect(heading.parentElement).toHaveClass("flex-wrap");
+      expect(heading.parentElement).toContainElement(button);
+      expect(heading.parentElement).toContainElement(screen.getByRole("button", { name: "编辑" }));
+      expect(button).toHaveClass("w-auto", "shrink-0");
       expect(screen.queryByText("标签不可读")).not.toBeInTheDocument();
       await userEvent.click(button);
       expect(within(await screen.findByRole("dialog", { name: "模型提示" })).getByText("标签不可读")).toBeVisible();
@@ -322,7 +337,7 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
 
-    expect(await screen.findByDisplayValue("用例模型")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "用例模型", level: 1 })).toBeInTheDocument());
     expect(screen.getByText("尚未生成 SVG")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "PlantUML" })).not.toBeInTheDocument();
     expect(screen.queryByText(/尚未生成。请回到/)).not.toBeInTheDocument();
@@ -531,7 +546,7 @@ describe("DiagramView", () => {
       ),
     );
 
-    expect(await screen.findByDisplayValue("提交订单需求分析模型")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "提交订单需求分析模型", level: 1 })).toBeInTheDocument());
     expect(screen.queryByText("来源：用例模型事件流（用例：提交订单）")).not.toBeInTheDocument();
     expect(screen.queryByText("来源：需求规则（未标明）")).not.toBeInTheDocument();
     expect(screen.getByText("提交订单需求分析模型 SVG")).toBeInTheDocument();
@@ -585,7 +600,7 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DiagramView type="class" />, repository));
 
-    expect(await screen.findByDisplayValue("领域概念模型")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "领域概念模型", level: 1 })).toBeInTheDocument());
     expect(screen.queryByText("来源：需求规则（R1、R2）")).not.toBeInTheDocument();
     expect(screen.queryByText("来源：需求规则（R1、R2、R3）")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "重新生成当前图" })).not.toBeInTheDocument();
@@ -627,7 +642,7 @@ describe("DiagramView", () => {
       ),
     );
 
-    expect(await screen.findByDisplayValue("借出图书用例实现设计")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "借出图书用例实现设计", level: 1 })).toBeInTheDocument());
     expect(screen.queryByText("来源：需求阶段用例模型事件流 + 需求分析模型（用例：借出图书）")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "重新生成当前图" })).not.toBeInTheDocument();
     namedView.unmount();
@@ -666,7 +681,7 @@ describe("DiagramView", () => {
       ),
     );
 
-    expect(await screen.findByDisplayValue("用例实现设计")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "用例实现设计", level: 1 })).toBeInTheDocument());
     expect(screen.queryByText("来源：需求阶段用例模型事件流 + 需求分析模型（用例ID：uc_only）")).not.toBeInTheDocument();
     idView.unmount();
 
@@ -698,7 +713,7 @@ describe("DiagramView", () => {
       withWorkspaceProviders(<DesignDiagramView type="sequence" />, sequenceWithoutUseCase),
     );
 
-    expect(await screen.findByDisplayValue("用例实现设计")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "用例实现设计", level: 1 })).toBeInTheDocument());
     expect(screen.queryByText("来源：需求阶段用例模型事件流 + 需求分析模型（具体用例未标明）")).not.toBeInTheDocument();
     missingView.unmount();
 
@@ -728,11 +743,11 @@ describe("DiagramView", () => {
     );
     render(withWorkspaceProviders(<DesignDiagramView type="activity" />, activityRepository));
 
-    expect(await screen.findByDisplayValue("界面关系图")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "界面关系图", level: 1 })).toBeInTheDocument());
     expect(screen.queryByText("来源：需求阶段原型界面关系 + 设计阶段用例实现设计")).not.toBeInTheDocument();
   });
 
-  it("autosaves title and summary edits, rerenders the design diagram, and shows a toast", async () => {
+  it("edits title and summary in a dialog, rerenders the design diagram, and shows a toast", async () => {
     const repository = createRepository(
       createWorkspaceRecord({
         generatedDesignDiagramTypes: ["class"],
@@ -761,14 +776,19 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DesignDiagramView type="class" />, repository));
 
-    const titleInput = await screen.findByLabelText("模型标题");
-    const summaryInput = screen.getByLabelText("模型摘要");
-    expect(titleInput).toHaveClass("px-2.5", "py-1");
-    expect(summaryInput).toHaveClass("px-2.5", "py-2");
+    const heading = await screen.findByRole("heading", { name: "设计类图", level: 1 });
+    expect(heading).toHaveClass("font-display", "font-bold", "text-3xl");
+    expect(screen.queryByLabelText("模型标题")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "编辑" }));
+    const dialog = await screen.findByRole("dialog", { name: "编辑模型信息" });
+    const titleInput = within(dialog).getByLabelText("模型标题");
+    const summaryInput = within(dialog).getByLabelText("模型摘要");
     await userEvent.clear(titleInput);
     await userEvent.type(titleInput, "图书馆设计类图");
     await userEvent.clear(summaryInput);
     await userEvent.type(summaryInput, "更新后的结构说明");
+    expect(repository.saveDesignModelEdit).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
       expect(repository.saveDesignModelEdit).toHaveBeenCalledWith(
@@ -788,10 +808,45 @@ describe("DiagramView", () => {
       }),
     );
     expect(toastMessage).toHaveBeenCalledWith("修改已保存，当前图已更新");
+    expect(await screen.findByRole("heading", { name: "图书馆设计类图", level: 1 })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "编辑模型信息" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "重新生成当前图" })).not.toBeInTheDocument();
   });
 
-  it("keeps edited text visible and shows a toast when autosave fails", async () => {
+  it("discards metadata edits when the dialog is cancelled", async () => {
+    const repository = createRepository(createWorkspaceRecord({
+      generatedDiagramTypes: ["usecase"],
+      models: { usecase: { diagramKind: "usecase", title: "原标题", summary: "原描述", notes: [], actors: [], useCases: [], systemBoundaries: [], relationships: [] } },
+      svgArtifacts: { usecase: { diagramKind: "usecase", svg: "<svg />", renderMeta: { engine: "test", generatedAt: "now", sourceLength: 1, durationMs: 1 } } },
+    }));
+    render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
+    await userEvent.click(await screen.findByRole("button", { name: "编辑" }));
+    const dialog = await screen.findByRole("dialog", { name: "编辑模型信息" });
+    await userEvent.clear(within(dialog).getByLabelText("模型标题"));
+    await userEvent.type(within(dialog).getByLabelText("模型标题"), "未保存标题");
+    await userEvent.click(within(dialog).getByRole("button", { name: "取消" }));
+    expect(screen.getByRole("heading", { name: "原标题", level: 1 })).toBeInTheDocument();
+    expect(screen.getByText("原描述")).toBeInTheDocument();
+    expect(repository.saveRequirementModelEdit).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "编辑" }));
+    expect(within(await screen.findByRole("dialog", { name: "编辑模型信息" })).getByLabelText("模型标题")).toHaveValue("原标题");
+  });
+
+  it("keeps model metadata read only without workspace edit permission", async () => {
+    const repository = createRepository(createWorkspaceRecord({
+      generatedDiagramTypes: ["usecase"],
+      models: { usecase: { diagramKind: "usecase", title: "只读模型", summary: "只读描述", notes: [], actors: [], useCases: [], systemBoundaries: [], relationships: [] } },
+      svgArtifacts: { usecase: { diagramKind: "usecase", svg: "<svg />", renderMeta: { engine: "test", generatedAt: "now", sourceLength: 1, durationMs: 1 } } },
+    }));
+    repository.getProjectAccess = vi.fn(async () => ({ capabilities: ["read_project"], generationExecutionMode: "provider" as const }));
+    render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
+    await waitFor(() => expect(repository.getProjectAccess).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "只读模型", level: 1 })).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("模型标题")).not.toBeInTheDocument();
+  });
+
+  it("keeps the editor open with its input when saving metadata fails", async () => {
     const repository = createRepository(
       createWorkspaceRecord({
         generatedDesignDiagramTypes: ["activity"],
@@ -820,13 +875,18 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DesignDiagramView type="activity" />, repository));
 
-    await userEvent.clear(await screen.findByLabelText("模型摘要"));
-    await userEvent.type(screen.getByLabelText("模型摘要"), "失败时仍保留的摘要");
+    await userEvent.click(await screen.findByRole("button", { name: "编辑" }));
+    const dialog = await screen.findByRole("dialog", { name: "编辑模型信息" });
+    await userEvent.clear(within(dialog).getByLabelText("模型摘要"));
+    await userEvent.type(within(dialog).getByLabelText("模型摘要"), "失败时仍保留的摘要");
+    await userEvent.click(within(dialog).getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith("保存失败，请稍后重试");
     }, { timeout: 2500 });
-    expect(screen.getByLabelText("模型摘要")).toHaveValue("失败时仍保留的摘要");
+    expect(within(dialog).getByLabelText("模型摘要")).toHaveValue("失败时仍保留的摘要");
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("保存失败");
+    expect(screen.getByRole("heading", { name: "界面关系图", level: 1, hidden: true })).toBeInTheDocument();
     expect(repository.renderStructuredModel).not.toHaveBeenCalled();
   });
 
@@ -1426,8 +1486,9 @@ describe("DiagramView", () => {
 
     const { container } = render(withWorkspaceProviders(<DiagramView type="class" />, repository));
 
-    expect(await screen.findByLabelText("模型标题")).toHaveValue("领域概念模型");
-    expect(screen.getByLabelText("模型摘要")).toHaveValue("公开日历领域对象");
+    await waitFor(() => expect(screen.getByRole("heading", { name: "领域概念模型", level: 1 })).toBeInTheDocument());
+    expect(screen.getByText("公开日历领域对象")).toBeInTheDocument();
+    expect(screen.queryByLabelText("模型标题")).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /元素/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /关系/ })).not.toBeInTheDocument();
     expect(screen.queryByText("编辑模型")).not.toBeInTheDocument();
@@ -1788,8 +1849,9 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
 
-    expect(await screen.findByLabelText("模型标题")).toHaveValue("用例图");
-    expect(screen.getByLabelText("模型摘要")).toHaveValue("教师登录系统");
+    expect(await screen.findByRole("heading", { name: "用例图", level: 1 })).toBeInTheDocument();
+    expect(screen.getByText("教师登录系统")).toBeInTheDocument();
+    expect(screen.queryByLabelText("模型标题")).not.toBeInTheDocument();
     expect(screen.queryByText(/手动修改会更新当前模型结构/)).not.toBeInTheDocument();
     expect(screen.queryByText("编辑模型")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "重新生成此图" })).not.toBeInTheDocument();
@@ -1948,8 +2010,12 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DiagramView type="class" />, repository));
 
-    await userEvent.clear(await screen.findByLabelText("模型标题"));
-    await userEvent.type(screen.getByLabelText("模型标题"), "订单类模型");
+    await userEvent.click(await screen.findByRole("button", { name: "编辑" }));
+    const metadataDialog = await screen.findByRole("dialog", { name: "编辑模型信息" });
+    await userEvent.clear(within(metadataDialog).getByLabelText("模型标题"));
+    await userEvent.type(within(metadataDialog).getByLabelText("模型标题"), "订单类模型");
+    await userEvent.click(within(metadataDialog).getByRole("button", { name: "保存" }));
+    expect(await screen.findByRole("heading", { name: "订单类模型", level: 1 })).toBeInTheDocument();
     expect(screen.queryByText("备注")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("模型备注")).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "编辑类：Order" }));

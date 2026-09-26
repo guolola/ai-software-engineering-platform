@@ -1096,6 +1096,9 @@ export const resources = {
         detail: {
           titleAria: "模型标题",
           summaryAria: "模型摘要",
+          editMetadata: "编辑",
+          editMetadataTitle: "编辑模型信息",
+          editMetadataDescription: "修改标题和描述，保存后更新当前图形。",
           savingAndUpdating: "保存并更新图中",
           changesSaved: "修改已保存",
           headerSaveFailed: "保存失败",
@@ -2600,6 +2603,9 @@ export const resources = {
         detail: {
           titleAria: "Model title",
           summaryAria: "Model summary",
+          editMetadata: "Edit",
+          editMetadataTitle: "Edit model details",
+          editMetadataDescription: "Update the title and description, then save to refresh the diagram.",
           savingAndUpdating: "Saving and updating diagram",
           changesSaved: "Changes saved",
           headerSaveFailed: "Save failed",

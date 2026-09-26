@@ -1,5 +1,6 @@
 // Renders the diagram detail workspace, including diagram selection, trace highlights, export actions, and model/SVG views.
 import { Card } from "../../../shared/ui/card";
+import { PageHeader } from "../../../shared/template/layout/page";
 import { SpotlightCard } from "../../../shared/ui/interactive-card";
 import { Checkbox } from "../../../shared/ui/checkbox";
 import { Input } from '../../../shared/ui/input';
@@ -348,11 +349,8 @@ function DiagramDetailView({
           : "diagram",
     );
   }, [compactViewport, highlightedRelationshipId, initialSection]);
-  const setDraftField = useCallback((key: string, value: unknown) => {
-    setDraft((current) => (current ? { ...current, [key]: value } : current));
-  }, []);
-  const commitDraftAndRerender = useCallback(async (nextDraft: Record<string, unknown>) => {
-    if (readOnly) return;
+  const commitDraftAndRerender = useCallback(async (nextDraft: Record<string, unknown>, explicit = false): Promise<boolean> => {
+    if (readOnly || !canUpdateWorkspace) return false;
     setSaving(true);
     setSaveStatus("saving");
     try {
@@ -366,7 +364,8 @@ function DiagramDetailView({
       const canonicalDraft = (
         parsedDraft.success ? parsedDraft.data : nextDraft
       ) as unknown as Record<string, unknown>;
-      setDraft(canonicalDraft);
+      // Metadata stays outside the shared draft until its explicit save succeeds.
+      if (!explicit) setDraft(canonicalDraft);
       if (isFeasibility) {
         if (!saveContextModel) {
           throw new Error("上下文模型校验失败");
@@ -384,18 +383,21 @@ function DiagramDetailView({
         });
       }
       persistedDraftFingerprintRef.current = draftFingerprint(canonicalDraft);
+      if (explicit) setDraft(canonicalDraft);
       setSaveStatus("saved");
       floatingAlert.message(t("diagrams.detail.savedToast"));
+      return true;
     } catch {
       setSaveStatus("error");
       floatingAlert.error(t("diagrams.detail.saveFailedToast"));
-      return;
+      return false;
     } finally {
       setSaving(false);
     }
   }, [
     designArtifactId,
     readOnly,
+    canUpdateWorkspace,
     isFeasibility,
     isDesign,
     requirementType,
@@ -407,7 +409,7 @@ function DiagramDetailView({
     t,
   ]);
   useEffect(() => {
-    if (readOnly || !draft || saving) return;
+    if (readOnly || !canUpdateWorkspace || !draft || saving) return;
     const fingerprint = draftFingerprint(draft);
     if (fingerprint === persistedDraftFingerprintRef.current) return;
     const timer = window.setTimeout(() => {
@@ -416,7 +418,14 @@ function DiagramDetailView({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [commitDraftAndRerender, draft, saving, readOnly]);
+  }, [commitDraftAndRerender, draft, saving, readOnly, canUpdateWorkspace]);
+  const saveMetadata = useCallback(async (title: string, summary: string) => {
+    if (!draft || saving || readOnly || !canUpdateWorkspace) return false;
+    return commitDraftAndRerender({ ...draft, title, summary }, true);
+  }, [canUpdateWorkspace, commitDraftAndRerender, draft, readOnly, saving]);
+  const commitModelDraft = useCallback(async (nextDraft: Record<string, unknown>) => {
+    await commitDraftAndRerender(nextDraft);
+  }, [commitDraftAndRerender]);
   const sourceRules = useMemo(
     () =>
       isFeasibility
@@ -539,6 +548,8 @@ function DiagramDetailView({
     reviewCheckedAt: savedVisualReview?.status === "pending_review" && !visualConfirmed ? savedVisualReview.checkedAt : undefined,
     confirmed: visualConfirmed,
   });
+  const noticeButton = <ModelNotices notices={notices} canConfirm={canUpdateWorkspace} onConfirm={(checkedAt) => confirmVisualReview(`${visualTaskKind}:${visualId}`, checkedAt)} />;
+  const canEditMetadata = Boolean(draft) && !readOnly && canUpdateWorkspace && (!isFeasibility || Boolean(saveContextModel));
   const overviewPanelId = `model-overview-${stage}-${statusKey}`.replace(/[^A-Za-z0-9_-]/g, "-");
   const openOverviewPanel = useCallback(() => {
     overviewPanelDismissedRef.current = false;
@@ -610,11 +621,7 @@ function DiagramDetailView({
       {!model && !source ? (
         <div className="w-full py-6 lg:py-8">
           <div className="mx-auto flex w-[calc(100%-2rem)] max-w-348 flex-col gap-4 sm:w-[calc(100%-3rem)]">
-            <h2 className="text-2xl font-semibold">{metaLabel}</h2>
-            {isFeasibility && contextData?.headerAction ? (
-              <div className="flex justify-end">{contextData.headerAction}</div>
-            ) : null}
-            <ModelNotices notices={notices} canConfirm={canUpdateWorkspace} onConfirm={(checkedAt) => confirmVisualReview(`${visualTaskKind}:${visualId}`, checkedAt)} />
+            <PageHeader title={metaLabel} description={metaDescription} titleAccessory={noticeButton} actions={isFeasibility ? contextData?.headerAction : undefined} />
             <Card className="gap-0 py-0 border-dashed px-4 py-12 text-center text-sm text-muted-foreground">
               {t("diagrams.detail.notGenerated", {
                 stage: isFeasibility
@@ -627,21 +634,21 @@ function DiagramDetailView({
       ) : (
         <div className="flex min-h-0 flex-1 flex-col py-4 lg:py-6">
           <div className="mx-auto flex min-h-0 w-[calc(100%-2rem)] max-w-348 flex-1 flex-col gap-4 sm:w-[calc(100%-3rem)]">
-          <ModelNotices notices={notices} canConfirm={canUpdateWorkspace} onConfirm={(checkedAt) => confirmVisualReview(`${visualTaskKind}:${visualId}`, checkedAt)} />
-
           <DiagramDetailHeader
-            draft={readOnly ? null : draft}
+            key={statusKey}
             modelTitle={modelTitle}
             modelSummary={modelSummary}
+            canEdit={canEditMetadata}
+            saving={saving}
             saveStatus={effectiveSaveStatus}
             saveStatusLabel={saveStatusLabel}
             compactViewport={compactViewport}
             itemCount={items.length}
             relationshipCount={relationships.length}
             groupCount={groups.length}
+            notices={noticeButton}
             actions={isFeasibility ? contextData?.headerAction : undefined}
-            onChangeTitle={(value) => setDraftField("title", value)}
-            onChangeSummary={(value) => setDraftField("summary", value)}
+            onSaveMetadata={saveMetadata}
           />
 
           <Tabs
@@ -746,7 +753,7 @@ function DiagramDetailView({
                     readOnly={readOnly}
                     draft={draft}
                     setDraft={setDraft}
-                    onCommitDraft={commitDraftAndRerender}
+                    onCommitDraft={commitModelDraft}
                     onSelectElement={selectElementInDiagram}
                     selectedElement={effectiveHighlightedElement}
                     saving={saving}
@@ -765,7 +772,7 @@ function DiagramDetailView({
                 <ModelEditPanel
                   draft={draft}
                   setDraft={setDraft}
-                  onCommitDraft={commitDraftAndRerender}
+                  onCommitDraft={commitModelDraft}
                   onSelectElement={selectElementInDiagram}
                   selectedElement={effectiveHighlightedElement}
                   saving={saving}

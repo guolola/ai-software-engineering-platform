@@ -39,7 +39,7 @@ export function ModelNotices({ notices, canConfirm, onConfirm }: {
   };
 
   return <>
-    <Button type="button" variant="outline" size="sm" aria-label={`提示（${notices.length}）`} onClick={() => setOpen(true)}>
+    <Button type="button" variant="outline" size="sm" className="w-auto shrink-0" aria-label={`提示（${notices.length}）`} onClick={() => setOpen(true)}>
       <AlertTriangle aria-hidden="true" className="size-4 text-warning" />提示（{notices.length}）
     </Button>
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setError(null); }}>
