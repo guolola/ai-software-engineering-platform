@@ -31,22 +31,42 @@ function indentBlock(block, indent) {
   return block.split('\n').map((line) => `${indent}${line}`).join('\n');
 }
 
-function insertRootLocation(config, webRoot) {
+function findServerBlock(config, webRoot) {
   const rootIndex = config.indexOf(`root ${webRoot};`);
+  if (rootIndex < 0 || config.indexOf(`root ${webRoot};`, rootIndex + 1) >= 0) {
+    throw new Error('Expected exactly one UML site root.');
+  }
   const serverMatches = [...config.slice(0, rootIndex).matchAll(/^[ \t]*server[ \t]*\{/gm)];
   const serverStart = serverMatches.at(-1)?.index;
   if (serverStart === undefined) throw new Error('Cannot find the UML site server block.');
   const open = config.indexOf('{', serverStart);
   const close = findBlockClose(config, open);
   if (close < 0 || close < rootIndex) throw new Error('Cannot safely parse the UML site server block.');
+  return { serverStart, close };
+}
+
+function insertRootLocation(config, webRoot) {
+  const { close } = findServerBlock(config, webRoot);
   return `${config.slice(0, close).trimEnd()}\n\n${indentBlock(nextLocation, '    ')}\n${config.slice(close)}`;
 }
 
 export function migrateNextRouting(config, deployPath) {
   const oldWebRoot = `${deployPath}${oldRoot}`;
   const newWebRoot = `${deployPath}${nextRoot}`;
-  if (config.includes(newWebRoot) && config.includes('proxy_pass http://127.0.0.1:4003;')) return config;
-  if (!config.includes(`root ${oldWebRoot};`) || !config.includes('location /api/ {')) {
+  const activeWebRoot = config.includes(`root ${oldWebRoot};`)
+    ? oldWebRoot
+    : config.includes(`root ${newWebRoot};`)
+      ? newWebRoot
+      : null;
+  if (!activeWebRoot) {
+    throw new Error('Unknown site root or API proxy; refusing to change Nginx routing.');
+  }
+  const { serverStart, close: serverClose } = findServerBlock(config, activeWebRoot);
+  const beforeServer = config.slice(0, serverStart);
+  const afterServer = config.slice(serverClose + 1);
+  let result = config.slice(serverStart, serverClose + 1);
+  if (result.includes(newWebRoot) && result.includes('proxy_pass http://127.0.0.1:4003;')) return config;
+  if (!result.includes(`root ${oldWebRoot};`) || !result.includes('location /api/ {')) {
     throw new Error('Unknown site root or API proxy; refusing to change Nginx routing.');
   }
   const staticLocations = [
@@ -56,7 +76,6 @@ export function migrateNextRouting(config, deployPath) {
     'location ~ ^/projects(?:/.*)?$', 'location = /app.html',
     'location = /404.html', 'location /assets/',
   ];
-  let result = config;
   for (const prefix of staticLocations) {
     const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const matches = [...result.matchAll(new RegExp(`^[ \\t]*${escaped}[ \\t]*\\{`, 'gm'))];
@@ -84,7 +103,8 @@ export function migrateNextRouting(config, deployPath) {
     .replace(`root ${oldWebRoot};`, `root ${newWebRoot};`)
     .replace(/\s*index index\.html;/, '')
     .replace(/\s*error_page 404 \/404\.html;/, '');
-  return rootLocationMatches.length === 0 ? insertRootLocation(result, newWebRoot) : result;
+  const migratedServer = rootLocationMatches.length === 0 ? insertRootLocation(result, newWebRoot) : result;
+  return `${beforeServer}${migratedServer}${afterServer}`;
 }
 
 function nginx(...args) {

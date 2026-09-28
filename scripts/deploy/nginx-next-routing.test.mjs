@@ -32,6 +32,24 @@ test('adds the Next proxy when optional legacy static locations are absent', () 
   assert.equal((nextConfig.match(/proxy_pass http:\/\/127\.0\.0\.1:4003;/g) ?? []).length, 1);
 });
 
+test('changes only the UML server when another server has a root location', () => {
+  const unrelatedServer = `server {
+    listen 8088;
+    server_name unrelated.example;
+    location / {
+        proxy_pass http://127.0.0.1:4999;
+    }
+}\n\n`;
+  const combinedConfig = `${unrelatedServer}${viteConfig}`;
+
+  const nextConfig = migrateNextRouting(combinedConfig, deployPath);
+
+  assert.match(nextConfig, /server_name unrelated\.example;[\s\S]*?proxy_pass http:\/\/127\.0\.0\.1:4999;/);
+  assert.match(nextConfig, /server_name jianglisoftware\.com;[\s\S]*?proxy_pass http:\/\/127\.0\.0\.1:4003;/);
+  assert.equal((nextConfig.match(/proxy_pass http:\/\/127\.0\.0\.1:4999;/g) ?? []).length, 1);
+  assert.equal((nextConfig.match(/proxy_pass http:\/\/127\.0\.0\.1:4003;/g) ?? []).length, 1);
+});
+
 test('backs up exact config and restores it after a failed or rolled-back deployment', () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'uml-next-routing-'));
   try {
