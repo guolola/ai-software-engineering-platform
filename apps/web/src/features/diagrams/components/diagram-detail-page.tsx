@@ -536,19 +536,21 @@ function DiagramDetailView({
         ? t("diagrams.detail.saveSaved")
         : t("diagrams.detail.saveFailed");
   const notices: ModelNotice[] = [];
-  if (isStale) notices.push({ id: "stale", title: "模型已过期", detail: t("diagrams.detail.stale") });
-  if (contextData?.errorMessage) notices.push({ id: "context-error", title: "可行性分析失败", detail: contextData.errorMessage });
-  if (contextData?.statusMessage) notices.push({ id: "context-status", title: "可行性分析状态", detail: contextData.statusMessage });
-  if (diagramError) notices.push({ id: "diagram-error", title: t("diagrams.detail.generatedFailed", { label: metaLabel }), detail: localizeRunFailure(diagramError.error, t("errors.codes.RUN_INTERNAL_ERROR")) });
+  if (isStale) notices.push({ id: "stale", kind: "freshness", tone: "warning", title: "模型已过期", detail: t("diagrams.detail.stale") });
+  if (contextData?.errorMessage) notices.push({ id: "context-error", kind: "error", tone: "destructive", title: "可行性分析失败", detail: contextData.errorMessage });
+  if (contextData?.statusMessage) notices.push({ id: "context-status", kind: "info", tone: "info", title: "可行性分析状态", detail: contextData.statusMessage });
+  if (diagramError) notices.push({ id: "diagram-error", kind: "error", tone: "destructive", title: t("diagrams.detail.generatedFailed", { label: metaLabel }), detail: localizeRunFailure(diagramError.error, t("errors.codes.RUN_INTERNAL_ERROR")) });
   if (visualStatus) notices.push({
-    id: "visual", title: visualStatus.split("：")[0] ?? "视觉检查", detail: visualConfirmed ? "已人工确认当前图" : visualSubtask?.status === "pending_review" || savedVisualReview?.status === "pending_review" ? pendingVisualDetail : savedVisualReview?.reason ?? visualSubtask?.message ?? visualStatus,
+    id: "visual", kind: "visual",
+    tone: visualConfirmed || savedVisualReview?.status === "passed" ? "success" : visualSubtask?.status === "pending_review" || savedVisualReview?.status === "pending_review" ? "warning" : "info",
+    title: "视觉检查", detail: visualConfirmed ? "已人工确认当前图" : visualSubtask?.status === "pending_review" || savedVisualReview?.status === "pending_review" ? savedVisualReview?.reason ?? subtaskVisualMessage ?? pendingVisualDetail : savedVisualReview?.reason ?? visualSubtask?.message ?? visualStatus,
     issues: savedVisualReview?.status === "pending_review" ? savedVisualReview.issues.filter((issue) => issue.trim()) : undefined,
     checks: savedVisualReview?.attempts,
     repairs: savedVisualReview?.repairAttempts,
     reviewCheckedAt: savedVisualReview?.status === "pending_review" && !visualConfirmed ? savedVisualReview.checkedAt : undefined,
     confirmed: visualConfirmed,
   });
-  const noticeButton = <ModelNotices notices={notices} canConfirm={canUpdateWorkspace} onConfirm={(checkedAt) => confirmVisualReview(`${visualTaskKind}:${visualId}`, checkedAt)} />;
+  const noticeButton = notices.length > 0 ? <ModelNotices notices={notices} canConfirm={canUpdateWorkspace} onConfirm={(checkedAt) => confirmVisualReview(`${visualTaskKind}:${visualId}`, checkedAt)} /> : null;
   const canEditMetadata = Boolean(draft) && !readOnly && canUpdateWorkspace && (!isFeasibility || Boolean(saveContextModel));
   const overviewPanelId = `model-overview-${stage}-${statusKey}`.replace(/[^A-Za-z0-9_-]/g, "-");
   const openOverviewPanel = useCallback(() => {
@@ -621,7 +623,7 @@ function DiagramDetailView({
       {!model && !source ? (
         <div className="w-full py-6 lg:py-8">
           <div className="mx-auto flex w-[calc(100%-2rem)] max-w-348 flex-col gap-4 sm:w-[calc(100%-3rem)]">
-            <PageHeader title={metaLabel} description={metaDescription} titleAccessory={noticeButton} actions={isFeasibility ? contextData?.headerAction : undefined} />
+            <PageHeader title={metaLabel} description={metaDescription} notice={noticeButton} actions={isFeasibility ? contextData?.headerAction : undefined} />
             <Card className="gap-0 py-0 border-dashed px-4 py-12 text-center text-sm text-muted-foreground">
               {t("diagrams.detail.notGenerated", {
                 stage: isFeasibility

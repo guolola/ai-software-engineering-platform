@@ -41,6 +41,7 @@ export function PageContainer({
 
 export function PageHeader({
   title,
+  notice,
   titleAccessory,
   description,
   actions,
@@ -48,6 +49,7 @@ export function PageHeader({
   className
 }: {
   title: ReactNode
+  notice?: ReactNode
   titleAccessory?: ReactNode
   description?: ReactNode
   actions?: ReactNode
@@ -66,6 +68,7 @@ export function PageHeader({
           >
             {title}
           </h1>
+          {notice}
           {titleAccessory}
         </div>
         {description ? <p className='text-muted-foreground mt-2 max-w-3xl text-sm leading-6'>{description}</p> : null}

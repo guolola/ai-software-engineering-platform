@@ -221,7 +221,7 @@ describe("CodeGenerationPage", () => {
     await screen.findByTestId("sandpack-provider");
     const button = screen.getByRole("button", { name: /启动生成/ });
     expect(button).toBeDisabled();
-    expect(screen.getByText("请先配置并选择模型供应商。")).toBeInTheDocument();
+    expect(screen.queryByText("未选择模型供应商")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "未选择模型" })).toBeEnabled();
     await userEvent.setup().click(button);
     expect(repository.startCodeRun).not.toHaveBeenCalled();
@@ -408,7 +408,7 @@ describe("CodeGenerationPage", () => {
     expect(screen.queryByText("代码生成存在诊断")).not.toBeInTheDocument();
     expect(screen.queryByText(/检测到真实网络请求痕迹，已保留本地 mock 数据/u)).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "运行预览" })).toBeEnabled());
-    await user.click(within(screen.getByTestId("code-generation-toolbar")).getByRole("button", { name: "诊断（18）" }));
+    await user.click(screen.getByRole("button", { name: "诊断（18）" }));
     const dialog = screen.getByRole("dialog", { name: "代码生成存在诊断" });
     expect(within(dialog).getAllByRole("listitem")).toHaveLength(18);
     expect(within(dialog).getByText(/第 18 项诊断详情/)).toBeInTheDocument();

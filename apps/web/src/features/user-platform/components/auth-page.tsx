@@ -44,7 +44,7 @@ import {
   type PlatformMfaChallenge,
 } from "../services/platform-api";
 
-type Navigate = (path: string) => void;
+type Navigate = (path: string, options?: { fromLogin?: boolean }) => void;
 
 const REMEMBERED_LOGIN_EMAIL_STORAGE_KEY = "uml-auth-remembered-email";
 const REMEMBERED_LOGIN_PASSWORD_STORAGE_KEY = "uml-auth-remembered-password";
@@ -211,7 +211,7 @@ export function AuthPage({
           writeRememberedLoginCredentials({ email, password }, rememberLogin);
           notifyAuthSessionChanged();
           showAlert({ title: t("auth.page.mfaSuccess"), tone: "success" });
-          onNavigate(redirectPath);
+          onNavigate(redirectPath, { fromLogin: true });
           return;
         }
         const response = await platformApi.login({ identifier: email, password });
@@ -231,7 +231,7 @@ export function AuthPage({
         writeRememberedLoginCredentials({ email, password }, rememberLogin);
         notifyAuthSessionChanged();
         showAlert({ title: t("auth.page.loginSuccess"), tone: "success" });
-        onNavigate(redirectPath);
+        onNavigate(redirectPath, { fromLogin: true });
         return;
       }
       if (path === "/register") {

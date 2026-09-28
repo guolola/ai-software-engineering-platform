@@ -65,6 +65,17 @@ const toDay = (dateString: string): number => Math.floor(new Date(dateString).ge
 const dayToMonthLabel = (day: number): string =>
   new Date(day * MS_PER_DAY).toLocaleDateString('en-US', { month: 'short' })
 
+export function buildTimelineAxis(days: number[]): { domain: [number, number]; ticks: number[] } {
+  if (days.length === 0) return { domain: [0, 1], ticks: [] }
+  const min = Math.min(...days)
+  const max = Math.max(...days)
+  const span = Math.max(max - min, 1)
+  // Use at most one tick per day so short project timelines never repeat axis keys.
+  const stepCount = Math.min(6, span)
+  const ticks = Array.from({ length: stepCount + 1 }, (_, index) => Math.round(min + (span * index) / stepCount))
+  return { domain: [min, min + span], ticks }
+}
+
 const iconByKind: Record<ProjectListIconKind, typeof SmartphoneIcon> = {
   mobile: SmartphoneIcon,
   web: LaptopMinimalIcon,
@@ -88,15 +99,7 @@ const ProjectTimelineCard = ({
 
   const { domain, ticks } = useMemo(() => {
     const days = chartData.flatMap(item => item.range as [number, number])
-    if (days.length === 0) {
-      return { domain: [0, 1] as [number, number], ticks: [] as number[] }
-    }
-    const min = Math.min(...days)
-    const max = Math.max(...days)
-    const span = Math.max(max - min, 1)
-    const stepCount = 6
-    const tickList = Array.from({ length: stepCount + 1 }, (_, index) => Math.round(min + (span * index) / stepCount))
-    return { domain: [min, max] as [number, number], ticks: tickList }
+    return buildTimelineAxis(days)
   }, [chartData])
 
   return (

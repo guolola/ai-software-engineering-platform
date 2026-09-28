@@ -14,7 +14,6 @@ import { Input } from '@/shared/ui/input'
 import { Separator } from '@/shared/ui/separator'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/shared/ui/sheet'
 import { Skeleton } from '@/shared/ui/skeleton'
-import { ScrollArea } from '@/shared/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip'
 import { useIsMobile } from '@/shared/hooks/use-mobile'
 import { cn } from '@/shared/ui/utils'
@@ -457,15 +456,13 @@ function SidebarSeparator({ className, ...props }: React.ComponentProps<typeof S
 
 function SidebarContent({ className, ...props }: React.ComponentProps<'div'>) {
   return (
-    <ScrollArea
+    <div
       data-slot='sidebar-content'
       data-sidebar='content'
       className={cn(
-        'min-h-0 flex-1',
+        'no-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden',
         className
       )}
-      viewportClassName='overflow-y-auto overflow-x-hidden group-data-[collapsible=icon]:overflow-hidden'
-      contentClassName='flex min-h-full flex-col gap-2'
       {...props}
     />
   )

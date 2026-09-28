@@ -6,7 +6,7 @@ export const resources = {
   "zh-CN": {
     translation: {
       generationModel: {
-        providerRequired: "请先配置并选择模型供应商。",
+        providerRequired: "未选择模型供应商",
         modelRequired: "请先选择用于生成的模型。",
         modelUnavailable: "所选模型已不可用，请从当前供应商的模型目录重新选择。",
       },
@@ -82,7 +82,7 @@ export const resources = {
           stat: "{{total}} 次",
         },
         performance: {
-          title: "性能",
+          title: "项目活动",
           membersTab: "团队",
           unknownOwner: "未知负责人",
           ownerRole: "项目负责人",
@@ -709,7 +709,10 @@ export const resources = {
         },
         credits: "可用次数 {{count}}，系统托管 Provider 每次生成消耗 1 次",
         closeCredits: "关闭权益提示",
-        noRules: "尚无有效需求规则。请先进入“系统需求”填写需求描述并生成或添加规则。",
+        modelBlockedTitle: "需求模型暂时无法生成",
+        selectTargetFirst: "请先选择至少一种目标模型。",
+        selectTargetAction: "选择目标模型",
+        sourceAction: "前往系统需求",
         targetModels: "目标模型",
         traceProof: "追踪证明",
         traceProofAria: "查看需求模型追踪证明，共 {{count}} 项",
@@ -734,7 +737,6 @@ export const resources = {
         willAutoFill: "将自动补齐：{{labels}}",
         analysisDependency: "基于用例模型事件流生成，不要求需求规则直接映射。",
         sourceCount: "已关联来源：{{count}}",
-        selectionHint: "勾选不会立即生效；点击「生成模型」后左侧菜单才会更新。之后生成需求模型、设计模型、代码原型和说明书时，都会优先使用这里选择的需求项。",
         replace: {
           title: "确认替换需求规则",
           description: "重新抽取会全量替换当前 {{count}} 条需求规则；旧需求模型仍可查看，但不再匹配新规则的追踪映射会被清理，并需要重新生成下游模型。",
@@ -1033,6 +1035,12 @@ export const resources = {
           members: "项目成员与权限",
           history: "运行历史",
           documents: "文档中心",
+        },
+        sectionDescriptions: {
+          settings: "管理 {{project}} 的配置与访问权限。",
+          members: "查看和管理 {{project}} 的成员与邀请。",
+          history: "查看 {{project}} 的生成运行和执行结果。",
+          documents: "查看和管理 {{project}} 的项目文档。",
         },
         drawer: {
           tasks: "生成任务",
@@ -1371,6 +1379,7 @@ export const resources = {
       },
       code: {
         title: "前端原型代码",
+        description: "依据设计模型生成、编辑并预览前端原型。",
         fileCount: "{{count}} 个文件",
         modelModes: { strict_json: "严格 JSON", json_object: "JSON 模式", compatible: "兼容模式" },
         compatibleWarning: "该模型将使用普通输出，并通过校验与修复重试保证结构。",
@@ -1510,7 +1519,7 @@ export const resources = {
   en: {
     translation: {
       generationModel: {
-        providerRequired: "Configure and select a model provider first.",
+        providerRequired: "No model provider selected",
         modelRequired: "Select a model for generation first.",
         modelUnavailable: "The selected model is unavailable. Select a model from the current provider's catalog.",
       },
@@ -1586,7 +1595,7 @@ export const resources = {
           stat: "{{total}} calls",
         },
         performance: {
-          title: "Performance",
+          title: "Project activity",
           membersTab: "Team",
           unknownOwner: "Unknown owner",
           ownerRole: "Project lead",
@@ -2216,7 +2225,10 @@ export const resources = {
         },
         credits: "{{count}} credits available; each generation with a hosted provider consumes 1 credit",
         closeCredits: "Dismiss credit notice",
-        noRules: "No valid requirement rules. Enter a description and generate or add rules under System requirements first.",
+        modelBlockedTitle: "Requirement models cannot be generated yet",
+        selectTargetFirst: "Select at least one target model first.",
+        selectTargetAction: "Select target models",
+        sourceAction: "Go to System requirements",
         targetModels: "Target models",
         traceProof: "Trace evidence",
         traceProofAria: "View requirement model trace evidence, {{count}} items",
@@ -2241,7 +2253,6 @@ export const resources = {
         willAutoFill: "Will auto-fill: {{labels}}",
         analysisDependency: "Generated from use-case event flows; no direct requirement-rule mapping is required.",
         sourceCount: "Linked sources: {{count}}",
-        selectionHint: "Selections take effect after you click Generate models and the sidebar updates. Later requirement, design, prototype, and document generation will prefer the selected requirements.",
         replace: {
           title: "Replace requirement rules?",
           description: "Re-extraction replaces all {{count}} current requirement rules. Existing models remain viewable, but trace mappings that no longer match are removed and downstream models must be regenerated.",
@@ -2540,6 +2551,12 @@ export const resources = {
           members: "Project members and access",
           history: "Run history",
           documents: "Document center",
+        },
+        sectionDescriptions: {
+          settings: "Manage settings and access for {{project}}.",
+          members: "View and manage members and invitations for {{project}}.",
+          history: "Review generation runs and results for {{project}}.",
+          documents: "View and manage project documents for {{project}}.",
         },
         drawer: {
           tasks: "Generation tasks",
@@ -2878,6 +2895,7 @@ export const resources = {
       },
       code: {
         title: "Frontend prototype code",
+        description: "Generate, edit, and preview a frontend prototype from design models.",
         fileCount: "{{count}} files",
         modelModes: { strict_json: "Strict JSON", json_object: "JSON mode", compatible: "Compatible mode" },
         compatibleWarning: "This model uses regular output with validation and repair retries to preserve structure.",

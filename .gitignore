@@ -55,6 +55,7 @@ vite.config.*.timestamp-*
 .superpowers/
 .codex-*.log
 .codex-*.png
+/.codex-test-*.txt
 .local-*.log
 current-page*.png
 tmp-*.png
@@ -73,6 +74,9 @@ trace*.json.gz
 frontend-prototype.sandpack.json
 apps/web/public/vendor/
 apps/web/public/sandpack/
+apps/web/.next/
+apps/web/next-env.d.ts
+apps/web/src/features/product-docs/model/docs-content.generated.ts
 .local-documents/
 apps/api/.local-documents/
 tmp/

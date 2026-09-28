@@ -701,7 +701,9 @@ describe("TraceabilityMatrixPage", () => {
     );
 
     expect(await screen.findByText("跟踪矩阵基于旧上游生成")).toBeInTheDocument();
-    expect(screen.getByText(/请重新生成需求模型/)).toBeInTheDocument();
+    expect(screen.queryByText(/请重新生成需求模型/)).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: /有 1 项需要处理/ }));
+    expect(within(await screen.findByRole("dialog")).getByText(/请重新生成需求模型/)).toBeInTheDocument();
     expect(screen.getByText(/覆盖完整性：/)).toHaveTextContent("需要重新生成");
   });
 

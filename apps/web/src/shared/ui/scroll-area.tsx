@@ -41,7 +41,6 @@ function ScrollArea({
       <ScrollAreaPrimitive.Scrollbar
         data-slot="scroll-area-scrollbar"
         orientation="vertical"
-        keepMounted
         className="m-1 w-1.5 rounded-full bg-transparent opacity-0 transition-opacity data-hovering:opacity-100 data-scrolling:opacity-100"
       >
         <ScrollAreaPrimitive.Thumb
@@ -53,7 +52,6 @@ function ScrollArea({
         <ScrollAreaPrimitive.Scrollbar
           data-slot="scroll-area-scrollbar"
           orientation="horizontal"
-          keepMounted
           className="m-1 h-1.5 rounded-full bg-transparent opacity-0 transition-opacity data-hovering:opacity-100 data-scrolling:opacity-100"
         >
           <ScrollAreaPrimitive.Thumb

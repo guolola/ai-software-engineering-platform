@@ -20,6 +20,7 @@ import {
 } from "../../../entities/requirement-rule/model";
 import type { WorkspaceRecord } from "../../../entities/workspace/model";
 import { Badge } from "../../../shared/ui/badge";
+import { categoryChipTone } from "../../../shared/ui/category-tones";
 import { Button } from "../../../shared/ui/button";
 import { Input } from "../../../shared/ui/input";
 import { SelectControl } from "../../../shared/ui/select";
@@ -153,7 +154,7 @@ export function RequirementRulesTable({
               onValueChange={(value) =>
                 setRuleCategoryFilter(value as RequirementRuleCategoryFilter)
               }
-              className="w-20 shrink-0 sm:w-36"
+              className={cn("w-20 shrink-0 sm:w-36", ruleCategoryFilter && categoryChipTone(RULE_CATEGORY_ORDER.indexOf(ruleCategoryFilter)))}
               aria-label={t("requirements.table.categoryFilter")}
               options={[
                 { value: ALL_RULE_CATEGORIES, label: t("requirements.table.allCategories") },
@@ -294,7 +295,7 @@ export function RequirementRulesTable({
                               })
                             : undefined
                         }
-                        className="mx-auto h-7 w-auto min-w-[6.5rem] max-w-full px-2 text-[11px] *:data-[slot=select-value]:flex-1 *:data-[slot=select-value]:justify-center md:h-8 md:text-xs"
+                        className={cn("mx-auto h-7 w-auto min-w-[6.5rem] max-w-full px-2 text-[11px] *:data-[slot=select-value]:flex-1 *:data-[slot=select-value]:justify-center md:h-8 md:text-xs", categoryChipTone(RULE_CATEGORY_ORDER.indexOf(rule.category)))}
                         contentClassName="min-w-[8rem]"
                         aria-label={t("requirements.table.categoryAria", { id: rule.id })}
                         disabled={generating || !canEditRequirements}
@@ -342,7 +343,7 @@ export function RequirementRulesTable({
                       <Button
                         type="button"
                         size="sm"
-                        variant="ghost"
+                        variant="destructive"
                         className="mx-auto h-7 px-1 md:h-8 md:px-2"
                         onClick={() => deleteRequirementRule(rule.id)}
                         disabled={generating || !canEditRequirements}

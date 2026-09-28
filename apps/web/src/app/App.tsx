@@ -1,10 +1,11 @@
 // Composes application providers, route matching, workspace shell layout, and top-level page selection.
-import { SidebarBrand } from "../shared/template/layout/sidebar-brand";
+'use client';
 import { PageContainer } from "../shared/template/layout/page";
+import { DefaultPagesLayout } from '../shared/template/layout/default-pages-layout';
+import { DefaultSidebar } from '../shared/template/layout/default-sidebar';
 import { PlatformSidebar } from '../features/workspace-shell/components/platform-sidebar';
 import React, { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Sidebar, SidebarContent, SidebarInset, SidebarProvider, SidebarResizeHandle, useSidebar } from '../shared/ui/sidebar';
-import { ScrollArea } from '../shared/ui/scroll-area';
+import { SidebarProvider, useSidebar } from '../shared/ui/sidebar';
 import { TooltipProvider } from '../shared/ui/tooltip';
 import Error404 from '../shared/template/views/pages/misc/error-page-404';
 import { PageErrorBoundary } from '../shared/ui/page-error-boundary';
@@ -359,14 +360,11 @@ function ProjectWorkspaceShell({
   }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1">
-      <Sidebar collapsible="icon">
-        <SidebarBrand />
-        <SidebarContent><SidebarMenu projectRuns={projectRuns} onNavigateItemSelect={() => setOpenMobile(false)} /></SidebarContent>
-        <SidebarResizeHandle label={t("workspace.sidebar.resize")} />
-      </Sidebar>
-      <SidebarInset className="h-svh min-w-0 overflow-hidden">
-        {React.isValidElement(header)
+    <DefaultPagesLayout
+      sidebar={<DefaultSidebar resizeLabel={t("workspace.sidebar.resize")}>
+        <SidebarMenu projectRuns={projectRuns} onNavigateItemSelect={() => setOpenMobile(false)} />
+      </DefaultSidebar>}
+      header={React.isValidElement(header)
           ? React.cloneElement(header as React.ReactElement<TopBarProps>, {
               projectDrawer: {
                 projectId,
@@ -376,22 +374,21 @@ function ProjectWorkspaceShell({
               },
             })
           : header}
-        <ScrollArea className="min-h-0 flex-1" viewportClassName="overflow-x-clip overflow-y-auto" contentClassName="w-full min-w-0! pt-19">
-          <main className="relative flex min-h-full flex-col bg-background">
-            <div className="relative min-h-0 flex-1">
-              <div
-                id="workspace-active-panel"
-                role="tabpanel"
-                className="min-h-0 overflow-x-clip"
-              >
-                {body}
-              </div>
-              <ProjectWorkspaceDrawer projectId={projectId} activeDrawer={activeDrawer} onNavigate={onNavigate} onClose={closeDrawer} preferredTaskRunId={preferredTaskRunId} />
+      contentClassName="min-w-0 p-0"
+    >
+        <div className="relative flex min-h-full flex-col bg-background">
+          <div className="relative min-h-0 flex-1">
+            <div
+              id="workspace-active-panel"
+              role="tabpanel"
+              className="min-h-0 overflow-x-clip"
+            >
+              {body}
             </div>
-          </main>
-        </ScrollArea>
-      </SidebarInset>
-    </div>
+            <ProjectWorkspaceDrawer projectId={projectId} activeDrawer={activeDrawer} onNavigate={onNavigate} onClose={closeDrawer} preferredTaskRunId={preferredTaskRunId} />
+          </div>
+        </div>
+    </DefaultPagesLayout>
   );
 }
 
@@ -401,6 +398,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
   const [preferredTaskRunId, setPreferredTaskRunId] = useState<string | null>(null);
   const { generationTasks, selectGenerationTask } = useWorkspaceSession();
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [loginLoadingRoute, setLoginLoadingRoute] = useState<string | null>(null);
   const [route, setRoute] = useState<AppRoute>(() => {
     const pathname = initialPath ?? (typeof window === "undefined" ? "/" : window.location.pathname);
     return matchAppRoute(pathname);
@@ -422,6 +420,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
   useEffect(() => {
     const handlePopState = () => {
       setActiveProjectDrawer(null);
+      setLoginLoadingRoute(null);
       setRoute(matchAppRoute(window.location.pathname));
     };
     window.addEventListener("popstate", handlePopState);
@@ -448,8 +447,14 @@ export function Shell({ initialPath }: { initialPath?: string }) {
     };
   }, [generationTasks, selectGenerationTask]);
 
-  const navigate = useCallback((nextPath: string) => {
-    const nextUrl = new URL(nextPath, window.location.origin);
+  const navigate = useCallback((nextPath: string, options?: { fromLogin?: boolean }) => {
+    const nextUrl = new URL(options?.fromLogin && nextPath === "/workspace" ? "/projects" : nextPath, window.location.origin);
+    const nextRoute = matchAppRoute(nextUrl.pathname);
+    setLoginLoadingRoute(
+      options?.fromLogin && (nextRoute.kind === "dashboard" || nextRoute.kind === "projects-index")
+        ? nextRoute.path
+        : null,
+    );
     const nextLocation = `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
     setActiveProjectDrawer(null);
     if (`${window.location.pathname}${window.location.search}` !== nextLocation) {
@@ -460,7 +465,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
         }),
       );
     }
-    setRoute(matchAppRoute(nextUrl.pathname));
+    setRoute(nextRoute);
   }, []);
 
   const renderRoute = () => {
@@ -533,24 +538,18 @@ export function Shell({ initialPath }: { initialPath?: string }) {
     route.kind !== "legacy-redirect" &&
     route.kind !== "not-found";
   const guardedRouteContent = showWorkspaceTopBar ? (
-    <div className="flex min-h-0 min-w-0 flex-1">
-      <PlatformSidebar path={route.path} />
-      <SidebarInset className="h-svh min-w-0 overflow-hidden">
-        <TopBar
+    <DefaultPagesLayout
+      sidebar={<PlatformSidebar path={route.path} />}
+      header={<TopBar
           currentRoute={route.path}
           onNavigate={navigate}
           accountDialogOpen={accountDialogOpen}
           onAccountDialogOpenChange={setAccountDialogOpen}
-        />
-        <ScrollArea
-          className="min-h-0 flex-1"
-          viewportClassName={route.kind === "shell" && route.path === "/tutorial" ? "overflow-hidden" : "overflow-x-clip overflow-y-auto"}
-          contentClassName={route.kind === "shell" && route.path === "/tutorial" ? "h-full w-full min-w-0! overflow-hidden pt-19" : "w-full min-w-0! pt-19"}
-        >
-          {routeContent}
-        </ScrollArea>
-      </SidebarInset>
-    </div>
+        />}
+      contentClassName="min-w-0 p-0"
+    >
+        {routeContent}
+    </DefaultPagesLayout>
   ) : routeContent;
 
   return (
@@ -561,7 +560,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
         <AuthenticatedRoute
           routeKey={protectedRoutePath}
           onNavigate={navigate}
-          showLoadingScreen={route.kind === "project-workspace"}
+          showLoadingScreen={route.kind === "project-workspace" || loginLoadingRoute === route.path}
         >
           {guardedRouteContent}
         </AuthenticatedRoute>

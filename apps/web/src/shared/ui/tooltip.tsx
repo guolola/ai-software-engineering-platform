@@ -1,6 +1,6 @@
 // AdminCN full-navbar 1.0.0 template source; only runtime, content and business integration adaptations.
-import * as React from 'react';
 'use client'
+import * as React from 'react';
 
 import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip'
 

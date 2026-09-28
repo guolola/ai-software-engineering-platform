@@ -28,6 +28,7 @@ import {
   type FeedbackDialogState,
 } from "../../../shared/ui/feedback-dialog";
 import { cn } from "../../../shared/ui/utils";
+import { categoryChipTone } from "../../../shared/ui/category-tones";
 import { useWorkspaceShell } from "../../workspace-shell/state";
 import { useWorkspaceSession } from "../../workspace-session/state";
 
@@ -385,7 +386,7 @@ export function TestModelPage() {
       accessorKey: "scenarioType",
       header: t("testingPage.columns.scenario"),
       size: 140,
-      cell: ({ row }) => <Badge variant="secondary">{t(`testingPage.scenarios.${row.original.scenarioType.replace("-", "_")}`)}</Badge>,
+      cell: ({ row }) => <Badge variant="outline" className={categoryChipTone(SCENARIO_TYPES.indexOf(row.original.scenarioType) - 1)}>{t(`testingPage.scenarios.${row.original.scenarioType.replace("-", "_")}`)}</Badge>,
     },
     {
       id: "steps",
@@ -425,9 +426,10 @@ export function TestModelPage() {
       cell: ({ row }) => (
         <span className={cn(
           "inline-flex rounded-full px-2 py-1 text-xs font-semibold",
-          row.original.priority === "P1" || row.original.priority === "P0"
-            ? "bg-primary/10 text-primary"
-            : "bg-muted text-muted-foreground",
+          row.original.priority === "P0" ? "bg-destructive/10 text-destructive"
+            : row.original.priority === "P1" ? "bg-warning/10 text-warning"
+              : row.original.priority === "P2" ? "bg-info/10 text-info"
+                : "bg-muted text-muted-foreground",
         )}>{row.original.priority}</span>
       ),
     },
@@ -446,7 +448,7 @@ export function TestModelPage() {
           <PageHeader
             title={t("testingPage.title")}
             description={t("testingPage.description")}
-            titleAccessory={blockFeedback?.keepReopenEntry ? (
+            notice={blockFeedback?.keepReopenEntry ? (
               <FeedbackReopenButton feedback={blockFeedback} />
             ) : null}
             actions={

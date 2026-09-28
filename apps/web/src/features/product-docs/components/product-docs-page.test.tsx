@@ -25,6 +25,15 @@ import {
 const PUBLIC_DIRECTORY = resolve(process.cwd(), "public");
 
 describe("ProductDocsPage", () => {
+  it("uses page scrolling and pins both desktop navigation columns", () => {
+    render(<ProductDocsPage />);
+
+    expect(screen.getByTestId("product-docs-page")).not.toHaveClass("overflow-y-auto");
+    expect(document.getElementById("product-docs-directory")).toHaveClass("@[720px]/docs:sticky", "@[720px]/docs:overflow-y-auto");
+    expect(screen.getByRole("complementary", { name: "本页大纲" })).toHaveClass("@[1040px]/docs:sticky", "@[1040px]/docs:overflow-y-auto");
+    expect(screen.getByRole("heading", { name: "快速开始" })).toHaveClass("@[720px]/docs:scroll-mt-24");
+  });
+
   it("shows the project-local quick start article by default", () => {
     render(<ProductDocsPage />);
 

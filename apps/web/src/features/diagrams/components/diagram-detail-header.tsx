@@ -82,8 +82,8 @@ export function DiagramDetailHeader({
     <PageHeader
       title={<span className="break-words">{modelTitle}</span>}
       description={modelSummary}
+      notice={notices}
       titleAccessory={<div className="flex w-fit max-w-full flex-wrap items-center gap-2">
-        {notices}
         {canEdit && <Button type="button" size="sm" variant="outline" className="w-auto shrink-0" disabled={saving} onClick={openEditor}>
           <Pencil aria-hidden="true" className="size-3.5" />{t("diagrams.detail.editMetadata")}
         </Button>}

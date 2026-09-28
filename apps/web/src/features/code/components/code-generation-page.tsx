@@ -1,12 +1,11 @@
 // Renders the code generation workspace, including model selection, file browser, and preview actions.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { PageContainer } from "../../../shared/template/layout/page";
+import { PageContainer, PageHeader } from "../../../shared/template/layout/page";
 import { SandpackProvider } from "@codesandbox/sandpack-react";
 import {
   AlertTriangle,
   CheckCircle2,
-  Code2,
   FolderTree,
   Info,
   Loader2,
@@ -337,15 +336,15 @@ export function CodeGenerationPage() {
 
   return (
     <PageContainer className="flex min-h-0 min-w-0 flex-col">
+      <PageHeader
+        className="mb-5"
+        title={t("code.title")}
+        description={t("code.description")}
+        notice={codeStatus || generationBlockFeedback ? <div className="flex flex-wrap items-center gap-2"><CodeStatusDialog status={codeStatus} diagnostics={codeDiagnostics} />{generationBlockFeedback && <FeedbackReopenButton feedback={generationBlockFeedback} />}</div> : null}
+      />
       <div data-testid="code-generation-page" className="flex min-h-0 min-w-0 flex-col">
         <div data-testid="code-workspace-frame" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs">
           <div data-testid="code-generation-toolbar" className="flex min-h-12 w-full min-w-0 flex-col items-stretch gap-2 border-b border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <Code2 className="size-4 shrink-0 text-primary" />
-              <span className="text-sm font-semibold">{t("code.title")}</span>
-              <CodeStatusDialog status={codeStatus} diagnostics={codeDiagnostics} />
-              {!canGenerate && <FeedbackReopenButton feedback={generationBlockFeedback!} />}
-            </div>
             {generating && (
               <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="size-3.5 animate-spin" />
@@ -377,7 +376,6 @@ export function CodeGenerationPage() {
               </Button>
             </div>
           </div>
-          {generationModelBlockedReason && <p role="status" className="border-b px-3 py-2 text-xs text-muted-foreground">{generationModelBlockedReason}</p>}
           {modelCapability.structuredOutputMode === "compatible" && defaultModel.trim() && (
             <div className="border-b border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{t("code.compatibleWarning")}</div>
           )}

@@ -227,6 +227,9 @@ describe("ProjectWorkspaceDrawer", () => {
 
     const drawer = await screen.findByTestId("project-workspace-drawer");
     const body = await screen.findByTestId("project-workspace-drawer-body");
+    expect(screen.getByRole("dialog", { name: "项目设置" })).toBe(drawer);
+    expect(document.getElementById(drawer.getAttribute("aria-labelledby") ?? "")).toHaveTextContent("项目设置");
+    expect(document.getElementById(drawer.getAttribute("aria-describedby") ?? "")).toHaveTextContent("goal-e2e destructive");
     expect(drawer).toHaveClass("overflow-x-hidden");
     expect(body).toHaveClass("overflow-x-hidden", "min-w-0");
     expect(screen.queryByText("默认模型策略")).not.toBeInTheDocument();

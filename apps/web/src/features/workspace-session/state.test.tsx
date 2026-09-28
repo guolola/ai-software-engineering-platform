@@ -456,6 +456,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     await act(async () => {
@@ -506,6 +507,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     await act(async () => {
@@ -599,6 +601,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
     act(() => {
       void result.current.generateRules();
@@ -649,6 +652,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     act(() => {
@@ -890,6 +894,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     act(() => {
@@ -1035,6 +1040,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let generation: Promise<unknown> | null = null;
@@ -1137,6 +1143,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     await act(async () => {
@@ -1237,6 +1244,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
     expect(result.current.requirementBaseline).toEqual(baseline);
     expect(result.current.requirementQualityReport).toEqual(
@@ -1378,6 +1386,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     expect(result.current.isRulesStale).toBe(false);
@@ -1416,6 +1425,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     expect(result.current.generatedDiagrams).toEqual(["usecase"]);
@@ -1498,6 +1508,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
     expect(result.current.isRulesStale).toBe(false);
     expect(result.current.staleDiagrams).toEqual([]);
@@ -1632,6 +1643,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     expect(result.current.staleDiagrams).toEqual([]);
@@ -1786,6 +1798,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     expect(result.current.staleDiagrams).toEqual([]);
@@ -2020,6 +2033,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let generation: Promise<void> | null = null;
@@ -2240,6 +2254,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     for (const diagram of ["usecase", "class", "activity"] as const) {
@@ -2398,6 +2413,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let generation: Promise<void> | null = null;
@@ -2505,6 +2521,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let generation: Promise<void> | null = null;
@@ -2605,6 +2622,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let generation: Promise<void> | null = null;
@@ -2741,6 +2759,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let generation: Promise<void> | null = null;
@@ -2877,6 +2896,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let generation: Promise<void> | null = null;
@@ -2979,6 +2999,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let generation: Promise<void> | null = null;
@@ -3077,6 +3098,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     await act(async () => {
@@ -3153,6 +3175,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     await act(async () => {
@@ -3249,6 +3272,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let generation: Promise<void> | null = null;
@@ -3367,6 +3391,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let generation: Promise<void> | null = null;
@@ -3545,6 +3570,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     await act(async () => {
@@ -3724,6 +3750,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
     expect(result.current.designGenerationBlockedReason).toBeNull();
 
@@ -3831,6 +3858,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     await act(async () => {
@@ -4013,6 +4041,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let generation: Promise<void> | null = null;
@@ -4165,6 +4194,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
     expect(result.current.designGenerationBlockedReason).toBeNull();
 
@@ -4342,6 +4372,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     await act(async () => {
@@ -4419,6 +4450,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
     act(() => {
       result.current.setRequirementText("订单系统需求");
@@ -4566,6 +4598,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let requirementsPromise!: Promise<DocumentRunSnapshot | null>;
@@ -4698,6 +4731,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     await act(async () => {
@@ -4787,6 +4821,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     let documentPromise!: Promise<DocumentRunSnapshot | null>;
@@ -4896,6 +4931,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     await act(async () => {
@@ -5180,6 +5216,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     const user = userEvent.setup();
@@ -5455,6 +5492,7 @@ describe("WorkspaceSessionProvider", () => {
 
     await waitFor(() => {
       expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
+      expect(result.current.workspaceInitialized).toBe(true);
     });
 
     await act(async () => {

@@ -55,8 +55,8 @@ export function ProductDocsPage({ onNavigate }: ProductDocsPageProps) {
   );
 
   return (
-    <main ref={pageRef} data-testid="product-docs-page" className="@container/docs h-full min-h-0 min-w-0 w-full overflow-y-auto overflow-x-clip overscroll-contain bg-background text-foreground">
-      <div className="sticky top-0 z-40 border-b border-border bg-background px-4 py-2 @[720px]/docs:hidden">
+    <main ref={pageRef} data-testid="product-docs-page" className="@container/docs min-w-0 w-full bg-background text-foreground">
+      <div className="sticky top-20 z-40 border-b border-border bg-background px-4 py-2 @[720px]/docs:hidden">
         <Button
           variant="ghost"
           className="w-full justify-start"
@@ -70,8 +70,8 @@ export function ProductDocsPage({ onNavigate }: ProductDocsPageProps) {
         </Button>
       </div>
       <PageContainer className="h-auto flex-none py-8 @[720px]/docs:py-10">
-        <div className="grid w-full grid-cols-1 items-start gap-8 @[720px]/docs:grid-cols-[256px_minmax(0,1fr)] @[1200px]/docs:grid-cols-[256px_minmax(0,800px)_200px]">
-          <div id="product-docs-directory" className={cn("min-w-0 @[720px]/docs:block", !directoryOpen && "hidden")}>
+        <div className="grid w-full grid-cols-1 items-start gap-8 @[720px]/docs:grid-cols-[256px_minmax(0,1fr)] @[1040px]/docs:grid-cols-[256px_minmax(0,800px)_200px]">
+          <div id="product-docs-directory" className={cn("min-w-0 @[720px]/docs:sticky @[720px]/docs:top-24 @[720px]/docs:max-h-[calc(100dvh-7rem)] @[720px]/docs:self-start @[720px]/docs:overflow-y-auto @[720px]/docs:block", !directoryOpen && "hidden")}>
             <DocsSidebar
               articles={articles}
               categories={categories}

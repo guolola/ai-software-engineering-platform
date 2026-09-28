@@ -49,7 +49,7 @@ describe("stage reading surface", () => {
   it("uses the shared viewport and preserves manual up-scroll until return to latest", () => {
     const { container, rerender } = render(<GenerationTranscript taskKey="a" steps={steps} active introduction="开始生成。" finalMessage="" />);
     const viewport = container.querySelector('[data-slot="scroll-area-viewport"]') as HTMLDivElement;
-    expect(container.querySelector('[data-slot="scroll-area-scrollbar"]')).not.toBeNull();
+    expect(container.querySelector('[data-slot="scroll-area-scrollbar"]')).toBeNull();
     Object.defineProperties(viewport, { scrollHeight: { value: 1000 }, clientHeight: { value: 300 } });
     fireEvent.wheel(viewport, { deltaY: -100 });
     viewport.scrollTop = 100; fireEvent.scroll(viewport);

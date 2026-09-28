@@ -1,6 +1,6 @@
 // Flow 2.0.0 template source; only runtime, content and business integration adaptations.
-import { FlowCopy, flowText } from '@/features/marketing-site/model/flow-copy';
 'use client'
+import { FlowCopy, flowText } from '@/features/marketing-site/model/flow-copy';
 
 import { useRef, useState, useEffect } from 'react'
 
@@ -316,8 +316,8 @@ const HeroSection = () => {
                           'shadow-xl': scrollProgress >= 37 && scrollProgress < 47
                         })}
                       >
-                        <img width={829} height={454} src='/help/images/workbench-performance.png' alt='项目性能概览' className='block h-auto w-full dark:hidden' />
-                        <img width={829} height={454} src='/help/images/workbench-performance-dark.png' alt='项目性能概览' className='hidden h-auto w-full dark:block' />
+                        <img width={829} height={454} src='/help/images/workbench-performance.png' alt='项目活动概览' className='block h-auto w-full dark:hidden' />
+                        <img width={829} height={454} src='/help/images/workbench-performance-dark.png' alt='项目活动概览' className='hidden h-auto w-full dark:block' />
                       </MotionPreset>
                     ) : (
                       <Skeleton className='bg-foreground/6 aspect-[829/454]' />

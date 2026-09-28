@@ -164,7 +164,7 @@ describe("createStartRunInput", () => {
       }),
     );
 
-    expect(() => createStartRunInput("生成 UML", ["usecase"])).toThrow("请先配置并选择模型供应商");
+    expect(() => createStartRunInput("生成 UML", ["usecase"])).toThrow("未选择模型供应商");
   });
 
   it("rejects real generation when only stale plaintext settings remain", () => {
@@ -181,7 +181,7 @@ describe("createStartRunInput", () => {
       }),
     );
 
-    expect(() => createStartRunInput("生成 UML", ["usecase"])).toThrow("请先配置并选择模型供应商");
+    expect(() => createStartRunInput("生成 UML", ["usecase"])).toThrow("未选择模型供应商");
   });
 
   it("includes only managed provider config references when selected", () => {

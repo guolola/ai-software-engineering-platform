@@ -800,7 +800,7 @@ export function InstructionDocumentsPage({
         <PageHeader
           title={t("documentsPage.title")}
           description={t("documentsPage.description")}
-          titleAccessory={listErrorFeedback?.keepReopenEntry ? (
+          notice={listErrorFeedback?.keepReopenEntry ? (
             <FeedbackReopenButton feedback={listErrorFeedback} />
           ) : null}
         />

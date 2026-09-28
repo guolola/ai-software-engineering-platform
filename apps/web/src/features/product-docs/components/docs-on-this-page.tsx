@@ -25,7 +25,7 @@ export function DocsOnThisPage({ headings }: DocsOnThisPageProps) {
   }, [headings]);
 
   return (
-    <aside aria-label={t("docs.outlineAria")} className="hidden min-w-0 @[1200px]/docs:block">
+    <aside aria-label={t("docs.outlineAria")} className="hidden min-w-0 @[1040px]/docs:sticky @[1040px]/docs:top-24 @[1040px]/docs:block @[1040px]/docs:max-h-[calc(100dvh-7rem)] @[1040px]/docs:self-start @[1040px]/docs:overflow-y-auto">
       <div className="border-l border-border pl-5 py-2">
         <div className="flex items-center gap-2">
           <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

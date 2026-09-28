@@ -1,6 +1,4 @@
 // Renders the requirement authoring page and coordinates rule editing, quality checks, and generation actions.
-import { Alert } from '../../../shared/ui/alert';
-import { Card } from "../../../shared/ui/card";
 import { Textarea } from '../../../shared/ui/textarea';
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,7 +9,6 @@ import {
   RefreshCw,
   ArrowUp,
   FileText,
-  ListChecks,
   Network,
   Box,
   Server,
@@ -21,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
+import { FeedbackReopenButton, type FeedbackDialogState } from "../../../shared/ui/feedback-dialog";
 import { Badge } from "../../../shared/ui/badge";
 import { cn } from "../../../shared/ui/utils";
 import type {
@@ -39,6 +37,7 @@ import {
   type RequirementRule,
 } from "../../../entities/requirement-rule/model";
 import { useWorkspaceSession } from "../../workspace-session/state";
+import { useWorkspaceShell } from "../../workspace-shell/state";
 import {
   clearRequirementRuleRequest,
   pendingRequirementRuleRequest,
@@ -56,7 +55,6 @@ import {
 } from "../lib/requirement-review-view-model";
 import { ModelPicker } from "../../../shared/ui/model-picker";
 import {
-  EmptyState,
   PageContainer,
   PageHeader,
 } from "../../../shared/template/layout/page";
@@ -113,6 +111,7 @@ export function TextRequirementView({
   view?: "system" | "models" | "all";
 }) {
   const { t } = useTranslation();
+  const { openSystemRequirements } = useWorkspaceShell();
   const { requirementStatusFor } = useModelCardStatus();
   const {
     requirementText,
@@ -417,8 +416,18 @@ export function TextRequirementView({
   const visibleRequirementReviewBlockedReason = requirementReviewBlockedReason
     ? t("requirements.reviewBlocked")
     : null;
-  const generationBlockedTitle =
-    visibleRequirementReviewBlockedReason ?? undefined;
+  const rulesStaleMessage =
+    rulesStaleReason === "rules"
+      ? t("requirements.stale.downstream")
+      : rulesStaleReason === "source-missing"
+        ? t("requirements.stale.empty")
+        : t("requirements.stale.changed");
+  const staleDiagramReason =
+    isRulesStale && rulesStaleReason === "text"
+      ? t("requirements.stale.changedTitle")
+      : rulesStaleReason === "source-missing"
+        ? t("requirements.stale.emptyTitle")
+      : t("requirements.stale.reviewTitle");
   const selectedTargetBlockReason =
     selectedDiagrams
       .map((diagram) =>
@@ -432,6 +441,49 @@ export function TextRequirementView({
         }),
       )
       .find(Boolean) ?? null;
+  const missingRequirementSourceReason = !hasRequirementSourceText && rules.length === 0
+    ? requirementTargetBlockReason({
+        diagram: "usecase",
+        generatedDiagrams,
+        hasRequirementSourceText,
+        isRulesStale,
+        rules,
+        staleDiagrams,
+      })
+    : null;
+  const modelGenerationBlockedReason = view === "system" ? null
+    : !canRunGeneration ? workspacePermissionReason ?? t("requirements.permissions.run")
+      : requirementReviewBlockedReason ? visibleRequirementReviewBlockedReason
+        : selectedTargetBlockReason ?? missingRequirementSourceReason ?? generationModelBlockedReason
+          ?? (selectedDiagrams.length === 0 ? t("requirements.selectTargetFirst") : null);
+  const pageNoticeMessages = [
+    !canEditRequirements ? editBlockedReason : null,
+    billingGenerationBlock ? `${billingGenerationBlock.message}\n${t("requirements.credits", { count: billingGenerationBlock.billingSummary.creditBalance })}` : null,
+    view !== "models" && showStaleBanner && isRulesStale ? rulesStaleMessage : null,
+    view !== "system" && showStaleBanner && staleDiagrams.length > 0
+      ? `${t("requirements.stale.modelCount", { count: staleDiagrams.length, reason: staleDiagramReason })}${staleDiagrams.map((diagram) => getDiagramLabel(diagram, t)).join(t("traceability.refSeparator"))}`
+      : null,
+    modelGenerationBlockedReason,
+  ].filter((message): message is string => Boolean(message));
+  const uniquePageNoticeMessages = [...new Set(pageNoticeMessages)];
+  const modelGuidanceAction = view !== "system" && modelGenerationBlockedReason && canRunGeneration
+    ? selectedTargetBlockReason || missingRequirementSourceReason || requirementReviewBlockedReason
+      ? { label: t("requirements.sourceAction"), onSelect: openSystemRequirements }
+      : selectedDiagrams.length === 0
+        ? { label: t("requirements.selectTargetAction"), onSelect: () => document.getElementById("requirement-target-models")?.scrollIntoView({ behavior: "smooth", block: "start" }) }
+        : undefined
+    : undefined;
+  const pageFeedback: FeedbackDialogState | null = pageNoticeMessages.length > 0 ? {
+    dedupeKey: `requirements:${view}:notices`,
+    revision: uniquePageNoticeMessages.join("|"),
+    tone: "warning",
+    title: modelGenerationBlockedReason ? t("requirements.modelBlockedTitle") : t("feedback.needsAttentionCount", { count: uniquePageNoticeMessages.length }),
+    message: uniquePageNoticeMessages.join("\n"),
+    primaryAction: modelGuidanceAction,
+    keepReopenEntry: true,
+  } : null;
+  const generationBlockedTitle =
+    visibleRequirementReviewBlockedReason ?? undefined;
   const requirementModelRepairRecords = useMemo(() => {
     return buildRequirementModelRepairRecords({
       generatedDiagrams,
@@ -439,29 +491,10 @@ export function TextRequirementView({
       rules,
     });
   }, [generatedDiagrams, requirementModelTraceability, rules]);
-  const rulesStaleMessage =
-    rulesStaleReason === "rules"
-      ? t("requirements.stale.downstream")
-      : rulesStaleReason === "source-missing"
-        ? t("requirements.stale.empty")
-        : t("requirements.stale.changed");
-  const staleDiagramReason =
-    isRulesStale && rulesStaleReason === "text"
-      ? t("requirements.stale.changedTitle")
-      : rulesStaleReason === "source-missing"
-        ? t("requirements.stale.emptyTitle")
-      : t("requirements.stale.reviewTitle");
 
   const renderRequirementInput = (mode: "empty" | "generated") => {
     // Keep the input mounted when loaded rules change the surrounding section presentation.
-    return <Card
-      className={cn(
-        "gap-0 py-0 relative",
-        mode === "generated" && "block overflow-visible rounded-none bg-transparent shadow-none ring-0",
-        mode === "empty" &&
-          "gap-0 overflow-hidden p-4 py-0 sm:p-6 sm:py-0",
-      )}
-    >
+    return <div className="relative flex flex-col">
       <div className="relative flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <FileText className="size-5 text-primary" />
@@ -536,7 +569,7 @@ export function TextRequirementView({
             </Button>
           </div>
       </div>
-    </Card>;
+    </div>;
   };
 
   const renderRequirementRules = () => (
@@ -572,10 +605,8 @@ export function TextRequirementView({
 
   return (
     <div className="flex min-h-0 min-w-0 max-w-full flex-col overflow-x-clip bg-background">
-      {generationModelBlockedReason && <p role="status" className="px-3 py-2 text-sm text-muted-foreground">{generationModelBlockedReason}</p>}
       {view !== "models" && showStaleBanner && isRulesStale && (
-        <div className="flex items-center gap-2 border-b border-warning/40 bg-warning/10 px-3 py-2 text-sm">
-          <AlertTriangle className="size-4 text-warning" />
+        <div className="flex items-center gap-2 px-3 py-2 text-sm text-warning">
           <span>{rulesStaleMessage}</span>
           <Button
             size="sm"
@@ -591,8 +622,7 @@ export function TextRequirementView({
       )}
 
       {view !== "system" && showStaleBanner && staleDiagrams.length > 0 && (
-        <div className="flex items-center gap-2 border-b border-warning/40 bg-warning/10 px-3 py-2 text-sm">
-          <AlertTriangle className="size-4 text-warning" />
+        <div className="flex items-center gap-2 px-3 py-2 text-sm text-warning">
           <span>
             {t("requirements.stale.modelCount", { count: staleDiagrams.length, reason: staleDiagramReason })}
             {staleDiagrams.map((diagram) => getDiagramLabel(diagram, t)).join(t("traceability.refSeparator"))}
@@ -634,21 +664,19 @@ export function TextRequirementView({
                   ? t("requirements.page.modelsDescription")
                   : t("requirements.page.allDescription")
             }
+            notice={pageFeedback ? <FeedbackReopenButton feedback={pageFeedback} label={t("feedback.needsAttentionCount", { count: uniquePageNoticeMessages.length })} /> : null}
           />
           {!canEditRequirements && (
-            <Alert className="inline-flex max-w-3xl items-center gap-2 border px-3 py-2 text-xs">
+            <p role="status" className="inline-flex max-w-3xl items-center gap-2 text-xs text-warning">
               <AlertTriangle className="size-3.5" />
               {editBlockedReason}
-            </Alert>
+            </p>
           )}
           {billingGenerationBlock && (
-            <Alert className="flex max-w-4xl flex-wrap items-center gap-3 border px-3 py-2 text-sm text-foreground">
+            <div role="status" className="flex max-w-4xl flex-wrap items-center gap-3 text-sm text-warning">
               <AlertTriangle className="size-4 text-warning" />
               <div className="min-w-0 flex-1">
                 <div className="font-medium">{billingGenerationBlock.message}</div>
-                <div className="text-xs text-muted-foreground">
-                  {t("requirements.credits", { count: billingGenerationBlock.billingSummary.creditBalance })}
-                </div>
               </div>
               <Button
                 type="button"
@@ -660,7 +688,7 @@ export function TextRequirementView({
               >
                 <X className="size-4" />
               </Button>
-            </Alert>
+            </div>
           )}
           {view !== "models" && <div className="grid min-w-0 max-w-full grid-cols-1 gap-4 overflow-x-hidden">
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
@@ -669,11 +697,7 @@ export function TextRequirementView({
             </div>
           </div>}
 
-          {view === "models" && rules.length === 0 && (
-            <EmptyState icon={ListChecks} title={t("requirements.noRules")} />
-          )}
-
-          {view !== "system" && <section className="flex min-w-0 flex-col gap-4">
+          {view !== "system" && <section id="requirement-target-models" className="flex min-w-0 flex-col gap-4">
             <div className="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Network className="size-5 text-primary" />
@@ -722,9 +746,7 @@ export function TextRequirementView({
                     !canRunGeneration || Boolean(generationModelBlockedReason)
                   }
                   title={
-                    !canRunGeneration || Boolean(generationModelBlockedReason)
-                      ? generationBlockedByPermissionReason
-                      : selectedTargetBlockReason ?? generationBlockedTitle
+                    modelGenerationBlockedReason ?? generationBlockedTitle
                   }
                   className="inline-flex h-9 min-w-0 flex-1 items-center gap-2 px-3 text-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-4"
                 >
@@ -737,11 +759,11 @@ export function TextRequirementView({
                 </Button>
               </div>
             </div>
-            {requirementReviewBlockedReason && (
-              <Alert className="flex items-center gap-1.5 border px-3 py-2 text-xs">
+            {modelGenerationBlockedReason && !generationModelBlockedReason && (
+              <p role="status" className="flex items-center gap-1.5 text-xs text-warning">
                 <AlertTriangle className="size-3.5" />
-                {visibleRequirementReviewBlockedReason}
-              </Alert>
+                {modelGenerationBlockedReason}
+              </p>
             )}
 
             <MobileCompactGrid
@@ -789,6 +811,7 @@ export function TextRequirementView({
                     description={localizedDescription}
                     singleLineDescription={isAnalysisDiagram}
                     icon={DiagramIcon}
+                    categoryColorIndex={DIAGRAM_ORDER.indexOf(diagram)}
                     selected={checked}
                     disabled={!canSelectDiagram}
                     countLabel={sourceCount}
@@ -835,9 +858,6 @@ export function TextRequirementView({
                 );
               })}
             </MobileCompactGrid>
-            <p className="pb-4 text-center text-xs text-muted-foreground">
-              {t("requirements.selectionHint")}
-            </p>
           </section>}
       </PageContainer>
 

@@ -6,8 +6,7 @@ deploy_path="${1:?An absolute deployment directory is required}"
 [[ "$deploy_path" == /* && "$deploy_path" != / ]] || exit 1
 node_bin="$(command -v node)"
 nginx_bin="$(command -v nginx)"
-routing_script="$deploy_path/shared/source/scripts/deploy/nginx-marketing-routes.mjs"
-web_root="$deploy_path/current/apps/web/dist"
+routing_script="$deploy_path/shared/source/scripts/deploy/nginx-next-routing.mjs"
 
 if [[ "$(id -u)" == 0 ]]; then
   echo 'Deployment account is root: yes'
@@ -27,7 +26,7 @@ if ! command -v sudo >/dev/null; then
 fi
 
 # sudo -l checks policy only; it never runs the requested command or modifies privileges.
-if sudo -n -l -- "$node_bin" "$routing_script" check "$web_root" >/dev/null 2>&1; then
+if sudo -n -l -- "$node_bin" "$routing_script" check "$deploy_path" --nginx-bin "$nginx_bin" >/dev/null 2>&1; then
   echo 'Existing sudo permission for routing helper: allowed'
 else
   echo 'Existing sudo permission for routing helper: unavailable'

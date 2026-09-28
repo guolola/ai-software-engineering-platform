@@ -370,7 +370,7 @@ describe("InstructionDocumentsPage", () => {
     const card = templateCard("可行性研究报告");
     const button = within(card).getByRole("button", { name: /生成并打开/ });
     expect(button).toBeDisabled();
-    expect(within(card).getByText("请先配置并选择模型供应商。")).toBeInTheDocument();
+    expect(within(card).getByText("未选择模型供应商")).toBeInTheDocument();
     await userEvent.setup().click(button);
     expect(repository.startDocumentRun).not.toHaveBeenCalled();
     act(() => patchUserSettings({ providerConfigId: "provider-1", defaultModel: "model-1", providerModelOptions: ["model-1"] }));

@@ -228,6 +228,17 @@ const resolvedApiInstances =
 module.exports = {
   apps: [
     {
+      name: "uml-web",
+      cwd: __dirname,
+      script: "apps/web/.next/standalone/apps/web/server.js",
+      instances: 1,
+      exec_mode: "fork",
+      env: { NODE_ENV: "production", HOSTNAME: "127.0.0.1", PORT: "4003", UML_API_ORIGIN: "http://127.0.0.1:4001", ...releaseEnv },
+      env_production: { NODE_ENV: "production", HOSTNAME: "127.0.0.1", PORT: "4003", UML_API_ORIGIN: "http://127.0.0.1:4001", ...releaseEnv },
+      max_memory_restart: "1024M",
+      time: true,
+    },
+    {
       name: "uml-render-service",
       cwd: __dirname,
       script: "bash",

@@ -6,6 +6,7 @@ import { Badge } from "../../../shared/ui/badge";
 import { Checkbox } from "../../../shared/ui/checkbox";
 import { cn } from "../../../shared/ui/utils";
 import { GenerationStatusIcon, type GenerationStatus } from "../../../shared/ui/generation-status-icon";
+import { categoryChipTone } from "../../../shared/ui/category-tones";
 
 type ModelBentoCardProps = {
   label: string;
@@ -13,6 +14,7 @@ type ModelBentoCardProps = {
   description: string;
   singleLineDescription?: boolean;
   icon: LucideIcon;
+  categoryColorIndex?: number;
   selected: boolean;
   disabled?: boolean;
   countLabel?: ReactNode;
@@ -33,6 +35,7 @@ export function ModelBentoCard({
   description,
   singleLineDescription = false,
   icon: Icon,
+  categoryColorIndex,
   selected,
   disabled = false,
   countLabel,
@@ -82,6 +85,7 @@ export function ModelBentoCard({
           <span
             className={cn(
               "flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground sm:size-10",
+              categoryColorIndex !== undefined && categoryChipTone(categoryColorIndex),
               disabled && "bg-muted text-muted-foreground",
             )}
           >
@@ -121,7 +125,7 @@ export function ModelBentoCard({
             {label}
           </h3>
           <GenerationStatusIcon status={status} label={label} />
-          {pendingReview && <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">待审</Badge>}
+          {pendingReview && <Badge variant="warning" className="px-1.5 py-0 text-[10px]">待审</Badge>}
         </div>
         <span title={english} className="block truncate font-mono text-[11px] leading-4 text-muted-foreground sm:text-xs sm:leading-5">
           {english}

@@ -45,7 +45,7 @@ describe("TextRequirementView", () => {
     const button = await screen.findByRole("button", { name: "开始分析提取" });
     await waitFor(() => expect(screen.getByRole("button", { name: "未选择模型" })).toBeEnabled());
     expect(button).toBeDisabled();
-    expect(screen.getByText("请先配置并选择模型供应商。")).toBeInTheDocument();
+    expect(screen.queryByText("未选择模型供应商")).not.toBeInTheDocument();
     await userEvent.setup().click(button);
     expect(repository.startRun).not.toHaveBeenCalled();
     act(() => patchUserSettings({ providerConfigId: "provider-1", defaultModel: "model-1", providerModelOptions: ["model-1"] }));
@@ -185,6 +185,8 @@ describe("TextRequirementView", () => {
     const requirementInput = await screen.findByPlaceholderText(
       "用一段话描述你的系统：做什么、给谁用、有哪些角色和关键流程，越具体越能抽出准确的需求规则",
     );
+    expect(screen.getByRole("heading", { name: "项目需求描述" }).closest('[data-slot="card"]')).not.toBeInTheDocument();
+    expect(requirementInput).toBeInTheDocument();
     expect(screen.getByText("需求分析提取")).toBeInTheDocument();
     expect(screen.getByTestId("requirements-input-toolbar")).toHaveClass(
       "min-w-0",
@@ -419,8 +421,13 @@ describe("TextRequirementView", () => {
     await user.click(screen.getByTitle("生成需求规则"));
 
     expect(await screen.findAllByText("需要开通生成权益")).not.toHaveLength(0);
-    expect(screen.getByText(/可用次数 0/)).toBeInTheDocument();
-    expect(screen.getByText(/系统托管 Provider 每次生成消耗 1 次/)).toBeInTheDocument();
+    expect(screen.queryByText(/可用次数 0/)).not.toBeInTheDocument();
+    const actionDialog = await screen.findByRole("dialog", { name: "需要开通生成权益" });
+    await user.click(within(actionDialog).getByRole("button", { name: "我知道了" }));
+    await user.click(screen.getByRole("button", { name: /有 \d+ 项需要处理/ }));
+    const notice = await screen.findByRole("dialog", { name: /需求模型暂时无法生成|需要处理/ });
+    expect(within(notice).getByText(/可用次数 0/)).toBeInTheDocument();
+    expect(within(notice).getByText(/系统托管 Provider 每次生成消耗 1 次/)).toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "购买权益" }),
     ).not.toBeInTheDocument();
@@ -2783,5 +2790,48 @@ describe("TextRequirementView", () => {
     expect(
       screen.queryByRole("button", { name: "定位需求规则 R1" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("removes the zero-rule card while allowing generation from existing requirement text", async () => {
+    const user = userEvent.setup();
+    const repository = createBaseRepository({
+      loadWorkspace: vi.fn(async () => createWorkspaceRecord({
+        requirementText: "客户可以预约维修。",
+        rules: [],
+        selectedDiagramTypes: ["usecase"],
+      })),
+    });
+    render(withWorkspaceProviders(<TextRequirementView view="models" />, repository));
+
+    expect(await screen.findByRole("heading", { name: "目标模型" })).toBeVisible();
+    await act(async () => {});
+    await user.click(screen.getByRole("button", { name: "选择用例模型" }));
+    expect(screen.queryByText(/尚无有效需求规则/)).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /有 \d+ 项需要处理/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /生成模型/ })).toBeEnabled();
+    });
+  });
+
+  it("opens a model-generation blocker only on request when its source is missing", async () => {
+    const user = userEvent.setup();
+    const repository = createBaseRepository({
+      loadWorkspace: vi.fn(async () => createWorkspaceRecord({
+        requirementText: "",
+        rules: [],
+        selectedDiagramTypes: ["usecase"],
+      })),
+    });
+    render(withWorkspaceProviders(<TextRequirementView view="models" />, repository));
+
+    await act(async () => {});
+    const blocked = await screen.findByRole("button", { name: /有 1 项需要处理/ });
+    expect(screen.getByRole("button", { name: /生成模型/ })).toBeDisabled();
+    expect(screen.queryByText(/尚无有效需求规则/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "需求模型暂时无法生成" })).not.toBeInTheDocument();
+    await user.click(blocked);
+    const dialog = await screen.findByRole("dialog", { name: "需求模型暂时无法生成" });
+    expect(within(dialog).getByText(/请先输入需求描述或添加需求规则/)).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "前往系统需求" })).toBeVisible();
   });
 });

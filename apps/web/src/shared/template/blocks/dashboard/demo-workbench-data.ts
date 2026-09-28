@@ -126,7 +126,7 @@ export const demoWorkbenchData: WorkbenchData = {
     ]
   },
   performance: {
-    title: '性能',
+    title: '项目活动',
     members: {
       tabLabel: '团队',
       person: { name: 'Amanda Lee', role: '项目负责人', initials: 'AL' },

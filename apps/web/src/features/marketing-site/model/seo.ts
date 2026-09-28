@@ -1,6 +1,6 @@
 // Defines the canonical metadata contract shared by runtime navigation and static prerendering.
 import type { AppRoute, MarketingRoutePath } from "../../../shared/lib/app-route-types";
-import { LOCALE_OG_LOCALE, type AppLocale } from "../../../shared/i18n";
+import { LOCALE_OG_LOCALE, type AppLocale } from "../../../shared/i18n/types";
 
 export const PUBLIC_SITE_URL = "https://jianglisoftware.com";
 export const SEO_JSON_LD_ID = "marketing-seo-json-ld";
@@ -153,7 +153,8 @@ export function applyRouteMetadata(
   });
 
   removeManagedStructuredData();
-  if (metadata.jsonLd?.length) {
+  // The initial Next.js JSON-LD script belongs to React; only add a client script after SPA navigation.
+  if (metadata.jsonLd?.length && !document.getElementById("marketing-seo-json-ld-server")) {
     const script = document.createElement("script");
     script.id = SEO_JSON_LD_ID;
     script.type = "application/ld+json";

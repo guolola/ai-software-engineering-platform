@@ -12,6 +12,7 @@ import {
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./button";
+import { PageNoticeButton } from "./page-notice-button";
 import {
   Dialog,
   DialogContent,
@@ -149,7 +150,7 @@ export function FeedbackDialog({
           <DialogTitle className="text-center text-[20px] font-semibold leading-[28px] text-foreground">
             {title}
           </DialogTitle>
-          <DialogDescription className="mx-auto mt-2 max-w-[320px] text-center text-[14px] leading-5 text-muted-foreground">
+          <DialogDescription className="mx-auto mt-2 max-w-[320px] whitespace-pre-line text-center text-[14px] leading-5 text-muted-foreground">
             {message}
           </DialogDescription>
         </DialogHeader>
@@ -277,15 +278,10 @@ export function FeedbackReopenButton({
   const { t } = useTranslation();
   const { openFeedback } = useFeedbackDialog();
   return (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      className="h-8 rounded-lg border-warning/40 bg-warning/10 text-warning hover:bg-warning/15 hover:text-warning"
+    <PageNoticeButton
+      label={label ?? t("feedback.needsAttention")}
+      tone={feedback.tone === "destructive" ? "destructive" : "warning"}
       onClick={() => openFeedback(feedback)}
-    >
-      <AlertTriangle className="size-4" />
-      {label ?? t("feedback.needsAttention")}
-    </Button>
+    />
   );
 }

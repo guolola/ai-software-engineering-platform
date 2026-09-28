@@ -12,8 +12,7 @@ import {
 } from "../../shared/i18n/api-errors";
 import { i18n } from "../../shared/i18n/i18n";
 
-const APP_API_BASE_URL =
-  import.meta.env.VITE_APP_API_BASE_URL ?? "";
+const APP_API_BASE_URL = process.env.NEXT_PUBLIC_APP_API_BASE_URL ?? "";
 const API_PATH_PREFIX = "/api";
 
 export class ApiClientError extends Error {

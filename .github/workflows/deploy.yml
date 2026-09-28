@@ -189,7 +189,7 @@ jobs:
         run: |
           set -euo pipefail
           matches="$(
-            find apps/web/dist -type f \( -name 'index.html' -o -name '*.js' \) \
+            find apps/web/.next/static -type f -name '*.js' \
               -exec grep -HnE '(127\.0\.0\.1|localhost):(4001|4101)' {} + || true
           )"
           if [ -n "$matches" ]; then

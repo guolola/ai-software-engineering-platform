@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { Badge } from "../../../shared/ui/badge";
 import { Button } from "../../../shared/ui/button";
+import { PageHeader } from "../../../shared/template/layout/page";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -362,6 +363,9 @@ function AuthenticatedRouteContent({
   }, [verifySession]);
 
   if (effectiveChecking) {
+    if (!showLoadingScreen) {
+      return <div data-testid="auth-check-placeholder" className="min-h-0 flex-1" aria-busy="true" />;
+    }
     return (
       <PlatformLoadingScreen
         message={overlayMessage}
@@ -373,7 +377,7 @@ function AuthenticatedRouteContent({
   }
 
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <AuthenticatedRouteSessionProvider value={authSession}>
         <ManagedProviderSettingsSync session={authSession} />
         {children}
@@ -418,15 +422,13 @@ export function ProjectSectionPage({
 
   return (
     <PageFrame onNavigate={onNavigate}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1>{sectionTitle}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{projectName}</p>
-        </div>
-        <Button type="button" variant="outline" onClick={() => onNavigate(`/projects/${projectId}`)}>
+      <PageHeader
+        title={sectionTitle}
+        description={t(`projectShell.sectionDescriptions.${section}`, { project: projectName })}
+        actions={<Button type="button" variant="outline" onClick={() => onNavigate(`/projects/${projectId}`)}>
           {t("projectShell.backToWorkspace")}
-        </Button>
-      </div>
+        </Button>}
+      />
       {overview.loading && (
         <SectionCard>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -517,7 +519,6 @@ function ProjectDrawerShell({
   const meta = projectDrawerMeta[kind];
   const Icon = meta.icon;
   const title = t(meta.titleKey);
-  const titleId = `project-${kind}-drawer-title`;
   const widthClass =
     kind === "tasks"
       ? "max-w-full data-[vaul-drawer-direction=right]:sm:max-w-3xl"
@@ -532,8 +533,6 @@ function ProjectDrawerShell({
       <Drawer direction={isMobile ? "bottom" : "right"} open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <DrawerContent
         data-testid="project-workspace-drawer"
-        aria-labelledby={titleId}
-        aria-describedby={undefined}
         className={cn("max-w-full gap-0 overflow-x-hidden overflow-y-hidden", widthClass, kind === "tasks" && isMobile && "h-[90dvh]")}
       >
         <DrawerHeader className="flex-row items-center justify-between gap-3 p-4">
@@ -544,7 +543,7 @@ function ProjectDrawerShell({
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <DrawerTitle id={titleId} className="text-base font-semibold">
+              <DrawerTitle className="text-base font-semibold">
                 {title}
               </DrawerTitle>
               <DrawerDescription className="truncate text-sm">
@@ -593,10 +592,8 @@ export function ProjectWorkspaceDrawer({
 }) {
   const { t } = useTranslation();
   const overview = useProjectOverview(projectId);
-  // Keep the last open kind mounted so the sheet can play its exit transition.
-  const lastKindRef = useRef<ProjectDrawerKind | null>(null);
-  if (activeDrawer) lastKindRef.current = activeDrawer;
-  const drawerKind = activeDrawer ?? lastKindRef.current;
+  // Unmount closed drawers so their modal focus lock cannot outlive the panel.
+  const drawerKind = activeDrawer;
   if (!drawerKind) return null;
 
   const projectName =

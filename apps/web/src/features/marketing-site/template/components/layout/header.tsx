@@ -1,8 +1,8 @@
 // Flow 2.0.0 template source; only runtime, content and business integration adaptations.
+'use client'
 import { useAppI18n } from "@/shared/i18n/i18n-provider";
 import { useTranslation } from 'react-i18next';
 import { FlowCopy, flowText } from '@/features/marketing-site/model/flow-copy';
-'use client'
 
 import { useEffect, useState } from 'react'
 

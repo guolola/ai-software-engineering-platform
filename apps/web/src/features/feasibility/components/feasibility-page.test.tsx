@@ -200,7 +200,7 @@ describe("FeasibilityPage", () => {
     const dialog = screen.getByRole("dialog", {
       name: "可行性分析暂时无法生成",
     });
-    expect(dialog).toHaveTextContent("请先配置并选择模型供应商");
+    expect(dialog).toHaveTextContent("未选择模型供应商");
     expect(within(dialog).queryByRole("button", { name: /前往/ })).not.toBeInTheDocument();
   });
 
@@ -589,7 +589,7 @@ describe("feasibility generation model modes", () => {
     repository.startFeasibilityRun = vi.fn();
     render(withWorkspaceProviders(<FeasibilityPage view="implementation" />, repository));
     await screen.findByTestId("implementation-plan-dashboard");
-    await waitFor(() => expect(screen.getByText("请先配置并选择模型供应商。")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("未选择模型供应商")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "重新生成" })).toBeDisabled();
     expect(repository.startFeasibilityRun).not.toHaveBeenCalled();
   });

@@ -10,7 +10,9 @@
 
 ## 概述
 
-推送 `main` 后，部署工作流会测试、构建并通过 SSH 在服务器创建按提交 SHA 命名的 release。Web 由 Nginx 托管，API 和 PlantUML 渲染服务由 PM2 管理。
+推送 `main` 后，部署工作流会测试、构建并通过 SSH 在服务器创建按提交 SHA 命名的 release。Next.js Web、API 和 PlantUML 渲染服务由 PM2 管理，Nginx 负责入口代理。
+
+归档包部署入口 `baota-pm2-deploy.sh` 仍依赖旧的 Vite 产物，迁移后已停用；生产发布使用本页所述的 Git 部署入口。
 
 ## 当前设计或配置
 
@@ -26,22 +28,22 @@
 
 ### 目录与进程
 
-部署根目录默认包含 `releases/<sha>`、`current` 软链接和 `shared/production.env`。PM2 进程为 `uml-api` 与 `uml-render-service`；API 监听 `4001`，渲染服务监听 `4002`。
+部署根目录默认包含 `releases/<sha>`、`current` 软链接和 `shared/production.env`。PM2 进程为 `uml-web`、`uml-api` 与 `uml-render-service`；分别监听 `4003`、`4001` 与 `4002`。Web release 包含 Next.js standalone 服务、`_next` 静态文件与 `public` 资源。
 
 ### Nginx
 
-站点根目录指向 `current/apps/web/dist`。`/api/` 原样反向代理到 API，业务页面使用不索引的 `app.html`，首页使用预渲染的 `index.html`；SSE 路径需要关闭代理缓冲并设置足够长的读取超时。
+站点 `/` 代理到 Next.js Web 进程；`/api/` 仍原样代理到 API，保留 SSE 的关闭缓冲与读取超时设置。首页由 Next.js 输出可索引元信息，登录及业务路由带有 `noindex`，未知地址返回真实 404。
 
-v2 只保留单页营销首页，旧的 `/features`、`/workflow`、`/cases` 和 `/pricing` 返回 404。部署脚本通过 `nginx -T` 定位唯一匹配当前 Web 根目录的站点，只迁移已知的旧营销路由块，保留 TLS 与代理配置。原配置备份到 release 目录的 `nginx-routing-backup.json`，通过 `nginx -t` 后才重载；健康或 SEO 检查失败时同时恢复应用和路由配置。非标准配置会停止部署，需人工核对；可用 `NGINX_BIN` 指定 Nginx 可执行文件。
+旧的 `/features`、`/workflow`、`/cases` 和 `/pricing` 返回 404。部署脚本通过 `nginx -T` 定位唯一匹配已知 Web 根目录的站点，把原 Vite 页面块迁移为 Next.js 代理，同时保留 TLS、API 和 OnlyOffice 配置。原配置备份到 release 目录的 `nginx-routing-backup.json`，通过 `nginx -t` 后才重载；健康或 SEO 检查失败时同时恢复应用和路由配置。非标准配置会停止部署，需人工核对；可用 `NGINX_BIN` 指定 Nginx 可执行文件。
 
-在构建与切换 `current` 前，脚本先只读预检站点匹配、路由形态和配置写权限。Nginx 迁移由 root 执行；非 root 部署账号仅通过已有的 `sudo -n` 权限执行路由 helper，构建、环境变量加载和 PM2 仍由原部署账号执行。脚本不修改 sudoers 或证书权限，也不请求密码；权限不足会提前停止并保留线上版本。路由恢复失败不会阻止应用回滚，但部署仍报告失败，需人工处理配置。
+在构建与切换 `current` 前，脚本先只读预检站点匹配、路由形态和配置写权限。Nginx 迁移由 root 执行；非 root 部署账号需要对新的 `nginx-next-routing.mjs` helper 具有现成的 `sudo -n` 权限，构建、环境变量加载和 PM2 仍由原部署账号执行。脚本不修改 sudoers 或证书权限，也不请求密码；权限不足会提前停止并保留线上版本。路由恢复失败不会阻止应用回滚，但部署仍报告失败，需人工处理配置。
 
 ## 操作与维护
 
 1. 在服务器准备 Node.js 22、Java 21、Graphviz、PM2、PostgreSQL、Redis 和 Nginx。
 2. 将生产变量保存在 `shared/production.env`，权限设为 `600`。
 3. 在仓库配置五项部署 Secret，推送 `main`。
-4. 工作流切换 `current` 后重启 PM2，并自动检查 API 与渲染服务健康状态。
+4. 工作流切换 `current` 后重启 PM2，并自动检查 Web、API 与渲染服务健康状态。
 5. 需要回滚时把 `current` 切回已验证的 release，并重新加载同一份外部环境文件后重启进程。
 
 不要把生产环境文件、服务器地址、账号或私钥提交到 Git。
@@ -55,11 +57,12 @@ pm2 status
 curl http://127.0.0.1:4001/api/health
 curl http://127.0.0.1:4001/api/version
 curl http://127.0.0.1:4002/health
+curl http://127.0.0.1:4003/
 ```
 
 `/api/version` 的 `releaseSha` 应与部署提交一致。公网还应检查首页、`/tutorial`、登录流程和一次完整生成。
 
-路由迁移的本地回归检查为 `node --test scripts/deploy/nginx-marketing-routes.test.mjs`。
+路由迁移的本地回归检查为 `node --test scripts/deploy/nginx-next-routing.test.mjs`。
 
 ## 相关文档
 

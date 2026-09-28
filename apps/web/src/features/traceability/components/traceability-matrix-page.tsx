@@ -1,5 +1,4 @@
 // Renders element-level traceability from persisted generation mappings.
-import { Alert } from '../../../shared/ui/alert';
 import { Progress } from '../../../shared/ui/progress';
 import { Card } from "../../../shared/ui/card";
 import { TableCell } from '../../../shared/ui/table';
@@ -18,6 +17,7 @@ import {
   Network,
 } from "lucide-react";
 import { Badge } from "../../../shared/ui/badge";
+import { FeedbackReopenButton, type FeedbackDialogState } from "../../../shared/ui/feedback-dialog";
 import { SelectControl } from "../../../shared/ui/select";
 import {
   PageContainer,
@@ -383,12 +383,33 @@ export function TraceabilityMatrixPage({
       ? t("traceability.filters.designModelType")
       : t("traceability.filters.requirementModelType");
   const sourceColumnLabel = isAnalysisRequirementScope ? t("traceability.columns.sourceUseCaseFlow") : t("traceability.columns.sourceRequirementRule");
+  const traceabilityNoticeTitle = !hasTraceability && rows.length > 0
+    ? missingTraceabilityTitle
+    : hasTraceability && (isTraceabilityStale || hasIncompleteCoverage)
+      ? isTraceabilityStale ? t("traceability.stale.title") : t("traceability.incomplete.title")
+      : null;
+  const traceabilityNoticeMessage = !hasTraceability && rows.length > 0
+    ? missingTraceabilityMessage
+    : hasTraceability && (isTraceabilityStale || hasIncompleteCoverage)
+      ? isContext
+        ? t(`${feasibilityCopyPrefix}.${isTraceabilityStale ? "staleMessage" : "missingMessage"}`)
+        : isDesign ? t("traceability.stale.designMessage") : t("traceability.stale.requirementMessage")
+      : null;
+  const traceabilityFeedback: FeedbackDialogState | null = traceabilityNoticeTitle && traceabilityNoticeMessage ? {
+    dedupeKey: `traceability:${scope}:notice`,
+    revision: `${traceabilityNoticeTitle}:${traceabilityNoticeMessage}`,
+    tone: "warning",
+    title: traceabilityNoticeTitle,
+    message: traceabilityNoticeMessage,
+    keepReopenEntry: true,
+  } : null;
   return (
     <div className="flex min-h-full flex-col bg-background">
       <PageContainer className="flex flex-col gap-5">
           <PageHeader
             title={title}
             description={description}
+            notice={traceabilityFeedback ? <FeedbackReopenButton feedback={traceabilityFeedback} /> : null}
             titleAccessory={
               <Badge variant="secondary" className="font-mono">
                 {t("traceability.count.items", { count: rows.length })}
@@ -396,27 +417,7 @@ export function TraceabilityMatrixPage({
             }
           />
 
-          {!hasTraceability && rows.length > 0 && (
-            <Alert variant="destructive" className="border px-4 py-3 text-sm">
-              <div className="font-semibold">{missingTraceabilityTitle}</div>
-              <p className="mt-1 leading-6">{missingTraceabilityMessage}</p>
-            </Alert>
-          )}
-
-          {hasTraceability && (isTraceabilityStale || hasIncompleteCoverage) && (
-            <Alert variant="destructive" className="border px-4 py-3 text-sm">
-              <div className="font-semibold">
-                {isTraceabilityStale ? t("traceability.stale.title") : t("traceability.incomplete.title")}
-              </div>
-              <p className="mt-1 leading-6">
-                {isContext
-                  ? t(`${feasibilityCopyPrefix}.${isTraceabilityStale ? "staleMessage" : "missingMessage"}`)
-                  : isDesign
-                  ? t("traceability.stale.designMessage")
-                  : t("traceability.stale.requirementMessage")}
-              </p>
-            </Alert>
-          )}
+          {traceabilityNoticeTitle ? <p role="status" className="flex items-center gap-2 text-sm text-warning"><AlertTriangle className="size-4" />{traceabilityNoticeTitle}</p> : null}
 
           <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
             <Card as="section" className="min-w-0 gap-0 overflow-hidden border py-0 ring-0">

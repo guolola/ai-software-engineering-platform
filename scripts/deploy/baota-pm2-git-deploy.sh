@@ -10,8 +10,6 @@ NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com}"
 NPM_CACHE_DIR="${NPM_CACHE_DIR:-$DEPLOY_PATH/shared/npm-cache}"
 STALE_INCOMING_DAYS="${STALE_INCOMING_DAYS:-1}"
 PLANTUML_JAR="${PLANTUML_JAR:-plantuml-1.2026.3beta8.jar}"
-WEB_ASSET_RETENTION_DAYS="${WEB_ASSET_RETENTION_DAYS:-365}"
-SHARED_WEB_ASSETS_DIR="$DEPLOY_PATH/shared/web/assets"
 
 log_deploy() {
   printf '[deploy][%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
@@ -80,7 +78,7 @@ run_nginx_routing() {
     echo "nginx is required for routing preflight" >&2
     return 1
   }
-  local routing_command=("$(command -v node)" "$SOURCE_DIR/scripts/deploy/nginx-marketing-routes.mjs")
+  local routing_command=("$(command -v node)" "$SOURCE_DIR/scripts/deploy/nginx-next-routing.mjs")
   # Only Nginx configuration needs root. Builds, secrets and PM2 stay owned by the deploy user.
   if [[ "$EUID" -ne 0 ]]; then
     routing_command=(sudo -n -- "${routing_command[@]}")
@@ -126,124 +124,38 @@ cleanup_stale_deploy_artifacts() {
     done
 }
 
-publish_shared_web_assets() {
-  local release_dir="$1"
-  local release_assets_dir="$release_dir/apps/web/dist/assets"
-
-  # Nginx serves immutable Vite chunks from this shared cache across releases.
-  if [[ ! -d "$release_assets_dir" ]]; then
-    echo "Release is missing web assets: $release_assets_dir" >&2
-    exit 1
-  fi
-
-  echo "Publishing web assets to shared cache: $SHARED_WEB_ASSETS_DIR"
-  mkdir -p "$SHARED_WEB_ASSETS_DIR"
-  # Let Nginx traverse to public assets without making shared secrets listable.
-  chmod o+x "$DEPLOY_PATH/shared" || true
-  chmod o+rx "$DEPLOY_PATH/shared/web" "$SHARED_WEB_ASSETS_DIR" || true
-  while IFS= read -r -d '' asset_file; do
-    local relative_path
-    local target_file
-    relative_path="${asset_file#"$release_assets_dir"/}"
-    target_file="$SHARED_WEB_ASSETS_DIR/$relative_path"
-    mkdir -p "$(dirname "$target_file")"
-    if [[ ! -e "$target_file" ]]; then
-      cp -p "$asset_file" "$target_file"
-    fi
-  done < <(find "$release_assets_dir" -type f -print0)
-  find "$SHARED_WEB_ASSETS_DIR" -type d -exec chmod o+rx {} + 2>/dev/null || true
-
-  echo "Cleaning shared web assets older than $WEB_ASSET_RETENTION_DAYS days ..."
-  find "$SHARED_WEB_ASSETS_DIR" -type f -mtime +"$WEB_ASSET_RETENTION_DAYS" -delete 2>/dev/null || true
-  find "$SHARED_WEB_ASSETS_DIR" -mindepth 1 -type d -empty -delete 2>/dev/null || true
-}
-
-verify_web_api_base() {
-  local dist_dir="$1"
+verify_web_bundle() {
+  local web_dir="$1"
+  local client_dir="$web_dir/.next/standalone/apps/web/.next/static"
   local matches
 
-  if [[ ! -f "$dist_dir/index.html" ]]; then
-    echo "Web dist is missing index.html: $dist_dir" >&2
+  if [[ ! -f "$web_dir/.next/standalone/apps/web/server.js" || ! -d "$client_dir" ]]; then
+    echo "Next.js standalone server or static assets are missing: $web_dir" >&2
     exit 1
   fi
 
   matches="$(
-    find "$dist_dir" -type f \( -name 'index.html' -o -name '*.js' \) \
+    find "$client_dir" -type f -name '*.js' \
       -exec grep -HnE '(127\.0\.0\.1|localhost):(4001|4101)' {} + 2>/dev/null || true
   )"
 
   if [[ -n "$matches" ]]; then
     echo "Production web bundle contains a local API base URL." >&2
-    echo "Build with VITE_APP_API_BASE_URL='' so browser requests use same-origin /api." >&2
+    echo "Build with NEXT_PUBLIC_APP_API_BASE_URL='' so browser requests use same-origin /api." >&2
     echo "$matches" >&2
     exit 1
   fi
 
-  echo "Web API base check passed: $dist_dir"
+  echo "Next.js web bundle check passed: $web_dir"
 }
 
 verify_web_seo_artifacts() {
-  local dist_dir="$1"
-  local required=(
-    "app.html"
-    "robots.txt"
-    "sitemap.xml"
-    "404.html"
-    "seo-manifest.json"
-    "og-cover.png"
-  )
-
-  for relative_path in "${required[@]}"; do
-    if [[ ! -f "$dist_dir/$relative_path" ]]; then
-      echo "Web SEO artifact is missing: $dist_dir/$relative_path" >&2
-      exit 1
-    fi
-  done
-  echo "Web SEO artifact check passed: $dist_dir"
-}
-
-verify_shared_public_assets() {
-  local release_dir="$1"
-  local dist_dir="$release_dir/apps/web/dist"
-  local public_asset="/assets/beian/gongan.png"
-  local release_asset="$dist_dir$public_asset"
-  local shared_asset="$SHARED_WEB_ASSETS_DIR/beian/gongan.png"
-
-  if find "$dist_dir" -type f \( -name 'index.html' -o -name 'app.html' -o -name '*.js' -o -name '*.css' \) \
-    -exec grep -q -- "$public_asset" {} +; then
-    if [[ ! -f "$release_asset" ]]; then
-      echo "Referenced public asset is missing from web dist: $release_asset" >&2
-      exit 1
-    fi
-    if [[ ! -f "$shared_asset" ]]; then
-      echo "Referenced public asset was not published to shared assets: $shared_asset" >&2
-      exit 1
-    fi
+  local web_dir="$1"
+  if [[ ! -f "$web_dir/.next/standalone/apps/web/public/og-cover.png" ]]; then
+    echo "Next.js public SEO cover is missing: $web_dir" >&2
+    exit 1
   fi
-  echo "Shared public asset check passed: $SHARED_WEB_ASSETS_DIR"
-}
-
-submit_changed_seo_urls() {
-  local current_manifest="$RELEASE_DIR/apps/web/dist/seo-manifest.json"
-  local previous_manifest=""
-  if [[ -n "$PREVIOUS_RELEASE" && -f "$PREVIOUS_RELEASE/apps/web/dist/seo-manifest.json" ]]; then
-    previous_manifest="$PREVIOUS_RELEASE/apps/web/dist/seo-manifest.json"
-  fi
-
-  (
-    load_production_env
-    if [[ -n "${INDEXNOW_KEY:-}" ]]; then
-      mkdir -p "$DEPLOY_PATH/shared/seo"
-      printf '%s\n' "$INDEXNOW_KEY" > "$DEPLOY_PATH/shared/seo/indexnow-key.txt"
-      chmod 644 "$DEPLOY_PATH/shared/seo/indexnow-key.txt"
-    fi
-
-    local args=(--current "$current_manifest")
-    if [[ -n "$previous_manifest" ]]; then
-      args+=(--previous "$previous_manifest")
-    fi
-    node "$SOURCE_DIR/apps/web/scripts/submit-seo.mjs" "${args[@]}"
-  ) || echo "Warning: search-engine notification failed; deployment remains healthy." >&2
+  echo "Next.js public SEO asset check passed: $web_dir"
 }
 
 copy_release_payload() {
@@ -259,7 +171,11 @@ copy_release_payload() {
   cp "$SOURCE_DIR/apps/web/package.json" "$TMP_DIR/apps/web/"
   cp -R "$SOURCE_DIR/apps/api/dist" "$TMP_DIR/apps/api/dist"
   cp -R "$SOURCE_DIR/apps/render-service/dist" "$TMP_DIR/apps/render-service/dist"
-  cp -R "$SOURCE_DIR/apps/web/dist" "$TMP_DIR/apps/web/dist"
+  mkdir -p "$TMP_DIR/apps/web/.next"
+  cp -R "$SOURCE_DIR/apps/web/.next/standalone" "$TMP_DIR/apps/web/.next/standalone"
+  mkdir -p "$TMP_DIR/apps/web/.next/standalone/apps/web/.next"
+  cp -R "$SOURCE_DIR/apps/web/.next/static" "$TMP_DIR/apps/web/.next/standalone/apps/web/.next/static"
+  cp -R "$SOURCE_DIR/apps/web/public" "$TMP_DIR/apps/web/.next/standalone/apps/web/public"
 
   mkdir -p "$TMP_DIR/packages/contracts" "$TMP_DIR/packages/prompts"
   cp "$SOURCE_DIR/packages/contracts/package.json" "$TMP_DIR/packages/contracts/"
@@ -268,7 +184,6 @@ copy_release_payload() {
   cp -R "$SOURCE_DIR/packages/prompts/dist" "$TMP_DIR/packages/prompts/dist"
 
   mkdir -p "$TMP_DIR/scripts/deploy"
-  cp "$SOURCE_DIR/scripts/deploy/baota-pm2-deploy.sh" "$TMP_DIR/scripts/deploy/"
   cp "$SOURCE_DIR/scripts/deploy/baota-pm2-git-deploy.sh" "$TMP_DIR/scripts/deploy/"
 }
 
@@ -392,6 +307,7 @@ reload_pm2_for_release() {
     pm2 delete uml-generation-worker >/dev/null 2>&1 || true
     pm2 delete uml-api >/dev/null 2>&1 || true
     pm2 delete uml-render-service >/dev/null 2>&1 || true
+    pm2 delete uml-web >/dev/null 2>&1 || true
     run_timed "pm2 start production processes" pm2 start ecosystem.config.cjs --env production
     sleep 2
 
@@ -403,6 +319,11 @@ reload_pm2_for_release() {
     run_timed "API health check" \
       wait_for_http_health "API" http://127.0.0.1:4001/api/health uml-api
 
+    if [[ -f "$release_dir/apps/web/.next/standalone/apps/web/server.js" ]]; then
+      run_timed "Next.js web health check" \
+        wait_for_http_health "web" http://127.0.0.1:4003/ uml-web
+    fi
+
     echo "Checking PM2 process directories ..."
     local expected_release_dir
     expected_release_dir="$(readlink -f "$release_dir")"
@@ -410,6 +331,10 @@ reload_pm2_for_release() {
       check_pm2_cwd uml-render-service "$expected_release_dir"
     run_timed "PM2 process cwd check API" \
       check_pm2_cwd uml-api "$expected_release_dir"
+    if [[ -f "$release_dir/apps/web/.next/standalone/apps/web/server.js" ]]; then
+      run_timed "PM2 process cwd check web" \
+        check_pm2_cwd uml-web "$expected_release_dir"
+    fi
 
     echo "Checking API version ..."
     local version_json
@@ -481,7 +406,7 @@ trap cleanup_tmp_dir EXIT
 
 # Fail before building or switching the current release if routing or privileges are unsuitable.
 if ! run_timed "Nginx routing preflight" \
-  run_nginx_routing check "$DEPLOY_PATH/current/apps/web/dist"; then
+  run_nginx_routing check "$DEPLOY_PATH"; then
   echo "Nginx preflight failed. A root deploy account or existing noninteractive sudo access is required." >&2
   echo "Production was not switched. Ask the server administrator to verify Nginx access and routing." >&2
   exit 1
@@ -496,7 +421,7 @@ echo "Building production bundles from $SOURCE_DIR ..."
 (
   cd "$SOURCE_DIR"
   git rev-parse --verify "$RELEASE_SHA^{commit}" >/dev/null
-  rm -rf apps/api/dist apps/render-service/dist apps/web/dist packages/contracts/dist packages/prompts/dist
+  rm -rf apps/api/dist apps/render-service/dist apps/web/.next packages/contracts/dist packages/prompts/dist
   run_timed "npm ci build dependencies" \
     npm ci --no-audit --no-fund --cache "$NPM_CACHE_DIR" --registry="$NPM_REGISTRY"
   run_timed "build contracts" npm run build:contracts
@@ -505,23 +430,20 @@ echo "Building production bundles from $SOURCE_DIR ..."
   run_timed "build render service" npm run build:render
   run_timed "build production web" npm run build:web:production
 )
-verify_web_api_base "$SOURCE_DIR/apps/web/dist"
-verify_web_seo_artifacts "$SOURCE_DIR/apps/web/dist"
+verify_web_bundle "$SOURCE_DIR/apps/web"
 
 copy_release_payload
 ensure_plantuml_jar
 run_timed "install production dependencies" install_production_dependencies
 
-if [[ ! -f "$TMP_DIR/apps/web/dist/index.html" ]]; then
-  echo "Current release candidate is missing apps/web/dist/index.html" >&2
+if [[ ! -f "$TMP_DIR/apps/web/.next/standalone/apps/web/server.js" ]]; then
+  echo "Current release candidate is missing its Next.js server" >&2
   exit 1
 fi
-verify_web_api_base "$TMP_DIR/apps/web/dist"
-verify_web_seo_artifacts "$TMP_DIR/apps/web/dist"
+verify_web_bundle "$TMP_DIR/apps/web"
+verify_web_seo_artifacts "$TMP_DIR/apps/web"
 
 mv "$TMP_DIR" "$RELEASE_DIR"
-publish_shared_web_assets "$RELEASE_DIR"
-verify_shared_public_assets "$RELEASE_DIR"
 ln -sfnT "$RELEASE_DIR" "$DEPLOY_PATH/current"
 
 if ! run_timed "PM2 reload and release verification" \
@@ -531,9 +453,9 @@ if ! run_timed "PM2 reload and release verification" \
   exit 1
 fi
 
-if ! run_timed "migrate retired marketing routes" \
+if ! run_timed "switch Nginx to Next.js" \
   run_nginx_routing apply \
-    "$RELEASE_DIR/nginx-routing-backup.json" "$DEPLOY_PATH/current/apps/web/dist"; then
+    "$RELEASE_DIR/nginx-routing-backup.json" "$DEPLOY_PATH"; then
   echo "Nginx route migration failed; restoring previous release" >&2
   rollback_to_previous_release
   exit 1
@@ -546,12 +468,10 @@ if ! run_timed "public SEO verification" \
   exit 1
 fi
 
-submit_changed_seo_urls
-
 cleanup_old_releases
 
-if [[ ! -f "$DEPLOY_PATH/current/apps/web/dist/index.html" ]]; then
-  echo "Current release is missing web dist after cleanup: $DEPLOY_PATH/current/apps/web/dist/index.html" >&2
+if [[ ! -f "$DEPLOY_PATH/current/apps/web/.next/standalone/apps/web/server.js" ]]; then
+  echo "Current release is missing its Next.js server after cleanup" >&2
   exit 1
 fi
 

@@ -37,5 +37,6 @@ describe("project backgrounds", () => {
       fallbackProjectBackground("project-a:课程 UML 实验项目").key,
     );
     expect(resolveProjectBackground({ id: "project-a", name: "课程 UML 实验项目" }).imageUrl).toBeTruthy();
+    expect(PROJECT_BACKGROUND_OPTIONS.every((background) => typeof background.imageUrl === "string")).toBe(true);
   });
 });

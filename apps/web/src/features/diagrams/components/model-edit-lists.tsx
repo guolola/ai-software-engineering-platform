@@ -204,7 +204,7 @@ export function ModelElementListSection({
                             <Button
                               type="button"
                               size="icon"
-                              variant="ghost"
+                              variant="destructive"
                               className="size-7"
                               aria-label={namedActionLabel(
                                 t("diagramLists.actions.delete"),
@@ -406,7 +406,7 @@ export function ModelRelationshipListSection({
                   <Button
                     type="button"
                     size="icon"
-                    variant="ghost"
+                    variant="destructive"
                     className="size-8"
                     aria-label={namedActionLabel(t("diagramLists.actions.delete"), t("diagramLists.relations.kind"), displayLabel)}
                     disabled={saving}

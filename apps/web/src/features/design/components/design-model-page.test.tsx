@@ -99,12 +99,12 @@ describe("DesignModelPage", () => {
     render(withWorkspaceProviders(<DesignModelPage />, repository));
     const button = await screen.findByRole("button", { name: /生成设计模型/ });
     expect(button).toBeDisabled();
-    expect(screen.getByText("请先配置并选择模型供应商。")).toBeInTheDocument();
+    expect(screen.queryByText("未选择模型供应商")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "未选择模型" })).toBeEnabled();
     await userEvent.setup().click(button);
     expect(repository.startDesignRun).not.toHaveBeenCalled();
     act(() => patchUserSettings({ providerConfigId: "provider-1", defaultModel: "model-1", providerModelOptions: ["model-1"] }));
-    expect(screen.queryByText("请先配置并选择模型供应商。")).not.toBeInTheDocument();
+    expect(screen.queryByText("未选择模型供应商")).not.toBeInTheDocument();
   });
 
   beforeEach(() => {
@@ -757,6 +757,8 @@ describe("DesignModelPage", () => {
 
     await screen.findByRole("img", { name: /用例实现设计：/, hidden: true });
     expect(screen.getByText("0/7")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "设计模型暂时无法生成" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /有 1 项需要处理/ }));
     const blocker = await screen.findByRole("dialog", {
       name: "设计模型暂时无法生成",
     });

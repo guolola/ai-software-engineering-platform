@@ -17,6 +17,7 @@ export default defineConfig({
   },
   use: {
     baseURL: "http://127.0.0.1:4175",
+    channel: process.env.PLAYWRIGHT_USE_SYSTEM_CHROME === "1" ? "chrome" : undefined,
     locale: "zh-CN",
     trace: "on-first-retry",
     screenshot: "only-on-failure",

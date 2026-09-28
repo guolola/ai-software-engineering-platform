@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { ModelNotices, type ModelNotice } from "./model-notices";
 
 const notices: ModelNotice[] = [
-  { id: "stale", title: "模型已过期", detail: "上游需求已变化" },
-  { id: "visual", title: "视觉检查待确认", detail: "图面有问题", issues: ["标签不可读", "连线交叉"], checks: 3, repairs: 2, reviewCheckedAt: "check-1" },
+  { id: "stale", kind: "freshness", tone: "warning", title: "模型已过期", detail: "上游需求已变化" },
+  { id: "visual", kind: "visual", tone: "warning", title: "视觉检查待确认", detail: "图面有问题", issues: ["标签不可读", "连线交叉"], checks: 3, repairs: 2, reviewCheckedAt: "check-1" },
 ];
 
 describe("model notices", () => {
@@ -15,6 +15,8 @@ describe("model notices", () => {
     expect(screen.queryByText("标签不可读")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "提示（2）" }));
     const dialog = screen.getByRole("dialog", { name: "模型提示" });
+    expect(within(dialog).getByRole("list", { name: "模型状态流程" })).toBeVisible();
+    expect(within(dialog).getByText("下一步")).toBeVisible();
     expect(within(dialog).getByText("上游需求已变化")).toBeVisible();
     expect(within(dialog).getByText("标签不可读")).toBeVisible();
     expect(within(dialog).getByText("已检查 3 次；已尝试自动修复 2 次")).toBeVisible();

@@ -25,6 +25,31 @@ describe("PageHeader", () => {
     expect(screen.getByText("维护项目需求描述")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "新建" })).toBeInTheDocument();
   });
+
+  it("does not duplicate the visible description in a generic notice", () => {
+    render(<PageHeader title="项目历史" description="查看项目操作记录" />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "页面提示" })).not.toBeInTheDocument();
+    expect(screen.getByText("查看项目操作记录")).toBeVisible();
+  });
+
+  it("places the notice beside the title before its badge and keeps the description below", () => {
+    const { container } = render(
+      <PageHeader
+        title="需求模型"
+        notice={<button type="button" aria-label="查看提示">提示</button>}
+        titleAccessory={<span>3 个模型</span>}
+        description="检查需求模型的状态"
+        actions={<button type="button">生成模型</button>}
+      />,
+    );
+
+    const header = container.firstElementChild!;
+    const titleRow = header.firstElementChild!.firstElementChild!;
+    expect(Array.from(titleRow.children).map((element) => element.textContent)).toEqual(["需求模型", "提示", "3 个模型"]);
+    expect(header.firstElementChild!.lastElementChild).toHaveTextContent("检查需求模型的状态");
+    expect(header.lastElementChild).toHaveTextContent("生成模型");
+  });
 });
 
 describe("TableToolbar", () => {

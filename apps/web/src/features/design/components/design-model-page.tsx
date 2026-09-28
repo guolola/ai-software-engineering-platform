@@ -31,7 +31,6 @@ import {
 import { ModelPicker } from "../../../shared/ui/model-picker";
 import {
   FeedbackReopenButton,
-  useFeedbackDialog,
   type FeedbackDialogState,
 } from "../../../shared/ui/feedback-dialog";
 import { cn } from "../../../shared/ui/utils";
@@ -296,7 +295,6 @@ export function DesignModelPage() {
     openRequirementsText,
     openSystemRequirements,
   } = useWorkspaceShell();
-  const { openFeedbackOnce } = useFeedbackDialog();
   const [defaultModel, setDefaultModel] = useState(
     () => loadUserSettings().defaultModel,
   );
@@ -588,30 +586,13 @@ export function DesignModelPage() {
     workspaceInitialized,
   ]);
 
-  useEffect(() => {
-    if (!generationBlockFeedback || !visibleGenerationBlockReason) return;
-    const isChangedOrRegressedState =
-      Object.values(designModels).some(Boolean) ||
-      /旧|过期|追踪|覆盖不足|修复结果/u.test(visibleGenerationBlockReason);
-    if (isChangedOrRegressedState) openFeedbackOnce(generationBlockFeedback);
-  }, [designModels, generationBlockFeedback, openFeedbackOnce, visibleGenerationBlockReason]);
-
   return (
     <div className="flex min-h-full flex-col bg-background">
       <PageContainer className="flex flex-col gap-5">
           <PageHeader
-            size="compact"
             title={t("designPage.title")}
-            titleAccessory={
-              <>
-                <Badge variant="secondary" className="font-mono">
-                  {effectiveSelected.length}/{DESIGN_DIAGRAM_ORDER.length}
-                </Badge>
-                {generationBlockFeedback?.keepReopenEntry ? (
-                  <FeedbackReopenButton feedback={generationBlockFeedback} />
-                ) : null}
-              </>
-            }
+            notice={generationBlockFeedback?.keepReopenEntry ? <FeedbackReopenButton feedback={generationBlockFeedback} /> : null}
+            titleAccessory={<Badge variant="secondary" className="font-mono">{effectiveSelected.length}/{DESIGN_DIAGRAM_ORDER.length}</Badge>}
             description={t("designPage.description")}
             actions={
               <>
@@ -639,7 +620,6 @@ export function DesignModelPage() {
             }
           />
 
-          {generationModelBlockedReason && <p role="status" className="text-sm text-muted-foreground">{generationModelBlockedReason}</p>}
           <div className="min-w-0">
             <main className="flex min-w-0 flex-col gap-4">
               <section>
@@ -696,6 +676,7 @@ export function DesignModelPage() {
                         english={meta.english}
                         description={localizedDescription}
                         icon={DiagramIcon}
+                        categoryColorIndex={DESIGN_DIAGRAM_ORDER.indexOf(diagram)}
                         selected={checked}
                         disabled={Boolean(blockReason)}
                         countLabel={

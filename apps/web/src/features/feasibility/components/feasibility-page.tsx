@@ -523,7 +523,7 @@ export function FeasibilityPage({
       <PageContainer className="flex flex-col gap-5">
         <PageHeader
           title={pageTitle}
-          titleAccessory={pageFeedback ? (
+          notice={pageFeedback ? (
             <FeedbackReopenButton
               feedback={pageFeedback}
               label={t("feedback.needsAttentionCount", { count: pageFeedbackItems.length })}
@@ -569,6 +569,7 @@ export function FeasibilityPage({
             english="System Environment Diagram"
             description={t("feasibility.artifact.contextDescription")}
             icon={Network}
+            categoryColorIndex={0}
             selected={selectedArtifacts.includes("context")}
             disabled={generating || !canUpdateWorkspace || !canStartRuns}
             countLabel={workspace.feasibilityContextTraceability.length}
@@ -582,6 +583,7 @@ export function FeasibilityPage({
             english="Business and System Flow"
             description={t("feasibility.artifact.businessFlowDescription")}
             icon={Network}
+            categoryColorIndex={1}
             selected={selectedArtifacts.includes("business-flow")}
             disabled={generating || !canUpdateWorkspace || !canStartRuns}
             countLabel={workspace.feasibilityBusinessFlow?.model.nodes.filter((node) => node.type === "activity").length ?? 0}
@@ -595,6 +597,7 @@ export function FeasibilityPage({
             english="Technical Proposed Solution"
             description={t("feasibility.artifact.implementationArtifactDescription")}
             icon={Wrench}
+            categoryColorIndex={2}
             selected={selectedArtifacts.includes("implementation")}
             disabled={generating || !canUpdateWorkspace || !canStartRuns}
             countLabel={workspace.feasibilityImplementationPlan?.candidates.length ?? 0}

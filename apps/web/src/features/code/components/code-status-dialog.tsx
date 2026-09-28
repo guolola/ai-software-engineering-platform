@@ -1,12 +1,11 @@
 // Keeps code status and complete diagnostics available without an inline workspace banner.
 import { useState } from "react";
-import { AlertTriangle, Loader2, type LucideIcon } from "lucide-react";
+import { AlertTriangle, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { WorkspaceRecord } from "../../../entities/workspace/model";
 import { formatCodeDiagnosticEntries, formatCodeDiagnosticSummary } from "../../../shared/lib/code-diagnostics";
-import { Button } from "../../../shared/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../../shared/ui/dialog";
-import { cn } from "../../../shared/ui/utils";
+import { PageNoticeButton } from "../../../shared/ui/page-notice-button";
 
 type CodeStatus = {
   tone: "success" | "destructive" | "warning" | "primary" | "muted";
@@ -34,31 +33,16 @@ export function CodeStatusDialog({ status, diagnostics }: {
         message: t("code.status.diagnostics.message", { summary: diagnosticSummary }),
       }
     : status;
-  const Icon = displayStatus.icon;
   const label = entries.length > 0
     ? t("code.actions.diagnostics", { count: entries.length })
     : displayStatus.title;
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-7 min-w-0 gap-1 px-1.5 text-xs"
-        aria-label={label}
-        title={displayStatus.title}
+      <PageNoticeButton
+        label={label}
+        tone={displayStatus.tone === "primary" || displayStatus.tone === "muted" ? "info" : displayStatus.tone}
         onClick={() => setOpen(true)}
-      >
-        <Icon className={cn("size-3.5 shrink-0",
-          displayStatus.tone === "success" && "text-success",
-          displayStatus.tone === "destructive" && "text-destructive",
-          displayStatus.tone === "warning" && "text-warning",
-          displayStatus.tone === "primary" && "text-primary",
-          displayStatus.tone === "muted" && "text-muted-foreground",
-          Icon === Loader2 && "animate-spin",
-        )} />
-        <span className="truncate">{label}</span>
-      </Button>
+      />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[80dvh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>

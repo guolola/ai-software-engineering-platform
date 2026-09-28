@@ -116,7 +116,7 @@ function EditCard({ children, onRemove, removeLabel }: { children: ReactNode; on
   return (
     <Card className="gap-0 py-0 relative grid gap-3 p-4">
       {onRemove && (
-        <Button type="button" variant="ghost" size="icon" className="absolute right-2 top-2" onClick={onRemove} aria-label={removeLabel}>
+        <Button type="button" variant="destructive" size="icon" className="absolute right-2 top-2" onClick={onRemove} aria-label={removeLabel}>
           <Trash2 className="size-4" />
         </Button>
       )}
@@ -136,7 +136,7 @@ function MoneyItemsForm({ title, addLabel, items, onChange }: { title: string; a
           <Input aria-label={`${title}${t("feasibility.costs.itemName")}`} value={item.name} onChange={(event) => update(item.id, { name: event.target.value })} placeholder={t("feasibility.costs.itemName")} />
           <Input aria-label={`${title}${t("feasibility.costs.amount")}`} type="number" min="0" value={item.amount ?? ""} onChange={(event) => update(item.id, { amount: event.target.value === "" ? null : Number(event.target.value) })} placeholder={t("feasibility.costs.amount")} />
           <SelectControl aria-label={`${title}${t("feasibility.costs.frequency")}`} value={item.frequency} onValueChange={(frequency) => update(item.id, { frequency: frequency as FeasibilityMoneyItem["frequency"] })} options={["one-time", "monthly", "annual"].map((frequency) => ({ value: frequency, label: t(`feasibility.frequency.${frequency}`) }))} />
-          <Button type="button" variant="ghost" size="icon" aria-label={`${t("feasibility.remove")} ${item.name}`} onClick={() => onChange(items.filter((current) => current.id !== item.id))}><Trash2 className="size-4" /></Button>
+          <Button type="button" variant="destructive" size="icon" aria-label={`${t("feasibility.remove")} ${item.name}`} onClick={() => onChange(items.filter((current) => current.id !== item.id))}><Trash2 className="size-4" /></Button>
           <Input className="md:col-span-4" value={item.note} onChange={(event) => update(item.id, { note: event.target.value })} placeholder={t("feasibility.costs.note")} />
         </div>
       ))}

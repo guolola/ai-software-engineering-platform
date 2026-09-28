@@ -245,19 +245,18 @@ describe("TopBar", () => {
     render(withWorkspaceProviders(<TopBarHarness />, repository));
 
     const banner = screen.getByRole("banner");
-    expect(banner).toHaveClass("fixed", "top-0", "right-0", "z-50", "h-[53px]", "px-4", "pt-2", "sm:px-6");
+    expect(banner).toHaveClass("sticky", "top-0", "z-50", "px-4", "sm:px-6");
     expect(banner).not.toHaveClass("isolate");
-    expect(banner.className).not.toContain("before:");
+    expect(banner.className).toContain("before:backdrop-blur-md");
     expect(banner.nextElementSibling).toHaveTextContent("主内容保持不变");
     expect(banner.parentElement?.querySelector('[aria-hidden="true"].h-19')).not.toBeInTheDocument();
     expect(banner.firstElementChild).toHaveClass(
       "rounded-xl",
-      "bg-card/82",
-      "backdrop-blur-xl",
-      "h-full",
-      "px-4",
-      "shadow-sm",
-      "sm:px-6",
+      "bg-card",
+      "mt-3",
+      "border",
+      "px-6",
+      "py-2",
     );
     expect(screen.getByRole("button", { name: "主页" }).tagName).toBe("BUTTON");
     expect(screen.getByRole("button", { name: "主题色板" })).toBeInTheDocument();
@@ -437,7 +436,7 @@ describe("TopBar", () => {
       height: "min(920px, calc(100vh - 4rem))",
     });
     const canvasScrollArea = within(dialog).getByTestId("lineage-canvas-scroll-area");
-    expect(canvasScrollArea.querySelectorAll('[data-slot="scroll-area-scrollbar"]')).toHaveLength(2);
+    expect(canvasScrollArea.querySelectorAll('[data-slot="scroll-area-scrollbar"]')).toHaveLength(0);
     const canvasViewport = canvasScrollArea.querySelector<HTMLElement>(
       '[data-slot="scroll-area-viewport"]',
     );
@@ -478,7 +477,7 @@ describe("TopBar", () => {
     );
     await user.click(usecaseNode);
     const detailScrollArea = within(dialog).getByTestId("lineage-detail-scroll-area");
-    expect(detailScrollArea.querySelectorAll('[data-slot="scroll-area-scrollbar"]')).toHaveLength(1);
+    expect(detailScrollArea.querySelectorAll('[data-slot="scroll-area-scrollbar"]')).toHaveLength(0);
     expect(classNode).toHaveClass("opacity-25");
 
     await user.click(within(dialog).getByRole("button", { name: "全部链路" }));

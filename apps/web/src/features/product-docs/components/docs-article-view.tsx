@@ -41,7 +41,7 @@ export function DocsArticleView({
     <article className="min-w-0 w-full max-w-[800px]">
       <header className="mb-8">
         <h1 id={headings.find((heading) => heading.level === 1)?.id ?? article.id}
-          tabIndex={-1} className="scroll-mt-20 break-words text-3xl font-semibold tracking-tight outline-none @[720px]/docs:scroll-mt-6 @[720px]/docs:text-4xl">
+          tabIndex={-1} className="scroll-mt-36 break-words text-3xl font-semibold tracking-tight outline-none @[720px]/docs:scroll-mt-24 @[720px]/docs:text-4xl">
           {headings.find((heading) => heading.level === 1)?.title ?? article.title}
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -110,7 +110,7 @@ function createMarkdownComponents({
       return (
         <h2
           id={headingId(2, children)}
-          className="mt-6 scroll-mt-20 @[720px]/docs:scroll-mt-6 break-words text-xl font-semibold first:mt-0"
+          className="mt-6 scroll-mt-36 @[720px]/docs:scroll-mt-24 break-words text-xl font-semibold first:mt-0"
           {...props}
         >
           {children}
@@ -121,7 +121,7 @@ function createMarkdownComponents({
       return (
         <h3
           id={headingId(3, children)}
-          className="mt-4 scroll-mt-20 @[720px]/docs:scroll-mt-6 break-words text-base font-semibold"
+          className="mt-4 scroll-mt-36 @[720px]/docs:scroll-mt-24 break-words text-base font-semibold"
           {...props}
         >
           {children}

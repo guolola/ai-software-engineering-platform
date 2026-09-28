@@ -89,7 +89,7 @@ function StatPair({ stat }: { stat: PerformanceStat }) {
   )
 }
 
-const PerformanceCard = ({ className, title = 'Performance', members, area, bar }: PerformanceProps) => {
+const PerformanceCard = ({ className, title = 'Project activity', members, area, bar }: PerformanceProps) => {
   const areaChartConfig = { value: { label: area.chartLabel } } satisfies ChartConfig
   const barChartConfig = { value: { label: bar.chartLabel } } satisfies ChartConfig
 
@@ -116,29 +116,29 @@ const PerformanceCard = ({ className, title = 'Performance', members, area, bar 
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>
-      <Tabs defaultValue='members' className='min-w-0 flex-1 gap-4 sm:gap-6'>
+      <Tabs defaultValue='members' className='min-w-0 w-full flex-1 flex-col gap-4 sm:gap-6'>
         <TabsList variant='line' className='w-full min-w-0 justify-start gap-0 overflow-x-auto border-b p-0'>
           <TabsTrigger
             value='members'
-            className='rounded-none border-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-0.5px]'
+            className='flex-none rounded-none border-0 px-4 group-data-[orientation=horizontal]/tabs:after:bottom-[-0.5px]'
           >
             {members.tabLabel}
           </TabsTrigger>
           <TabsTrigger
             value='area'
-            className='rounded-none border-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-0.5px]'
+            className='flex-none rounded-none border-0 px-4 group-data-[orientation=horizontal]/tabs:after:bottom-[-0.5px]'
           >
             {area.tabLabel}
           </TabsTrigger>
           <TabsTrigger
             value='bar'
-            className='rounded-none border-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-0.5px]'
+            className='flex-none rounded-none border-0 px-4 group-data-[orientation=horizontal]/tabs:after:bottom-[-0.5px]'
           >
             {bar.tabLabel}
           </TabsTrigger>
         </TabsList>
 
-        <CardContent className='min-w-0 px-3 sm:px-6'>
+        <CardContent className='min-w-0 w-full px-3 sm:px-6'>
           <TabsContent value='members' className='flex flex-col justify-between gap-4 text-base'>
             <div className='flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2 sm:gap-4 sm:px-4'>
               <Avatar className='size-10.5'>

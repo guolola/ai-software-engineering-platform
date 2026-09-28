@@ -18,7 +18,7 @@
 
 | 组件 | 主要职责 |
 | --- | --- |
-| `apps/web` | React 页面、业务功能、领域展示、服务调用与共享 UI |
+| `apps/web` | Next.js 页面路由与 AdminCN default-layout 框架、业务功能、领域展示、服务调用与共享 UI |
 | `apps/api` | HTTP/SSE 路由、认证授权、生成流水线、记录与文档组装 |
 | `apps/render-service` | PlantUML 到 SVG 的隔离渲染 |
 | `packages/contracts` | 前后端共享的请求、响应与领域类型 |
@@ -34,9 +34,11 @@ API 路由只解析输入并调用领域能力。生成任务按“路由 → �
 
 `app` 负责入口与页面组合，`features` 负责业务交互，`entities` 负责领域模型展示，`services` 负责远端调用，`shared` 负责通用 UI 与工具。页面状态不得绕过业务守卫直接触发缺少前置条件的生成。
 
+登录后的平台页和项目工作台共用 `shared/template/layout/default-pages-layout.tsx`。它移植自 AdminCN `default-layout` 的 `src/app/(pages)/layout.tsx`，并组合模板的 Sidebar、SidebarInset、Header 和 Footer；平台业务菜单作为 Sidebar 的内容接入。模板的 `src/components/ui/sidebar.tsx` 已移植到 `shared/ui/sidebar.tsx`，保留可折叠侧栏、移动端抽屉和菜单组件，仅扩展了项目工作台所需的宽度调整。Next.js 的 `app` 路由承载这些页面，登录、项目与业务状态仍由现有功能模块管理。
+
 ### 运行依赖
 
-生产环境使用 PostgreSQL 持久化、Redis/BullMQ 承载队列、PM2 运行 API 和渲染服务、Nginx 托管 Web 与反向代理。OnlyOffice 是文档在线编辑的可选外部服务。
+生产环境使用 PostgreSQL 持久化、Redis/BullMQ 承载队列、PM2 运行 Next.js Web、API 和渲染服务、Nginx 负责反向代理。OnlyOffice 是文档在线编辑的可选外部服务。
 
 ## 操作与维护
 

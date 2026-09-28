@@ -1,5 +1,6 @@
 // Defines the product documentation manifest and binds each Markdown file to typed article metadata.
 import { TUTORIAL_QUICK_START_VIDEO_URL } from "../../../shared/lib/video-assets";
+import { markdownModules } from './docs-content.generated';
 
 export type ProductDocCategoryId =
   | "overview"
@@ -49,12 +50,6 @@ type ProductDocArticleManifestItem = Omit<
 > & {
   sourcePath: keyof typeof markdownModules;
 };
-
-const markdownModules = import.meta.glob<string>("../content/*.md", {
-  eager: true,
-  import: "default",
-  query: "?raw",
-});
 
 export const PRODUCT_DOC_CATEGORIES: readonly ProductDocCategory[] = [
   {
