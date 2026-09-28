@@ -500,14 +500,15 @@ const projectDrawerMeta: Record<
   },
 };
 
-function DesktopDrawerOverlay() {
+function DesktopDrawerOverlay({ onClose }: { onClose: () => void }) {
   if (typeof document === "undefined") return null;
 
   return createPortal(
     <div
       data-slot="drawer-overlay"
       aria-hidden="true"
-      className="fixed inset-0 z-40 bg-black/45"
+      className="fixed inset-0 z-[60] bg-black/45"
+      onPointerDown={onClose}
     />,
     document.body,
   );
@@ -545,7 +546,7 @@ function ProjectDrawerShell({
   return (
     <div data-testid="project-workspace-drawer-layer">
       {/* Desktop side drawers keep the page scrollbar so opening them cannot shift the workspace. */}
-      {!isMobile && open ? <DesktopDrawerOverlay /> : null}
+      {!isMobile && open ? <DesktopDrawerOverlay onClose={onClose} /> : null}
       <Drawer
         direction={isMobile ? "bottom" : "right"}
         modal={isMobile}
@@ -554,7 +555,7 @@ function ProjectDrawerShell({
       >
         <DrawerContent
           data-testid="project-workspace-drawer"
-          className={cn("max-w-full gap-0 overflow-x-hidden overflow-y-hidden", widthClass, kind === "tasks" && isMobile && "h-[90dvh]")}
+          className={cn("max-w-full gap-0 overflow-x-hidden overflow-y-hidden", !isMobile && "z-[70]", widthClass, kind === "tasks" && isMobile && "h-[90dvh]")}
         >
           <DrawerHeader className="flex-row items-center justify-between gap-3 p-4">
             <div className="flex min-w-0 items-center gap-3">

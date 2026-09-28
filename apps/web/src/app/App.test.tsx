@@ -2770,11 +2770,12 @@ describe("App shell routes", () => {
     expect(await screen.findByRole("dialog", { name: "生成任务" })).toBeInTheDocument();
     expect(screen.getByTestId("project-workspace-drawer-layer")).toBeInTheDocument();
     expect(screen.getByTestId("project-workspace-drawer")).not.toHaveClass("transition");
+    expect(screen.getByTestId("project-workspace-drawer")).toHaveClass("z-[70]");
     const overlay = document.querySelector<HTMLElement>("[data-slot='drawer-overlay']");
-    expect(overlay).toHaveClass("bg-black/45");
+    expect(overlay).toHaveClass("bg-black/45", "z-[60]");
     expect(overlay).not.toHaveClass("backdrop-blur-[1px]");
 
-    await user.click(screen.getByRole("button", { name: "关闭生成任务抽屉" }));
+    await user.click(overlay as HTMLElement);
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "生成任务" })).not.toBeInTheDocument();
     });
