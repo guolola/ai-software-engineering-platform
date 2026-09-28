@@ -126,10 +126,14 @@ cleanup_stale_deploy_artifacts() {
 
 verify_web_bundle() {
   local web_dir="$1"
-  local client_dir="$web_dir/.next/standalone/apps/web/.next/static"
+  local standalone_dir="$web_dir/.next/standalone/apps/web"
+  local client_dir="$web_dir/.next/static"
   local matches
 
-  if [[ ! -f "$web_dir/.next/standalone/apps/web/server.js" || ! -d "$client_dir" ]]; then
+  if [[ ! -d "$client_dir" && -d "$standalone_dir/.next/static" ]]; then
+    client_dir="$standalone_dir/.next/static"
+  fi
+  if [[ ! -f "$standalone_dir/server.js" || ! -d "$client_dir" ]]; then
     echo "Next.js standalone server or static assets are missing: $web_dir" >&2
     exit 1
   fi
@@ -151,7 +155,7 @@ verify_web_bundle() {
 
 verify_web_seo_artifacts() {
   local web_dir="$1"
-  if [[ ! -f "$web_dir/.next/standalone/apps/web/public/og-cover.png" ]]; then
+  if [[ ! -f "$web_dir/public/og-cover.png" && ! -f "$web_dir/.next/standalone/apps/web/public/og-cover.png" ]]; then
     echo "Next.js public SEO cover is missing: $web_dir" >&2
     exit 1
   fi
