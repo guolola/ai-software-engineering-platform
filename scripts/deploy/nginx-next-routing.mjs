@@ -59,6 +59,16 @@ export function migrateNextRouting(config, deployPath) {
       ? newWebRoot
       : null;
   if (!activeWebRoot) {
+    const directNextServers = [...config.matchAll(/^[ \t]*server[ \t]*\{/gm)]
+      .map((match) => {
+        const open = config.indexOf('{', match.index);
+        const close = findBlockClose(config, open);
+        return close < 0 ? '' : config.slice(match.index, close + 1);
+      })
+      .filter((server) => server.includes('server_name jianglisoftware.com;'))
+      .filter((server) => server.includes('proxy_pass http://127.0.0.1:4001;'))
+      .filter((server) => server.includes('proxy_pass http://127.0.0.1:4003;'));
+    if (directNextServers.length === 1) return config;
     throw new Error('Unknown site root or API proxy; refusing to change Nginx routing.');
   }
   const { serverStart, close: serverClose } = findServerBlock(config, activeWebRoot);
@@ -119,7 +129,12 @@ export function checkNextRouting(deployPath, runNginx = nginx) {
     .filter((file, index, files) => files.indexOf(file) === index)
     .filter((file) => {
       const contents = readFileSync(file, 'utf8');
-      return contents.includes(`root ${deployPath}${oldRoot};`) || contents.includes(`root ${deployPath}${nextRoot};`);
+      const hasKnownRoot = contents.includes(`root ${deployPath}${oldRoot};`)
+        || contents.includes(`root ${deployPath}${nextRoot};`);
+      const hasDirectNextRouting = contents.includes('server_name jianglisoftware.com;')
+        && contents.includes('proxy_pass http://127.0.0.1:4001;')
+        && contents.includes('proxy_pass http://127.0.0.1:4003;');
+      return hasKnownRoot || hasDirectNextRouting;
     });
   if (configFiles.length !== 1) throw new Error(`Expected one UML site config, found ${configFiles.length}.`);
   const configPath = configFiles[0];

@@ -50,6 +50,35 @@ test('changes only the UML server when another server has a root location', () =
   assert.equal((nextConfig.match(/proxy_pass http:\/\/127\.0\.0\.1:4003;/g) ?? []).length, 1);
 });
 
+test('accepts a directly configured Next proxy without a legacy web root', () => {
+  const directConfig = `server {
+    listen 443 ssl;
+    server_name jianglisoftware.com;
+    location /api/ {
+        proxy_pass http://127.0.0.1:4001;
+    }
+    location / {
+        proxy_pass http://127.0.0.1:4003;
+    }
+}\n`;
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'uml-next-routing-direct-'));
+  try {
+    const configPath = path.join(directory, 'site.conf');
+    writeFileSync(configPath, directConfig);
+    const runNginx = (...args) => args[0] === '-T'
+      ? `# configuration file ${configPath}:\n${directConfig}`
+      : '';
+
+    const preflight = checkNextRouting(deployPath, runNginx);
+
+    assert.equal(preflight.configPath, configPath);
+    assert.equal(preflight.original, directConfig);
+    assert.equal(preflight.migrated, directConfig);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('backs up exact config and restores it after a failed or rolled-back deployment', () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'uml-next-routing-'));
   try {

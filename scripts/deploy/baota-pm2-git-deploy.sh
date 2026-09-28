@@ -337,7 +337,7 @@ reload_pm2_for_release() {
       check_pm2_cwd uml-api "$expected_release_dir"
     if [[ -f "$release_dir/apps/web/.next/standalone/apps/web/server.js" ]]; then
       run_timed "PM2 process cwd check web" \
-        check_pm2_cwd uml-web "$expected_release_dir"
+        check_pm2_cwd uml-web "$expected_release_dir/apps/web/.next/standalone/apps/web"
     fi
 
     echo "Checking API version ..."
