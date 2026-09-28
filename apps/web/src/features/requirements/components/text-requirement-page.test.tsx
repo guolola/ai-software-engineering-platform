@@ -2839,4 +2839,20 @@ describe("TextRequirementView", () => {
     expect(within(dialog).getByText(/请先输入需求描述或添加需求规则/)).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "前往系统需求" })).toBeVisible();
   });
+
+  it("does not show a guidance button when no target model is selected", async () => {
+    const repository = createBaseRepository({
+      loadWorkspace: vi.fn(async () => createWorkspaceRecord({
+        requirementText: "客户可以预约维修。",
+        rules: [],
+        selectedDiagramTypes: [],
+      })),
+    });
+    render(withWorkspaceProviders(<TextRequirementView view="models" />, repository));
+
+    expect(await screen.findByRole("heading", { name: "目标模型" })).toBeVisible();
+    await act(async () => {});
+    expect(screen.getByRole("button", { name: /生成模型/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /有 \d+ 项需要处理/ })).not.toBeInTheDocument();
+  });
 });

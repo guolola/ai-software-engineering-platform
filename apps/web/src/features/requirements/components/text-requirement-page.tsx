@@ -454,8 +454,7 @@ export function TextRequirementView({
   const modelGenerationBlockedReason = view === "system" ? null
     : !canRunGeneration ? workspacePermissionReason ?? t("requirements.permissions.run")
       : requirementReviewBlockedReason ? visibleRequirementReviewBlockedReason
-        : selectedTargetBlockReason ?? missingRequirementSourceReason ?? generationModelBlockedReason
-          ?? (selectedDiagrams.length === 0 ? t("requirements.selectTargetFirst") : null);
+        : selectedTargetBlockReason ?? missingRequirementSourceReason ?? generationModelBlockedReason;
   const pageNoticeMessages = [
     !canEditRequirements ? editBlockedReason : null,
     billingGenerationBlock ? `${billingGenerationBlock.message}\n${t("requirements.credits", { count: billingGenerationBlock.billingSummary.creditBalance })}` : null,
@@ -469,9 +468,7 @@ export function TextRequirementView({
   const modelGuidanceAction = view !== "system" && modelGenerationBlockedReason && canRunGeneration
     ? selectedTargetBlockReason || missingRequirementSourceReason || requirementReviewBlockedReason
       ? { label: t("requirements.sourceAction"), onSelect: openSystemRequirements }
-      : selectedDiagrams.length === 0
-        ? { label: t("requirements.selectTargetAction"), onSelect: () => document.getElementById("requirement-target-models")?.scrollIntoView({ behavior: "smooth", block: "start" }) }
-        : undefined
+      : undefined
     : undefined;
   const pageFeedback: FeedbackDialogState | null = pageNoticeMessages.length > 0 ? {
     dedupeKey: `requirements:${view}:notices`,

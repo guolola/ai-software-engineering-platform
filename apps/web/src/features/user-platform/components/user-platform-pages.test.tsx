@@ -232,6 +232,7 @@ describe("ProjectWorkspaceDrawer", () => {
     expect(document.getElementById(drawer.getAttribute("aria-describedby") ?? "")).toHaveTextContent("goal-e2e destructive");
     expect(drawer).toHaveClass("overflow-x-hidden");
     expect(body).toHaveClass("overflow-x-hidden", "min-w-0");
+    expect(document.body).not.toHaveAttribute("data-scroll-locked");
     expect(screen.queryByText("默认模型策略")).not.toBeInTheDocument();
     const retentionValue = screen.getByText("手动归档", {
       selector: "[data-slot='select-value']",

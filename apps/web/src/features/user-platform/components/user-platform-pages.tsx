@@ -530,44 +530,50 @@ function ProjectDrawerShell({
 
   return (
     <div data-testid="project-workspace-drawer-layer">
-      <Drawer direction={isMobile ? "bottom" : "right"} open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DrawerContent
-        data-testid="project-workspace-drawer"
-        className={cn("max-w-full gap-0 overflow-x-hidden overflow-y-hidden", widthClass, kind === "tasks" && isMobile && "h-[90dvh]")}
+      {/* Desktop side drawers keep the page scrollbar so opening them cannot shift the workspace. */}
+      <Drawer
+        direction={isMobile ? "bottom" : "right"}
+        modal={isMobile}
+        open={open}
+        onOpenChange={(next) => { if (!next) onClose(); }}
       >
-        <DrawerHeader className="flex-row items-center justify-between gap-3 p-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Avatar className="size-9.5 rounded-sm after:border-0">
-              <AvatarFallback className="bg-primary/10 text-primary size-9.5 shrink-0 rounded-sm [&>svg]:size-4.75">
-                <Icon className="size-5" aria-hidden="true" />
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <DrawerTitle className="text-base font-semibold">
-                {title}
-              </DrawerTitle>
-              <DrawerDescription className="truncate text-sm">
-                {projectName}
-              </DrawerDescription>
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t("projectShell.drawer.close", { title })}
-            onClick={onClose}
-          >
-            <X className="size-4" />
-          </Button>
-        </DrawerHeader>
-        <div
-          data-testid="project-workspace-drawer-body"
-          className={cn("min-h-0 min-w-0 flex-1 overflow-x-hidden px-4 py-4", kind === "tasks" ? "flex flex-col overflow-y-hidden" : "overflow-y-auto")}
+        <DrawerContent
+          data-testid="project-workspace-drawer"
+          className={cn("max-w-full gap-0 overflow-x-hidden overflow-y-hidden", widthClass, kind === "tasks" && isMobile && "h-[90dvh]")}
         >
-          {children}
-        </div>
-      </DrawerContent>
+          <DrawerHeader className="flex-row items-center justify-between gap-3 p-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <Avatar className="size-9.5 rounded-sm after:border-0">
+                <AvatarFallback className="bg-primary/10 text-primary size-9.5 shrink-0 rounded-sm [&>svg]:size-4.75">
+                  <Icon className="size-5" aria-hidden="true" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <DrawerTitle className="text-base font-semibold">
+                  {title}
+                </DrawerTitle>
+                <DrawerDescription className="truncate text-sm">
+                  {projectName}
+                </DrawerDescription>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("projectShell.drawer.close", { title })}
+              onClick={onClose}
+            >
+              <X className="size-4" />
+            </Button>
+          </DrawerHeader>
+          <div
+            data-testid="project-workspace-drawer-body"
+            className={cn("min-h-0 min-w-0 flex-1 overflow-x-hidden px-4 py-4", kind === "tasks" ? "flex flex-col overflow-y-hidden" : "overflow-y-auto")}
+          >
+            {children}
+          </div>
+        </DrawerContent>
       </Drawer>
     </div>
   );
