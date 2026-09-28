@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 import type { TFunction } from "i18next";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { localizeCaughtFailure } from "../../../shared/i18n/api-errors";
 import {
@@ -499,6 +500,19 @@ const projectDrawerMeta: Record<
   },
 };
 
+function DesktopDrawerOverlay() {
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      data-slot="drawer-overlay"
+      aria-hidden="true"
+      className="fixed inset-0 z-40 bg-black/45"
+    />,
+    document.body,
+  );
+}
+
 function ProjectDrawerShell({
   open,
   kind,
@@ -531,6 +545,7 @@ function ProjectDrawerShell({
   return (
     <div data-testid="project-workspace-drawer-layer">
       {/* Desktop side drawers keep the page scrollbar so opening them cannot shift the workspace. */}
+      {!isMobile && open ? <DesktopDrawerOverlay /> : null}
       <Drawer
         direction={isMobile ? "bottom" : "right"}
         modal={isMobile}
