@@ -15,10 +15,37 @@ const nextLocation = `location / {
         proxy_read_timeout 3600s;
     }`;
 
+function findBlockClose(config, open) {
+  let depth = 0;
+  for (let index = open; index < config.length; index += 1) {
+    if (config[index] === '{') depth += 1;
+    if (config[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+function indentBlock(block, indent) {
+  return block.split('\n').map((line) => `${indent}${line}`).join('\n');
+}
+
+function insertRootLocation(config, webRoot) {
+  const rootIndex = config.indexOf(`root ${webRoot};`);
+  const serverMatches = [...config.slice(0, rootIndex).matchAll(/^[ \t]*server[ \t]*\{/gm)];
+  const serverStart = serverMatches.at(-1)?.index;
+  if (serverStart === undefined) throw new Error('Cannot find the UML site server block.');
+  const open = config.indexOf('{', serverStart);
+  const close = findBlockClose(config, open);
+  if (close < 0 || close < rootIndex) throw new Error('Cannot safely parse the UML site server block.');
+  return `${config.slice(0, close).trimEnd()}\n\n${indentBlock(nextLocation, '    ')}\n${config.slice(close)}`;
+}
+
 export function migrateNextRouting(config, deployPath) {
   const oldWebRoot = `${deployPath}${oldRoot}`;
   const newWebRoot = `${deployPath}${nextRoot}`;
-  if (config.includes(newWebRoot) && config.includes(nextLocation)) return config;
+  if (config.includes(newWebRoot) && config.includes('proxy_pass http://127.0.0.1:4003;')) return config;
   if (!config.includes(`root ${oldWebRoot};`) || !config.includes('location /api/ {')) {
     throw new Error('Unknown site root or API proxy; refusing to change Nginx routing.');
   }
@@ -27,27 +54,37 @@ export function migrateNextRouting(config, deployPath) {
     'location ~ ^/(features|workflow|cases|pricing)/?$',
     'location ~ ^/(login|register|verify-email|forgot-password|reset-password|workspace|exam|tutorial|invitations/accept|billing/alipay/return|account|account/security|settings/models|account/billing)$',
     'location ~ ^/projects(?:/.*)?$', 'location = /app.html',
-    'location = /404.html', 'location /assets/', 'location /',
+    'location = /404.html', 'location /assets/',
   ];
   let result = config;
   for (const prefix of staticLocations) {
     const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const matches = [...result.matchAll(new RegExp(`^\\s*${escaped}\\s*\\{`, 'gm'))];
-    if (matches.length !== 1) {
-      throw new Error(`Expected one known Nginx block: ${prefix}`);
-    }
+    const matches = [...result.matchAll(new RegExp(`^[ \\t]*${escaped}[ \\t]*\\{`, 'gm'))];
+    if (matches.length > 1) throw new Error(`Expected at most one known Nginx block: ${prefix}`);
+    if (matches.length === 0) continue;
     const locationStart = matches[0].index;
     const open = result.indexOf('{', locationStart + matches[0][0].length - 1);
-    const close = result.indexOf('}', open + 1);
-    if (open < 0 || close < 0 || result.slice(open + 1, close).includes('{')) {
+    const close = findBlockClose(result, open);
+    if (open < 0 || close < 0) {
       throw new Error(`Cannot safely parse Nginx block: ${prefix}`);
     }
-    result = result.slice(0, locationStart) + (prefix === 'location /' ? nextLocation : '') + result.slice(close + 1);
+    result = result.slice(0, locationStart) + result.slice(close + 1);
   }
-  return result
+  const rootLocationMatches = [...result.matchAll(/^[ \t]*location[ \t]+\/[ \t]*\{/gm)];
+  if (rootLocationMatches.length > 1) throw new Error('Expected at most one root Nginx location block.');
+  if (rootLocationMatches.length === 1) {
+    const locationStart = rootLocationMatches[0].index;
+    const open = result.indexOf('{', locationStart);
+    const close = findBlockClose(result, open);
+    if (close < 0) throw new Error('Cannot safely parse the root Nginx location block.');
+    const indent = rootLocationMatches[0][0].match(/^[ \t]*/)?.[0] ?? '';
+    result = result.slice(0, locationStart) + indentBlock(nextLocation, indent) + result.slice(close + 1);
+  }
+  result = result
     .replace(`root ${oldWebRoot};`, `root ${newWebRoot};`)
     .replace(/\s*index index\.html;/, '')
     .replace(/\s*error_page 404 \/404\.html;/, '');
+  return rootLocationMatches.length === 0 ? insertRootLocation(result, newWebRoot) : result;
 }
 
 function nginx(...args) {

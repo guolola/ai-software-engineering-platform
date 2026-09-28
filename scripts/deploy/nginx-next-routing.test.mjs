@@ -20,6 +20,18 @@ test('moves the known site to Next while retaining API, OnlyOffice, and TLS rout
   assert.throws(() => migrateNextRouting('server {}', deployPath), /Unknown site root/);
 });
 
+test('adds the Next proxy when optional legacy static locations are absent', () => {
+  const reducedConfig = viteConfig
+    .replace(/\n[ \t]*location = \/index\.html \{[\s\S]*?\n[ \t]*\}/, '')
+    .replace(/\n[ \t]*location \/ \{[\s\S]*?\n[ \t]*\}/, '');
+
+  const nextConfig = migrateNextRouting(reducedConfig, deployPath);
+
+  assert.match(nextConfig, /location \/ \{[\s\S]*?proxy_pass http:\/\/127\.0\.0\.1:4003;/);
+  assert.match(nextConfig, /location \/api\/ \{[\s\S]*?proxy_pass http:\/\/127\.0\.0\.1:4001;/);
+  assert.equal((nextConfig.match(/proxy_pass http:\/\/127\.0\.0\.1:4003;/g) ?? []).length, 1);
+});
+
 test('backs up exact config and restores it after a failed or rolled-back deployment', () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'uml-next-routing-'));
   try {
