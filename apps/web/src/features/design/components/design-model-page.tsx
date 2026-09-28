@@ -1,5 +1,4 @@
 // Renders design-stage model generation controls, selection state, and requirement-to-design trace summaries.
-import { Card } from "../../../shared/ui/card";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DiagramModelSpec } from "@uml-platform/contracts";
@@ -13,7 +12,6 @@ import {
   GitBranch,
   Loader2,
   Network,
-  Route,
   Server,
   Wand2,
 } from "lucide-react";
@@ -60,10 +58,6 @@ import {
 import { useWorkspaceShell } from "../../workspace-shell/state";
 import {
   MobileCompactGrid,
-  MobileRail,
-  MobileRailCard,
-  MobileStatusPill,
-  MobileStatusRail,
   mobileTouchTargetClass,
 } from "../../workspace-shell/components/mobile-density";
 import { ModelBentoCard } from "../../workspace-shell/components/model-bento-card";
@@ -592,37 +586,48 @@ export function DesignModelPage() {
           <PageHeader
             title={t("designPage.title")}
             notice={generationBlockFeedback?.keepReopenEntry ? <FeedbackReopenButton feedback={generationBlockFeedback} /> : null}
-            titleAccessory={<Badge variant="secondary" className="font-mono">{effectiveSelected.length}/{DESIGN_DIAGRAM_ORDER.length}</Badge>}
             description={t("designPage.description")}
-            actions={
-              <>
-                <ModelPicker
-                  value={defaultModel}
-                  onValueChange={updateModel}
-                  align="end"
-                  triggerClassName="bg-card"
-                />
-                <Button
-                  size="sm"
-                  className="h-9 min-w-0 flex-1 sm:flex-none"
-                  onClick={runGenerate}
-                  disabled={!canGenerate || generating}
-                  title={generationModelBlockedReason ?? designGenerationBlockedReason ?? selectedDesignBlockReason ?? undefined}
-                >
-                  {generating ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Wand2 className="size-4" />
-                  )}
-                  <span className="min-w-0 truncate">{t("designPage.generate")}</span>
-                </Button>
-              </>
-            }
           />
 
           <div className="min-w-0">
             <main className="flex min-w-0 flex-col gap-4">
-              <section>
+              <section id="design-target-models" className="flex min-w-0 flex-col gap-4">
+                <div className="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <Network className="size-5 text-primary" />
+                    <h2 className="text-xl font-semibold tracking-normal text-foreground">
+                      {t("designPage.targetModels")}
+                    </h2>
+                    <Badge
+                      variant="secondary"
+                      className="border-0 px-3 py-1 font-mono text-xs"
+                    >
+                      {effectiveSelected.length}/{DESIGN_DIAGRAM_ORDER.length}
+                    </Badge>
+                  </div>
+                  <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto pb-1 sm:shrink-0 sm:overflow-visible sm:pb-0">
+                    <ModelPicker
+                      value={defaultModel}
+                      onValueChange={updateModel}
+                      align="end"
+                      triggerClassName="bg-card"
+                    />
+                    <Button
+                      size="sm"
+                      className="h-9 min-w-0 flex-1 sm:flex-none"
+                      onClick={runGenerate}
+                      disabled={!canGenerate || generating}
+                      title={generationModelBlockedReason ?? designGenerationBlockedReason ?? selectedDesignBlockReason ?? undefined}
+                    >
+                      {generating ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Wand2 className="size-4" />
+                      )}
+                      <span className="min-w-0 truncate">{t("designPage.generate")}</span>
+                    </Button>
+                  </div>
+                </div>
                 <MobileCompactGrid
                   minWidth={720}
                   variant="model-targets"

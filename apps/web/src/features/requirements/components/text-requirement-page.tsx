@@ -759,13 +759,6 @@ export function TextRequirementView({
                 </Button>
               </div>
             </div>
-            {modelGenerationBlockedReason && !generationModelBlockedReason && (
-              <p role="status" className="flex items-center gap-1.5 text-xs text-warning">
-                <AlertTriangle className="size-3.5" />
-                {modelGenerationBlockedReason}
-              </p>
-            )}
-
             <MobileCompactGrid
               minWidth={720}
               variant="model-targets"

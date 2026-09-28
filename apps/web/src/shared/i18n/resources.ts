@@ -602,7 +602,7 @@ export const resources = {
       feasibility: feasibilityResourcesZh,
       designPage: {
         traceDialogs: { title: "设计模型追踪证明", description: "查看设计元素到上游需求模型的来源证明；这些内容用于审计和排查，不会改动需求规则或设计模型。", evidence: "来源追踪", count: "共 {{count}} 项", complete: "追踪已补齐", reason: "原因：{{value}}", repair: "补齐：{{value}}", status: "状态：{{value}}", repairAgain: "重新补齐证明", resultTitle: "单项证明补齐完成", resultDescription: "已只重新检查当前设计模型追踪证明，没有重新生成全部设计模型。", stage: "阶段：", target: "对象：", acknowledge: "我知道了" },
-        title: "设计模型", description: "基于需求自动生成或手动构建系统架构模型", generate: "生成设计模型",
+        title: "设计模型", description: "基于需求自动生成或手动构建系统架构模型", targetModels: "目标模型", generate: "生成设计模型",
         viewSequence: "查看用例实现设计", backToRequirements: "回到需求页更新", generated: "已生成设计模型",
         sequenceCount: "{{count}} 个用例实现设计", select: "选择{{label}}", deselect: "取消选择{{label}}", view: "查看",
         waiting: "等待生成设计模型", autoFill: "将自动补齐：{{labels}}", autoFillGeneric: "将自动补齐所需上游模型", source: "来源：{{source}}",
@@ -2118,7 +2118,7 @@ export const resources = {
       feasibility: feasibilityResourcesEn,
       designPage: {
         traceDialogs: { title: "Design-model trace evidence", description: "Review evidence linking design elements to upstream requirement models. This supports audits and troubleshooting without changing requirements or design models.", evidence: "Source trace", count: "{{count}} items", complete: "Trace complete", reason: "Reason: {{value}}", repair: "Resolution: {{value}}", status: "Status: {{value}}", repairAgain: "Rebuild evidence", resultTitle: "Evidence rebuilt", resultDescription: "Only this design-model trace item was checked again; all design models were not regenerated.", stage: "Stage: ", target: "Target: ", acknowledge: "Got it" },
-        title: "Design models", description: "Generate system architecture models from requirements or build them manually", generate: "Generate design models",
+        title: "Design models", description: "Generate system architecture models from requirements or build them manually", targetModels: "Target models", generate: "Generate design models",
         viewSequence: "View use-case implementation", backToRequirements: "Update requirements", generated: "Design model generated",
         sequenceCount: "{{count}} use-case implementations", select: "Select {{label}}", deselect: "Deselect {{label}}", view: "View",
         waiting: "Waiting for design generation", autoFill: "Will auto-fill: {{labels}}", autoFillGeneric: "Required upstream models will be filled automatically", source: "Source: {{source}}",

@@ -2768,10 +2768,14 @@ describe("TextRequirementView", () => {
 
   it("keeps requirement authoring controls off the requirement models page", async () => {
     const user = userEvent.setup();
+    const requirementBaseline = createRequirementBaseline([
+      createAtomicRequirement(),
+    ]);
     const repository = createBaseRepository({
       loadWorkspace: vi.fn(async () => createWorkspaceRecord({
         requirementText: "维修预约系统",
         rules: [createRule({ id: "R1", text: "客户可以预约维修。" })],
+        requirementBaseline,
       })),
     });
     render(withWorkspaceProviders(<TextRequirementView view="models" />, repository));
@@ -2779,6 +2783,7 @@ describe("TextRequirementView", () => {
     expect(screen.getByRole("heading", { name: "目标模型" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "需求描述" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /需求规则/u })).not.toBeInTheDocument();
+    expect(screen.queryByText("请先确认需求规则修复结果")).not.toBeInTheDocument();
     const useCaseCard = screen.getByRole("button", { name: "选择用例模型" });
     expect(within(useCaseCard).queryByText("R1")).not.toBeInTheDocument();
     await user.click(

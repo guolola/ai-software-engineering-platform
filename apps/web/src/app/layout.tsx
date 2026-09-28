@@ -6,6 +6,10 @@ import './styles/index.css';
 export const metadata: Metadata = {
   title: '软件工程实践平台',
   description: 'UML 软件工程实践平台',
+  icons: {
+    icon: [{ url: '/brand/uml-platform-logo.png', type: 'image/png' }],
+    shortcut: '/brand/uml-platform-logo.png'
+  }
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

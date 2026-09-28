@@ -97,7 +97,12 @@ describe("DesignModelPage", () => {
     repository.getProjectAccess = async () => ({ capabilities: ["update_project", "start_runs"], generationExecutionMode: "provider" });
     repository.startDesignRun = vi.fn();
     render(withWorkspaceProviders(<DesignModelPage />, repository));
+    const targetHeading = await screen.findByRole("heading", { name: "目标模型" });
+    const targetRow = targetHeading.parentElement?.parentElement as HTMLElement;
+    expect(within(targetRow).getByText("0/7")).toBeInTheDocument();
+    expect(within(targetRow).getByRole("button", { name: "未选择模型" })).toBeEnabled();
     const button = await screen.findByRole("button", { name: /生成设计模型/ });
+    expect(within(targetRow).getByRole("button", { name: /生成设计模型/ })).toBe(button);
     expect(button).toBeDisabled();
     expect(screen.queryByText("未选择模型供应商")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "未选择模型" })).toBeEnabled();
