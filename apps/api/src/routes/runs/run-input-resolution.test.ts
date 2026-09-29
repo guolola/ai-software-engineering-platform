@@ -138,6 +138,32 @@ test("rules-only extraction uses the draft text but excludes persisted old rules
   assert.deepEqual(result.input.rules, []);
 });
 
+test("rules-only extraction accepts a draft when the saved project text is empty", async () => {
+  const result = await resolveRequirementRunInput(
+    { projectId: "project-a", selectedDiagrams: [], requirementText: "读者可以预约座位。" },
+    { projectId: "project-a" },
+    async () => ({ state: { requirementText: "", rules } }),
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.input.requirementText, "读者可以预约座位。");
+  assert.deepEqual(result.input.rules, []);
+});
+
+test("rules-only extraction still rejects a blank draft", async () => {
+  const result = await resolveRequirementRunInput(
+    { projectId: "project-a", selectedDiagrams: [], requirementText: "   " },
+    { projectId: "project-a" },
+    async () => ({ state: { requirementText: "", rules } }),
+  );
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.statusCode, 409);
+  assert.equal(result.body.error.code, "REQUIREMENT_SOURCE_MISSING");
+});
+
 test("current feasibility analysis enables a report without requirement or design models", async () => {
   const result = await resolveDocumentRunInput(
     command,

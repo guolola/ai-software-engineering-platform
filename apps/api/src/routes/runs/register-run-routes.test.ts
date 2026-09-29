@@ -3359,6 +3359,36 @@ test("project requirements start command builds legacy run input from workspace"
   await app.close();
 });
 
+test("project rules extraction accepts unsaved text when the workspace text is empty", async () => {
+  const { app, runs } = await createRunRouteTestContext({
+    completeRuns: false,
+    runAccessGuard: createTestRunAccessGuard({
+      "user-a": { start_runs: ["project-a"] },
+    }),
+    loadProjectWorkspace: async () => ({
+      state: { ...createProjectWorkspaceState(), requirementText: "" },
+    }),
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/runs",
+    headers: { "x-test-user-id": "user-a" },
+    payload: {
+      projectId: "project-a",
+      selectedDiagrams: [],
+      requirementText: "读者可以预约座位。",
+    },
+  });
+
+  assert.equal(response.statusCode, 202, response.body);
+  const record = runs.get(response.json().runId);
+  assert.ok(record);
+  assert.equal(record.snapshot.requirementText, "读者可以预约座位。");
+  assert.deepEqual(record.snapshot.rules, []);
+  await app.close();
+});
+
 test("project requirements analysis command records implicit usecase dependency targets", async () => {
   const workspaceState = {
     ...createProjectWorkspaceState(),

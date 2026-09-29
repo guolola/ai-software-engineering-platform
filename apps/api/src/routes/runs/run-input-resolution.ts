@@ -883,9 +883,14 @@ export async function resolveRequirementRunInput(
     loadProjectWorkspace,
   });
   if (!workspace.ok) return workspace;
+  const requirementText = rulesOnly && command.requirementText !== undefined
+    ? command.requirementText
+    : stringValue(workspace.input.state.requirementText);
   const preflight = rejectProjectGenerationPreflight({
     kind: "requirements",
-    state: workspace.input.state,
+    // A rules-only run commits the submitted draft after success. The saved
+    // workspace can be empty before that first extraction.
+    state: { ...workspace.input.state, requirementText },
   });
   if (preflight) return preflight;
   const contextModels = presentRecordValues(workspace.input.state.models);
@@ -903,9 +908,7 @@ export async function resolveRequirementRunInput(
     ok: true,
     input: startRunRequestSchema.parse({
       projectId: workspace.input.projectId,
-      requirementText: rulesOnly && command.requirementText !== undefined
-        ? command.requirementText
-        : stringValue(workspace.input.state.requirementText),
+      requirementText,
       selectedDiagrams: requirementTargets.selectedDiagrams,
       requestedDiagrams: requirementTargets.requestedDiagrams,
       dependencyDiagrams: requirementTargets.dependencyDiagrams,
