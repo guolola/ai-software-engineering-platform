@@ -1,4 +1,5 @@
 // Verifies diagram detail editing, rerendering, trace highlighting, and export interactions.
+import { tableDiagramSpecSchema } from "@uml-platform/contracts";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -717,31 +718,30 @@ describe("DiagramView", () => {
     expect(screen.queryByText("来源：需求阶段用例模型事件流 + 需求分析模型（具体用例未标明）")).not.toBeInTheDocument();
     missingView.unmount();
 
-    const activityRepository = createRepository(
+    const navigationRepository = createRepository(
       createWorkspaceRecord({
-        generatedDesignDiagramTypes: ["activity"],
-        designPlantUml: { activity: "@startuml\n@enduml" },
+        generatedDesignDiagramTypes: ["navigation"],
+        designPlantUml: { navigation: "@startuml\n@enduml" },
         designModels: {
-          activity: {
-            diagramKind: "activity",
+          navigation: {
+            diagramKind: "navigation",
             title: "界面关系图",
             summary: "业务流程",
             notes: [],
-            swimlanes: [],
             nodes: [],
             relationships: [],
           },
         },
         designSvgArtifacts: {
-          activity: {
-            diagramKind: "activity",
-            svg: "<svg><text>activity</text></svg>",
+          navigation: {
+            diagramKind: "navigation",
+            svg: "<svg><text>navigation</text></svg>",
             renderMeta: { engine: "plantuml" },
           },
         },
       }),
     );
-    render(withWorkspaceProviders(<DesignDiagramView type="activity" />, activityRepository));
+    render(withWorkspaceProviders(<DesignDiagramView type="navigation" />, navigationRepository));
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "界面关系图", level: 1 })).toBeInTheDocument());
     expect(screen.queryByText("来源：需求阶段原型界面关系 + 设计阶段用例实现设计")).not.toBeInTheDocument();
@@ -806,7 +806,7 @@ describe("DiagramView", () => {
         title: "图书馆设计类图",
         summary: "更新后的结构说明",
       }),
-    );
+     "design",);
     expect(toastMessage).toHaveBeenCalledWith("修改已保存，当前图已更新");
     expect(await screen.findByRole("heading", { name: "图书馆设计类图", level: 1 })).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "编辑模型信息" })).not.toBeInTheDocument();
@@ -849,23 +849,22 @@ describe("DiagramView", () => {
   it("keeps the editor open with its input when saving metadata fails", async () => {
     const repository = createRepository(
       createWorkspaceRecord({
-        generatedDesignDiagramTypes: ["activity"],
-        designPlantUml: { activity: "@startuml\n@enduml" },
+        generatedDesignDiagramTypes: ["navigation"],
+        designPlantUml: { navigation: "@startuml\n@enduml" },
         designModels: {
-          activity: {
-            diagramKind: "activity",
+          navigation: {
+            diagramKind: "navigation",
             title: "界面关系图",
             summary: "业务流程",
             notes: [],
-            swimlanes: [],
             nodes: [],
             relationships: [],
           },
         },
         designSvgArtifacts: {
-          activity: {
-            diagramKind: "activity",
-            svg: "<svg><text>activity</text></svg>",
+          navigation: {
+            diagramKind: "navigation",
+            svg: "<svg><text>navigation</text></svg>",
             renderMeta: { engine: "plantuml" },
           },
         },
@@ -873,7 +872,7 @@ describe("DiagramView", () => {
     );
     vi.mocked(repository.saveDesignModelEdit!).mockRejectedValueOnce(new Error("save failed"));
 
-    render(withWorkspaceProviders(<DesignDiagramView type="activity" />, repository));
+    render(withWorkspaceProviders(<DesignDiagramView type="navigation" />, repository));
 
     await userEvent.click(await screen.findByRole("button", { name: "编辑" }));
     const dialog = await screen.findByRole("dialog", { name: "编辑模型信息" });
@@ -1436,7 +1435,7 @@ describe("DiagramView", () => {
                 name: "Event",
                 description: "公开活动",
                 classKind: "entity",
-                stereotype: null,
+
                 attributes: [],
                 operations: [],
               },
@@ -1445,7 +1444,7 @@ describe("DiagramView", () => {
                 name: "Reminder",
                 description: "提醒记录",
                 classKind: "entity",
-                stereotype: null,
+
                 attributes: [],
                 operations: [],
               },
@@ -1458,7 +1457,7 @@ describe("DiagramView", () => {
                 type: "association",
                 sourceId: "cls_event",
                 targetId: "cls_reminder",
-                label: null,
+
                 sourceRole: "event",
                 targetRole: "reminders",
                 sourceMultiplicity: "1",
@@ -1556,11 +1555,11 @@ describe("DiagramView", () => {
     await waitFor(() => expect(repository.renderStructuredModel).toHaveBeenCalled());
     expect(repository.renderStructuredModel).toHaveBeenCalledWith(
       expect.objectContaining({ relationships: [] }),
-    );
+     "requirements",);
     expect(toastMessage).toHaveBeenCalledWith("修改已保存，当前图已更新");
   });
 
-  it("removes dangling relationships when confirming element deletion", async () => {
+  it("preserves dangling relationships and blocks persistence until explicitly resolved", async () => {
     const repository = createRepository(
       createWorkspaceRecord({
         generatedDiagramTypes: ["class"],
@@ -1625,29 +1624,10 @@ describe("DiagramView", () => {
     const deleteDialog = await screen.findByRole("dialog", { name: /删除类/u });
     await userEvent.click(within(deleteDialog).getByRole("button", { name: "确认删除" }));
 
-    await waitFor(() => expect(saveRequirementModelEdit).toHaveBeenCalled());
-    await waitFor(() => expect(renderStructuredModel).toHaveBeenCalled());
-    expect(saveRequirementModelEdit).toHaveBeenCalledWith(
-      "class",
-      expect.objectContaining({
-        classes: [expect.objectContaining({ id: "cls_reminder" })],
-        relationships: [],
-      }),
-      expect.objectContaining({ status: "dirty" }),
-      expect.objectContaining({
-        requirementModelTraceability: [],
-        designModelTraceability: [],
-      }),
-    );
-    expect(renderStructuredModel).toHaveBeenCalledWith(
-      expect.objectContaining({
-        classes: [expect.objectContaining({ id: "cls_reminder" })],
-        relationships: [],
-      }),
-    );
-    expect(saveRequirementModelEdit.mock.invocationCallOrder[0]).toBeLessThan(
-      renderStructuredModel.mock.invocationCallOrder[0],
-    );
+    expect(saveRequirementModelEdit).not.toHaveBeenCalled();
+    expect(renderStructuredModel).not.toHaveBeenCalled();
+    expect(await screen.findByText(/关系端点不存在/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /删除关系：/ })).toBeInTheDocument();
   });
 
   it("opens add dialogs before creating elements or relations", async () => {
@@ -1698,7 +1678,6 @@ describe("DiagramView", () => {
     let dialog = await screen.findByRole("dialog", { name: /添加类/u });
     expect(dialog).toHaveClass("sm:max-w-2xl");
     expect(dialog).toHaveAttribute("data-form-layout", "4");
-    expect(within(dialog).queryByText(/cls_|rel_|actor_/u)).not.toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "取消" }));
     expect(repository.renderStructuredModel).not.toHaveBeenCalled();
 
@@ -1713,7 +1692,7 @@ describe("DiagramView", () => {
       expect.objectContaining({
         classes: expect.arrayContaining([expect.objectContaining({ name: "Invoice" })]),
       }),
-    );
+     "requirements",);
 
     await userEvent.click(screen.getByRole("button", { name: "添加关系" }));
     dialog = await screen.findByRole("dialog", { name: /添加关系/u });
@@ -1722,8 +1701,7 @@ describe("DiagramView", () => {
     expect(dialog.querySelector("select")).toBeNull();
     expect(within(dialog).getByRole("combobox", { name: "起点" })).toBeInTheDocument();
     expect(within(dialog).getByRole("combobox", { name: "终点" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("combobox", { name: "关系类型" })).toBeInTheDocument();
-    expect(within(dialog).queryByText(/cls_|rel_|actor_/u)).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("combobox", { name: "类型" })).toBeInTheDocument();
     const relationNameInput = within(dialog).getByLabelText("关系名称");
     await userEvent.clear(relationNameInput);
     await userEvent.type(relationNameInput, "关联发票");
@@ -1733,7 +1711,7 @@ describe("DiagramView", () => {
       expect.objectContaining({
         relationships: expect.arrayContaining([expect.objectContaining({ label: "关联发票" })]),
       }),
-    );
+     "requirements",);
     expect(toastMessage).toHaveBeenCalledWith("修改已保存，当前图已更新");
   });
 
@@ -1813,6 +1791,7 @@ describe("DiagramView", () => {
             useCases: [
               {
                 id: "uc_login",
+                systemBoundaryId: "system",
                 name: "登录",
                 goal: "进入系统",
                 preconditions: [],
@@ -1885,8 +1864,7 @@ describe("DiagramView", () => {
     expect(dialog.querySelector("select")).toBeNull();
     expect(within(dialog).getByRole("combobox", { name: "起点" })).toBeInTheDocument();
     expect(within(dialog).getByRole("combobox", { name: "终点" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("combobox", { name: "关系类型" })).toBeInTheDocument();
-    expect(within(dialog).queryByText(/rel_/u)).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("combobox", { name: "类型" })).toBeInTheDocument();
     const relationLabelInput = within(dialog).getByLabelText("关系名称");
     await userEvent.clear(relationLabelInput);
     await userEvent.type(relationLabelInput, "发起登录");
@@ -1912,7 +1890,7 @@ describe("DiagramView", () => {
         actors: [expect.objectContaining({ name: "授课教师" })],
         relationships: [expect.objectContaining({ label: "发起登录" })],
       }),
-    );
+     "requirements",);
     expect(
       vi.mocked(repository.saveRequirementModelEdit).mock.invocationCallOrder[0],
     ).toBeLessThan(
@@ -1926,9 +1904,9 @@ describe("DiagramView", () => {
   it("edits class members, relation metadata, and shared model fields", async () => {
     const repository = createRepository(
       createWorkspaceRecord({
-        generatedDiagramTypes: ["class"],
-        plantUml: { class: "@startuml\nclass Order\n@enduml" },
-        models: {
+        generatedDesignDiagramTypes: ["class"],
+        designPlantUml: { class: "@startuml\nclass Order\n@enduml" },
+        designModels: {
           class: {
             diagramKind: "class",
             title: "类图",
@@ -1993,7 +1971,7 @@ describe("DiagramView", () => {
             ],
           },
         },
-        svgArtifacts: {
+        designSvgArtifacts: {
           class: {
             diagramKind: "class",
             svg: "<svg><text>Order</text></svg>",
@@ -2008,7 +1986,7 @@ describe("DiagramView", () => {
       }),
     );
 
-    render(withWorkspaceProviders(<DiagramView type="class" />, repository));
+    render(withWorkspaceProviders(<DesignDiagramView type="class" />, repository));
 
     await userEvent.click(await screen.findByRole("button", { name: "编辑" }));
     const metadataDialog = await screen.findByRole("dialog", { name: "编辑模型信息" });
@@ -2024,8 +2002,8 @@ describe("DiagramView", () => {
     expect(dialog).toHaveAttribute("data-form-layout", "4");
     await userEvent.clear(within(dialog).getByLabelText("第 1 个属性名称"));
     await userEvent.type(within(dialog).getByLabelText("第 1 个属性名称"), "totalAmount");
-    await userEvent.clear(within(dialog).getByLabelText("第 1 个操作的第 1 个参数名称"));
-    await userEvent.type(within(dialog).getByLabelText("第 1 个操作的第 1 个参数名称"), "userId");
+    await userEvent.clear(within(dialog).getByLabelText("第 1 个参数名称"));
+    await userEvent.type(within(dialog).getByLabelText("第 1 个参数名称"), "userId");
     await userEvent.click(within(dialog).getByRole("button", { name: "确认编辑" }));
 
     await userEvent.click(screen.getByRole("button", { name: "编辑接口：Payable" }));
@@ -2036,15 +2014,15 @@ describe("DiagramView", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "编辑枚举：OrderStatus" }));
     dialog = await screen.findByRole("dialog", { name: /编辑枚举/u });
-    fireEvent.change(within(dialog).getByLabelText("枚举字面量"), {
+    fireEvent.change(within(dialog).getByLabelText("枚举枚举值"), {
       target: { value: "CREATED\nPAID" },
     });
     await userEvent.click(within(dialog).getByRole("button", { name: "确认编辑" }));
 
     await userEvent.click(screen.getByRole("button", { name: /编辑关系：/u }));
     dialog = await screen.findByRole("dialog", { name: /编辑关系/u });
-    await userEvent.clear(within(dialog).getByLabelText("目标多重性"));
-    await userEvent.type(within(dialog).getByLabelText("目标多重性"), "0..*");
+    await userEvent.clear(within(dialog).getByLabelText("终点多重性"));
+    await userEvent.type(within(dialog).getByLabelText("终点多重性"), "0..*");
     await userEvent.click(within(dialog).getByRole("button", { name: "确认编辑" }));
 
     await waitFor(() => {
@@ -2075,121 +2053,29 @@ describe("DiagramView", () => {
             }),
           ],
         }),
-      );
+       "design",);
     });
   });
 
-  it("edits table columns and field-level table relations", async () => {
-    const repository = createRepository(
-      createWorkspaceRecord({
-        generatedDesignDiagramTypes: ["table"],
-        designPlantUml: { table: "@startuml\n@enduml" },
-        designModels: {
-          table: {
-            diagramKind: "table",
-            title: "数据库设计",
-            summary: "订单表",
-            notes: [],
-            tables: [
-              {
-                id: "orders",
-                name: "orders",
-                columns: [
-                  {
-                    id: "order_id",
-                    name: "id",
-                    dataType: "uuid",
-                    isPrimaryKey: true,
-                    isForeignKey: false,
-                    nullable: false,
-                  },
-                  {
-                    id: "user_id",
-                    name: "user_id",
-                    dataType: "uuid",
-                    isPrimaryKey: false,
-                    isForeignKey: true,
-                    nullable: false,
-                  },
-                ],
-              },
-              {
-                id: "users",
-                name: "users",
-                columns: [
-                  {
-                    id: "id",
-                    name: "id",
-                    dataType: "uuid",
-                    isPrimaryKey: true,
-                    isForeignKey: false,
-                    nullable: false,
-                  },
-                ],
-              },
-            ],
-            relationships: [
-              {
-                id: "rel_orders_users",
-                type: "one-to-many",
-                sourceTableId: "users",
-                targetTableId: "orders",
-              },
-            ],
-          },
-        },
-        designSvgArtifacts: {
-          table: {
-            diagramKind: "table",
-            svg: "<svg><text>orders</text></svg>",
-            renderMeta: {
-              engine: "plantuml",
-              generatedAt: new Date().toISOString(),
-              sourceLength: 10,
-              durationMs: 1,
-            },
-          },
-        },
-      }),
-    );
-
+  it("edits table columns and authoritative composite constraints instead of derived edges", async () => {
+    const model = tableDiagramSpecSchema.parse({ diagramKind: "table", title: "数据库设计", summary: "订单", notes: [], tables: [
+      { id: "orders", name: "orders", columns: [{ id: "id", name: "id", dataType: "bigint", nullable: false }], relationalConstraints: [{ id: "pk", type: "primary-key", columnIds: ["id"] }] },
+      { id: "items", name: "items", columns: [{ id: "id", name: "id", dataType: "bigint", nullable: false }, { id: "order", name: "order_id", dataType: "bigint", nullable: false }], relationalConstraints: [{ id: "pk", type: "primary-key", columnIds: ["id"] }, { id: "fk", type: "foreign-key", columnIds: ["order"], referenceTableId: "orders", referenceColumnIds: ["id"] }] },
+    ], relationships: [] });
+    const repository = createRepository(createWorkspaceRecord({ generatedDesignDiagramTypes: ["table"], designModels: { table: model as any } }));
     render(withWorkspaceProviders(<DesignDiagramView type="table" />, repository));
-
-    await userEvent.click(await screen.findByRole("button", { name: "编辑数据表：orders" }));
-    let dialog = await screen.findByRole("dialog", { name: /编辑数据表/u });
-    await userEvent.clear(within(dialog).getByLabelText("第 1 个字段名称"));
-    await userEvent.type(within(dialog).getByLabelText("第 1 个字段名称"), "order_id");
-    await userEvent.click(within(dialog).getByLabelText("添加字段"));
+    await userEvent.click(await screen.findByRole("button", { name: "编辑数据表：items" }));
+    const dialog = await screen.findByRole("dialog", { name: /编辑数据表/ });
+    fireEvent.change(within(dialog).getByLabelText("第 1 个字段名称"), { target: { value: "item_id" } });
+    const constraints = within(dialog).getByRole("group", { name: /主键、唯一、外键与检查约束/ });
+    expect(within(constraints).getByDisplayValue("order")).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText(/第 2 个主键、唯一、外键与检查约束名称/), { target: { value: "fk_items_orders" } });
     await userEvent.click(within(dialog).getByRole("button", { name: "确认编辑" }));
-
-    await userEvent.click(screen.getByRole("button", { name: /编辑关系：/u }));
-    dialog = await screen.findByRole("dialog", { name: /编辑关系/u });
-    expect(dialog.querySelector("select")).toBeNull();
-    await selectComboboxOption(dialog, "源字段", "id");
-    await selectComboboxOption(dialog, "目标字段", "user_id");
-    await userEvent.click(within(dialog).getByRole("button", { name: "确认编辑" }));
-
-    await waitFor(() => {
-      expect(repository.renderStructuredModel).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tables: expect.arrayContaining([
-            expect.objectContaining({
-              id: "orders",
-              columns: expect.arrayContaining([
-                expect.objectContaining({ id: "order_id", name: "order_id" }),
-                expect.objectContaining({ name: "new_column" }),
-              ]),
-            }),
-          ]),
-          relationships: [
-            expect.objectContaining({
-              sourceColumnId: "id",
-              targetColumnId: "user_id",
-            }),
-          ],
-        }),
-      );
-    });
+    await waitFor(() => expect(repository.saveDesignModelEdit).toHaveBeenCalledWith("table", expect.objectContaining({
+      tables: expect.arrayContaining([expect.objectContaining({ id: "items", columns: expect.arrayContaining([expect.objectContaining({ id: "id", name: "item_id" })]), relationalConstraints: expect.arrayContaining([expect.objectContaining({ type: "foreign-key", name: "fk_items_orders", columnIds: ["order"], referenceColumnIds: ["id"] })]) })]),
+      relationships: [expect.objectContaining({ sourceTableId: "orders", targetTableId: "items", sourceColumnIds: ["id"], targetColumnIds: ["order"] })],
+    }), expect.anything(), expect.anything()));
+    expect(screen.queryByRole("button", { name: /编辑关系：/ })).not.toBeInTheDocument();
   });
 
   it("edits sequence message details and fragment message membership", async () => {
@@ -2262,7 +2148,7 @@ describe("DiagramView", () => {
     await userEvent.click(await screen.findByRole("button", { name: "编辑参与对象：认证服务" }));
     let dialog = await screen.findByRole("dialog", { name: /编辑参与对象/u });
     expect(dialog.querySelector("select")).toBeNull();
-    await selectComboboxOption(dialog, "参与对象类型", "control");
+    await selectComboboxOption(dialog, "参与对象类型", "控制对象");
     await userEvent.click(within(dialog).getByRole("button", { name: "确认编辑" }));
 
     await userEvent.click(screen.getByRole("button", { name: "编辑关系：登录" }));
@@ -2280,7 +2166,7 @@ describe("DiagramView", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "编辑组合片段：认证成功" }));
     dialog = await screen.findByRole("dialog", { name: /编辑组合片段/u });
-    await userEvent.click(within(dialog).getByRole("checkbox", { name: "包含消息：返回结果" }));
+    fireEvent.change(within(dialog).getByLabelText("组合片段包含消息"), { target: { value: "msg_login\nmsg_result" } });
     await userEvent.click(within(dialog).getByRole("button", { name: "确认编辑" }));
 
     await waitFor(() => {
@@ -2295,7 +2181,7 @@ describe("DiagramView", () => {
           ]),
           fragments: [expect.objectContaining({ messageIds: ["msg_login", "msg_result"] })],
         }),
-      );
+       "design",);
     });
   });
 
@@ -2314,9 +2200,13 @@ describe("DiagramView", () => {
             nodes: [
               { id: "start", type: "start", name: "开始" },
               { id: "decide", type: "decision", question: "是否通过" },
+              { id: "end", type: "end", name: "结束" },
               { id: "approve", type: "activity", name: "批准", input: [], output: [] },
             ],
             relationships: [
+              { id: "first", type: "control_flow", sourceId: "start", targetId: "decide" },
+              { id: "no", type: "control_flow", sourceId: "decide", targetId: "end", guard: "否" },
+              { id: "last", type: "control_flow", sourceId: "approve", targetId: "end" },
               { id: "flow_yes", type: "control_flow", sourceId: "decide", targetId: "approve", guard: "是" },
             ],
           },
@@ -2344,10 +2234,10 @@ describe("DiagramView", () => {
     await userEvent.type(within(dialog).getByLabelText("活动节点问题"), "是否允许提交");
     await userEvent.click(within(dialog).getByRole("button", { name: "确认编辑" }));
 
-    await userEvent.click(screen.getByRole("button", { name: /编辑关系：/u }));
+    await userEvent.click(screen.getAllByRole("button", { name: /编辑关系：/u }).at(-1)!);
     dialog = await screen.findByRole("dialog", { name: /编辑关系/u });
-    await userEvent.clear(within(dialog).getByLabelText("守卫"));
-    await userEvent.type(within(dialog).getByLabelText("守卫"), "允许");
+    await userEvent.clear(within(dialog).getByLabelText("守卫条件"));
+    await userEvent.type(within(dialog).getByLabelText("守卫条件"), "允许");
     await userEvent.click(within(dialog).getByRole("button", { name: "确认编辑" }));
 
     await waitFor(() => {
@@ -2356,9 +2246,9 @@ describe("DiagramView", () => {
           nodes: expect.arrayContaining([
             expect.objectContaining({ id: "decide", question: "是否允许提交" }),
           ]),
-          relationships: [expect.objectContaining({ guard: "允许" })],
+          relationships: expect.arrayContaining([expect.objectContaining({ guard: "允许" })]),
         }),
-      );
+       "requirements",);
     });
     expect(
       (
@@ -2380,7 +2270,7 @@ describe("DiagramView", () => {
             title: "部署图",
             summary: "部署拓扑",
             notes: [],
-            nodes: [{ id: "web", name: "Web", nodeType: "server" }],
+            nodes: [{ id: "web", name: "Web", nodeType: "device" }],
             databases: [{ id: "db", name: "DB", engine: "PostgreSQL" }],
             components: [],
             externalSystems: [],
@@ -2426,7 +2316,7 @@ describe("DiagramView", () => {
         expect.objectContaining({
           relationships: [expect.objectContaining({ protocol: "HTTPS", direction: "two-way" })],
         }),
-      );
+       "design",);
     });
     expect(
       (
@@ -2456,7 +2346,7 @@ describe("DiagramView", () => {
                 name: "Event",
                 description: "公开活动",
                 classKind: "entity",
-                stereotype: null,
+
                 attributes: [],
                 operations: [],
               },
@@ -2465,7 +2355,7 @@ describe("DiagramView", () => {
                 name: "Reminder",
                 description: "提醒记录",
                 classKind: "entity",
-                stereotype: null,
+
                 attributes: [],
                 operations: [],
               },
@@ -2474,7 +2364,7 @@ describe("DiagramView", () => {
                 name: "User",
                 description: "用户",
                 classKind: "entity",
-                stereotype: null,
+
                 attributes: [],
                 operations: [],
               },
@@ -2487,7 +2377,7 @@ describe("DiagramView", () => {
                 type: "association",
                 sourceId: "cls_event",
                 targetId: "cls_reminder",
-                label: null,
+
                 sourceRole: "event",
                 targetRole: "reminders",
                 sourceMultiplicity: "1",
@@ -2497,7 +2387,7 @@ describe("DiagramView", () => {
               },
               {
                 id: "rel_user_reminder",
-                type: "dependency",
+                type: "association",
                 sourceId: "cls_user",
                 targetId: "cls_reminder",
                 label: "查看提醒",

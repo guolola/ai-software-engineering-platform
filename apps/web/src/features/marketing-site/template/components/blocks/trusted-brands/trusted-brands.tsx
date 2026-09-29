@@ -1,21 +1,17 @@
 // Flow 2.0.0 template source; only runtime, content and business integration adaptations.
 import { FlowCopy, flowText } from '@/features/marketing-site/model/flow-copy';
+import type { BrandLogo } from '@/features/marketing-site/template/content/trusted-brands'
 import { Card, CardContent } from '@/features/marketing-site/template/components/ui/card'
 
 import { Marquee } from '@/features/marketing-site/template/components/ui/marquee'
 
-export type brandLogos = {
-  image: string
-  name: string
-}
-
-const TrustedBrands = ({ brandLogos }: { brandLogos: brandLogos[] }) => {
+const TrustedBrands = ({ brandLogos }: { brandLogos: BrandLogo[] }) => {
   return (
     <section id='trusted-brands' className='py-4 sm:py-6 lg:py-8'>
       <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
         {/* Header */}
         <div className='mb-4 space-y-4 text-center sm:mb-6 lg:mb-8'>
-          <p className='text-muted-foreground text-xl'><FlowCopy text="Trusted by startups, enterprises, and industry giants alike." /></p>
+          <p className='text-muted-foreground text-xl'><FlowCopy text="Software engineering tools and platforms" /></p>
         </div>
 
         <div className='relative'>

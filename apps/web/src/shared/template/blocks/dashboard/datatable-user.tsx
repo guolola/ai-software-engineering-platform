@@ -1,8 +1,8 @@
-// AdminCN/shadcn-studio datatable-user; verbatim port (imports adapted to the shared UI boundary).
-// Presents the workbench bottom table; RowActions dropdown items are presentational in this context.
+// Presents the localized workbench table; RowActions remain presentational here.
 'use client'
 
 import { useId, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { Column, ColumnDef, ColumnFiltersState, PaginationState, RowData } from '@tanstack/react-table'
 import {
@@ -50,6 +50,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip'
 
 import { usePagination } from '@/shared/template/blocks/dashboard/use-pagination'
+import { i18n as appI18n } from '@/shared/i18n'
 
 import { cn } from '@/shared/ui/utils'
 
@@ -72,7 +73,9 @@ export type Item = {
   status: 'active' | 'inactive' | 'pending'
 }
 
-const columns: ColumnDef<Item>[] = [
+type TableTranslation = (key: string, options?: Record<string, string | number>) => string
+
+const createColumns = (t: TableTranslation): ColumnDef<Item>[] => [
   {
     id: 'select',
     header: ({ table }) => (
@@ -80,20 +83,20 @@ const columns: ColumnDef<Item>[] = [
         checked={table.getIsAllPageRowsSelected()}
         indeterminate={table.getIsSomePageRowsSelected()}
         onCheckedChange={value => table.toggleAllRowsSelected(!!value)}
-        aria-label='Select all'
+        aria-label={t('dashboard.table.selectAll')}
       />
     ),
     cell: ({ row }) => (
       <Checkbox
         checked={row.getIsSelected()}
         onCheckedChange={value => row.toggleSelected(!!value)}
-        aria-label='Select row'
+        aria-label={t('dashboard.table.selectRow')}
       />
     ),
     size: 50
   },
   {
-    header: 'User',
+    header: t('dashboard.table.user'),
     accessorKey: 'user',
     cell: ({ row }) => (
       <div className='flex items-center gap-2'>
@@ -110,7 +113,7 @@ const columns: ColumnDef<Item>[] = [
     size: 360
   },
   {
-    header: 'Role',
+    header: t('dashboard.table.role'),
     accessorKey: 'role',
     cell: ({ row }) => {
       const role = row.getValue('role') as string
@@ -126,31 +129,27 @@ const columns: ColumnDef<Item>[] = [
       return (
         <div className='flex items-center gap-2'>
           {roles}
-          <span className='capitalize'>{role}</span>
+          <span>{t(`dashboard.table.roles.${role}`)}</span>
         </div>
       )
     }
   },
   {
-    header: 'Plan',
+    header: t('dashboard.table.plan'),
     accessorKey: 'plan',
-    cell: ({ row }) => <span className='text-muted-foreground capitalize'>{row.getValue('plan')}</span>
+    cell: ({ row }) => <span className='text-muted-foreground'>{t(`dashboard.table.plans.${row.getValue('plan')}`)}</span>
   },
   {
-    header: 'Billing',
+    header: t('dashboard.table.billing'),
     accessorKey: 'billing',
     cell: ({ row }) => (
       <span className='text-muted-foreground'>
-        {row.getValue('billing') === 'auto-debit'
-          ? 'Auto debit'
-          : row.getValue('billing') === 'manual-cash'
-            ? 'Manual - cash'
-            : 'Manual - PayPal'}
+        {t(`dashboard.table.billingMethods.${row.getValue('billing')}`)}
       </span>
     )
   },
   {
-    header: 'Status',
+    header: t('dashboard.table.status'),
     accessorKey: 'status',
     filterFn: 'equalsString',
     cell: ({ row }) => {
@@ -167,33 +166,33 @@ const columns: ColumnDef<Item>[] = [
 
       return (
         <Badge className={cn('h-auto rounded-sm border-none capitalize focus-visible:outline-none', styles)}>
-          {row.getValue('status')}
+          {t(`dashboard.table.statuses.${status}`)}
         </Badge>
       )
     }
   },
   {
     id: 'actions',
-    header: () => 'Actions',
+    header: () => t('dashboard.table.actions'),
     cell: () => (
       <div className='flex items-center gap-1'>
         <Tooltip>
-          <TooltipTrigger render={<Button variant='ghost' size='icon' aria-label='Delete item' />}>
+          <TooltipTrigger render={<Button variant='ghost' size='icon' aria-label={t('dashboard.table.deleteItem')} />}>
             <Trash2Icon className='size-4.5' />
           </TooltipTrigger>
           <TooltipContent>
-            <p>Delete</p>
+            <p>{t('dashboard.table.delete')}</p>
           </TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger render={<Button variant='ghost' size='icon' aria-label='View item' />}>
+          <TooltipTrigger render={<Button variant='ghost' size='icon' aria-label={t('dashboard.table.viewItem')} />}>
             <EyeIcon className='size-4.5' />
           </TooltipTrigger>
           <TooltipContent>
-            <p>View</p>
+            <p>{t('dashboard.table.view')}</p>
           </TooltipContent>
         </Tooltip>
-        <RowActions />
+        <RowActions t={t} />
       </div>
     ),
     enableHiding: false
@@ -201,6 +200,13 @@ const columns: ColumnDef<Item>[] = [
 ]
 
 const UserDatatable = ({ data }: { data: Item[] }) => {
+  const { t: translate, i18n: activeI18n } = useTranslation()
+  const hasProviderResources = activeI18n.exists?.('dashboard.table.user') ?? false
+  const t = useMemo<TableTranslation>(
+    () => (key, options) => String(hasProviderResources ? translate(key, options) : appI18n.t(key, options)),
+    [activeI18n.language, hasProviderResources, translate]
+  )
+  const columns = useMemo(() => createColumns(t), [t])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
   const pageSize = 5
@@ -240,9 +246,9 @@ const UserDatatable = ({ data }: { data: Item[] }) => {
       <div className='border-b'>
         <div className='flex flex-col gap-4 p-6'>
           <div className='grid grid-cols-1 gap-6 max-md:*:last:col-span-full sm:grid-cols-2 md:grid-cols-3'>
-            <Filter column={table.getColumn('role')!} />
-            <Filter column={table.getColumn('plan')!} />
-            <Filter column={table.getColumn('status')!} />
+            <Filter column={table.getColumn('role')!} t={t} />
+            <Filter column={table.getColumn('plan')!} t={t} />
+            <Filter column={table.getColumn('status')!} t={t} />
           </div>
         </div>
         <Table>
@@ -300,7 +306,7 @@ const UserDatatable = ({ data }: { data: Item[] }) => {
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className='h-24 text-center'>
-                  No results.
+                  {t('dashboard.table.noResults')}
                 </TableCell>
               </TableRow>
             )}
@@ -310,19 +316,11 @@ const UserDatatable = ({ data }: { data: Item[] }) => {
 
       <div className='flex items-center justify-between gap-3 px-6 py-4 max-sm:flex-col md:max-lg:flex-col'>
         <p className='text-muted-foreground text-sm whitespace-nowrap' aria-live='polite'>
-          Showing{' '}
-          <span>
-            {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
-            {Math.min(
-              Math.max(
-                table.getState().pagination.pageIndex * table.getState().pagination.pageSize +
-                  table.getState().pagination.pageSize,
-                0
-              ),
-              table.getRowCount()
-            )}
-          </span>{' '}
-          of <span>{table.getRowCount().toString()} entries</span>
+          {t('dashboard.table.pageSummary', {
+            start: table.getRowCount() === 0 ? 0 : table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1,
+            end: Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getRowCount()),
+            total: table.getRowCount()
+          })}
         </p>
 
         <div>
@@ -334,10 +332,10 @@ const UserDatatable = ({ data }: { data: Item[] }) => {
                   variant='ghost'
                   onClick={() => table.previousPage()}
                   disabled={!table.getCanPreviousPage()}
-                  aria-label='Go to previous page'
+                  aria-label={t('dashboard.table.previousPage')}
                 >
                   <ChevronLeftIcon aria-hidden='true' />
-                  Previous
+                  {t('dashboard.table.previous')}
                 </Button>
               </PaginationItem>
 
@@ -376,9 +374,9 @@ const UserDatatable = ({ data }: { data: Item[] }) => {
                   variant='ghost'
                   onClick={() => table.nextPage()}
                   disabled={!table.getCanNextPage()}
-                  aria-label='Go to next page'
+                  aria-label={t('dashboard.table.nextPage')}
                 >
-                  Next
+                  {t('dashboard.table.next')}
                   <ChevronRightIcon aria-hidden='true' />
                 </Button>
               </PaginationItem>
@@ -392,12 +390,13 @@ const UserDatatable = ({ data }: { data: Item[] }) => {
 
 export default UserDatatable
 
-function Filter({ column }: { column: Column<any, unknown> }) {
+function Filter({ column, t }: { column: Column<any, unknown>; t: TableTranslation }) {
   const id = useId()
   const columnFilterValue = column.getFilterValue()
   const { filterVariant } = column.columnDef.meta ?? {}
 
   const columnHeader = typeof column.columnDef.header === 'string' ? column.columnDef.header : ''
+  const optionGroup = column.id === 'role' ? 'roles' : column.id === 'plan' ? 'plans' : 'statuses'
 
   const facetedUniqueValues = column.getFacetedUniqueValues()
 
@@ -419,12 +418,12 @@ function Filter({ column }: { column: Column<any, unknown> }) {
 
   return (
     <div className='flex w-full flex-col gap-2'>
-      <Label htmlFor={`${id}-select`}>Select {columnHeader}</Label>
+      <Label htmlFor={`${id}-select`}>{t('dashboard.table.filter', { field: columnHeader })}</Label>
       <Select
         items={[
-          { label: `All`, value: 'all' },
+          { label: t('dashboard.table.all'), value: 'all' },
           ...sortedUniqueValues.map(value => ({
-            label: String(value),
+            label: t(`dashboard.table.${optionGroup}.${value}`),
             value: String(value)
           }))
         ]}
@@ -438,10 +437,10 @@ function Filter({ column }: { column: Column<any, unknown> }) {
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectItem value='all'>All</SelectItem>
+            <SelectItem value='all'>{t('dashboard.table.all')}</SelectItem>
             {sortedUniqueValues.map(value => (
               <SelectItem key={String(value)} value={String(value)} className='capitalize'>
-                {String(value)}
+                {t(`dashboard.table.${optionGroup}.${value}`)}
               </SelectItem>
             ))}
           </SelectGroup>
@@ -451,19 +450,19 @@ function Filter({ column }: { column: Column<any, unknown> }) {
   )
 }
 
-function RowActions() {
+function RowActions({ t }: { t: TableTranslation }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button size='icon' variant='ghost' aria-label='Edit item' />}>
+      <DropdownMenuTrigger render={<Button size='icon' variant='ghost' aria-label={t('dashboard.table.editItem')} />}>
         <EllipsisVerticalIcon className='size-4.5' aria-hidden='true' />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuGroup>
           <DropdownMenuItem>
-            <span>Edit</span>
+            <span>{t('dashboard.table.edit')}</span>
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <span>Duplicate</span>
+            <span>{t('dashboard.table.duplicate')}</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

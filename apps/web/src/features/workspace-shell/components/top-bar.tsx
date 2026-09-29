@@ -9,6 +9,7 @@ import {
   BookOpen,
   Boxes,
   CheckCircle2,
+  CircleHelp,
   GitBranch,
   History,
   Home,
@@ -58,11 +59,13 @@ export type TopBarProps = {
   onNavigate: (route: string) => void;
   accountDialogOpen?: boolean;
   onAccountDialogOpenChange?: (open: boolean) => void;
+  globalSettingsRequestId?: number;
   projectDrawer?: {
     projectId: string;
     onOpenDrawer: (kind: "tasks" | "history" | "members" | "documents" | "settings") => void;
     projectRuns?: PlatformRunSummary[];
     projectName?: string;
+    onStartTour?: () => void;
   } | null;
 };
 
@@ -70,6 +73,7 @@ type ProjectWorkspaceActionsProps = {
   projectId: string;
   onOpenDrawer: (kind: "tasks" | "history" | "members" | "documents" | "settings") => void;
   projectRuns?: PlatformRunSummary[];
+  onStartTour?: () => void;
 };
 
 const EMPTY_PROJECT_RUNS: PlatformRunSummary[] = [];
@@ -261,6 +265,7 @@ export { ProjectGenerationTasksDrawerContent } from "./project-generation-tasks"
 export function ProjectWorkspaceActions({
   onOpenDrawer,
   projectRuns = EMPTY_PROJECT_RUNS,
+  onStartTour,
 }: ProjectWorkspaceActionsProps) {
   const { t } = useTranslation();
   const [lineageOpen, setLineageOpen] = useState(false);
@@ -295,6 +300,12 @@ export function ProjectWorkspaceActions({
 
   return (
     <div className="flex shrink-0 items-center gap-2">
+      {onStartTour && (
+        <Button type="button" variant="ghost" size="icon" className={topBarActionButtonClass}
+          aria-label={t("onboarding.replay")} title={t("onboarding.replay")} onClick={onStartTour}>
+          <CircleHelp className="size-5" />
+        </Button>
+      )}
       {lineageOpen && (
         <LineageGraphDialog
           open={lineageOpen}
@@ -316,6 +327,7 @@ export function ProjectWorkspaceActions({
       </Button>
 
       <Button
+        id="onboarding-tasks-action"
         variant="ghost"
         className={taskStatusButtonClass}
         title={t("status.tasks")}
@@ -346,6 +358,7 @@ export function ProjectWorkspaceActions({
       </Button>
 
       <Button
+        id="onboarding-history-action"
         type="button"
         variant="ghost"
         className="h-9 shrink-0 px-2.5"
@@ -356,6 +369,7 @@ export function ProjectWorkspaceActions({
       </Button>
 
       <Button
+        id="onboarding-settings-action"
         type="button"
         variant="ghost"
         className="h-9 shrink-0 px-2.5"
@@ -393,6 +407,7 @@ export function TopBar({
   onNavigate,
   accountDialogOpen: controlledAccountDialogOpen,
   onAccountDialogOpenChange,
+  globalSettingsRequestId,
   projectDrawer = null,
 }: TopBarProps) {
   const { t } = useTranslation();
@@ -446,6 +461,7 @@ export function TopBar({
             projectId={projectDrawer.projectId}
             onOpenDrawer={projectDrawer.onOpenDrawer}
             projectRuns={projectDrawer.projectRuns}
+            onStartTour={projectDrawer.onStartTour}
           />
         ) : null}
         <DropdownMenu>
@@ -511,6 +527,7 @@ export function TopBar({
           onOpenChange={setAccountDialogOpen}
           onNavigate={onNavigate}
           initialUser={authSession?.user ?? null}
+          globalSettingsRequestId={globalSettingsRequestId}
         />
     </>}
   />;

@@ -5,6 +5,8 @@ import type { RequirementRule } from "../../../entities/requirement-rule/model";
 import type { WorkspaceRecord } from "../../../entities/workspace/model";
 import { pendingAutoReviewsForRequirementDiagram } from "./requirement-review-view-model";
 
+export const STALE_USECASE_BLOCK_REASON = "用例模型已存在但基于旧规则，请先更新用例模型";
+
 export interface RequirementModelRepairRecord {
   id: string;
   reason: string;
@@ -82,7 +84,7 @@ export function requirementTargetBlockReason(input: {
     generatedDiagrams.includes("usecase") &&
     staleDiagrams.includes("usecase")
   ) {
-    return "用例模型已存在但基于旧规则，请先更新用例模型";
+    return STALE_USECASE_BLOCK_REASON;
   }
   return null;
 }

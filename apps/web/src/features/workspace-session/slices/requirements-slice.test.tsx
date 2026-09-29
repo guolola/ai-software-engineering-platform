@@ -23,22 +23,12 @@ function createRepository(): WorkspaceRepository {
   };
 }
 
-function deferred<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((innerResolve, innerReject) => {
-    resolve = innerResolve;
-    reject = innerReject;
-  });
-  return { promise, resolve, reject };
-}
-
 describe("useRequirementsSlice", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("tracks text version and persists text edits", () => {
+  it("tracks text edits as a draft without persisting them", () => {
     vi.useFakeTimers();
     const repository = createRepository();
     const { result } = renderHook(() => useRequirementsSlice(repository));
@@ -49,14 +39,14 @@ describe("useRequirementsSlice", () => {
     expect(result.current.textVersion).toBe(1);
     expect(repository.updateRequirementText).not.toHaveBeenCalled();
 
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-
-    expect(repository.updateRequirementText).toHaveBeenCalledWith("新的需求");
+    act(() => vi.advanceTimersByTime(500));
+    expect(repository.updateRequirementText).not.toHaveBeenCalled();
+    expect(result.current.hasUncommittedRequirementDraft).toBe(true);
+    act(() => result.current.setCommittedRequirementText("新的需求"));
+    expect(result.current.hasUncommittedRequirementDraft).toBe(false);
   });
 
-  it("coalesces rapid text edits into the latest persisted value", () => {
+  it("keeps only the latest rapid edit in the draft", () => {
     vi.useFakeTimers();
     const repository = createRepository();
     const { result } = renderHook(() => useRequirementsSlice(repository));
@@ -68,41 +58,20 @@ describe("useRequirementsSlice", () => {
       vi.advanceTimersByTime(500);
     });
 
-    expect(repository.updateRequirementText).toHaveBeenCalledTimes(1);
-    expect(repository.updateRequirementText).toHaveBeenCalledWith(
-      "此日历仅供公众使用",
-    );
+    expect(result.current.requirementText).toBe("此日历仅供公众使用");
+    expect(repository.updateRequirementText).not.toHaveBeenCalled();
   });
 
-  it("flushes pending requirement text saves before the debounce timer fires", async () => {
-    vi.useFakeTimers();
-    const save = deferred<void>();
+  it("does not save a draft when legacy flush is called", async () => {
     const repository = createRepository();
-    vi.mocked(repository.updateRequirementText).mockReturnValueOnce(
-      save.promise,
-    );
     const { result } = renderHook(() => useRequirementsSlice(repository));
 
     act(() => result.current.setRequirementText("立即生成前的新需求"));
-
-    let flushPromise!: Promise<void>;
-    act(() => {
-      flushPromise = result.current.flushRequirementTextSave();
-    });
-
-    expect(repository.updateRequirementText).toHaveBeenCalledTimes(1);
-    expect(repository.updateRequirementText).toHaveBeenCalledWith(
-      "立即生成前的新需求",
-    );
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-    expect(repository.updateRequirementText).toHaveBeenCalledTimes(1);
-
-    save.resolve();
     await act(async () => {
-      await flushPromise;
+      await result.current.flushRequirementTextSave();
     });
+    expect(repository.updateRequirementText).not.toHaveBeenCalled();
+    expect(result.current.hasUncommittedRequirementDraft).toBe(true);
   });
 
   it("creates and updates requirement rules with stable ids", () => {

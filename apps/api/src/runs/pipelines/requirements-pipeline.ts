@@ -1,6 +1,8 @@
 // Orchestrates requirement extraction, model generation, PlantUML, and SVG rendering.
+import { getStageModelSchema, contractResponseSchema } from "@uml-platform/contracts";
 
 import { createStageLifecycle } from "./shared/stage-lifecycle.js";
+import { screenRequirementInput } from "./requirements/input-screening.js";
 import {
   artifactReadyRunEventSchema,
   completedRunEventSchema,
@@ -335,7 +337,8 @@ async function generateAnalysisModelWithRepair(
       ? scopedUseCaseModel.useCases[0]
       : null;
   const modelId = sourceUseCase ? analysisModelIdForUseCase(sourceUseCase) : undefined;
-  let prompt = promptOverride ?? buildGenerateRequirementAnalysisPrompt(scopedUseCaseModel);
+  const initialPrompt = promptOverride ?? buildGenerateRequirementAnalysisPrompt(scopedUseCaseModel);
+  let prompt = initialPrompt;
   let previousOutput = "";
   let lastErrorMessage = "";
 
@@ -369,6 +372,7 @@ async function generateAnalysisModelWithRepair(
 
     try {
       const parsed = parseRequirementDiagramModelsOnly(content);
+      if (parsed.models.some((model) => model.diagramKind !== "analysis")) throw new Error("本次只允许返回 analysis 模型，不能丢弃其他模型换取成功");
       const analysisModels = parsed.models.filter(
         (model) => model.diagramKind === "analysis",
       );
@@ -410,7 +414,7 @@ async function generateAnalysisModelWithRepair(
         errorMessage: lastErrorMessage,
       });
       if (attempt === MAX_MODEL_REPAIR_ATTEMPTS) {
-        throw new Error(`generate_models structured output failed: ${lastErrorMessage}`);
+        throw new Error(`generate_models structured output failed: ${lastErrorMessage}`, { cause: error });
       }
       emitEvent(
         record,
@@ -429,6 +433,7 @@ async function generateAnalysisModelWithRepair(
         previousOutput,
         lastErrorMessage,
       );
+      prompt += `\n\n本次原始建模任务与权威输入：\n${initialPrompt}`;
     }
   }
 
@@ -561,14 +566,8 @@ function buildCompactActivityModelPrompt(
     "这是 activity 子任务超时后的精简重试：优先返回完整、合法、较小的 JSON，不要输出解释、Markdown 或代码块。",
     "返回 JSON 对象，格式必须是 {\"models\":[...],\"requirementModelTraceability\":[]}。",
     "models 必须且只能包含一个 diagramKind=\"activity\" 的模型。",
-    "activity 模型字段必须包含 diagramKind, title, summary, notes, swimlanes, nodes, relationships。",
-    "nodes 建议 8-16 个，必须覆盖主流程、关键状态流、权限/异常分支和超时触发。",
-    "节点类型只能使用 start, end, activity, decision, merge, fork, join。",
-    "activity 节点字段：id, type, name, description(可选), actorOrLane(可选), input(string[]), output(string[])。",
-    "decision 节点字段：id, type, name, question。",
-    "relationships 字段：id, type(control_flow|object_flow), sourceId, targetId, guard/trigger/description(可选)。",
-    "所有 relationship 的 sourceId/targetId 必须引用 nodes 中存在的 id。",
-    "必须包含一个 start 节点和至少一个 end 节点；不要把所有业务节点都标成 start 或 end。",
+    `当前阶段的字段与枚举：${JSON.stringify(contractResponseSchema(getStageModelSchema("requirements", "activity")!))}`,
+    "保留业务控制流和对象流，端点必须引用节点或动作引脚的标识。同名动作、循环、并发和不同终止语义不能合并或替换。",
     "requirementModelTraceability 固定返回 []，系统会自动补齐追踪关系。",
     "",
     "Activity 相关规则：",
@@ -595,7 +594,7 @@ function buildCompactAnalysisModelPrompt(useCase: UseCaseForAnalysis) {
     "models 必须且只能包含一个 diagramKind=\"analysis\" 的模型。",
     `analysis 模型必须使用 modelId=\"${analysisModelIdForUseCase(useCase)}\"、sourceUseCaseId=\"${useCase.id}\"、sourceUseCaseName=\"${useCase.name}\"。`,
     "analysis 模型字段必须包含 diagramKind, modelId, sourceUseCaseId, sourceUseCaseName, title, summary, notes, participants, messages, fragments。",
-    "participants 建议 3-6 个，participantType 只能使用 actor, boundary, control, entity, external。",
+    `字段与枚举：${JSON.stringify(contractResponseSchema(getStageModelSchema("requirements", "analysis")!))}`,
     "messages 建议 4-10 条，必须覆盖主成功场景、关键权限/异常分支和系统响应；sourceId/targetId 必须引用 participants 中存在的 id。",
     "fragments 可以为空数组；如使用 alt/loop/opt，必须保持 messageIds 引用 messages 中存在的 id。",
     "requirementModelTraceability 固定返回 []。",
@@ -843,6 +842,7 @@ export async function generateModelsWithRepair(
 
     try {
       const parsed = parseRequirementDiagramModelsResult(content, rules);
+      if (parsed.models.some((model) => !selectedDiagrams.includes(model.diagramKind))) throw new Error("返回了本次未请求的模型类型，必须修复结构化输出");
       const selectedSet = new Set(selectedDiagrams);
       const filteredModels = parsed.models.filter((model) =>
         selectedSet.has(model.diagramKind),
@@ -874,7 +874,9 @@ export async function generateModelsWithRepair(
     } catch (error) {
       const modelOnly = (() => {
         try {
-          return parseRequirementDiagramModelsOnly(content);
+          const result = parseRequirementDiagramModelsOnly(content);
+          if (result.models.some((model) => !selectedDiagrams.includes(model.diagramKind))) return null;
+          return result;
         } catch {
           return null;
         }
@@ -1042,6 +1044,7 @@ export async function generateModelsWithRepair(
       if (attempt === MAX_MODEL_REPAIR_ATTEMPTS) {
         throw new Error(
           `generate_models structured output failed: ${lastErrorMessage}`,
+          { cause: error },
         );
       }
 
@@ -1214,6 +1217,37 @@ export async function runStagePipeline(
   if (rules.length === 0 || snapshot.selectedDiagrams.length === 0) {
     updateStage("extract_rules", "正在抽取需求规则");
     const timeoutConfig = readRequirementModelTaskTimeoutConfig();
+    let screenedText: string;
+    try {
+      const screening = await withModelTaskTimeout(
+        (markActivity, _markBlankActivity, abortSignal) =>
+          screenRequirementInput(snapshot.requirementText, providerSettings, llmTransport, abortSignal, markActivity),
+        {
+          ...timeoutConfig,
+          label: "需求输入预检",
+          isCancelled: () => isRunCancelled(record),
+          createCancelError: () => new RunCancelledError(snapshot.runId),
+        },
+      );
+      throwIfRunCancelled(record);
+      snapshot.inputScreening = { ignoredSpans: screening.ignoredSpans };
+      if (screening.unsafeSpans.length > 0) {
+        const first = screening.unsafeSpans[0]!;
+        const line = snapshot.requirementText.slice(0, first.startOffset).split(/\r?\n/u).length;
+        throwRunError(createRunError("RUN_REQUIREMENT_INPUT_UNSAFE", undefined, {
+          params: { line },
+          details: { line, ...first },
+        }));
+      }
+      if (!screening.hasRequirement || !screening.acceptedText.trim()) {
+        throwRunError(createRunError("RUN_REQUIREMENT_INPUT_IRRELEVANT"));
+      }
+      screenedText = screening.acceptedText;
+    } catch (error) {
+      if (isRunCancelled(record) || error instanceof RunCancelledError) throw error;
+      if (error instanceof Error && "runError" in error) throw error;
+      throwRunError(createRunError("RUN_REQUIREMENT_SCREENING_FAILED"));
+    }
     const ruleResult = await withModelTaskTimeout(
       (markActivity, markBlankActivity, abortSignal) => {
         const chunkHandlers = createRunLlmChunkHandlers({
@@ -1223,7 +1257,7 @@ export async function runStagePipeline(
         return collectStructuredResult(
           llmTransport,
           providerSettings,
-          createMessages(buildExtractRulesPrompt(snapshot.requirementText)),
+          createMessages(buildExtractRulesPrompt(screenedText)),
           "extract_rules",
           {
             ...chunkHandlers,
@@ -1236,11 +1270,7 @@ export async function runStagePipeline(
               chunkHandlers.onBlankChunk?.(chunk);
             },
           },
-          (text) =>
-            normalizeRequirementRulesResult(
-              parseJson(text),
-              snapshot.requirementText,
-            ),
+          (text) => normalizeRequirementRulesResult(parseJson(text), screenedText),
           getExtractRequirementRulesResponseFormat(providerSettings),
           undefined,
           abortSignal,
@@ -1254,7 +1284,13 @@ export async function runStagePipeline(
       },
     );
     throwIfRunCancelled(record);
-    rules = ruleResult.rules;
+    // Only facts with an exact source in screened text may enter the trusted baseline.
+    rules = ruleResult.rules.filter((rule) =>
+      Boolean(rule.sourceFragment && screenedText.includes(rule.sourceFragment)),
+    );
+    if (rules.length === 0) {
+      throwRunError(createRunError("RUN_REQUIREMENT_RULES_EMPTY"));
+    }
     snapshot.rules = rules;
     snapshot.requirementBaseline = buildRequirementBaseline({
       runId: snapshot.runId,

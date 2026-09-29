@@ -1755,7 +1755,7 @@ describe("SidebarMenu", () => {
             "class",
             "deployment",
             "architecture",
-            "activity",
+            "navigation",
             "sequence",
             "table",
           ],
@@ -1780,12 +1780,11 @@ describe("SidebarMenu", () => {
               messages: [],
               fragments: [],
             },
-            activity: {
-              diagramKind: "activity",
-              title: "界面关系图",
+            navigation: {
+              diagramKind: "navigation",
+              title: "页面导航模型",
               summary: "业务逻辑流转",
               notes: [],
-              swimlanes: [],
               nodes: [],
               relationships: [],
             },
@@ -1889,8 +1888,8 @@ describe("SidebarMenu", () => {
       .filter(Boolean);
     expect(nodeLabels.indexOf("总体架构图")).toBeLessThan(nodeLabels.indexOf("用例实现设计"));
     expect(nodeLabels.indexOf("用例实现设计")).toBeLessThan(nodeLabels.indexOf("设计类图"));
-    expect(nodeLabels.indexOf("设计类图")).toBeLessThan(nodeLabels.indexOf("界面关系图"));
-    expect(nodeLabels.indexOf("界面关系图")).toBeLessThan(nodeLabels.indexOf("数据库设计"));
+    expect(nodeLabels.indexOf("设计类图")).toBeLessThan(nodeLabels.indexOf("页面导航模型"));
+    expect(nodeLabels.indexOf("页面导航模型")).toBeLessThan(nodeLabels.indexOf("数据库设计"));
     expect(nodeLabels.indexOf("数据库设计")).toBeLessThan(nodeLabels.indexOf("组件（构件）关系"));
     expect(nodeLabels.indexOf("组件（构件）关系")).toBeLessThan(nodeLabels.indexOf("部署设计"));
   });

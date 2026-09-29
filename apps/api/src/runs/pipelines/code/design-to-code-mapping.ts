@@ -91,13 +91,13 @@ function collectDesignElements(model: DesignDiagramModelSpec): DesignElementRef[
         ...model.messages.map((item) => ref(model, item.id, "sequence-message", item.name)),
         ...model.fragments.map((item) => ref(model, item.id, "sequence-fragment", item.label)),
       ];
-    case "activity":
+    case "navigation":
       return [
         ...model.nodes.map((item) =>
-          ref(model, item.id, `activity-${item.type}`, compactText(item.name) || item.id),
+          ref(model, item.id, `navigation-${item.nodeType}`, compactText(item.name) || item.id),
         ),
         ...model.relationships.map((item) =>
-          ref(model, item.id, "activity-relationship", relationshipLabel(item)),
+          ref(model, item.id, "navigation-relationship", relationshipLabel(item)),
         ),
       ];
     case "class":
@@ -195,17 +195,18 @@ function targetFor(ref: DesignElementRef): {
             : "/src/services/mock-services.ts",
         rationale: "用例实现设计决定用户操作、handler、mock service 调用顺序和异常分支。",
       };
-    case "activity":
+    case "navigation":
+      if (ref.elementKind === "navigation-module") return { targetType: "feature-module", targetPath: `/src/features/${readableLabel}/index.ts`, rationale: "页面所属模块与模块依赖决定功能模块边界。" };
       return {
         targetType:
-          ref.elementKind === "activity-decision" || ref.elementKind.includes("relationship")
+          ref.elementKind === "navigation-entry-point" || ref.elementKind.includes("relationship")
             ? "route-state"
             : "page",
         targetPath:
-          ref.elementKind === "activity-decision" || ref.elementKind.includes("relationship")
+          ref.elementKind === "navigation-entry-point" || ref.elementKind.includes("relationship")
             ? "/src/components/WorkspaceShell.tsx"
             : `/src/pages/${pascal(ref.label, pascal(ref.elementId, "MappedPage"))}.tsx`,
-        rationale: "界面关系图决定页面流、模拟路由、条件渲染和状态切换。",
+        rationale: "页面导航模型决定页面、路由、打开/提交/返回与导航守卫。",
       };
     case "class":
       return {

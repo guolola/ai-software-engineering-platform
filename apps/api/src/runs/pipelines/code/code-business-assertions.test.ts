@@ -292,7 +292,8 @@ test("buildCodeBusinessAssertionResults preserves OR logic and each permission r
   });
   const weakened = buildCodeBusinessAssertionResults({
     runId: "run-role-or-weakened",
-    baseline,
+    // This test starts after explicit user confirmation; an R- label alone is not acceptance.
+    baseline: { ...baseline, requirements: baseline.requirements.map((requirement) => ({ ...requirement, status: "accepted" })) },
     businessLogic: null,
     files: {
       "/src/Booking.tsx":
@@ -308,7 +309,7 @@ test("buildCodeBusinessAssertionResults preserves OR logic and each permission r
 
   const implemented = buildCodeBusinessAssertionResults({
     runId: "run-role-or-implemented",
-    baseline,
+    baseline: { ...baseline, requirements: baseline.requirements.map((requirement) => ({ ...requirement, status: "accepted" })) },
     businessLogic: null,
     files: {
       "/src/Booking.tsx":

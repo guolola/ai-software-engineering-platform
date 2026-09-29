@@ -1,9 +1,9 @@
-// Verifies project document commands derive feasibility reports only from complete, current feasibility analysis.
+// Verifies project run commands derive trusted inputs and accept only explicit rule-extraction drafts.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { snapshotInputFingerprint, buildFeasibilityImplementationFingerprint } from "@uml-platform/contracts";
 import { createBusinessFlowArtifact } from "../../test-fixtures/feasibility/business-flow.js";
-import { resolveDocumentRunInput } from "./run-input-resolution.js";
+import { resolveDocumentRunInput, resolveRequirementRunInput } from "./run-input-resolution.js";
 
 const rules = [{
   id: "R1",
@@ -120,6 +120,23 @@ const command = {
   },
   useAiText: false,
 };
+
+test("rules-only extraction uses the draft text but excludes persisted old rules", async () => {
+  let loaded = false;
+  const result = await resolveRequirementRunInput(
+    { projectId: "project-a", selectedDiagrams: [], requirementText: "新需求", analysisTargetUseCaseIds: [] },
+    { projectId: "project-a" },
+    async () => {
+      loaded = true;
+      return { state: { requirementText: "旧需求", rules } };
+    },
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(loaded, true);
+  assert.equal(result.input.requirementText, "新需求");
+  assert.deepEqual(result.input.rules, []);
+});
 
 test("current feasibility analysis enables a report without requirement or design models", async () => {
   const result = await resolveDocumentRunInput(

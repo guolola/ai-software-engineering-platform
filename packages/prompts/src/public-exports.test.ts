@@ -36,7 +36,6 @@ const REQUIRED_RUNTIME_EXPORTS = [
   "buildVerifyCodeUiFidelityPrompt",
   "buildGenerateDocumentContentPrompt",
   "buildRepairDocumentContentPrompt",
-  "buildRepairPlantUmlPrompt",
 ] as const;
 
 test("prompts keep required runtime public exports available", () => {

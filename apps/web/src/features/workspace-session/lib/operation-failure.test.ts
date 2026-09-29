@@ -17,6 +17,11 @@ describe("operationFailurePresentation", () => {
     expect(failure.actionTarget).toBe("requirement-models");
   });
 
+  it("routes missing and stale feasibility business flow errors to feasibility", () => {
+    expect(operationFailureForCode("FEASIBILITY_BUSINESS_FLOW_MISSING").actionTarget).toBe("feasibility");
+    expect(operationFailureForCode("FEASIBILITY_BUSINESS_FLOW_STALE").actionTarget).toBe("feasibility");
+  });
+
   it("hides unknown English technical exception text", () => {
     const failure = operationFailurePresentation(
       new Error("ECONNRESET while rendering PlantUML with secret-token"),

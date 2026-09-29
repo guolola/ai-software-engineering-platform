@@ -1,5 +1,5 @@
 // Validates activity connectivity, lane ownership and rule traceability without inventing workflow steps.
-import { feasibilityBusinessFlowSchema, type FeasibilityBusinessFlow } from "@uml-platform/contracts";
+import { feasibilityBusinessFlowSchema, validateModelInput, ModelSemanticError, type FeasibilityBusinessFlow } from "@uml-platform/contracts";
 
 function omitNullFields(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(omitNullFields);
@@ -16,7 +16,10 @@ export function normalizeFeasibilityBusinessFlow(
   validRequirementIds: ReadonlySet<string>,
 ): FeasibilityBusinessFlow {
   // Strict providers encode absent optional fields as null; required fields still fail schema validation.
-  const result = feasibilityBusinessFlowSchema.parse(omitNullFields(value));
+  const input = omitNullFields(value);
+  const diagnostics = validateModelInput((input as { model?: unknown })?.model, "feasibility");
+  if (diagnostics.length) throw new ModelSemanticError(diagnostics);
+  const result = feasibilityBusinessFlowSchema.parse(input);
   const { model, traceability } = result;
   model.modelId = "feasibility-business-flow";
   const ids = new Set<string>();

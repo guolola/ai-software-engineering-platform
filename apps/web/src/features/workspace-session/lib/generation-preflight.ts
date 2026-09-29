@@ -12,6 +12,12 @@ import { getDesignModelId } from "../../../entities/diagram/model";
 import type { RequirementRule } from "../../../entities/requirement-rule/model";
 import type { WorkspaceRecord } from "../../../entities/workspace/model";
 import type { GenerationResultDialogState } from "../components/generation-dialogs";
+import { i18n } from "../../../shared/i18n/i18n";
+import {
+  requestOpenProjectWorkspaceTarget,
+  requestOpenRequirementRule,
+  type ProjectWorkspaceTarget,
+} from "../../../shared/lib/app-navigation";
 import { requirementRuleIdsBlockingGeneration } from "./requirement-review";
 import {
   DESIGN_REQUIREMENT_SOURCE_MAP,
@@ -39,8 +45,15 @@ import {
 
 type PreflightBlock = Pick<
   GenerationResultDialogState,
-  "title" | "tone" | "message" | "stageLabel" | "targetLabel"
+  "title" | "tone" | "message" | "stageLabel" | "targetLabel" | "primaryAction"
 >;
+
+function openWorkspaceAction(target: ProjectWorkspaceTarget, labelKey: "systemRequirements" | "requirementModels" | "designModels") {
+  return {
+    label: i18n.t(`feedback.actions.${labelKey}`),
+    onSelect: () => requestOpenProjectWorkspaceTarget(target),
+  };
+}
 
 type RequirementGenerationPreflight =
   | { status: "empty" }
@@ -101,6 +114,7 @@ function staleRulesBlock(targetLabel: string): PreflightBlock {
     message: "需求规则已过期，请先手动更新需求规则",
     stageLabel: "需求规则",
     targetLabel,
+    primaryAction: openWorkspaceAction("system-requirements", "systemRequirements"),
   };
 }
 
@@ -114,6 +128,12 @@ function pendingReviewBlock(
     message: "请先确认需求规则修复结果",
     stageLabel: "需求规则",
     targetLabel,
+    primaryAction: pendingReviews[0]
+      ? {
+          label: i18n.t("feedback.actions.pendingRules"),
+          onSelect: () => requestOpenRequirementRule(pendingReviews[0]!),
+        }
+      : openWorkspaceAction("system-requirements", "systemRequirements"),
   };
 }
 
@@ -218,6 +238,7 @@ export function analyzeRequirementGenerationPreflight(
         message: "缺少需求来源，无法自动生成需求规则",
         stageLabel: "需求规则",
         targetLabel: "已选需求模型",
+        primaryAction: openWorkspaceAction("system-requirements", "systemRequirements"),
       },
     };
   }
@@ -245,6 +266,7 @@ export function analyzeRequirementGenerationPreflight(
         message: "用例模型已存在但基于旧规则，请先手动更新用例模型",
         stageLabel: "需求模型",
         targetLabel: "已选需求模型",
+        primaryAction: openWorkspaceAction("requirement-models", "requirementModels"),
       },
     };
   }
@@ -318,6 +340,7 @@ export function analyzeDesignGenerationPreflight(
         message: `已有需求阶段${diagramLabels(staleRequirementSources).join("、")}基于旧规则，请先回到需求页更新`,
         stageLabel: "需求模型",
         targetLabel: "已选设计模型",
+        primaryAction: openWorkspaceAction("requirement-models", "requirementModels"),
       },
     };
   }
@@ -341,6 +364,7 @@ export function analyzeDesignGenerationPreflight(
         message: "需求模型追踪关系不完整，请先回到需求页处理",
         stageLabel: "需求模型",
         targetLabel: "已选设计模型",
+        primaryAction: openWorkspaceAction("requirement-models", "requirementModels"),
       },
     };
   }
@@ -353,7 +377,7 @@ export function analyzeDesignGenerationPreflight(
   const sequenceWillGenerate =
     resolvedDesignPlan.effectiveDiagrams.includes("sequence");
   const needsExistingSequenceDependency = resolvedDesignPlan.effectiveDiagrams.some(
-    (diagram) => diagram === "class" || diagram === "activity",
+    (diagram) => diagram === "class" || diagram === "navigation",
   );
   if (
     needsExistingSequenceDependency &&
@@ -369,6 +393,7 @@ export function analyzeDesignGenerationPreflight(
         message: "已有用例实现设计覆盖不足，请先手动更新用例实现设计",
         stageLabel: "设计模型",
         targetLabel: "已选设计模型",
+        primaryAction: openWorkspaceAction("design-models", "designModels"),
       },
     };
   }
@@ -390,6 +415,7 @@ export function analyzeDesignGenerationPreflight(
         message: "设计类图已存在但基于旧需求，请先手动更新设计类图",
         stageLabel: "设计模型",
         targetLabel: "已选设计模型",
+        primaryAction: openWorkspaceAction("design-models", "designModels"),
       },
     };
   }
@@ -413,6 +439,7 @@ export function analyzeDesignGenerationPreflight(
         message: "组件（构件）关系已存在但基于旧需求，请先手动更新组件（构件）关系",
         stageLabel: "设计模型",
         targetLabel: "已选设计模型",
+        primaryAction: openWorkspaceAction("design-models", "designModels"),
       },
     };
   }

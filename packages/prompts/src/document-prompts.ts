@@ -1,9 +1,5 @@
-// Builds document content and PlantUML repair prompts for downstream API pipelines.
+// Builds document content prompts for downstream API pipelines.
 import type {
-  DesignDiagramKind,
-  DesignDiagramModelSpec,
-  DiagramKind,
-  DiagramModelSpec,
   DocumentKind,
 } from "@uml-platform/contracts";
 
@@ -47,7 +43,7 @@ export function buildGenerateDocumentContentPrompt(
         "标题 1：引言、系统总体架构 (System Architecture)、用例实现设计 (Use Case Realization)、领域模型设计 (Static Class & Domain Model)、交互响应与前端组件设计 (UI/UX Componentization)、数据库设计 (Persistence & Data Strategy)、组件设计、部署设计与交付 (Deployment & CI/CD)、尚未设计的问题。",
         "标题 2：系统概述、基线、定义与标识、参考资料、系统总体逻辑流程设计、系统架构设计、对应用例的实现方案、设计类图、设计类描述、设计类之间的关系、需求到类跟踪矩阵、界面关系图、界面的详述、表与表的关系图、表的详述、表与表的关系详述、设计阶段的组件关系图、组件描述、设计阶段的部署图、部署描述。",
         "标题 3：流程描述、总体架构描述、方案描述、各类跟踪关系。",
-        "图位置：requirement:activity 放系统总体逻辑流程设计，architecture 放系统架构设计，sequence:<useCaseId> 放对应“用例的实现方案”，class 放设计类图，activity 放界面关系图，table 放表与表的关系图，component 放组件关系图，deployment 放设计阶段部署图。",
+        "图位置：requirement:activity 放系统总体逻辑流程设计，architecture 放系统架构设计，sequence:<useCaseId> 放对应“用例的实现方案”，class 放设计类图，navigation 放页面导航模型，table 放表与表的关系图，component 放组件关系图，deployment 放设计阶段部署图。",
       ];
 
   return [
@@ -119,43 +115,5 @@ export function buildRepairDocumentContentPrompt(
     "",
     "当前产物上下文：",
     stringifyDocumentContext(context),
-  ].join("\n");
-}
-
-export function buildRepairPlantUmlPrompt(
-  diagramKind: DiagramKind | DesignDiagramKind,
-  model: DiagramModelSpec | DesignDiagramModelSpec,
-  plantUmlSource: string,
-  renderError: string,
-) {
-  const activitySpecificRules =
-    diagramKind === "activity"
-      ? [
-          "这是 PlantUML activity diagram。",
-          "泳道必须按 PlantUML 活动图合法位置放置，首次泳道声明必须出现在图开始处。",
-          "必须保留 start / stop / decision / fork / join / swimlane 的业务语义。",
-          "如果无法安全表达并发或分支，优先输出可编译的顺序化活动图，不要继续输出语法错误。",
-        ]
-      : [];
-  return [
-    "请修复下面无法编译或返回占位 SVG 的 PlantUML。",
-    "你是 PlantUML 修复助手。",
-    "输出 JSON，必须符合接口 schema；不要输出 Markdown、解释或代码围栏。",
-    "source 必须是完整、可编译的 PlantUML 源码，必须包含 @startuml 和 @enduml。",
-    "必须保留原图的业务语义，不要任意删除核心参与者、核心节点、核心关系或关键说明。",
-    "优先修正语法错误、别名冲突、关系引用错误、图类型不合法元素和不兼容语法。",
-    ...activitySpecificRules,
-    "",
-    "图类型：",
-    diagramKind,
-    "",
-    "结构化模型：",
-    JSON.stringify(model, null, 2),
-    "",
-    "当前失败的 PlantUML：",
-    plantUmlSource,
-    "",
-    "编译或渲染错误：",
-    renderError,
   ].join("\n");
 }

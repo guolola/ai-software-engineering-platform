@@ -168,6 +168,21 @@ export type AccountProfileResponse = z.infer<
   typeof accountProfileResponseSchema
 >;
 
+export const onboardingTourSchema = z.enum(["empty-workspace", "first-project"]);
+export const onboardingTourOutcomeSchema = z.enum(["skipped", "completed"]);
+export const onboardingStateResponseSchema = z.object({
+  emptyWorkspace: z.enum(["skipped", "completed"]).nullable(),
+  firstProject: z.enum(["skipped", "completed", "ineligible"]).nullable(),
+  firstProjectId: z.string().min(1).nullable(),
+});
+export const onboardingTourUpdateRequestSchema = z.object({
+  tour: onboardingTourSchema,
+  outcome: onboardingTourOutcomeSchema,
+});
+export type OnboardingStateResponse = z.infer<typeof onboardingStateResponseSchema>;
+export type OnboardingTour = z.infer<typeof onboardingTourSchema>;
+export type OnboardingTourOutcome = z.infer<typeof onboardingTourOutcomeSchema>;
+
 export const adminSessionResponseSchema = z
   .object({
     user: userDtoSchema,

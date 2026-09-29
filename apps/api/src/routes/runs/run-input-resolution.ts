@@ -129,7 +129,7 @@ const DESIGN_DIAGRAM_ORDER: DesignDiagramKind[] = [
   "architecture",
   "sequence",
   "class",
-  "activity",
+  "navigation",
   "table",
   "component",
   "deployment",
@@ -141,7 +141,7 @@ const DESIGN_MODEL_DEPENDENCY_MAP: Record<
 > = {
   architecture: [],
   sequence: [],
-  activity: ["sequence"],
+  navigation: ["sequence"],
   class: ["sequence"],
   component: ["class"],
   deployment: ["component"],
@@ -151,7 +151,7 @@ const DESIGN_MODEL_DEPENDENCY_MAP: Record<
 const DESIGN_REQUIREMENT_SOURCE_MAP: Record<DesignDiagramKind, DiagramKind[]> = {
   architecture: ["function"],
   sequence: ["usecase", "analysis"],
-  activity: ["prototype"],
+  navigation: ["prototype"],
   class: ["class"],
   component: [],
   deployment: ["deployment"],
@@ -866,10 +866,17 @@ export async function resolveRequirementRunInput(
   metadata: RunInputMetadata | undefined,
   loadProjectWorkspace?: LoadProjectWorkspaceForRun,
 ): Promise<InputResolution<StartRunRequest>> {
+  const parsedCommand = startRunCommandSchema.safeParse(body);
   const legacy = startRunRequestSchema.safeParse(body);
-  if (legacy.success) return { ok: true, input: legacy.data };
-
-  const command: StartRunCommand = startRunCommandSchema.parse(body);
+  // Payloads without an explicit project id or workspace loader remain legacy
+  // full-run requests; project commands read the server's saved inputs.
+  if (legacy.success && (!parsedCommand.success ||
+    !parsedCommand.data.projectId || !loadProjectWorkspace)) {
+    return { ok: true, input: legacy.data };
+  }
+  if (!parsedCommand.success) throw parsedCommand.error;
+  const command: StartRunCommand = parsedCommand.data;
+  const rulesOnly = command.selectedDiagrams.length === 0;
   const workspace = await loadWorkspaceStateForCommand({
     commandProjectId: command.projectId,
     metadata,
@@ -896,11 +903,14 @@ export async function resolveRequirementRunInput(
     ok: true,
     input: startRunRequestSchema.parse({
       projectId: workspace.input.projectId,
-      requirementText: stringValue(workspace.input.state.requirementText),
+      requirementText: rulesOnly && command.requirementText !== undefined
+        ? command.requirementText
+        : stringValue(workspace.input.state.requirementText),
       selectedDiagrams: requirementTargets.selectedDiagrams,
       requestedDiagrams: requirementTargets.requestedDiagrams,
       dependencyDiagrams: requirementTargets.dependencyDiagrams,
-      rules: requirementSource.rules,
+      // A rules-only run must not carry old rules into failed snapshots.
+      rules: rulesOnly ? [] : requirementSource.rules,
       contextModels,
       contextRequirementModelTraceability: arrayValue(
         workspace.input.state.requirementModelTraceability,

@@ -44,6 +44,8 @@ vite.config.ts.timestamp-*
 vite.config.*.timestamp-*
 
 # local codex/dev artifacts
+/output/
+/apps/web/public/brand/engineering-construct-logo.png
 .codex/
 .codex-remote-attachments/
 .codex-artifacts/

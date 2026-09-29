@@ -67,6 +67,7 @@ export async function startRequirementRunRequest(
     "/api/runs",
     runPayloadWithoutUnmanagedProviderSettings({
       projectId: scopedProjectId,
+      ...(input.selectedDiagrams.length === 0 ? { requirementText: input.requirementText } : {}),
       selectedDiagrams: input.selectedDiagrams,
       requestedDiagrams: input.requestedDiagrams,
       dependencyDiagrams: input.dependencyDiagrams,
@@ -161,11 +162,12 @@ export async function renderPlantUmlRequest(
 export async function renderStructuredModelRequest(
   model: DiagramModelSpec | DesignDiagramModelSpec,
   projectId: string | null,
+  stage: "feasibility" | "requirements" | "design",
 ) {
   const scopedProjectId = requireProjectScope(projectId);
   return postJson<RenderStructuredModelResponse>(
     "/api/render/model",
-    { model },
+    { model, stage },
     {
       errorKey: "errors.operations.redrawModel",
       headers: projectHeaders(scopedProjectId),

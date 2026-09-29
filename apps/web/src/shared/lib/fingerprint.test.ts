@@ -39,7 +39,7 @@ describe("snapshotInputFingerprint", () => {
     expect(left.length).toBeLessThan(48);
   });
 
-  it("normalizes legacy JSON fingerprints before comparison", () => {
+  it("does not upgrade legacy JSON fingerprints to the current semantic version", () => {
     const legacyFingerprint = JSON.stringify({
       rules: [
         {
@@ -52,7 +52,7 @@ describe("snapshotInputFingerprint", () => {
       requirementText: "订单需求",
     });
 
-    expect(normalizeSnapshotFingerprint(legacyFingerprint)).toBe(
+    expect(normalizeSnapshotFingerprint(legacyFingerprint)).not.toBe(
       snapshotInputFingerprint({
         requirementText: "订单需求",
         rules: [
@@ -106,7 +106,7 @@ describe("designInputFingerprint", () => {
     expect(left.length).toBeLessThan(48);
   });
 
-  it("normalizes legacy design fingerprints before comparison", () => {
+  it("does not upgrade legacy design fingerprints to the current semantic version", () => {
     const legacyFingerprint = JSON.stringify({
       requirementModels: [
         { diagramKind: "class", classes: [{ id: "class_order" }] },
@@ -120,7 +120,7 @@ describe("designInputFingerprint", () => {
       ],
     });
 
-    expect(normalizeDesignInputFingerprint(legacyFingerprint)).toBe(
+    expect(normalizeDesignInputFingerprint(legacyFingerprint)).not.toBe(
       designInputFingerprint(
         [
           { diagramKind: "usecase", useCases: [{ id: "uc_submit" }] },

@@ -117,6 +117,7 @@ function normalizeTraceabilityDiagramKind(value: unknown) {
     case "deployment-diagram":
     case "deployment-requirement":
       return "deployment";
+    case "navigation": return "navigation";
     case "prototype":
     case "prototype-diagram":
     case "prototype-interface":
@@ -180,6 +181,8 @@ function addRef(
 
 function activityNodeKind(nodeType: unknown) {
   switch (nodeType) {
+    case "object": return "object-node";
+    case "flow_final": return "flow-final-node";
     case "activity":
       return "activity";
     case "decision":
@@ -214,6 +217,7 @@ function prototypeNodeKind(nodeType: unknown) {
 
 function isBusinessElementKind(kind: string) {
   return ![
+    "flow-final-node", "input-pin", "output-pin", "activation",
     "system-boundary",
     "swimlane",
     "start-node",
@@ -260,13 +264,15 @@ export function collectModelRefs(
     ];
 
     const businessElementIds = new Set<string>();
+    const pinOwners = new Map<string, string>();
+    if (model.diagramKind === "activity") for (const node of model.nodes) if (node.type === "activity") for (const pin of [...node.inputPins ?? [], ...node.outputPins ?? []]) pinOwners.set(pin.id, node.id);
     for (const [key, defaultKind] of listKeys) {
       for (const item of ensureArray(record[key])) {
         if (!isPlainRecord(item)) continue;
         const kind =
           key === "nodes" && diagramKind === "activity"
             ? activityNodeKind(item.type)
-            : key === "nodes" && diagramKind === "prototype"
+            : key === "nodes" && (diagramKind === "prototype" || diagramKind === "navigation")
               ? prototypeNodeKind(item.nodeType)
               : defaultKind;
         const beforeCount = refs.length;
@@ -300,8 +306,8 @@ export function collectModelRefs(
       if (!isPlainRecord(relationship)) continue;
       if (
         diagramKind === "activity" &&
-        (!businessElementIds.has(compactString(relationship.sourceId)) ||
-          !businessElementIds.has(compactString(relationship.targetId)))
+        (!businessElementIds.has(pinOwners.get(compactString(relationship.sourceId)) ?? compactString(relationship.sourceId)) ||
+          !businessElementIds.has(pinOwners.get(compactString(relationship.targetId)) ?? compactString(relationship.targetId)))
       ) {
         continue;
       }

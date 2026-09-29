@@ -1,4 +1,4 @@
-// Verifies visual review decisions, image input, and source-only repair behavior.
+// Verifies visual review decisions, image input, and advisory review without source mutation.
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DiagramModelSpec, ProviderSettings } from "@uml-platform/contracts";
@@ -40,7 +40,7 @@ test("passes latest PNG with model and source to the selected chat model", async
   assert.equal(run.events.some((event) => event.type === "stage_progress" && event.stage === "verify_diagram_visual" && event.subtaskStatus === "completed"), true);
 });
 
-test("repairs PlantUML and rerenders before accepting the second visual judgment", async () => {
+test("keeps visual feedback advisory without allowing source rewrites", async () => {
   const run = record();
   let calls = 0;
   const transport: LlmTransport = { async *streamChatCompletion() {
@@ -48,10 +48,10 @@ test("repairs PlantUML and rerenders before accepting the second visual judgment
     yield calls === 1 ? '{"passed":false,"issues":["连线缺失"]}' : calls === 2 ? '{"source":"@startuml\\nA --> B\\n@enduml"}' : '{"passed":true,"issues":[]}';
   } };
   const result = await reviewRenderedArtifact({ record: run, providerSettings: settings, llmTransport: transport, renderClient, pngRenderClient, model, rendered: await rendered(run) });
-  assert.equal(result.review.status, "passed");
-  assert.equal(calls, 3);
-  assert.equal(result.review.repairAttempts, 1);
-  assert.match(result.rendered.artifact.source, /A --> B/);
+  assert.equal(result.review.status, "pending_review");
+  assert.equal(calls, 1);
+  assert.equal(result.review.repairAttempts, 0);
+  assert.doesNotMatch(result.rendered.artifact.source, /A --> B/);
   assert.deepEqual(model.relationships, []);
 });
 
@@ -71,7 +71,7 @@ test("checks an image even when catalog capability is text chat", async () => {
   assert.equal(calls, 1);
 });
 
-test("keeps the last compilable source and issues when visual repairs are exhausted", async () => {
+test("keeps deterministic source and full issues after one advisory review", async () => {
   const run = record();
   let calls = 0;
   const transport: LlmTransport = { async *streamChatCompletion() {
@@ -82,8 +82,8 @@ test("keeps the last compilable source and issues when visual repairs are exhaus
   } };
   const result = await reviewRenderedArtifact({ record: run, providerSettings: settings, llmTransport: transport, renderClient, pngRenderClient, model, rendered: await rendered(run) });
   assert.equal(result.review.status, "pending_review");
-  assert.equal(result.review.attempts, 3);
-  assert.equal(result.review.repairAttempts, 2);
+  assert.equal(result.review.attempts, 1);
+  assert.equal(result.review.repairAttempts, 0);
   assert.deepEqual(result.review.issues, ["标签不可读"]);
-  assert.match(result.rendered.artifact.source, /A --> B : 4/);
+  assert.doesNotMatch(result.rendered.artifact.source, /A --> B/);
 });

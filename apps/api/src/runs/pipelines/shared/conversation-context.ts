@@ -43,16 +43,14 @@ export function createContextualLlmTransport(transport: LlmTransport) {
       const history = histories.get(id) ?? (id === "main" ? [] : [...(histories.get("main") ?? [])]);
       const incoming = input.messages.filter((message) => message.role !== "system");
       const stageSystem = input.messages.find((message) => message.role === "system");
-      const system = history.find((message) => message.role === "system") ?? stageSystem;
+      // Each stage owns its response contract; earlier stage instructions must not override it.
+      const system = stageSystem ?? history.find((message) => message.role === "system");
       const next = compact([
         ...(system ? [system] : []),
         ...history.filter((message) => message.role !== "system").map((message): ChatMessage =>
           Array.isArray(message.content)
             ? { ...message, content: message.content.filter((part) => part.type !== "image_url") }
             : message),
-        ...(stageSystem && stageSystem.content !== system?.content
-          ? [{ role: "user" as const, content: `本阶段约束：${stageSystem.content}` }]
-          : []),
         ...incoming,
       ], [...validated.entries()].map(([branchId, summary]) => `${branchId}: ${summary}`));
       let output = "";

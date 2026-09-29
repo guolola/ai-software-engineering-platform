@@ -71,6 +71,7 @@ type AccountDialogProps = {
   initialUser?: PlatformUser | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  globalSettingsRequestId?: number;
 };
 
 export function AccountDialog({
@@ -79,6 +80,7 @@ export function AccountDialog({
   initialUser = null,
   open: controlledOpen,
   onOpenChange,
+  globalSettingsRequestId,
 }: AccountDialogProps) {
   const { t, i18n } = useTranslation();
   const isMobile = useIsMobile();
@@ -112,6 +114,10 @@ export function AccountDialog({
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [activeTab, setActiveTab] = useState("profile");
+  // A new connection-error request should focus this tab even if the dialog stayed open.
+  useEffect(() => {
+    if (globalSettingsRequestId) setActiveTab("global");
+  }, [globalSettingsRequestId]);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const dialogContentRef = useRef<HTMLDivElement | null>(null);
   const openLocationRef = useRef<string | null>(null);

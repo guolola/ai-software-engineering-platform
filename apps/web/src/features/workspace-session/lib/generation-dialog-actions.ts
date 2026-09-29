@@ -67,7 +67,7 @@ export function failedRunResultDialog(input: {
   });
   const primaryAction = target === "pending-rules"
     ? {
-        label: i18n.t("feedback.actions.pendingRules"),
+        label: i18n.t(ruleIds[0] ? "feedback.actions.pendingRules" : "feedback.actions.systemRequirements"),
         onSelect: () => ruleIds[0]
           ? requestOpenRequirementRule(ruleIds[0])
           : requestOpenProjectWorkspaceTarget("system-requirements"),
@@ -131,6 +131,7 @@ export function failedRunResultDialog(input: {
 export function requirementRunCompletionDialog(input: {
   diagramFailureCount: number;
   isRulesOnly: boolean;
+  ignoredCount: number;
   qualityHintCount: number;
   repairFailedCount: number;
   repairPendingCount: number;
@@ -147,10 +148,11 @@ export function requirementRunCompletionDialog(input: {
       input.qualityHintCount > 0 ||
       input.repairPendingCount > 0 ||
       input.repairFailedCount > 0 ||
+      input.ignoredCount > 0 ||
       input.diagramFailureCount > 0
         ? "warning"
         : "success",
-    message:
+    message: [
       input.repairFailedCount > 0
         ? i18n.t("generation.dialog.repairFailedCount", { count: input.repairFailedCount })
         : input.repairPendingCount > 0
@@ -159,6 +161,10 @@ export function requirementRunCompletionDialog(input: {
               qualityHintCount: input.qualityHintCount,
               diagramFailureCount: input.diagramFailureCount,
             }),
+      input.ignoredCount > 0
+        ? i18n.t("requirements.source.ignoredSummary", { count: input.ignoredCount })
+        : null,
+    ].filter(Boolean).join(" "),
     runId: input.runId,
     stageLabel: input.isRulesOnly ? i18n.t("generation.dialog.labels.rules") : i18n.t("generation.dialog.labels.requirementModels"),
     targetLabel: input.isRulesOnly ? i18n.t("generation.dialog.labels.currentText") : i18n.t("generation.dialog.labels.selectedRequirementModels"),

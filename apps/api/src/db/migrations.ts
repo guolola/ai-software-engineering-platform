@@ -1153,6 +1153,23 @@ create table if not exists prompt_runtime_active (
 );
 `;
 
+export const onboardingStateSql = `
+create table if not exists user_onboarding_state (
+  user_id text primary key references users(id) on delete cascade,
+  empty_workspace_status text check (empty_workspace_status in ('skipped', 'completed')),
+  first_project_status text check (first_project_status in ('skipped', 'completed', 'ineligible')),
+  first_project_id text,
+  updated_at timestamptz not null default now()
+);
+
+-- Existing project owners can replay the guide but are not treated as new creators.
+insert into user_onboarding_state (user_id, first_project_status, first_project_id)
+select distinct on (owner_user_id) owner_user_id, 'ineligible', id
+from projects
+order by owner_user_id, created_at, id
+on conflict (user_id) do nothing;
+`;
+
 export const migrations = [
   {
     id: "001_user_admin_platform_base",
@@ -1261,6 +1278,10 @@ export const migrations = [
   {
     id: "027_prompt_runtime_versions",
     sql: promptRuntimeSql,
+  },
+  {
+    id: "028_user_onboarding_state",
+    sql: onboardingStateSql,
   },
 ] as const;
 

@@ -23,7 +23,7 @@ export function expectedDocumentDiagramKinds(documentKind: DocumentKind) {
   return documentKind === "requirementsSpec"
     ? ["function", "activity", "usecase", "class", "deployment", "prototype", "analysis"]
     : documentKind === "softwareDesignSpec"
-      ? ["architecture", "sequence", "class", "activity", "table", "component", "deployment"]
+      ? ["architecture", "sequence", "class", "navigation", "table", "component", "deployment"]
       : ["context"];
 }
 
@@ -501,7 +501,7 @@ function functionStructureBody(input: StartDocumentRunRequest) {
 function activityBody(input: StartDocumentRunRequest, stage: "requirement" | "design") {
   const model = stage === "requirement"
     ? requirementModel(input, "activity")
-    : designModel(input, "activity");
+    : designModel(input, "navigation");
   if (!model || model.nodes.length === 0) {
     return [
       stage === "requirement"
@@ -509,19 +509,14 @@ function activityBody(input: StartDocumentRunRequest, stage: "requirement" | "de
         : "界面关系围绕入口页面、业务表单、状态反馈、列表详情和返回路径组织。",
     ];
   }
-  const laneNames = model.swimlanes.map((lane) => lane.name);
-  const nodeNames = model.nodes
-    .filter((node) => node.type !== "start" && node.type !== "end")
-    .map((node) => node.name ?? node.description)
-    .filter(Boolean);
   return [
-    `参与泳道：${compactJoin(laneNames, "业务参与方和系统处理节点")}。`,
-    `关键节点：${compactJoin(nodeNames, "用户操作、系统校验、状态更新和结果反馈")}。`,
-    `流程关系数量：${model.relationships.length}，用于表达活动之间的控制流和条件流转。`,
+    ...(model.diagramKind === "activity" ? model.swimlanes.map((lane) => `泳道 ${lane.id}：${lane.name}`) : []),
+    ...model.nodes.map((node) => `节点 ${node.id}：${node.name ?? node.id}（${"type" in node ? node.type : node.nodeType}）${"dataType" in node ? `，对象类型 ${node.dataType}，状态 ${node.state ?? "未指定"}` : ""}${"route" in node && node.route ? `，路由 ${node.route}` : ""}${"inputPins" in node ? `，输入引脚 ${(node.inputPins ?? []).map((pin) => `${pin.id}:${pin.dataType}`).join("、")}，输出引脚 ${(node.outputPins ?? []).map((pin) => `${pin.id}:${pin.dataType}`).join("、")}` : ""}`),
+    ...model.relationships.map((edge) => `${edge.id}：${edge.sourceId} → ${edge.targetId}（${edge.type}）${"label" in edge && edge.label ? `，${edge.label}` : ""}${edge.condition ? `；条件：${edge.condition}` : ""}${edge.guard ? `；守卫：${edge.guard}` : ""}${edge.trigger ? `；触发：${edge.trigger}` : ""}`),
   ];
 }
 
-function classDescriptionBody(classes: ReturnType<typeof requirementClasses>) {
+function classDescriptionBody(classes: ReturnType<typeof requirementClasses> | ReturnType<typeof designClasses>) {
   if (classes.length === 0) {
     return [
       "领域对象围绕需求文本中的业务名词、状态数据和操作结果组织，用于承接功能需求中的核心数据结构。",
@@ -553,21 +548,15 @@ function deploymentBody(
   model: Extract<DiagramModelSpec | DesignDiagramModelSpec, { diagramKind: "deployment" }> | undefined,
   stage: "requirement" | "design",
 ) {
-  if (!model) {
-    return [
-      stage === "requirement"
-        ? "运行环境由应用服务、数据存储、外部系统和访问终端构成，部署需求强调网络连通、服务可访问和数据持久化。"
-        : "部署设计将应用组件、数据存储和外部依赖分配到可交付节点，保证运行环境与组件边界一致。",
-    ];
-  }
-  const nodes = model.nodes.map((node) => `${node.name}（${node.nodeType}）`);
-  const components = model.components.map((component) => component.name);
-  const databases = model.databases.map((database) => database.name);
+  if (!model) return [stage === "requirement" ? "尚未记录部署约束。" : "尚未生成部署设计。"];
   return [
-    `部署节点：${compactJoin(nodes, "应用节点、数据节点和访问终端")}。`,
-    `部署组件：${compactJoin(components, "业务服务、界面服务和支撑组件")}。`,
-    `数据存储：${compactJoin(databases, "系统数据存储")}。`,
-    `连接关系数量：${model.relationships.length}，用于表达部署、通信、托管和依赖关系。`,
+    ...model.nodes.map((node) => `节点 ${node.id}：${node.name}（${node.nodeType}），技术：${node.technology ?? "未指定"}，上层节点：${node.parentId ?? "无"}，环境约束：${node.environment ?? "未指定"}`),
+    ...model.databases.map((node) => `数据库执行环境 ${node.id}：${node.name}，上层节点：${node.parentId ?? "无"}，引擎：${node.engine ?? "未指定"}`),
+    ...model.externalSystems.map((node) => `外部系统 ${node.id}：${node.name}`),
+    ...model.components.map((node) => `逻辑组件 ${node.id}：${node.name}`),
+    ...model.artifacts.map((node) => `制品 ${node.id}：${node.name}（${node.artifactType ?? "未指定类型"}）`),
+    ...model.relationships.map((edge) => `${edge.id}：${edge.sourceId} → ${edge.targetId}（${edge.type}），方向 ${edge.direction ?? "outbound"}${edge.protocol ? `，协议 ${edge.protocol}` : ""}${edge.port ? `，端口 ${edge.port}` : ""}${"label" in edge && edge.label ? `，${edge.label}` : ""}${edge.description ? `，${edge.description}` : ""}`),
+    ...model.notes,
   ];
 }
 
@@ -581,7 +570,7 @@ function prototypeBody(input: StartDocumentRunRequest) {
   return [
     `界面节点：${compactJoin(model.nodes.map((node) => `${node.name}（${node.nodeType}）`))}。`,
     `界面关系：${compactJoin(
-      model.relationships.map((relation) => relation.label ?? relation.type),
+      model.relationships.map((relation) => `${relation.sourceId} → ${relation.targetId}（${relation.type}）${relation.label ?? ""}${relation.trigger ? `；触发：${relation.trigger}` : ""}${relation.condition ? `；条件：${relation.condition}` : ""}${relation.guard ? `；守卫：${relation.guard}` : ""}`),
       "导航、包含、提交、返回和依赖关系",
     )}。`,
   ];
@@ -650,12 +639,14 @@ function sequenceBody(
       ...useCaseEventFlowBody(useCase),
     ];
   }
-  const participants = model.participants.map((participant) => `${participant.name}（${participant.participantType}）`);
-  const messages = model.messages.map((message) => message.name);
   return [
-    `参与对象：${compactJoin(participants, "参与者、边界对象、控制对象、实体对象和数据对象")}。`,
-    `消息调用：${compactJoin(messages, "请求、校验、处理、保存和返回结果")}。`,
-    `组合片段数量：${model.fragments.length}，用于表达条件、循环、并行或可选流程。`,
+    ...model.participants.map((participant) => `${participant.id}：${participant.name}（${participant.participantType}）`),
+    ...model.messages.map((message) => `${message.id}：${message.sourceId} → ${message.targetId}（${message.type}）${message.name}(${message.parameters.join(", ")})${message.returnValue ? `：${message.returnValue}` : ""}${message.condition ? `；条件：${message.condition}` : ""}`),
+    ...model.fragments.flatMap((fragment) => [
+      `片段 ${fragment.id}（${fragment.type}）：${fragment.label}；条件 ${fragment.condition ?? "无"}；父片段 ${fragment.parentFragmentId ?? "无"}；父分支 ${fragment.parentBranchId ?? "无"}；消息 ${fragment.messageIds.join("、")}`,
+      ...(fragment.branches ?? []).map((branch) => `分支 ${branch.id}：${branch.label ?? ""}；条件 ${branch.condition ?? "无"}；消息 ${branch.messageIds.join("、")}`),
+    ]),
+    ...(model.activations ?? []).map((activation) => `激活 ${activation.id}：${activation.participantId}，${activation.startMessageId} 至 ${activation.endMessageId}`),
   ];
 }
 
@@ -729,6 +720,7 @@ function tableDesignBody(input: StartDocumentRunRequest) {
 
   return tables.flatMap((table) => [
     `${table.name}：${table.description ?? "保存对应业务对象及其状态数据"}`,
+    ...(table.relationalConstraints ?? []).map((key) => key.type === "check" ? `检查约束 ${key.name ?? key.id}：${key.expression}` : `${key.type} ${key.name ?? key.id} (${key.columnIds.join(", ")})${key.type === "foreign-key" ? ` REFERENCES ${key.referenceTableId} (${key.referenceColumnIds.join(", ")})` : ""}`),
     ...table.columns.map((column) => {
       const constraints = [
         column.isPrimaryKey ? "主键" : undefined,
@@ -751,7 +743,7 @@ function tableRelationBody(input: StartDocumentRunRequest) {
   return model.relationships.map((relation) => {
     const source = model.tables.find((table) => table.id === relation.sourceTableId)?.name ?? relation.sourceTableId;
     const target = model.tables.find((table) => table.id === relation.targetTableId)?.name ?? relation.targetTableId;
-    return `${source} 与 ${target}：${relation.type}${relation.label ? `，${relation.label}` : ""}${relation.description ? `，${relation.description}` : ""}。`;
+    return `${source}（${relation.sourceMultiplicity ?? ""}）与 ${target}（${relation.targetMultiplicity ?? ""}）：${relation.type}${relation.label ? `，${relation.label}` : ""}${relation.description ? `，${relation.description}` : ""}。`;
   });
 }
 
@@ -1102,7 +1094,7 @@ export function fallbackDocumentSections(input: StartDocumentRunRequest): Docume
       { level: 2, title: "设计类之间的关系", body: classRelationBody(designClass) },
       { level: 2, title: "设计类跟踪矩阵", body: ["设计类与需求模型元素的对应关系如下。"], table: { headers: ["编号", "设计元素", "映射需求元素"], rows: designTraceRows(input, "class") } },
       { level: 1, title: "交互响应与前端组件设计 (UI/UX Componentization)", body: [] },
-      { level: 2, title: "界面关系图", body: ["设计阶段界面关系图表达界面节点、状态反馈、表单提交和返回路径。"], diagramKind: "activity" },
+      { level: 2, title: "界面关系图", body: ["页面导航图表达页面、入口、模块、条件导航和返回路径。"], diagramKind: "navigation" },
       { level: 2, title: "界面的详述", body: activityBody(input, "design") },
       { level: 2, title: "跟踪关系", body: ["用例与界面的对应关系如下。"], table: { headers: ["编号", "用例名称", "界面名称"], rows: designUseCaseInterfaceRows(input) } },
       { level: 1, title: "数据库设计 (Persistence & Data Strategy)", body: [] },

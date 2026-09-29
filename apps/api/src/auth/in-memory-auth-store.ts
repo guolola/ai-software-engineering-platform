@@ -13,6 +13,9 @@ import {
   type ProjectStatus,
   type ProjectVisibility,
   type UserStatus,
+  type OnboardingStateResponse,
+  type OnboardingTour,
+  type OnboardingTourOutcome,
 } from "@uml-platform/contracts";
 
 export type UserRecord = {
@@ -167,6 +170,7 @@ export function createInMemoryAuthStore() {
   const usersByUsername = new Map<string, string>();
   const sessions = new Map<string, SessionRecord>();
   const projects = new Map<string, ProjectRecord>();
+  const onboardingStates = new Map<string, OnboardingStateResponse>();
   const projectWorkspaces = new Map<string, ProjectWorkspaceRecord>();
   const members = new Map<string, ProjectMemberRecord>();
   const auditLogs: AuditLogDto[] = [];
@@ -680,6 +684,16 @@ export function createInMemoryAuthStore() {
     };
     projects.set(project.id, project);
 
+    // The first project identity stays fixed even if later projects are created.
+    const onboarding = onboardingStates.get(input.ownerUserId) ?? {
+      emptyWorkspace: null,
+      firstProject: null,
+      firstProjectId: null,
+    };
+    if (!onboarding.firstProjectId) {
+      onboardingStates.set(input.ownerUserId, { ...onboarding, firstProjectId: project.id });
+    }
+
     const owner = users.get(input.ownerUserId);
     const member = createMember({
       projectId: project.id,
@@ -776,6 +790,27 @@ export function createInMemoryAuthStore() {
     return [...projects.values()].filter(
       (project) => projectIds.has(project.id) && project.status !== "deleted",
     );
+  }
+
+  function getOnboardingState(userId: string): OnboardingStateResponse {
+    return onboardingStates.get(userId) ?? {
+      emptyWorkspace: null,
+      firstProject: null,
+      firstProjectId: null,
+    };
+  }
+
+  function setOnboardingOutcome(
+    userId: string,
+    tour: OnboardingTour,
+    outcome: OnboardingTourOutcome,
+  ): OnboardingStateResponse {
+    const current = getOnboardingState(userId);
+    const next = tour === "empty-workspace"
+      ? { ...current, emptyWorkspace: outcome }
+      : { ...current, firstProject: outcome };
+    onboardingStates.set(userId, next);
+    return next;
   }
 
   function listProjects() {
@@ -946,6 +981,8 @@ export function createInMemoryAuthStore() {
     saveProjectWorkspace,
     updateProject,
     listProjectsForUser,
+    getOnboardingState,
+    setOnboardingOutcome,
     listProjects,
     createMember,
     findProjectMember,

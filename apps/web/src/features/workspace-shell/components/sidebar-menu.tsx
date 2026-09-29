@@ -95,6 +95,11 @@ type SidebarMenuProps = {
 };
 
 const KIND_ICON: Record<SemanticElementKind, ReactNode> = {
+  "object-node": <Box className="size-3.5 text-muted-foreground" />,
+  "flow-final-node": <CircleDot className="size-3.5 text-muted-foreground" />,
+  "input-pin": <Plug className="size-3.5 text-muted-foreground" />,
+  "output-pin": <Plug className="size-3.5 text-muted-foreground" />,
+  activation: <ActivityIcon className="size-3.5 text-muted-foreground" />,
   actor: <User className="size-3.5 text-muted-foreground" />,
   usecase: <CircleDot className="size-3.5 text-muted-foreground" />,
   function: <GitBranch className="size-3.5 text-muted-foreground" />,
@@ -250,7 +255,7 @@ function TreeItem({
   // Icon mode uses the template menu flyout so every nested business item remains reachable.
   if (state === 'collapsed' && !isMobile) {
     return <DropdownMenu>
-      <DropdownMenuTrigger render={<SidebarMenuButton aria-label={node.label} isActive={selected} />}>
+      <DropdownMenuTrigger render={<SidebarMenuButton data-onboarding-nav={node.key} aria-label={node.label} isActive={selected} />}>
         {node.icon}
       </DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="start" className="max-h-[80vh] w-72 overflow-auto">
@@ -261,6 +266,7 @@ function TreeItem({
   return (
     <Collapsible open={open} onOpenChange={setNodeOpen} render={<SidebarMenuItem />}>
       <SidebarMenuButton
+        data-onboarding-nav={node.key}
         isActive={selected}
         tooltip={node.label}
         onClick={handleSelect}

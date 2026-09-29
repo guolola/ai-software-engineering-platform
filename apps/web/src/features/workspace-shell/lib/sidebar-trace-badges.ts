@@ -37,7 +37,7 @@ const DESIGN_UPSTREAM_BADGES: Record<DesignDiagramType, string[]> = {
   architecture: [DIAGRAM_META.function.label],
   sequence: [DIAGRAM_META.usecase.label, DIAGRAM_META.analysis.label],
   class: [DIAGRAM_META.class.label, DESIGN_DIAGRAM_META.sequence.label],
-  activity: [DIAGRAM_META.prototype.label, DESIGN_DIAGRAM_META.sequence.label],
+  navigation: [DIAGRAM_META.prototype.label, DESIGN_DIAGRAM_META.sequence.label],
   table: [DESIGN_DIAGRAM_META.class.label],
   component: [DESIGN_DIAGRAM_META.class.label],
   deployment: [DIAGRAM_META.deployment.label, DESIGN_DIAGRAM_META.component.label],

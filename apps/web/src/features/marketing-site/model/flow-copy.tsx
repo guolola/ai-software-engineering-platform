@@ -226,6 +226,58 @@ const copy: Record<string, Record<string, string>> = {
     "zh-CN": "面向软件工程教学与实践",
     "en": "For software engineering education and practice"
   },
+  "AI-Powered": {
+    "zh-CN": "AI 驱动",
+    "en": "AI-Powered"
+  },
+  "For software engineering education and practice": {
+    "zh-CN": "面向软件工程教学与实践",
+    "en": "For software engineering education and practice"
+  },
+  "Connect": {
+    "zh-CN": "用 AI 连接",
+    "en": "Connect"
+  },
+  "with AI": {
+    "zh-CN": "",
+    "en": "with AI"
+  },
+  "Make engineering practice": {
+    "zh-CN": "让软件工程实践",
+    "en": "Make engineering practice"
+  },
+  "clearer": {
+    "zh-CN": "更清晰",
+    "en": "clearer"
+  },
+  "Example rating: 4.5 out of 5": {
+    "zh-CN": "示例评分：满分 5 分中的 4.5 分",
+    "en": "Example rating: 4.5 out of 5"
+  },
+  "Interface example · Requirements, models and delivery": {
+    "zh-CN": "界面示例 · 需求 · 建模 · 交付",
+    "en": "Interface example · Requirements · Models · Delivery"
+  },
+  "Requirements analysis": {
+    "zh-CN": "需求分析",
+    "en": "Requirements analysis"
+  },
+  "Engineering delivery": {
+    "zh-CN": "工程交付",
+    "en": "Engineering delivery"
+  },
+  "Requirements → UML": {
+    "zh-CN": "需求 → UML 模型",
+    "en": "Requirements → UML"
+  },
+  "Models → Code & Docs": {
+    "zh-CN": "模型 → 代码与文档",
+    "en": "Models → Code & Docs"
+  },
+  "View pricing": {
+    "zh-CN": "查看价格",
+    "en": "View pricing"
+  },
   "Supercharge Your Product&rsquo;s": {
     "zh-CN": "用 AI 连接软件工程",
     "en": "Connect engineering with AI"
@@ -310,9 +362,9 @@ const copy: Record<string, Record<string, string>> = {
     "zh-CN": "查看完整使用指南",
     "en": "Read the complete guide"
   },
-  "Trusted by startups, enterprises, and industry giants alike.": {
-    "zh-CN": "覆盖需求、建模、设计、代码、测试与文档。",
-    "en": "Cover requirements, modeling, design, code, testing and documentation."
+  "Software engineering tools and platforms": {
+    "zh-CN": "软件工程领域的工具与平台",
+    "en": "Software engineering tools and platforms"
   },
   "Workbench dashboard preview": {
     "zh-CN": "软件工程实践平台工作台看板预览",

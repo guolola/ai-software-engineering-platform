@@ -305,6 +305,12 @@ export function WorkspaceSessionProvider({
   const repository = useWorkspaceRepository();
   const {
     requirementText,
+    hasUncommittedRequirementDraft,
+    setCommittedRequirementText,
+    inputScreening,
+    setInputScreening,
+    inputScreeningError,
+    setInputScreeningError,
     setRequirementText,
     setRequirementTextRaw,
     rules,
@@ -681,6 +687,7 @@ export function WorkspaceSessionProvider({
   );
 
   const applyWorkspaceRecord = useCallback((workspace: WorkspaceRecord) => {
+    setCommittedRequirementText(workspace.requirementText);
     applyWorkspaceRecordToSessionState(workspace, {
       setRequirementTextRaw,
       setRules,
@@ -731,7 +738,7 @@ export function WorkspaceSessionProvider({
       setRunUiState,
       setTextVersion,
     });
-  }, []);
+  }, [setCommittedRequirementText]);
 
   const workspaceInitialized = useWorkspaceInitialization({
     applyWorkspaceRecord,
@@ -790,6 +797,8 @@ export function WorkspaceSessionProvider({
       );
 
       if (mode.kind === "rules-only") {
+        setInputScreening(snapshot.inputScreening ?? null);
+        setInputScreeningError(null);
         const nextRequirementModelTraceability =
           pruneRequirementTraceabilityForRules(
             latestInputRef.current.requirementModelTraceability,
@@ -798,6 +807,7 @@ export function WorkspaceSessionProvider({
         setRules(snapshot.rules);
         setRequirementModelTraceability(nextRequirementModelTraceability);
         void repository.updateRequirementRules?.(snapshot.rules, {
+          sourceRunId: snapshot.runId,
           requirementInputFingerprint: activeRequirementFingerprint,
           rulesBasedOnTextVersion: baseTextVersion,
           rulesVersion: nextRulesVersion,
@@ -809,7 +819,7 @@ export function WorkspaceSessionProvider({
             snapshot.requirementBaseline?.qualityReport ?? null,
           );
           setRequirementReviewCandidates({});
-          void repository.updateRequirementReviewCandidates?.({});
+          void repository.updateRequirementReviewCandidates?.({}, { sourceRunId: snapshot.runId });
         }
       }
       setRulesVersion(nextRulesVersion);
@@ -1102,7 +1112,7 @@ export function WorkspaceSessionProvider({
       });
 
       setRequirementTextRaw(plan.requirementText);
-      void repository.updateRequirementText(plan.requirementText);
+      setCommittedRequirementText(plan.requirementText);
       setRules(plan.rules);
       setRulesVersion(plan.rulesVersion);
       setRulesBasedOnTextVersion(plan.rulesBasedOnTextVersion);
@@ -1177,6 +1187,10 @@ export function WorkspaceSessionProvider({
       options?: RunGenerationOptions,
     ) => {
       if (!checkGenerationModel()) return null;
+      if (mode.kind === "rules-only") {
+        setInputScreening(null);
+        setInputScreeningError(null);
+      }
       const runRequestId = runController.beginRun("requirements");
       const baseTextVersion = textVersion;
       const rulesForRun =
@@ -1277,6 +1291,10 @@ export function WorkspaceSessionProvider({
         }));
 
         await repository.subscribeToRun(runId, (event) => {
+          if (mode.kind === "rules-only" && event.type === "completed") {
+            lastCompletedSnapshot = event.snapshot as WorkspaceRunSnapshot;
+            return;
+          }
           if (clientTaskId) {
             updateGenerationTask(clientTaskId, (task) =>
               updateTaskFromEvent(task, event, {
@@ -1293,7 +1311,7 @@ export function WorkspaceSessionProvider({
           if (event.type === "completed") {
             lastCompletedSnapshot = event.snapshot as WorkspaceRunSnapshot;
           }
-          if (runId && shouldRefreshRunSnapshotFromEvent(event)) {
+          if (runId && mode.kind !== "rules-only" && shouldRefreshRunSnapshotFromEvent(event)) {
             const eventDiagramKind =
               "diagramKind" in event ? event.diagramKind : undefined;
             const refreshMode: RunMode =
@@ -1347,7 +1365,7 @@ export function WorkspaceSessionProvider({
         if (snapshot.status === "cancelled") {
           const stageLabel =
             mode.kind === "rules-only" ? "需求规则" : "需求模型";
-          if (!options?.deferRulesOnlySnapshotApplication) {
+          if (mode.kind !== "rules-only" && !options?.deferRulesOnlySnapshotApplication) {
             applyRunSnapshot(snapshot, baseTextVersion, mode, {
               preserveRuleReviewState: Boolean(
                 options?.skipRuleRepairCandidates,
@@ -1363,6 +1381,20 @@ export function WorkspaceSessionProvider({
             cancelledRunResultDialog(snapshot, stageLabel, clientTaskId),
           );
           return null;
+        }
+
+        if (mode.kind === "rules-only" && snapshot.status !== "completed") {
+          throw new Error(snapshot.error?.message ?? "需求规则抽取未完成，需求草稿未保存。");
+        }
+
+        // Wait for the server's atomic text-and-rules workspace sync before publishing success.
+        if (mode.kind === "rules-only") {
+          await repository.saveRunHistory(snapshot, {
+            providerModel,
+            durationMs: Date.now() - startedAtMs,
+          });
+          setCommittedRequirementText(snapshot.requirementText);
+          void refreshHistory().catch(() => {});
         }
 
         if (!options?.deferRulesOnlySnapshotApplication) {
@@ -1506,10 +1538,12 @@ export function WorkspaceSessionProvider({
             }));
           }
         }
-        await saveHistorySnapshot(snapshot, {
-          providerModel,
-          durationMs: Date.now() - startedAtMs,
-        });
+        if (mode.kind !== "rules-only") {
+          await saveHistorySnapshot(snapshot, {
+            providerModel,
+            durationMs: Date.now() - startedAtMs,
+          });
+        }
         if (
           options?.abortOnPendingRuleReviews &&
           pendingReviewRuleIds.length > 0
@@ -1545,6 +1579,7 @@ export function WorkspaceSessionProvider({
             requirementRunCompletionDialog({
               diagramFailureCount,
               isRulesOnly: mode.kind === "rules-only",
+              ignoredCount: snapshot.inputScreening?.ignoredSpans.length ?? 0,
               qualityHintCount,
               repairFailedCount,
               repairPendingCount,
@@ -1554,6 +1589,15 @@ export function WorkspaceSessionProvider({
         }
         if (repairFailedCount > 0) notifyGenerationFailed("需求规则修复有失败项");
         else notifyGenerationCompleted("requirements");
+        if (mode.kind === "rules-only" && clientTaskId && (!snapshot.requirementBaseline || options?.skipRuleRepairCandidates)) {
+          updateGenerationTask(clientTaskId, (task) => ({
+            ...task,
+            status: "completed",
+            progress: 100,
+            message: "需求规则生成完成",
+            finishedAt: new Date().toISOString(),
+          }));
+        }
         if (
           baseInputFingerprint !==
           snapshotInputFingerprint({
@@ -1573,6 +1617,9 @@ export function WorkspaceSessionProvider({
         const detail =
           billingBlock?.message ??
           failure.message;
+        if (failure.code.startsWith("RUN_REQUIREMENT_")) {
+          setInputScreeningError(detail);
+        }
         if (clientTaskId) {
           updateGenerationTask(clientTaskId, (task) => ({
             ...task,
@@ -1661,6 +1708,8 @@ export function WorkspaceSessionProvider({
       openBillingEntitlementDialog,
       openGenerationResultDialog,
       repository,
+      refreshHistory,
+      setCommittedRequirementText,
       repairRequirementRuleCandidates,
       flushRequirementTextSave,
       requirementBaseline,
@@ -3444,6 +3493,7 @@ export function WorkspaceSessionProvider({
     currentRunDiagnostics: visibleRunDiagnostics,
   } = deriveWorkspaceStatus({
     currentRunDiagnostics,
+    hasUncommittedRequirementDraft,
     designInputFingerprints,
     designModelTraceability,
     designModels,
@@ -3470,6 +3520,9 @@ export function WorkspaceSessionProvider({
     () => ({
       workspaceInitialized,
       requirementText,
+      hasUncommittedRequirementDraft,
+      inputScreening,
+      inputScreeningError,
       setRequirementText,
       rules,
       requirementBaseline,
@@ -3594,6 +3647,9 @@ export function WorkspaceSessionProvider({
     [
       workspaceInitialized,
       requirementText,
+      hasUncommittedRequirementDraft,
+      inputScreening,
+      inputScreeningError,
       setRequirementText,
       rules,
       requirementBaseline,

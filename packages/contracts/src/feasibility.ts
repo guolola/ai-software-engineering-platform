@@ -1,6 +1,6 @@
 // Defines editable feasibility facts, context traceability, implementation plans, and run snapshots.
 import { z } from "zod";
-import { activityDiagramSpecSchema, contextDiagramSpecSchema, plantUmlArtifactSchema, svgArtifactSchema } from "./models.js";
+import { feasibilityActivityDiagramSpecSchema, contextDiagramSpecSchema, plantUmlArtifactSchema, svgArtifactSchema } from "./models.js";
 import { requirementBaselineSchema, requirementRulesSchema } from "./requirements.js";
 import { providerSettingsSchema } from "./provider-configs.js";
 import { snapshotInputFingerprint } from "./fingerprints.js";
@@ -14,7 +14,7 @@ export type FeasibilityArtifactKind = z.infer<typeof feasibilityArtifactKindSche
 
 // Feasibility activities have their own source mappings and never replace requirement models.
 export const feasibilityBusinessFlowSchema = z.object({
-  model: activityDiagramSpecSchema,
+  model: feasibilityActivityDiagramSpecSchema,
   traceability: z.array(z.object({
     requirementId: z.string().min(1),
     targetId: z.string().min(1),

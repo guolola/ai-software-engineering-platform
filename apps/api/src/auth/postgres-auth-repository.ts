@@ -4,6 +4,9 @@ import type {
   AdminRole,
   AuditLogDto,
   LoginEventDto,
+  OnboardingStateResponse,
+  OnboardingTour,
+  OnboardingTourOutcome,
   ProjectBackgroundKey,
   ProjectMemberRole,
   ProjectMemberStatus,
@@ -53,6 +56,20 @@ type SessionRow = {
   user_agent: string | null;
   revoked_at: string | Date | null;
 };
+
+type OnboardingRow = {
+  empty_workspace_status: OnboardingStateResponse["emptyWorkspace"];
+  first_project_status: OnboardingStateResponse["firstProject"];
+  first_project_id: string | null;
+};
+
+function mapOnboardingRow(row?: OnboardingRow): OnboardingStateResponse {
+  return {
+    emptyWorkspace: row?.empty_workspace_status ?? null,
+    firstProject: row?.first_project_status ?? null,
+    firstProjectId: row?.first_project_id ?? null,
+  };
+}
 
 type ProjectRow = {
   id: string;
@@ -1255,6 +1272,17 @@ export function createPostgresAuthRepository(db: Queryable) {
         joinedAt,
       });
 
+      // Keep the first self-created project stable across later project creation.
+      await db.query(
+        `insert into user_onboarding_state (user_id, first_project_id)
+         values ($1, $2)
+         on conflict (user_id) do update
+         set first_project_id = coalesce(user_onboarding_state.first_project_id, excluded.first_project_id),
+             updated_at = now()
+         where user_onboarding_state.first_project_id is null`,
+        [input.ownerUserId, project.id],
+      );
+
       return { project, ownerMember };
     },
 
@@ -1444,6 +1472,34 @@ export function createPostgresAuthRepository(db: Queryable) {
       );
 
       return result.rows.map(mapProjectRow);
+    },
+
+    async getOnboardingState(userId: string): Promise<OnboardingStateResponse> {
+      const result = await db.query<OnboardingRow>(
+        `select empty_workspace_status, first_project_status, first_project_id
+         from user_onboarding_state where user_id = $1`,
+        [userId],
+      );
+      return mapOnboardingRow(result.rows[0]);
+    },
+
+    async setOnboardingOutcome(
+      userId: string,
+      tour: OnboardingTour,
+      outcome: OnboardingTourOutcome,
+    ): Promise<OnboardingStateResponse> {
+      const column = tour === "empty-workspace"
+        ? "empty_workspace_status"
+        : "first_project_status";
+      const result = await db.query<OnboardingRow>(
+        `insert into user_onboarding_state (user_id, ${column})
+         values ($1, $2)
+         on conflict (user_id) do update
+         set ${column} = excluded.${column}, updated_at = now()
+         returning empty_workspace_status, first_project_status, first_project_id`,
+        [userId, outcome],
+      );
+      return mapOnboardingRow(result.rows[0]);
     },
 
     async listProjects() {

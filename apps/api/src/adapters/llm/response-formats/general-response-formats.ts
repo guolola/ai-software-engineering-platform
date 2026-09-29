@@ -25,6 +25,7 @@ const requirementRuleSchema = {
       ],
     },
     text: { type: "string" },
+    sourceFragment: { type: "string" },
     relatedDiagrams: {
       type: "array",
       items: {
@@ -33,7 +34,7 @@ const requirementRuleSchema = {
       },
     },
   },
-  required: ["id", "category", "text", "relatedDiagrams"],
+  required: ["id", "category", "text", "sourceFragment", "relatedDiagrams"],
 } as const;
 
 const requirementFieldProvenanceEntrySchema = {
@@ -207,18 +208,6 @@ export const DOCUMENT_CONTENT_RESPONSE_FORMAT = strictResponseFormat(
   },
 );
 
-export const REPAIR_PLANTUML_RESPONSE_FORMAT = strictResponseFormat(
-  "repair_plantuml_result",
-  {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      source: { type: "string" },
-    },
-    required: ["source"],
-  },
-);
-
 export const HEALTHCHECK_RESPONSE_FORMAT = strictResponseFormat(
   "provider_healthcheck",
   {
@@ -245,10 +234,6 @@ export function getRepairRequirementRulesResponseFormat(model: ModelCapabilitySo
 
 export function getDocumentContentResponseFormat(model: ModelCapabilitySource) {
   return responseFormatIfSupported(model, DOCUMENT_CONTENT_RESPONSE_FORMAT);
-}
-
-export function getRepairPlantUmlResponseFormat(model: ModelCapabilitySource) {
-  return responseFormatIfSupported(model, REPAIR_PLANTUML_RESPONSE_FORMAT);
 }
 
 export function getHealthcheckResponseFormat(model: ModelCapabilitySource) {

@@ -4,7 +4,7 @@ import {
   requirementModelTraceabilityEntrySchema,
 } from "./models.js";
 
-export const WORKSPACE_FINGERPRINT_VERSION = "fp:v2";
+export const WORKSPACE_FINGERPRINT_VERSION = "fp:v3";
 
 export function snapshotInputFingerprint(value: unknown) {
   return `${WORKSPACE_FINGERPRINT_VERSION}:${fingerprintHash(
@@ -24,35 +24,9 @@ export function designInputFingerprint(
   );
 }
 
-export function normalizeDesignInputFingerprint(
-  fingerprint: string | null | undefined,
-) {
-  if (!fingerprint) return fingerprint ?? null;
-  if (fingerprint.startsWith(`${WORKSPACE_FINGERPRINT_VERSION}:`)) {
-    return fingerprint;
-  }
-  try {
-    return snapshotInputFingerprint(
-      normalizeDesignInputFingerprintValue(JSON.parse(fingerprint)),
-    );
-  } catch {
-    return fingerprint;
-  }
-}
-
-export function normalizeSnapshotFingerprint(
-  fingerprint: string | null | undefined,
-) {
-  if (!fingerprint) return fingerprint ?? null;
-  if (fingerprint.startsWith(`${WORKSPACE_FINGERPRINT_VERSION}:`)) {
-    return fingerprint;
-  }
-  try {
-    return snapshotInputFingerprint(JSON.parse(fingerprint));
-  } catch {
-    return fingerprint;
-  }
-}
+// Old hashes and serialized snapshots remain old: reading must never certify an unvalidated model as v3.
+export function normalizeDesignInputFingerprint(fingerprint: string | null | undefined) { return fingerprint ?? null; }
+export function normalizeSnapshotFingerprint(fingerprint: string | null | undefined) { return fingerprint ?? null; }
 
 function fingerprintHash(value: string) {
   let h1 = 1779033703;

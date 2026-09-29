@@ -1,4 +1,5 @@
 // Owns pure diagram model draft helpers used by the diagram detail editor UI.
+import { getStageModelSchema, contractResponseSchema, type ModelingStage } from "@uml-platform/contracts";
 import type { DesignDiagramType, DiagramType } from "../../../entities/diagram/model";
 import type { DiagramDetailItem } from "../../../entities/diagram/lib/model-details";
 
@@ -69,6 +70,8 @@ export const EDITABLE_COLLECTIONS: Record<string, EditableCollection[]> = {
         preconditions: [],
         postconditions: [],
         supportingActorIds: [],
+        eventFlows: [],
+        extensionPoints: [],
       }),
     },
     {
@@ -129,7 +132,7 @@ export const EDITABLE_COLLECTIONS: Record<string, EditableCollection[]> = {
       key: "nodes",
       label: "部署节点",
       nameKey: "name",
-      create: () => ({ id: createDraftId("node"), name: "新节点", nodeType: "server" }),
+      create: () => ({ id: createDraftId("node"), name: "新节点", nodeType: "device" }),
     },
     {
       key: "databases",
@@ -182,6 +185,7 @@ export const EDITABLE_COLLECTIONS: Record<string, EditableCollection[]> = {
       create: () => ({
         id: createDraftId("table"),
         name: "new_table",
+        relationalConstraints: [{ id: "pk", type: "primary-key", columnIds: ["id"] }],
         columns: [
           {
             id: "id",
@@ -196,6 +200,28 @@ export const EDITABLE_COLLECTIONS: Record<string, EditableCollection[]> = {
     },
   ],
 };
+
+// These models share collection mechanics, but their schemas and semantics remain stage-specific.
+const collection = (key: string, label: string, fields: Record<string, unknown> = {}): EditableCollection => ({ key, label, nameKey: "name", create: () => ({ id: createDraftId(key), name: `新${label}`, ...structuredClone(fields) }) });
+EDITABLE_COLLECTIONS.function = [collection("nodes", "功能", { sourceRequirementIds: [] })];
+EDITABLE_COLLECTIONS.prototype = [collection("nodes", "页面或模块", { nodeType: "screen", sourceUseCaseIds: [], sourceRequirementIds: [] })];
+EDITABLE_COLLECTIONS.navigation = EDITABLE_COLLECTIONS.prototype!;
+EDITABLE_COLLECTIONS.architecture = [collection("packages", "包"), collection("components", "组件", { sourceRequirementIds: [] })];
+EDITABLE_COLLECTIONS.component = [collection("components", "组件", { sourceClassIds: [] }), collection("interfaces", "接口", { operationNames: [] })];
+EDITABLE_COLLECTIONS.sequence!.push({ key: "activations", label: "激活区间", nameKey: "id", create: () => ({ id: createDraftId("activation"), participantId: "", startMessageId: "", endMessageId: "" }) });
+EDITABLE_COLLECTIONS.analysis = EDITABLE_COLLECTIONS.sequence!;
+
+/** Drafts can be incomplete; this endpoint inventory never parses or drops their contents. */
+export function draftGraphElements(model: Record<string, unknown>): Array<{ id: string; kind: string; name: string }> {
+  const kinds: Record<string, string> = { actors: "actor", useCases: "usecase", classes: "class", interfaces: "interface", enums: "enum", packages: "package", components: "component", artifacts: "artifact", databases: "execution-environment", externalSystems: "external", people: "person", tables: "table" };
+  const result: Array<{ id: string; kind: string; name: string }> = [];
+  if (model.diagramKind === "context" && model.system) { const item = model.system as Record<string, unknown>; result.push({ id: stringValue(item.id), kind: "system", name: stringValue(item.name) }); }
+  for (const [key, value] of Object.entries(model)) if (Array.isArray(value) && (key in kinds || ["nodes", "participants"].includes(key))) for (const item of value) {
+    result.push({ id: stringValue(item.id), name: stringValue(item.name ?? item.question ?? item.id), kind: kinds[key] ?? (model.diagramKind === "function" ? "function" : stringValue(item.type ?? item.nodeType ?? item.participantType)) });
+    for (const pins of ["inputPins", "outputPins"]) for (const pin of Array.isArray(item[pins]) ? item[pins] : []) result.push({ id: stringValue(pin.id), name: `${stringValue(item.name)} / ${stringValue(pin.name)}`, kind: pins === "inputPins" ? "input-pin" : "output-pin" });
+  }
+  return result;
+}
 
 export function createDraftId(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
@@ -228,7 +254,7 @@ export function designSourceLabel(
     }
     return "来源：需求阶段用例模型事件流 + 需求分析模型（具体用例未标明）";
   }
-  if (diagram === "activity") {
+  if (diagram === "navigation") {
     return "来源：需求阶段原型界面关系 + 设计阶段用例实现设计";
   }
   if (diagram === "class") {
@@ -319,12 +345,14 @@ export function setOptionalStringValue(
   }
 }
 
-export function editableCollectionsFor(model: unknown) {
+export function editableCollectionsFor(model: unknown, stage: ModelingStage = "requirements") {
   const diagramKind =
     model && typeof model === "object"
       ? String((model as Record<string, unknown>).diagramKind ?? "")
       : "";
-  return EDITABLE_COLLECTIONS[diagramKind] ?? [];
+  const schema = getStageModelSchema(stage, diagramKind);
+  const properties = schema ? contractResponseSchema(schema).properties : {};
+  return (EDITABLE_COLLECTIONS[diagramKind] ?? []).filter((item) => properties[item.key] && properties[item.key].maxItems !== 0);
 }
 
 export function collectionItems(draft: Record<string, unknown>, collection: EditableCollection) {
@@ -356,7 +384,7 @@ export function setItemLabel(item: Record<string, unknown>, collection: Editable
 }
 
 export function relationshipItems(draft: Record<string, unknown>) {
-  if (draft.diagramKind === "sequence") {
+  if (["analysis", "sequence"].includes(String(draft.diagramKind))) {
     return Array.isArray(draft.messages)
       ? (draft.messages as Array<Record<string, unknown>>)
       : [];
@@ -406,62 +434,16 @@ export function updateDraftItem(
   );
 }
 
-export function removeDanglingRelations(draft: Record<string, unknown>) {
-  const ids = new Set(
-    editableCollectionsFor(draft).flatMap((collection) =>
-      collectionItems(draft, collection).map((item) => String(item.id ?? "")),
-    ),
-  );
-  const relationships = relationshipItems(draft).map((relation) => {
-    if (draft.diagramKind !== "table") return relation;
-    const sourceTableId = stringValue(relation.sourceTableId);
-    const targetTableId = stringValue(relation.targetTableId);
-    const sourceColumnId = stringValue(relation.sourceColumnId);
-    const targetColumnId = stringValue(relation.targetColumnId);
-    const tableColumns = new Map(
-      collectionItems(draft, { key: "tables", label: "数据表", nameKey: "name", create: () => ({}) })
-        .map((table) => [
-          stringValue(table.id),
-          new Set(
-            Array.isArray(table.columns)
-              ? table.columns.map((column) => stringValue((column as Record<string, unknown>).id))
-              : [],
-          ),
-        ]),
-    );
-    const nextRelation = { ...relation };
-    if (sourceColumnId && !tableColumns.get(sourceTableId)?.has(sourceColumnId)) {
-      delete nextRelation.sourceColumnId;
-    }
-    if (targetColumnId && !tableColumns.get(targetTableId)?.has(targetColumnId)) {
-      delete nextRelation.targetColumnId;
-    }
-    return nextRelation;
-  }).filter((relation) => {
-    const source = String(relation[relationEndpointKey(draft, "source")] ?? "");
-    const target = String(relation[relationEndpointKey(draft, "target")] ?? "");
-    return ids.has(source) && ids.has(target);
-  });
-  if (draft.diagramKind === "sequence") {
-    const messageIds = new Set(relationships.map((message) => stringValue(message.id)));
-    const fragments = collectionItems(draft, { key: "fragments", label: "组合片段", nameKey: "label", create: () => ({}) })
-      .map((fragment) => ({
-        ...fragment,
-        messageIds: stringListValue(fragment.messageIds).filter((id) => messageIds.has(id)),
-      }));
-    return { ...draft, messages: relationships, fragments };
-  }
-  return { ...draft, relationships };
-}
+// Deleting a node keeps dependent references visible for explicit repair; no silent cascading rewrite.
+export function removeDanglingRelations(draft: Record<string, unknown>) { return draft; }
 
-export function createRelationshipDraft(draft: Record<string, unknown>) {
-  const endpointIds = editableCollectionsFor(draft)
-    .flatMap((collection) => collectionItems(draft, collection))
+export function createRelationshipDraft(draft: Record<string, unknown>, stage: ModelingStage = "requirements") {
+  const endpointIds = draftGraphElements(draft)
     .map((item) => String(item.id ?? ""))
     .filter(Boolean);
   const source = endpointIds[0] ?? "";
   const target = endpointIds[1] ?? source;
-  if (draft.diagramKind === "sequence") {
+  if (["analysis", "sequence"].includes(String(draft.diagramKind))) {
     return {
       id: createDraftId("msg"),
       type: "sync",
@@ -502,32 +484,19 @@ export function createRelationshipDraft(draft: Record<string, unknown>) {
   }
   return {
     id: createDraftId("rel"),
-    type: "association",
+    type: relationTypeOptions(draft.diagramKind, stage)[0] ?? "association",
     sourceId: source,
     targetId: target,
     label: "新关系",
   };
 }
 
-export function relationTypeOptions(diagramKind: unknown) {
-  switch (diagramKind) {
-    case "context":
-      return ["directed", "bidirectional"];
-    case "usecase":
-      return ["association", "include", "extend", "generalization"];
-    case "class":
-      return ["association", "aggregation", "composition", "inheritance", "implementation", "dependency"];
-    case "activity":
-      return ["control_flow", "object_flow"];
-    case "deployment":
-      return ["deployment", "communication", "dependency", "hosting"];
-    case "sequence":
-      return ["sync", "async", "return", "create", "destroy"];
-    case "table":
-      return ["one-to-one", "one-to-many", "many-to-many"];
-    default:
-      return ["association"];
-  }
+export function relationTypeOptions(diagramKind: unknown, stage: ModelingStage = "requirements"): string[] {
+  const kind = String(diagramKind);
+  const contract = getStageModelSchema(stage, kind);
+  if (!contract) return [];
+  const schema = contractResponseSchema(contract);
+  return schema.properties[kind === "analysis" || kind === "sequence" ? "messages" : "relationships"]?.items?.properties?.[kind === "context" ? "direction" : "type"]?.enum ?? [];
 }
 
 export function activityNodeForType(
@@ -538,6 +507,7 @@ export function activityNodeForType(
     id: item.id,
     type,
     description: item.description,
+    actorOrLane: item.actorOrLane,
   };
   const name = stringValue(item.name) || stringValue(item.question);
   switch (type) {
@@ -546,6 +516,8 @@ export function activityNodeForType(
         ...base,
         name: name || "新活动",
         actorOrLane: item.actorOrLane,
+        inputPins: item.inputPins,
+        outputPins: item.outputPins,
         input: stringListValue(item.input),
         output: stringListValue(item.output),
       };
@@ -554,6 +526,10 @@ export function activityNodeForType(
         ...base,
         question: stringValue(item.question) || name || "条件判断",
       };
+    case "object":
+      return { ...base, name: name || "对象", dataType: stringValue(item.dataType) || "Object", state: item.state };
+    case "flow_final":
+      return { ...base, name: name || "分支结束" };
     case "start":
       return { ...base, name: name || "开始" };
     case "end":

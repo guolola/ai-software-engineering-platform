@@ -85,77 +85,8 @@ export function createStableCodeScaffold() {
 }
 
 export function summarizeDesignModelForCode(model: DesignDiagramModelSpec) {
-  const source = model as Record<string, unknown>;
-  const limitArray = (value: unknown, maxItems: number) =>
-    Array.isArray(value) ? value.slice(0, maxItems) : value;
-  const base = {
-    diagramKind: model.diagramKind,
-    title: source.title,
-    summary: source.summary,
-    notes: source.notes,
-    itemCounts: Object.fromEntries(
-      Object.entries(source)
-        .filter(([, value]) => Array.isArray(value))
-        .map(([key, value]) => [key, (value as unknown[]).length]),
-    ),
-  };
-
-  switch (model.diagramKind) {
-    case "class":
-      return {
-        ...base,
-        classes: limitArray(source.classes, 12),
-        interfaces: limitArray(source.interfaces, 8),
-        enums: limitArray(source.enums, 6),
-        relationships: limitArray(source.relationships, 18),
-      };
-    case "activity":
-      return {
-        ...base,
-        nodes: limitArray(source.nodes, 24),
-        relationships: limitArray(source.relationships, 28),
-        swimlanes: limitArray(source.swimlanes, 8),
-      };
-    case "sequence":
-      return {
-        ...base,
-        participants: limitArray(source.participants, 14),
-        messages: limitArray(source.messages, 24),
-        fragments: limitArray(source.fragments, 8),
-      };
-    case "table":
-      return {
-        ...base,
-        tables: limitArray(source.tables, 12),
-        relationships: limitArray(source.relationships, 18),
-      };
-    case "deployment":
-      return {
-        ...base,
-        nodes: limitArray(source.nodes, 10),
-        databases: limitArray(source.databases, 6),
-        components: limitArray(source.components, 12),
-        externalSystems: limitArray(source.externalSystems, 6),
-        artifacts: limitArray(source.artifacts, 8),
-        relationships: limitArray(source.relationships, 18),
-      };
-    case "architecture":
-      return {
-        ...base,
-        packages: limitArray(source.packages, 12),
-        components: limitArray(source.components, 18),
-        relationships: limitArray(source.relationships, 24),
-      };
-    case "component":
-      return {
-        ...base,
-        components: limitArray(source.components, 18),
-        interfaces: limitArray(source.interfaces, 12),
-        relationships: limitArray(source.relationships, 24),
-      };
-    default:
-      return base;
-  }
+  // Every endpoint and constraint must reach code generation; a sliced graph is not a valid model.
+  return { ...model, itemCounts: Object.fromEntries(Object.entries(model).filter(([, value]) => Array.isArray(value)).map(([key, value]) => [key, (value as unknown[]).length])) };
 }
 
 export function buildCodeContext(snapshot: CodeRunSnapshot) {

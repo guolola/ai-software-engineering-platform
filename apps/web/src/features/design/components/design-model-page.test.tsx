@@ -14,6 +14,7 @@ import {
 } from "../../../test/workspace-test-utils";
 import { designInputFingerprint } from "../../../shared/lib/fingerprint";
 import { DesignModelPage } from "./design-model-page";
+import { useWorkspaceShell } from "../../workspace-shell/state";
 
 type StartDesignRunInput = Parameters<
   NonNullable<WorkspaceRepository["startDesignRun"]>
@@ -33,6 +34,8 @@ const useCaseModel = {
       preconditions: [],
       postconditions: [],
       supportingActorIds: [],
+      eventFlows: [],
+      systemBoundaryId: "system",
     },
   ],
   systemBoundaries: [{ id: "system", name: "平台" }],
@@ -69,9 +72,7 @@ const prototypeModel = {
   title: "原型界面关系",
   summary: "页面入口",
   notes: [],
-  pages: [],
-  modules: [],
-  entryPoints: [],
+  nodes: [],
   relationships: [],
 };
 
@@ -156,6 +157,30 @@ describe("DesignModelPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("opens the trace matrix for the requirement model with a coverage gap", async () => {
+    const repository = createMockWorkspaceRepository({
+      requirementText: "生成 UML",
+      rules: [createRule()],
+      models: { class: classModel },
+      generatedDiagramTypes: ["class"],
+      selectedDesignDiagramTypes: ["class"],
+    });
+    function SelectionProbe() {
+      const { selection } = useWorkspaceShell();
+      return <output data-testid="workspace-selection">{
+        selection.kind === "requirement-trace-matrix" ? selection.diagram : selection.kind
+      }</output>;
+    }
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<><DesignModelPage /><SelectionProbe /></>, repository));
+    await screen.findByRole("heading", { name: "目标模型" });
+    await user.click(await screen.findByRole("button", { name: /需要处理/ }));
+    const guidance = screen.getByRole("dialog", { name: "设计模型暂时无法生成" });
+    await user.click(within(guidance).getByRole("button", { name: "查看跟踪矩阵" }));
+
+    expect(screen.getByTestId("workspace-selection")).toHaveTextContent("class");
+  });
+
   it("treats per-use-case analysis models as available requirement sources", async () => {
     const repository: WorkspaceRepository = {
       loadWorkspace: vi.fn(async () =>
@@ -223,14 +248,14 @@ describe("DesignModelPage", () => {
 
     render(withWorkspaceProviders(<DesignModelPage />, repository));
 
-    expect(screen.getByRole("checkbox", { name: /界面关系图/ })).not.toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("checkbox", { name: /页面导航模型/ })).not.toHaveAttribute("aria-disabled", "true");
   });
 
   it("keeps downstream design selection separate and confirms missing sequence dependency", async () => {
     const snapshot: DesignRunSnapshot = {
       runId: "design-run",
       requirementText: "生成 UML",
-      selectedDiagrams: ["sequence", "activity"],
+      selectedDiagrams: ["sequence", "navigation"],
       rules: [],
       requirementBaseline: createRequirementBaseline(),
       requirementModels: [useCaseModel],
@@ -330,9 +355,9 @@ describe("DesignModelPage", () => {
 
     render(withWorkspaceProviders(<DesignModelPage />, repository));
 
-    await userEvent.click(await screen.findByRole("button", { name: "选择界面关系图" }));
+    await userEvent.click(await screen.findByRole("button", { name: "选择页面导航模型" }));
     expect(screen.getByRole("checkbox", { name: /用例实现设计/ })).not.toBeChecked();
-    expect(screen.getByRole("checkbox", { name: /界面关系图/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /页面导航模型/ })).toBeChecked();
     await userEvent.click(screen.getByRole("button", { name: /生成设计模型/ }));
     const confirmation = await screen.findByRole("dialog", { name: "确认生成设计模型" });
     expect(within(confirmation).getByText("设计依赖补齐")).toBeInTheDocument();
@@ -342,8 +367,8 @@ describe("DesignModelPage", () => {
     await waitFor(() => {
       expect(startDesignRun).toHaveBeenCalledWith(
         expect.objectContaining({
-          selectedDiagrams: ["sequence", "activity"],
-          requestedDiagrams: ["activity"],
+          selectedDiagrams: ["sequence", "navigation"],
+          requestedDiagrams: ["navigation"],
         }),
       );
     });
@@ -490,7 +515,7 @@ describe("DesignModelPage", () => {
     render(withWorkspaceProviders(<DesignModelPage />, repository));
 
     await screen.findByText("设计模型");
-    expect(screen.getByRole("checkbox", { name: /界面关系图/ })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: /页面导航模型/ })).toBeEnabled();
     expect(screen.getAllByText(/将自动补齐：原型界面关系/).length).toBeGreaterThan(0);
   });
 

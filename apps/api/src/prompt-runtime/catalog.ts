@@ -29,7 +29,7 @@ export const catalog: CatalogEntry[] = [
   entry("feasibility.plan-repair", ["可行性分析", "方案 JSON 修复"], "只修复校验错误涉及的字段或章节，其余内容必须原样保留。", "feasibility-prompts.ts"),
   entry("feasibility.section-repair", ["可行性分析", "章节修复"], "仅修复候选方案索引", "feasibility-prompts.ts"),
   entry("design.sequence", ["设计建模", "用例实现设计"], "请根据已确认需求项、需求阶段用例模型事件流和需求分析模型生成设计阶段用例实现设计结构化模型。", "model-prompts.ts"),
-  ...(["architecture", "class", "activity", "component", "deployment", "table"] as const).map((kind) =>
+  ...(["architecture", "class", "navigation", "component", "deployment", "table"] as const).map((kind) =>
     entry(`design.model.${kind}`, ["设计建模", "模型生成", kind], "请根据已确认需求项、需求阶段模型和全部用例实现设计生成设计阶段 UML 结构化模型。", "model-prompts.ts")),
   entry("design.repair", ["设计建模", "模型修复"], "请修复下面不符合要求的设计阶段 UML 结构化模型 JSON 输出。", "model-prompts.ts"),
   entry("design.trace", ["设计建模", "追踪关系生成"], "请为已经生成成功的设计阶段 UML 模型补充元素级可追踪关系。", "model-prompts.ts"),
@@ -46,7 +46,6 @@ export const catalog: CatalogEntry[] = [
   entry("code.fidelity", ["代码原型", "界面保真度核验"], "请检查当前 React 原型代码是否覆盖业务逻辑，以及 ui-ux-pro-max 应从业务逻辑推导出的界面方案。", "code-prompts.ts"),
   entry("documents.generate", ["文档与渲染", "文档正文生成"], "请根据平台当前产物生成", "document-prompts.ts"),
   entry("documents.repair", ["文档与渲染", "文档正文修复"], "请修复《", "document-prompts.ts"),
-  entry("render.plantuml-repair", ["文档与渲染", "PlantUML 修复"], "请修复下面无法编译或返回占位 SVG 的 PlantUML。", "document-prompts.ts"),
   { id: "shared.json", path: ["共用约束", "JSON 系统指令"], instruction: "你是一个严谨的软件需求与 UML 建模助手。你必须只返回 JSON，不要输出 Markdown、解释或代码围栏。", match: "", source: "model-prompts.ts", kind: "locked" },
   { id: "shared.schema", path: ["共用约束", "结构化输出契约"], instruction: "由代码中的 JSON Schema、输入数据和安全约束生成，不开放编辑。", match: "", source: "response-formats", kind: "locked" },
   { id: "skill.ui-ux-pro-max", path: ["Skill", "UI/UX Pro Max"], instruction: "代码生成使用的 UI/UX Skill。说明、资源和动作本轮只读。", match: "", source: "code-skills/ui-ux-pro-max/SKILL.md", kind: "skill" },

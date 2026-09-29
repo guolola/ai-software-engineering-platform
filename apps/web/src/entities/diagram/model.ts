@@ -72,7 +72,7 @@ export const DESIGN_DIAGRAM_META: Record<
 > = {
   architecture: {
     label: "总体架构图",
-    english: "Package Diagram",
+    english: "Logical Architecture",
     description: "包、子系统、核心组件与依赖",
   },
   sequence: {
@@ -80,10 +80,10 @@ export const DESIGN_DIAGRAM_META: Record<
     english: "Sequence Diagram",
     description: "基于事件流的对象调用时序与动态行为",
   },
-  activity: {
+  navigation: {
     label: "界面关系图",
-    english: "Activity Diagram",
-    description: "界面节点、状态与跳转关系",
+    english: "Page Navigation",
+    description: "页面、入口、模块与导航关系",
   },
   class: {
     label: "设计类图",
@@ -98,7 +98,7 @@ export const DESIGN_DIAGRAM_META: Record<
   deployment: {
     label: "部署设计",
     english: "Deployment Diagram",
-    description: "组件在 Pod、服务器、数据库上的分布",
+    description: "设备、执行环境、制品部署与通信",
   },
   table: {
     label: "数据库设计",
@@ -111,7 +111,7 @@ export const DESIGN_DIAGRAM_ORDER: DesignDiagramType[] = [
   "architecture",
   "sequence",
   "class",
-  "activity",
+  "navigation",
   "table",
   "component",
   "deployment",

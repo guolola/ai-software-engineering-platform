@@ -19,6 +19,8 @@ function tableDesignModel(): DesignDiagramModelSpec {
       {
         id: "users",
         name: "users",
+        constraints: [],
+        relationalConstraints: [{ id: "pk_users", type: "primary-key", columnIds: ["id"] }],
         columns: [
           {
             id: "id",

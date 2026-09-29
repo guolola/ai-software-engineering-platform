@@ -27,3 +27,8 @@
   --info: var(--color-blue-400);
 }
 html, body, #root { min-height: 100%; }
+
+/* The portal overlay must sit above the sticky header and fixed sidebar. */
+[data-name="onborda-overlay"] {
+  z-index: 901;
+}

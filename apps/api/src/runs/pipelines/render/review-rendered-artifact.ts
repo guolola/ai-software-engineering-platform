@@ -1,4 +1,4 @@
-// Reviews a compiled UML image against its structured model and repairs only diagram source.
+// Provides advisory image review without changing model semantics or deterministic source.
 import { z } from "zod";
 import {
   diagramVisualReviewSchema,
@@ -8,7 +8,7 @@ import {
   type DiagramVisualReview,
   type ProviderSettings,
 } from "@uml-platform/contracts";
-import { JSON_ONLY_SYSTEM_PROMPT, buildRepairPlantUmlPrompt } from "@uml-platform/prompts";
+import { JSON_ONLY_SYSTEM_PROMPT } from "@uml-platform/prompts";
 import type { ChatMessage, LlmTransport } from "../../../llm.js";
 import type { PngRenderClient } from "../../../adapters/render/png-render-client.js";
 import type { RenderClient } from "../../../adapters/render/render-client.js";
@@ -20,8 +20,7 @@ import { renderArtifactWithRepair } from "./render-artifact-with-repair.js";
 
 type Rendered = Extract<Awaited<ReturnType<typeof renderArtifactWithRepair>>, { status: "success" }>;
 const judgmentSchema = z.object({ passed: z.boolean(), issues: z.array(z.string()) });
-const sourceSchema = z.object({ source: z.string().min(1) });
-const MAX_VISUAL_REPAIRS = 2;
+const MAX_VISUAL_REPAIRS = 0;
 
 function unsupportedImage(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
@@ -55,8 +54,8 @@ export async function reviewRenderedArtifact(input: {
   model: DiagramModelSpec | DesignDiagramModelSpec;
   rendered: Rendered;
 }): Promise<{ rendered: Rendered; review: DiagramVisualReview }> {
-  const { record, providerSettings, llmTransport, renderClient, pngRenderClient, model } = input;
-  let rendered = input.rendered;
+  const { record, providerSettings, llmTransport, pngRenderClient, model } = input;
+  const rendered = input.rendered;
   progress(record, rendered, "正在检查图面与结构化模型是否一致", "running", model.title);
   if (!pngRenderClient) {
     const review = result("skipped", [], "当前运行环境无法生成检查所需的 PNG，已跳过视觉检查", 0, 0);
@@ -66,7 +65,7 @@ export async function reviewRenderedArtifact(input: {
 
   let issues: string[] = [];
   let checks = 0;
-  let repairs = 0;
+  const repairs = 0;
   for (let attempt = 0; attempt <= MAX_VISUAL_REPAIRS; attempt += 1) {
     try {
       const image = await pngRenderClient(rendered.artifact);
@@ -93,27 +92,8 @@ export async function reviewRenderedArtifact(input: {
         return { rendered, review };
       }
       issues = judgment.issues.length ? judgment.issues : ["视觉模型未确认图面正确"];
-      if (attempt === MAX_VISUAL_REPAIRS) break;
-      progress(record, rendered, `视觉检查发现问题，正在修复（${attempt + 1}/${MAX_VISUAL_REPAIRS}）`, "repairing", model.title);
-      repairs += 1;
-      const repairPrompt = `${buildRepairPlantUmlPrompt(rendered.artifact.diagramKind, model, rendered.artifact.source, issues.join("；"))}\n视觉检查问题：${issues.join("；")}\n只修改 PlantUML 源码，不修改结构化模型。`;
-      const repairedRaw = await collectTextResult(
-        llmTransport,
-        providerSettings,
-        [{ role: "system", content: JSON_ONLY_SYSTEM_PROMPT }, { role: "user", content: repairPrompt }],
-        () => undefined,
-        { type: "json_object" },
-      );
-      const repairedSource = sourceSchema.parse(parseJson(repairedRaw)).source;
-      const candidate = await renderArtifactWithRepair(record, providerSettings, llmTransport, renderClient, model, {
-        ...rendered.artifact,
-        source: repairedSource,
-      });
-      if (candidate.status !== "success") {
-        issues = [...issues, "视觉修复后的图源码无法渲染"];
-        break;
-      }
-      rendered = candidate;
+      // Visual findings are advisory; semantic changes must go through model validation.
+      break;
     } catch (error) {
       if (unsupportedImage(error)) {
         const review = result("skipped", [], "本次模型不支持图片输入，已跳过视觉检查", checks, repairs);

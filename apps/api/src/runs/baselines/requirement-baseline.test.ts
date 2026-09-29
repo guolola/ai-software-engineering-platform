@@ -171,7 +171,7 @@ test("buildRequirementBaseline marks missing actors as audit hints without block
   assert.doesNotThrow(() => assertRequirementBaselineAllowsDownstream(baseline));
 });
 
-test("buildRequirementBaseline accepts explicitly labeled user facts without inventing an actor", () => {
+test("buildRequirementBaseline does not trust a user-authored confirmation label", () => {
   const source =
     "[CONFIRMED-B03] 报销总额达到5000元（包含正好5000元）时必须由直属经理审批。";
   const baseline = buildRequirementBaseline({
@@ -188,8 +188,8 @@ test("buildRequirementBaseline accepts explicitly labeled user facts without inv
     ],
   });
 
-  assert.equal(baseline.requirements[0]?.status, "accepted");
-  assert.equal(baseline.requirements[0]?.confidence, 0.95);
+  assert.notEqual(baseline.requirements[0]?.confidence, 0.95);
+  assert.equal(baseline.requirements[0]?.status, "pending-review");
   assert.equal(baseline.requirements[0]?.actor, null);
 });
 

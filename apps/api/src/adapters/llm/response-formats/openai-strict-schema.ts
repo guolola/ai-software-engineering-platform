@@ -9,6 +9,8 @@ function addNullType(schema: Record<string, unknown>) {
 
   if (typeof type === "string") {
     next.type = type === "null" ? type : [type, "null"];
+  } else if (Array.isArray(next.anyOf)) {
+    if (!next.anyOf.some((item) => isRecord(item) && item.type === "null")) next.anyOf = [...next.anyOf, { type: "null" }];
   } else if (Array.isArray(type) && !type.includes("null")) {
     next.type = [...type, "null"];
   }

@@ -19,6 +19,8 @@ import {
 } from "../../../test/workspace-test-utils";
 import { snapshotInputFingerprint } from "../../../shared/lib/fingerprint";
 import { TextRequirementView } from "./text-requirement-page";
+import { useWorkspaceShell } from "../../workspace-shell/state";
+import { useWorkspaceSession } from "../../workspace-session/state";
 
 function storeManagedUserSettings() {
   localStorage.setItem(
@@ -173,7 +175,7 @@ describe("TextRequirementView", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
-  it("renders the empty state with input guidance and clears requirement text", async () => {
+  it("renders the empty state with an unsaved requirement draft", async () => {
     const updateRequirementText = vi.fn(async () => {});
     const repository = createBaseRepository({ updateRequirementText });
 
@@ -222,12 +224,9 @@ describe("TextRequirementView", () => {
 
     await user.type(requirementInput, "创建一个订单系统");
     expect(requirementInput).toHaveValue("创建一个订单系统");
-    await user.click(screen.getByRole("button", { name: "清空" }));
-
-    expect(requirementInput).toHaveValue("");
-    await waitFor(() => {
-      expect(updateRequirementText).toHaveBeenLastCalledWith("");
-    });
+    expect(screen.getByText(/需求文本尚未保存。点击/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "清空" })).not.toBeInTheDocument();
+    expect(updateRequirementText).not.toHaveBeenCalled();
   });
 
   it("shows rule autofill only when source requirement text exists", async () => {
@@ -309,6 +308,32 @@ describe("TextRequirementView", () => {
       await screen.findByRole("dialog", { name: "需求规则已生成" }),
     ).toBeInTheDocument();
     expect(screen.getByText("生成完成。")).toBeInTheDocument();
+  });
+
+  it("shows the exact ignored source after a mixed-input rules run", async () => {
+    const requirementText = "学生可以预约座位。今天天气真好。";
+    const ignored = "今天天气真好。";
+    const startOffset = requirementText.indexOf(ignored);
+    const snapshot = createRunSnapshot({
+      runId: "run-mixed-input",
+      requirementText,
+      rules: [createRule({ text: "学生可以预约座位。", sourceFragment: "学生可以预约座位。" })],
+      inputScreening: {
+        ignoredSpans: [{ startOffset, endOffset: startOffset + ignored.length, reason: "irrelevant" }],
+      },
+    });
+    const repository = createBaseRepository({
+      loadWorkspace: vi.fn(async () => createWorkspaceRecord({ requirementText })),
+      subscribeToRun: vi.fn(async (_runId, onEvent) => {
+        onEvent({ type: "queued" });
+        onEvent({ type: "completed", snapshot });
+      }),
+      getRunSnapshot: vi.fn(async () => snapshot),
+    });
+    render(withWorkspaceProviders(<TextRequirementView />, repository));
+    await userEvent.setup().click(await screen.findByTitle("生成需求规则"));
+    expect(await screen.findByText(ignored)).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "需求规则已生成" })).toHaveTextContent("无关");
   });
 
   it("asks before replacing existing requirement rules", async () => {
@@ -798,7 +823,7 @@ describe("TextRequirementView", () => {
     await user.type(sourceText, "并支持退款。");
 
     expect(
-      screen.getByText("需求文本已修改，下方规则基于旧文本，可能已过时。"),
+      screen.getByText(/需求文本尚未保存。点击/),
     ).toBeInTheDocument();
     const useCaseCheckbox = screen.getByRole("checkbox", { name: /用例模型/ });
     expect(useCaseCheckbox).toBeEnabled();
@@ -1681,7 +1706,7 @@ describe("TextRequirementView", () => {
           }),
         ],
         expect.objectContaining({
-          requirementInputFingerprint: expect.stringMatching(/^fp:v2:/),
+          requirementInputFingerprint: expect.stringMatching(/^fp:v3:/),
           rulesBasedOnTextVersion: 0,
           rulesVersion: 2,
         }),
@@ -1728,7 +1753,7 @@ describe("TextRequirementView", () => {
       expect(updateRequirementRules).toHaveBeenLastCalledWith(
         [usecaseRule],
         expect.objectContaining({
-          requirementInputFingerprint: expect.stringMatching(/^fp:v2:/),
+          requirementInputFingerprint: expect.stringMatching(/^fp:v3:/),
           rulesBasedOnTextVersion: 0,
           rulesVersion: 2,
         }),
@@ -1899,7 +1924,7 @@ describe("TextRequirementView", () => {
           },
         ],
         expect.objectContaining({
-          requirementInputFingerprint: expect.stringMatching(/^fp:v2:/),
+          requirementInputFingerprint: expect.stringMatching(/^fp:v3:/),
           requirementBaseline: null,
           requirementQualityReport: null,
           requirementReviewCandidates: {},
@@ -2344,14 +2369,10 @@ describe("TextRequirementView", () => {
 
     await user.type(sourceText, "，并支持退款");
 
-    await waitFor(() => {
-      expect(updateRequirementText).toHaveBeenLastCalledWith(
-        "创建一个订单系统，并支持退款",
-      );
-    });
+    expect(updateRequirementText).not.toHaveBeenCalled();
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(
-      screen.getByText("需求文本已修改，下方规则基于旧文本，可能已过时。"),
+      screen.getByText(/需求文本尚未保存。点击/),
     ).toBeInTheDocument();
   });
 
@@ -2726,7 +2747,7 @@ describe("TextRequirementView", () => {
           },
         ],
         expect.objectContaining({
-          requirementInputFingerprint: expect.stringMatching(/^fp:v2:/),
+          requirementInputFingerprint: expect.stringMatching(/^fp:v3:/),
           rulesBasedOnTextVersion: 0,
           rulesVersion: 2,
         }),
@@ -2795,6 +2816,42 @@ describe("TextRequirementView", () => {
     expect(
       screen.queryByRole("button", { name: "定位需求规则 R1" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("opens the stale use-case model from requirement model guidance", async () => {
+    const repository = createBaseRepository({
+      loadWorkspace: vi.fn(async () => createWorkspaceRecord({
+        requirementText: "用户可以提交订单。",
+        rules: [createRule({ relatedDiagrams: ["usecase", "analysis"] })],
+        rulesVersion: 2,
+        generatedDiagramTypes: ["usecase"],
+        diagramVersions: { usecase: 1 },
+        models: {
+          usecase: {
+            diagramKind: "usecase", title: "订单用例模型", summary: "用户提交订单。",
+            notes: [], actors: [], useCases: [], systemBoundaries: [], relationships: [],
+          },
+        },
+      })),
+    });
+    function SelectionProbe() {
+      const { selection } = useWorkspaceShell();
+      const { setSelectedDiagrams } = useWorkspaceSession();
+      return <>
+        <output data-testid="workspace-selection">{
+          selection.kind === "diagram" ? selection.diagram : selection.kind
+        }</output>
+        <button onClick={() => setSelectedDiagrams(["analysis"])}>select analysis target</button>
+      </>;
+    }
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<><TextRequirementView view="models" /><SelectionProbe /></>, repository));
+    await screen.findByRole("heading", { name: "需求模型" });
+    await user.click(screen.getByRole("button", { name: "select analysis target" }));
+    await user.click(await screen.findByRole("button", { name: /需要处理/ }));
+    const guidance = screen.getByRole("dialog", { name: "需求模型暂时无法生成" });
+    await user.click(within(guidance).getByRole("button", { name: "前往需求模型" }));
+    expect(screen.getByTestId("workspace-selection")).toHaveTextContent("usecase");
   });
 
   it("removes the zero-rule card while allowing generation from existing requirement text", async () => {

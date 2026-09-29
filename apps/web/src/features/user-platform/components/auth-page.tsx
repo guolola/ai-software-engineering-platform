@@ -700,9 +700,6 @@ export function AuthPage({
               )}
             </form>
             </div>
-            <p className="text-center text-xs leading-5 text-muted-foreground">
-              {t("auth.page.securityFootnote")}
-            </p>
           </div>
           <aside className="hidden flex-col justify-center gap-8 rounded-r-2xl border-s bg-muted/40 p-8 lg:flex">
             <div>

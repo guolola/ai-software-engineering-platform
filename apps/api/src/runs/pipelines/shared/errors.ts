@@ -1,5 +1,6 @@
 // Owns run-scoped error objects so routes, pipelines, snapshots, and SSE stay aligned.
 import {
+  ModelSemanticError,
   runErrorSchema,
   type RunError,
   type RunErrorCategory,
@@ -69,6 +70,26 @@ const RUN_ERROR_DEFAULTS: Record<
     category: "generation",
     retryable: true,
     message: "模型未生成有效结果，请重试或检查模型输出。",
+  },
+  RUN_REQUIREMENT_INPUT_UNSAFE: {
+    category: "generation",
+    retryable: false,
+    message: "需求文本包含疑似指挥模型改变任务的内容，请修改后重试。",
+  },
+  RUN_REQUIREMENT_INPUT_IRRELEVANT: {
+    category: "generation",
+    retryable: false,
+    message: "未发现可用于抽取的软件需求，请补充功能、规则或约束后重试。",
+  },
+  RUN_REQUIREMENT_SCREENING_FAILED: {
+    category: "generation",
+    retryable: true,
+    message: "需求输入检查未完成，请稍后重试。",
+  },
+  RUN_REQUIREMENT_RULES_EMPTY: {
+    category: "generation",
+    retryable: true,
+    message: "未提取到有来源依据的需求规则，请检查需求描述或重试。",
   },
   RUN_STRUCTURED_OUTPUT_INVALID: {
     category: "generation",
@@ -143,6 +164,8 @@ export function normalizeRunError(error: unknown): RunError {
   if (existing) return existing;
 
   const message = error instanceof Error ? error.message : String(error);
+  const semanticError = error instanceof ModelSemanticError ? error : error instanceof Error && error.cause instanceof ModelSemanticError ? error.cause : null;
+  if (semanticError) return createRunError("RUN_STRUCTURED_OUTPUT_INVALID", message, { details: { diagnostics: semanticError.diagnostics } });
   const lower = message.toLowerCase();
 
   if (

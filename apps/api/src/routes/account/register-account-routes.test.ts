@@ -8,6 +8,68 @@ import { createGenerationUsageService } from "../../generation/generation-usage.
 import { hashPassword } from "../../security/password-hashing.js";
 import { registerAccountRoutes } from "./register-account-routes.js";
 
+test("account onboarding state follows the first owned project across sessions", async () => {
+  const authStore = createInMemoryAuthStore();
+  const owner = authStore.createUser({
+    email: "guide-owner@example.edu", displayName: "Guide Owner",
+    passwordHash: hashPassword("guide-password"), emailVerified: true,
+  });
+  const invitee = authStore.createUser({
+    email: "guide-invitee@example.edu", displayName: "Guide Invitee",
+    passwordHash: hashPassword("guide-password"), emailVerified: true,
+  });
+  assert.ok(owner && invitee);
+  const firstSession = authStore.createSession({ userId: owner.id, ipAddress: null, userAgent: "first" });
+  const secondSession = authStore.createSession({ userId: owner.id, ipAddress: null, userAgent: "second" });
+  const inviteeSession = authStore.createSession({ userId: invitee.id, ipAddress: null, userAgent: "invitee" });
+  const app = Fastify({ logger: false });
+  registerAccountRoutes({ app, authStore, avatarStorageDir: "data/test-avatars" });
+  const request = (sessionId: string, method: "GET" | "PUT" = "GET", payload?: unknown) => app.inject({
+    method, url: "/api/account/onboarding",
+    headers: { cookie: `${SESSION_COOKIE_NAME}=${sessionId}` },
+    ...(payload ? { payload } : {}),
+  });
+
+  assert.equal((await app.inject({ method: "GET", url: "/api/account/onboarding" })).statusCode, 401);
+  assert.deepEqual((await request(firstSession.id)).json(), {
+    emptyWorkspace: null, firstProject: null, firstProjectId: null,
+  });
+  const first = authStore.createProject({
+    ownerUserId: owner.id, name: "First", description: null, visibility: "private",
+  }).project;
+  authStore.createMember({
+    projectId: first.id, userId: invitee.id, email: invitee.email,
+    displayName: invitee.displayName, role: "viewer", status: "active",
+    invitedByUserId: owner.id, invitedAt: null, joinedAt: new Date().toISOString(),
+  });
+  authStore.createProject({
+    ownerUserId: owner.id, name: "Second", description: null, visibility: "private",
+  });
+  assert.equal((await request(secondSession.id)).json().firstProjectId, first.id);
+  assert.equal((await request(inviteeSession.id)).json().firstProjectId, null);
+  await request(inviteeSession.id, "PUT", { tour: "first-project", outcome: "completed" });
+  const inviteeFirst = authStore.createProject({
+    ownerUserId: invitee.id, name: "Invitee's first", description: null, visibility: "private",
+  }).project;
+  assert.deepEqual((await request(inviteeSession.id)).json(), {
+    emptyWorkspace: null, firstProject: "completed", firstProjectId: inviteeFirst.id,
+  });
+
+  assert.equal((await request(firstSession.id, "PUT", {
+    tour: "empty-workspace", outcome: "skipped",
+  })).statusCode, 200);
+  assert.equal((await request(secondSession.id, "PUT", {
+    tour: "first-project", outcome: "completed",
+  })).statusCode, 200);
+  assert.deepEqual((await request(firstSession.id)).json(), {
+    emptyWorkspace: "skipped", firstProject: "completed", firstProjectId: first.id,
+  });
+  assert.equal((await request(firstSession.id, "PUT", {
+    tour: "first-project", outcome: "invalid",
+  })).statusCode, 400);
+  await app.close();
+});
+
 test("account profile includes unlimited generation usage for regular users", async () => {
   const authStore = createInMemoryAuthStore();
   const user = authStore.createUser({

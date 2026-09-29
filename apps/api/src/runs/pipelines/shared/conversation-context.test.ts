@@ -65,3 +65,17 @@ test("queued parallel branches keep the common history even after another branch
   assert.doesNotMatch(JSON.stringify(calls.at(-1)), /First validated diagram/);
   assert.match(JSON.stringify(calls.at(-1)), /Shared rules/);
 });
+
+test("current stage system constraints supersede earlier response contracts", async () => {
+  const calls: ChatMessage[][] = [];
+  const context = createContextualLlmTransport({ async *streamChatCompletion(input) {
+    calls.push(input.messages); yield "{}";
+  } });
+  for (const instruction of ["Classify input", "Generate UML model"]) {
+    for await (const _ of context.transport.streamChatCompletion({
+      providerSettings: { apiBaseUrl: "https://example.test", apiKey: "test", model: "test" },
+      messages: [{ role: "system", content: instruction }, { role: "user", content: "input" }],
+    })) { /* Drain the stream to retain the completed turn. */ }
+  }
+  assert.deepEqual(calls[1]?.filter((message) => message.role === "system"), [{ role: "system", content: "Generate UML model" }]);
+});

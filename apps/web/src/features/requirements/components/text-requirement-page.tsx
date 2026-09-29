@@ -48,6 +48,7 @@ import {
   requirementDiagramsButtonLabel,
   requirementTargetBlockReason,
   requirementTargetCardState,
+  STALE_USECASE_BLOCK_REASON,
 } from "../lib/requirement-target-view-model";
 import {
   requirementRowState,
@@ -111,10 +112,13 @@ export function TextRequirementView({
   view?: "system" | "models" | "all";
 }) {
   const { t } = useTranslation();
-  const { openSystemRequirements } = useWorkspaceShell();
+  const { openDiagram, openSystemRequirements } = useWorkspaceShell();
   const { requirementStatusFor } = useModelCardStatus();
   const {
     requirementText,
+    hasUncommittedRequirementDraft,
+    inputScreening,
+    inputScreeningError,
     setRequirementText,
     rules,
     createRequirementRule,
@@ -417,7 +421,9 @@ export function TextRequirementView({
     ? t("requirements.reviewBlocked")
     : null;
   const rulesStaleMessage =
-    rulesStaleReason === "rules"
+    hasUncommittedRequirementDraft
+      ? t("requirements.source.draftNotice")
+      : rulesStaleReason === "rules"
       ? t("requirements.stale.downstream")
       : rulesStaleReason === "source-missing"
         ? t("requirements.stale.empty")
@@ -458,17 +464,20 @@ export function TextRequirementView({
   const pageNoticeMessages = [
     !canEditRequirements ? editBlockedReason : null,
     billingGenerationBlock ? `${billingGenerationBlock.message}\n${t("requirements.credits", { count: billingGenerationBlock.billingSummary.creditBalance })}` : null,
-    view !== "models" && showStaleBanner && isRulesStale ? rulesStaleMessage : null,
+    view !== "models" && showStaleBanner && isRulesStale && !hasUncommittedRequirementDraft ? rulesStaleMessage : null,
     view !== "system" && showStaleBanner && staleDiagrams.length > 0
       ? `${t("requirements.stale.modelCount", { count: staleDiagrams.length, reason: staleDiagramReason })}${staleDiagrams.map((diagram) => getDiagramLabel(diagram, t)).join(t("traceability.refSeparator"))}`
       : null,
     modelGenerationBlockedReason,
   ].filter((message): message is string => Boolean(message));
   const uniquePageNoticeMessages = [...new Set(pageNoticeMessages)];
+  const staleUsecaseBlocked = modelGenerationBlockedReason === STALE_USECASE_BLOCK_REASON;
   const modelGuidanceAction = view !== "system" && modelGenerationBlockedReason && canRunGeneration
-    ? selectedTargetBlockReason || missingRequirementSourceReason || requirementReviewBlockedReason
-      ? { label: t("requirements.sourceAction"), onSelect: openSystemRequirements }
-      : undefined
+    ? staleUsecaseBlocked
+      ? { label: t("feedback.actions.requirementModels"), onSelect: () => openDiagram("usecase") }
+      : selectedTargetBlockReason || missingRequirementSourceReason || requirementReviewBlockedReason
+        ? { label: t("requirements.sourceAction"), onSelect: openSystemRequirements }
+        : undefined
     : undefined;
   const pageFeedback: FeedbackDialogState | null = pageNoticeMessages.length > 0 ? {
     dedupeKey: `requirements:${view}:notices`,
@@ -521,6 +530,28 @@ export function TextRequirementView({
           mode === "empty" ? "min-h-80" : "min-h-[240px]",
         )}
       />
+      {hasUncommittedRequirementDraft && (
+        <p className="mt-2 text-sm text-warning" role="status">
+          {t("requirements.source.draftNotice")}
+        </p>
+      )}
+      {inputScreeningError && (
+        <p role="alert" className="mt-2 text-sm text-destructive">
+          {t("requirements.source.screeningErrorTitle")}：{inputScreeningError}
+        </p>
+      )}
+      {inputScreening && inputScreening.ignoredSpans.length > 0 && (
+        <div className="mt-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-sm" aria-live="polite">
+          <p className="font-medium">{t("requirements.source.ignoredTitle")}：{t("requirements.source.ignoredSummary", { count: inputScreening.ignoredSpans.length })}</p>
+          <ul className="mt-1 list-inside list-disc">
+            {inputScreening.ignoredSpans.slice(0, 5).map((span) => (
+              <li key={`${span.startOffset}-${span.endOffset}`} className="break-words">
+                {requirementText.slice(span.startOffset, span.endOffset).slice(0, 180)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div data-testid="requirements-input-toolbar" className="relative mt-6 flex min-w-0 flex-nowrap items-center gap-2">
           <ModelPicker
             value={defaultModel}
@@ -529,21 +560,10 @@ export function TextRequirementView({
           />
           {isRulesStale && (
             <Badge variant="secondary" className="hidden px-1.5 py-0 text-[11px] sm:inline-flex">
-              {t("requirements.source.changed")}
+              {t(hasUncommittedRequirementDraft ? "requirements.source.draft" : "requirements.source.changed")}
             </Badge>
           )}
           <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-10 shrink-0 px-3 sm:px-6"
-              onClick={() => setRequirementText("")}
-              disabled={!requirementText || generating || !canEditRequirements}
-              title={!canEditRequirements ? editBlockedReason : undefined}
-            >
-              {t("requirements.source.clear")}
-            </Button>
             <Button
               type="button"
               onClick={runGenerateRules}
@@ -602,7 +622,7 @@ export function TextRequirementView({
 
   return (
     <div className="flex min-h-0 min-w-0 max-w-full flex-col overflow-x-clip bg-background">
-      {view !== "models" && showStaleBanner && isRulesStale && (
+      {view !== "models" && showStaleBanner && isRulesStale && !hasUncommittedRequirementDraft && (
         <div className="flex items-center gap-2 px-3 py-2 text-sm text-warning">
           <span>{rulesStaleMessage}</span>
           <Button

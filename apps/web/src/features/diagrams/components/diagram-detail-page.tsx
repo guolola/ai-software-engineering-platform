@@ -1,4 +1,5 @@
 // Renders the diagram detail workspace, including diagram selection, trace highlights, export actions, and model/SVG views.
+import { validateModelInput, deriveTableModel } from "@uml-platform/contracts";
 import { Card } from "../../../shared/ui/card";
 import { PageHeader } from "../../../shared/template/layout/page";
 import { SpotlightCard } from "../../../shared/ui/interactive-card";
@@ -351,6 +352,8 @@ function DiagramDetailView({
   }, [compactViewport, highlightedRelationshipId, initialSection]);
   const commitDraftAndRerender = useCallback(async (nextDraft: Record<string, unknown>, explicit = false): Promise<boolean> => {
     if (readOnly || !canUpdateWorkspace) return false;
+    if (!explicit) setDraft(nextDraft);
+    if (validateModelInput(nextDraft, isFeasibility ? "feasibility" : isDesign ? "design" : "requirements").length) { setSaveStatus("error"); return false; }
     setSaving(true);
     setSaveStatus("saving");
     try {
@@ -362,7 +365,7 @@ function DiagramDetailView({
           ? designDiagramModelSpecSchema.safeParse(nextDraft)
           : diagramModelSpecSchema.safeParse(nextDraft);
       const canonicalDraft = (
-        parsedDraft.success ? parsedDraft.data : nextDraft
+        parsedDraft.success ? parsedDraft.data.diagramKind === "table" ? deriveTableModel(parsedDraft.data) : parsedDraft.data : nextDraft
       ) as unknown as Record<string, unknown>;
       // Metadata stays outside the shared draft until its explicit save succeeds.
       if (!explicit) setDraft(canonicalDraft);
@@ -411,7 +414,7 @@ function DiagramDetailView({
   useEffect(() => {
     if (readOnly || !canUpdateWorkspace || !draft || saving) return;
     const fingerprint = draftFingerprint(draft);
-    if (fingerprint === persistedDraftFingerprintRef.current) return;
+    if (fingerprint === persistedDraftFingerprintRef.current || validateModelInput(draft, isFeasibility ? "feasibility" : isDesign ? "design" : "requirements").length) return;
     const timer = window.setTimeout(() => {
       void commitDraftAndRerender(draft);
     }, 600);
@@ -752,6 +755,7 @@ function DiagramDetailView({
                     </ul>
                   )}
                   <ModelEditPanel
+                    stage={isFeasibility ? "feasibility" : isDesign ? "design" : "requirements"}
                     readOnly={readOnly}
                     draft={draft}
                     setDraft={setDraft}
@@ -772,6 +776,7 @@ function DiagramDetailView({
             <TabsContent value="edit" className="m-0 p-0">
               <div className="px-3 pb-3 pt-3 sm:px-5 sm:pb-5 sm:pt-5">
                 <ModelEditPanel
+                    stage={isFeasibility ? "feasibility" : isDesign ? "design" : "requirements"}
                   draft={draft}
                   setDraft={setDraft}
                   onCommitDraft={commitModelDraft}

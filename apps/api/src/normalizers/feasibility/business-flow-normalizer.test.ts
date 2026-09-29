@@ -53,21 +53,21 @@ test("rejects unknown rules, unmapped actions and invalid trace targets", () => 
 test("rejects missing lanes, duplicate ids and invalid endpoints", () => {
   const value = flow();
   Object.assign(value.model.nodes[1]!, { actorOrLane: "unknown" });
-  assert.throws(() => normalizeFeasibilityBusinessFlow(value, rules), /有效泳道/);
+  assert.throws(() => normalizeFeasibilityBusinessFlow(value, rules), /missing-reference/);
   value.model.nodes.push({ id: "check", type: "end", name: "结束" });
-  assert.throws(() => normalizeFeasibilityBusinessFlow(value, rules), /编号重复/);
+  assert.throws(() => normalizeFeasibilityBusinessFlow(value, rules), /duplicate-id/);
   const badEdge = flow();
   badEdge.model.relationships[0]!.targetId = "missing";
-  assert.throws(() => normalizeFeasibilityBusinessFlow(badEdge, rules), /有效节点/);
+  assert.throws(() => normalizeFeasibilityBusinessFlow(badEdge, rules), /missing-endpoint/);
 });
 
 test("rejects isolated nodes, dead-end loops and missing branch guards", () => {
   const isolated = flow();
   isolated.model.nodes.push({ id: "isolated", type: "end", name: "孤立" });
-  assert.throws(() => normalizeFeasibilityBusinessFlow(isolated, rules), /从开始可达/);
+  assert.throws(() => normalizeFeasibilityBusinessFlow(isolated, rules), /unreachable-node/);
   const loop = flow();
   loop.model.relationships[2]!.targetId = "check";
-  assert.throws(() => normalizeFeasibilityBusinessFlow(loop, rules), /通往结束/);
+  assert.throws(() => normalizeFeasibilityBusinessFlow(loop, rules), /split-degree|unreachable-node/);
   const missingGuard = flow();
   delete missingGuard.model.relationships[3]!.guard;
   assert.throws(() => normalizeFeasibilityBusinessFlow(missingGuard, rules), /不同条件/);

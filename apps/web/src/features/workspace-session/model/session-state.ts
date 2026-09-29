@@ -17,6 +17,7 @@ import type {
   BillingEntitlementErrorResponse,
   RequirementTraceEntry,
   RequirementBaseline,
+  RequirementInputScreening,
   AtomicRequirementField,
   RequirementQualityReport,
   DocumentKind,
@@ -129,6 +130,9 @@ export interface GenerationTaskRunSummary {
 export interface WorkspaceSessionState {
   workspaceInitialized: boolean;
   requirementText: string;
+  hasUncommittedRequirementDraft: boolean;
+  inputScreening: RequirementInputScreening | null;
+  inputScreeningError: string | null;
   setRequirementText: (value: string) => void;
   rules: RequirementRule[];
   requirementBaseline: RequirementBaseline | null;

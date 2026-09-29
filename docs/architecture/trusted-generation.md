@@ -24,7 +24,7 @@
 
 ### 结构与覆盖
 
-模型输出先经过 JSON、PlantUML 或领域结构的解析与修复，再进入持久化。追踪矩阵和覆盖关系用于发现未覆盖、低置信或断开的链路。
+模型输出先经过按阶段契约与公共语义校验，结构错误最多修复两轮。通过后确定性生成 PlantUML，不允许 LLM 改写最终源码；图像审查仅作辅助反馈。追踪矩阵和覆盖关系用于发现未覆盖、低置信或断开的链路。
 
 ### 人工责任
 
@@ -55,6 +55,7 @@
 
 ## 相关文档
 
+- [建模能力与图形一致性](modeling-capabilities.md)
 - [平台架构](platform-overview.md)
 - [生成任务 Worker](../deployment/generation-workers.md)
 - [应用内快速开始](../../apps/web/src/features/product-docs/content/quick-start.md)

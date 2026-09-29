@@ -42,6 +42,7 @@ interface WorkspaceDerivedStatusInput {
   requirementModelTraceability: WorkspaceRecord["requirementModelTraceability"];
   requirementReviewCandidates: WorkspaceRecord["requirementReviewCandidates"];
   requirementText: string;
+  hasUncommittedRequirementDraft: boolean;
   rules: RequirementRule[];
   rulesBasedOnTextVersion: number | null;
   rulesVersion: number;
@@ -58,7 +59,8 @@ export function deriveWorkspaceStatus(input: WorkspaceDerivedStatusInput) {
   );
   const isRulesStale =
     input.rules.length > 0 &&
-    (requirementSourceMissing ||
+    (input.hasUncommittedRequirementDraft ||
+      requirementSourceMissing ||
       (input.requirementInputFingerprint
       ? !fingerprintMatches(
           input.requirementInputFingerprint,
@@ -71,7 +73,8 @@ export function deriveWorkspaceStatus(input: WorkspaceDerivedStatusInput) {
       ? null
       : requirementSourceMissing
         ? "source-missing"
-        : input.rulesBasedOnTextVersion !== null &&
+        : input.hasUncommittedRequirementDraft ||
+            input.rulesBasedOnTextVersion !== null &&
             input.rulesBasedOnTextVersion !== input.textVersion
           ? "text"
           : "rules";

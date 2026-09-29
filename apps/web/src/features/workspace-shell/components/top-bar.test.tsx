@@ -1481,7 +1481,7 @@ describe("TopBar", () => {
     await waitFor(() => expect(screen.getByText("生成中 40%")).toBeInTheDocument());
     expect(
       within(screen.getByTestId("generation-transcript")).getByText(
-        "已生成 0 个图形预览。",
+        "此任务未保存完整回复，当前仅展示可用的执行记录。",
       ),
     ).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "我知道了" }));

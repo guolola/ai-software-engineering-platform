@@ -4,6 +4,9 @@ import type {
   DesignDiagramKind,
   DiagramKind,
   DocumentKind,
+  OnboardingStateResponse,
+  OnboardingTour,
+  OnboardingTourOutcome,
   ProviderModelCapabilityMap,
   ProviderModelDiscoveryResponse,
   ProviderModelDiscoveryProgressEvent,
@@ -511,6 +514,15 @@ export const platformApi = {
   },
   getAccountProfile() {
     return requestJson<PlatformAccountProfileResponse>("/api/account/profile");
+  },
+  getOnboardingState() {
+    return requestJson<OnboardingStateResponse>("/api/account/onboarding");
+  },
+  saveOnboardingOutcome(tour: OnboardingTour, outcome: OnboardingTourOutcome) {
+    return requestJson<OnboardingStateResponse>("/api/account/onboarding", {
+      method: "PUT",
+      body: JSON.stringify({ tour, outcome }),
+    });
   },
   updateAccountProfile(input: { displayName: string; avatarUrl?: string | null }) {
     return requestJson<PlatformAccountProfileResponse>("/api/account/profile", {

@@ -44,6 +44,26 @@ function managedProviderSettings(model: string) {
 }
 
 function createTestApiServer(options?: Parameters<typeof createApiServer>[0]) {
+  // Existing pipeline fixtures model extraction; answer the new preflight with source ids.
+  const screeningTransport: LlmTransport | undefined = options?.llmTransport ? {
+    async *streamChatCompletion(input: Parameters<LlmTransport["streamChatCompletion"]>[0]) {
+      if (lastPromptText(input.messages).startsWith("请对照结构化模型检查此 UML 图")) {
+        yield JSON.stringify({ passed: true, issues: [] });
+        return;
+      }
+      if (String(input.messages[0]?.content).includes("你是软件需求输入检查器")) {
+        const units = JSON.parse(String(input.messages[1]?.content)) as Array<{ id: string; text: string }>;
+        yield JSON.stringify({ units: units.map((unit) => ({
+          id: unit.id,
+          category: /忽略之前的指令/u.test(unit.text)
+            ? "injection"
+            : /天气/u.test(unit.text) ? "irrelevant" : "requirement",
+        })) });
+        return;
+      }
+      yield* options.llmTransport!.streamChatCompletion(input);
+    },
+  } : undefined;
   const providerConfigStore =
     options?.providerConfigStore ??
     createProviderConfigStore({
@@ -90,6 +110,8 @@ function createTestApiServer(options?: Parameters<typeof createApiServer>[0]) {
   }
   return createApiServer({
     ...options,
+    pngRenderClient: options?.pngRenderClient ?? (async () => ({ png: VALID_PNG, renderMeta: { engine: "plantuml", generatedAt: new Date().toISOString(), sourceLength: 1, durationMs: 1 } })),
+    ...(screeningTransport ? { llmTransport: screeningTransport } : {}),
     disableBillingEntitlementGuard:
       options?.disableBillingEntitlementGuard ?? true,
     providerConfigStore,
@@ -103,7 +125,7 @@ function createTestApiServer(options?: Parameters<typeof createApiServer>[0]) {
 type TestApiServer = Awaited<ReturnType<typeof createTestApiServer>>;
 
 async function waitForRunSnapshot(app: TestApiServer, url: string) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
     const response = await app.inject({ method: "GET", url });
     const snapshot = response.json();
     if (
@@ -143,7 +165,7 @@ function lastPromptText(messages: Parameters<LlmTransport["streamChatCompletion"
 }
 
 const RULES_JSON =
-  '{"rules":[{"id":"r1","category":"业务规则","text":"研究人员可以根据文本需求生成 UML 模型。","relatedDiagrams":["usecase","activity"]}]}';
+  '{"rules":[{"id":"r1","category":"业务规则","text":"研究人员可以根据文本需求生成 UML 模型。","sourceFragment":"实验平台根据文本需求生成模型和 UML 图。","relatedDiagrams":["usecase","activity"]}]}';
 const TEST_REQUIREMENT_BASELINE = buildRequirementBaseline({
   runId: "api-index-baseline",
   requirementText: "实验平台根据文本需求生成模型和 UML 图。",
@@ -155,18 +177,21 @@ const RULES_WITH_ENUM_ALIASES_JSON = JSON.stringify({
       id: "r1",
       category: "功能需求",
       text: "用户选择目标日期、时间段与座位，提交预约请求。",
+      sourceFragment: "共享自习室座位预约系统支持微信登录、查座、预约和签到。",
       relatedDiagrams: ["外部接口"],
     },
     {
       id: "r2",
       category: "安全需求",
       text: "接口请求做合法性校验，防止恶意预约。",
+      sourceFragment: "共享自习室座位预约系统支持微信登录、查座、预约和签到。",
       relatedDiagrams: ["deployment", "外部接口"],
     },
     {
       id: "r3",
       category: "性能需求",
       text: "系统支持至少100人同时在线使用，页面加载速度小于2秒。",
+      sourceFragment: "共享自习室座位预约系统支持微信登录、查座、预约和签到。",
       relatedDiagrams: ["性能需求"],
     },
   ],
@@ -198,6 +223,7 @@ const USECASE_MODEL_JSON = JSON.stringify({
       useCases: [
         {
           id: "usecase_generate",
+          systemBoundaryId: "boundary_platform",
           name: "生成模型",
           goal: "根据需求生成 UML 模型",
           preconditions: ["已输入需求文本"],
@@ -1425,39 +1451,9 @@ const DESIGN_SEQUENCE_JSON = JSON.stringify({
   ],
 });
 
-const DESIGN_ACTIVITY_JSON = JSON.stringify({
-  models: [
-    {
-      ...ACTIVITY_MODEL,
-      title: "设计业务逻辑",
-      summary: "设计阶段业务逻辑层",
-      notes: ["由顺序图约束对象协作"],
-    },
-  ],
-  designModelTraceability: [
-    ...ACTIVITY_REQUIREMENT_TRACEABILITY.filter(
-      (entry) => entry.target.elementId !== "submit",
-    ).map((entry) => ({
-      source: entry.target,
-      targets: [entry.target],
-    })),
-    {
-      source: {
-        diagramKind: "activity",
-        elementId: "submit",
-        elementKind: "activity-node",
-        label: "提交需求",
-      },
-      targets: [
-        {
-          diagramKind: "activity",
-          elementId: "submit",
-          elementKind: "activity-node",
-          label: "提交需求",
-        },
-      ],
-    },
-  ],
+const DESIGN_NAVIGATION_JSON = JSON.stringify({
+  models: [{ ...PROTOTYPE_MODEL, diagramKind: "navigation", modelId: "navigation", title: "页面导航", summary: "需求界面的实现路由" }],
+  designModelTraceability: PROTOTYPE_REQUIREMENT_TRACEABILITY.map((entry) => ({ source: { ...entry.target, diagramKind: "navigation", modelId: "navigation" }, targets: [entry.target] })),
 });
 
 const DESIGN_CLASS_AND_TABLE_JSON = JSON.stringify({
@@ -1487,6 +1483,7 @@ const DESIGN_CLASS_AND_TABLE_JSON = JSON.stringify({
         {
           id: "user",
           name: "需求",
+          relationalConstraints: [{ id: "pk_user", type: "primary-key", columnIds: ["id"] }],
           columns: [
             {
               id: "id",
@@ -1501,6 +1498,7 @@ const DESIGN_CLASS_AND_TABLE_JSON = JSON.stringify({
         {
           id: "order",
           name: "UML模型",
+          relationalConstraints: [{ id: "pk_order", type: "primary-key", columnIds: ["id"] }, { id: "rel_user_order_table", type: "foreign-key", columnIds: ["user_id"], referenceTableId: "user", referenceColumnIds: ["id"] }],
           columns: [
             {
               id: "id",
@@ -1795,7 +1793,7 @@ test("api runs a full pipeline and streams SSE events", async () => {
     },
   });
 
-  assert.equal(startResponse.statusCode, 202);
+  assert.equal(startResponse.statusCode, 202, startResponse.body);
   const { runId } = startResponse.json();
 
   const eventsResponse = await app.inject({
@@ -2015,7 +2013,7 @@ test("api auto-fills empty design sequence traceability without extra LLM repair
   const snapshot = await waitForRunSnapshot(app, `/api/design-runs/${startResponse.json().runId}`);
 
   assert.equal(snapshot.status, "completed");
-  assert.equal(prompts.length, 1);
+  assert.equal(prompts.length, 1, prompts.map((prompt) => prompt.slice(0, 160)).join("\n"));
   assert.equal(snapshot.models[0]?.diagramKind, "sequence");
   assert.ok(
     snapshot.designModelTraceability.every(
@@ -2135,9 +2133,6 @@ test("api generates design sequences with one LLM request per use case", async (
         sourceUseCaseName: useCaseName,
         title: `${useCaseName}顺序`,
       };
-      if (useCaseId === "usecase_review") {
-        delete (model as { summary?: string }).summary;
-      }
       return JSON.stringify({
       models: [model],
       designModelTraceability: sources.map((source) => ({
@@ -2333,10 +2328,10 @@ test("api retries an empty use-case sequence result and completes coverage", asy
           );
           return;
         }
-        const useCaseId = prompt.includes('"id": "uc_filter_date"')
+        const useCaseId = prompt.includes("uc_filter_date")
           ? "uc_filter_date"
           : "usecase_generate";
-        const isSequencePrompt = prompt.includes("生成设计阶段顺序图结构化模型");
+        const isSequencePrompt = true;
         const attempt = isSequencePrompt
           ? (attemptsByUseCase.get(useCaseId) ?? 0) + 1
           : 1;
@@ -2533,7 +2528,7 @@ test("api preserves successful sequences when one use-case sequence keeps failin
   await app.close();
 });
 
-test("api records design PlantUML repair trace", async () => {
+test("api records design render failure without requesting PlantUML rewrites", async () => {
   let renderAttempts = 0;
   const app = await createTestApiServer({
     llmTransport: {
@@ -2588,27 +2583,11 @@ test("api records design PlantUML repair trace", async () => {
   const { runId } = startResponse.json();
   const snapshot = await waitForRunSnapshot(app, `/api/design-runs/${runId}`);
 
-  assert.equal(snapshot.status, "completed");
-  assert.equal(renderAttempts, 2);
-  assert.ok(
-    snapshot.designTrace.some(
-      (entry: { kind: string; errorMessage?: string }) =>
-        entry.kind === "render_error" && /Syntax Error/.test(entry.errorMessage ?? ""),
-    ),
-  );
-  assert.ok(
-    snapshot.designTrace.some(
-      (entry: { kind: string; rawOutput?: string }) =>
-        entry.kind === "repair_output" && /提交设计请求/.test(entry.rawOutput ?? ""),
-    ),
-  );
-  assert.ok(
-    snapshot.designTrace.some(
-      (entry: { kind: string; plantUmlSource?: string }) =>
-        entry.kind === "repaired_plantuml" &&
-        /提交设计请求/.test(entry.plantUmlSource ?? ""),
-    ),
-  );
+  assert.equal(snapshot.status, "failed");
+  assert.equal(renderAttempts, 1);
+  assert.equal(snapshot.svgArtifacts.length, 0);
+  assert.ok(snapshot.designTrace.some((entry: { kind: string }) => entry.kind === "render_error"));
+  assert.ok(snapshot.designTrace.every((entry: { kind: string }) => !["repair_output", "repaired_plantuml"].includes(entry.kind)));
 
   await app.close();
 });
@@ -2707,7 +2686,7 @@ test("api records design model parse repair trace", async () => {
   await app.close();
 });
 
-test("api normalizes common design model shape issues before validation", async () => {
+test("api rejects malformed design fields after two structured repair attempts", async () => {
   const app = await createTestApiServer({
     llmTransport: {
       async *streamChatCompletion({ messages, responseFormat }) {
@@ -2825,10 +2804,10 @@ test("api normalizes common design model shape issues before validation", async 
   const { runId } = startResponse.json();
   const snapshot = await waitForRunSnapshot(app, `/api/design-runs/${runId}`);
 
-  assert.equal(snapshot.status, "completed");
-  assert.deepEqual(snapshot.models[0].notes, ["由用例推导"]);
-  assert.equal(snapshot.models[0].messages[0].type, "return");
-  assert.deepEqual(snapshot.models[0].messages[0].parameters, ["result"]);
+  assert.equal(snapshot.status, "failed");
+  assert.equal(snapshot.models.length, 0);
+  assert.equal(snapshot.designTrace.filter((entry: { kind: string }) => entry.kind === "llm_output").length, 3);
+  assert.match(JSON.stringify(snapshot.diagramErrors), /notes|Expected array/);
 
   await app.close();
 });
@@ -2952,7 +2931,7 @@ test("api generates an explicit sequence dependency for downstream design diagra
           yield DESIGN_SEQUENCE_JSON;
           return;
         }
-        yield DESIGN_ACTIVITY_JSON;
+        yield DESIGN_NAVIGATION_JSON;
       },
     },
     renderClient: async (artifact) => ({
@@ -2976,8 +2955,8 @@ test("api generates an explicit sequence dependency for downstream design diagra
         ...USECASE_REQUIREMENT_TRACEABILITY,
         ...PROTOTYPE_REQUIREMENT_TRACEABILITY,
       ],
-      selectedDiagrams: ["sequence", "activity"],
-      requestedDiagrams: ["activity"],
+      selectedDiagrams: ["sequence", "navigation"],
+      requestedDiagrams: ["navigation"],
       providerSettings: MANAGED_PROVIDER_SETTINGS,
     },
   });
@@ -2986,11 +2965,11 @@ test("api generates an explicit sequence dependency for downstream design diagra
   const { runId } = startResponse.json();
   const snapshot = await waitForRunSnapshot(app, `/api/design-runs/${runId}`);
   assert.equal(snapshot.status, "completed");
-  assert.deepEqual(snapshot.selectedDiagrams, ["sequence", "activity"]);
-  assert.deepEqual(snapshot.requestedDiagrams, ["activity"]);
+  assert.deepEqual(snapshot.selectedDiagrams, ["sequence", "navigation"]);
+  assert.deepEqual(snapshot.requestedDiagrams, ["navigation"]);
   assert.deepEqual(
     snapshot.models.map((model: { diagramKind: string }) => model.diagramKind),
-    ["sequence", "activity"],
+    ["sequence", "navigation"],
   );
   assert.equal(prompts.length, 2);
 
@@ -3003,7 +2982,7 @@ test("api reports missing design prerequisites when downstream diagrams bypass f
     llmTransport: {
       async *streamChatCompletion() {
         llmCalls += 1;
-        yield DESIGN_ACTIVITY_JSON;
+        yield DESIGN_NAVIGATION_JSON;
       },
     },
     renderClient: async (artifact) => ({
@@ -3027,7 +3006,7 @@ test("api reports missing design prerequisites when downstream diagrams bypass f
         ...USECASE_REQUIREMENT_TRACEABILITY,
         ...PROTOTYPE_REQUIREMENT_TRACEABILITY,
       ],
-      selectedDiagrams: ["activity"],
+      selectedDiagrams: ["navigation"],
       providerSettings: MANAGED_PROVIDER_SETTINGS,
     },
   });
@@ -4993,13 +4972,14 @@ test("api sends json_schema for Claude models and completes", async () => {
   await app.close();
 });
 
-test("api normalizes requirement model relationship aliases and numeric deployment ports", async () => {
+test("api rejects ambiguous deployment endpoints without deleting relationships", async () => {
   const deploymentRulesJson = JSON.stringify({
     rules: [
       {
         id: "r1",
         category: "部署需求",
         text: "系统部署包含 Web、Node API、数据库和邮件服务。",
+        sourceFragment: "系统部署包含 Web、Node API、数据库和邮件服务。",
         relatedDiagrams: ["deployment"],
       },
     ],
@@ -5134,16 +5114,9 @@ test("api normalizes requirement model relationship aliases and numeric deployme
   await app.inject({ method: "GET", url: `/api/runs/${runId}/events` });
   const snapshotResponse = await app.inject({ method: "GET", url: `/api/runs/${runId}` });
   const snapshot = snapshotResponse.json();
-  const model = snapshot.models[0];
-  assert.equal(snapshot.status, "completed");
-  assert.deepEqual(model.notes, ["线上部署拓扑"]);
-  assert.equal(model.relationships.length, 2);
-  assert.equal(model.relationships[0].sourceId, "component_web");
-  assert.equal(model.relationships[0].targetId, "node_api");
-  assert.equal(model.relationships[0].port, "8080");
-  assert.equal(model.relationships[1].sourceId, "node_api");
-  assert.equal(model.relationships[1].targetId, "db_main");
-  assert.equal(model.relationships[1].port, "5432");
+  assert.equal(snapshot.status, "failed");
+  assert.equal(snapshot.models.length, 0);
+  assert.match(JSON.stringify(snapshot.diagramErrors), /sourceName|sourceId|nodeType|notes/);
 
   await app.close();
 });
@@ -5216,7 +5189,7 @@ test("api logs the final generate_models output when parsing or schema validatio
   });
 });
 
-test("api repairs PlantUML after the first render failure and completes the run", async () => {
+test("api fails rendering without accepting an LLM PlantUML rewrite", async () => {
   let renderAttempts = 0;
   const app = await createTestApiServer({
     llmTransport: createMockLlmTransport(),
@@ -5258,8 +5231,8 @@ test("api repairs PlantUML after the first render failure and completes the run"
       origin: "http://localhost:5173",
     },
   });
-  assert.match(eventsResponse.body, /PlantUML 编译失败/);
-  assert.match(eventsResponse.body, /"type":"completed"/);
+  assert.match(eventsResponse.body, /模型绘图失败/);
+  assert.match(eventsResponse.body, /"type":"failed"/);
 
   const snapshotResponse = await app.inject({
     method: "GET",
@@ -5267,34 +5240,16 @@ test("api repairs PlantUML after the first render failure and completes the run"
   });
   const snapshot = snapshotResponse.json();
 
-  assert.equal(snapshot.status, "completed");
-  assert.equal(renderAttempts, 2);
-  assert.match(snapshot.plantUml[0].source, /研究人员 --> 生成模型/);
-  assert.equal(snapshot.svgArtifacts.length, 1);
-  assert.ok(
-    snapshot.requirementTrace.some(
-      (entry: { kind: string; errorMessage?: string }) =>
-        entry.kind === "render_error" && /Syntax Error/.test(entry.errorMessage ?? ""),
-    ),
-  );
-  assert.ok(
-    snapshot.requirementTrace.some(
-      (entry: { kind: string; rawOutput?: string }) =>
-        entry.kind === "repair_output" && /研究人员 --> 生成模型/.test(entry.rawOutput ?? ""),
-    ),
-  );
-  assert.ok(
-    snapshot.requirementTrace.some(
-      (entry: { kind: string; plantUmlSource?: string }) =>
-        entry.kind === "repaired_plantuml" &&
-        /研究人员 --> 生成模型/.test(entry.plantUmlSource ?? ""),
-    ),
-  );
+  assert.equal(snapshot.status, "failed");
+  assert.equal(renderAttempts, 1);
+  assert.equal(snapshot.svgArtifacts.length, 0);
+  assert.ok(snapshot.requirementTrace.some((entry: { kind: string }) => entry.kind === "render_error"));
+  assert.ok(snapshot.requirementTrace.every((entry: { kind: string }) => !["repair_output", "repaired_plantuml"].includes(entry.kind)));
 
   await app.close();
 });
 
-test("api treats placeholder SVG as a repairable render failure", async () => {
+test("api rejects placeholder SVG without rewriting model semantics", async () => {
   let renderAttempts = 0;
   const app = await createTestApiServer({
     llmTransport: createMockLlmTransport(),
@@ -5342,8 +5297,8 @@ test("api treats placeholder SVG as a repairable render failure", async () => {
       origin: "http://localhost:5173",
     },
   });
-  assert.match(eventsResponse.body, /PlantUML 编译失败/);
-  assert.match(eventsResponse.body, /"type":"completed"/);
+  assert.match(eventsResponse.body, /模型绘图失败/);
+  assert.match(eventsResponse.body, /"type":"failed"/);
 
   const snapshotResponse = await app.inject({
     method: "GET",
@@ -5351,9 +5306,11 @@ test("api treats placeholder SVG as a repairable render failure", async () => {
   });
   const snapshot = snapshotResponse.json();
 
-  assert.equal(snapshot.status, "completed");
-  assert.equal(renderAttempts, 2);
-  assert.match(snapshot.svgArtifacts[0].svg, /fixed after placeholder/);
+  assert.equal(snapshot.status, "failed");
+  assert.equal(renderAttempts, 1);
+  assert.equal(snapshot.svgArtifacts.length, 0);
+  assert.ok(snapshot.requirementTrace.some((entry: { kind: string }) => entry.kind === "render_error"));
+  assert.ok(snapshot.requirementTrace.every((entry: { kind: string }) => !["repair_output", "repaired_plantuml"].includes(entry.kind)));
 
   await app.close();
 });
@@ -5377,7 +5334,11 @@ test("api keeps successful diagrams and reports activity render failure in diagr
         }
 
         assert.equal(responseFormat?.type, "json_schema");
-        yield MULTI_MODEL_JSON;
+        const result = JSON.parse(MULTI_MODEL_JSON);
+        const selected = prompt.match(/只生成以下图类型：\s*\n([^\n]+)/u)?.[1]?.trim();
+        result.models = result.models.filter((model: { diagramKind: string }) => model.diagramKind === selected);
+        result.requirementModelTraceability = result.requirementModelTraceability.filter((entry: { target: { diagramKind: string } }) => entry.target.diagramKind === selected);
+        yield JSON.stringify(result);
       },
     },
     renderClient: async (artifact) => {
@@ -5427,14 +5388,14 @@ test("api keeps successful diagrams and reports activity render failure in diagr
   assert.equal(snapshot.svgArtifacts[0].diagramKind, "usecase");
   assert.match(
     snapshot.diagramErrors.activity?.error?.message ?? "",
-    /PlantUML repair failed for activity/i,
+    /模型绘图失败/,
   );
   assert.equal(snapshot.diagramErrors.activity?.stage, "render_svg");
 
   await app.close();
 });
 
-test("api fails the run when PlantUML still cannot be repaired after retries", async () => {
+test("api fails the run when deterministic PlantUML cannot be rendered", async () => {
   const app = await createTestApiServer({
     llmTransport: createMockLlmTransport(),
     renderClient: async () => {
@@ -5460,7 +5421,7 @@ test("api fails the run when PlantUML still cannot be repaired after retries", a
       origin: "http://localhost:5173",
     },
   });
-  assert.match(eventsResponse.body, /PlantUML 编译失败/);
+  assert.match(eventsResponse.body, /模型绘图失败/);
   assert.match(eventsResponse.body, /"type":"failed"/);
 
   const snapshotResponse = await app.inject({
@@ -5470,7 +5431,7 @@ test("api fails the run when PlantUML still cannot be repaired after retries", a
   const snapshot = snapshotResponse.json();
 
   assert.equal(snapshot.status, "failed");
-  assert.match(snapshot.error?.message ?? "", /PlantUML repair failed for usecase/i);
+  assert.match(snapshot.error?.message ?? "", /模型绘图失败/);
   assert.match(snapshot.error?.message ?? "", /broken uml source/i);
 
   await app.close();
@@ -5696,6 +5657,7 @@ test("api rerenders structured use case models without calling the LLM", async (
       "x-uml-project-id": project.id,
     },
     payload: {
+      stage: "requirements",
       model: {
         diagramKind: "usecase",
         title: "登录用例模型",
@@ -5712,6 +5674,7 @@ test("api rerenders structured use case models without calling the LLM", async (
         useCases: [
           {
             id: "uc_login",
+            systemBoundaryId: "system",
             name: "登录",
             goal: "进入系统",
             preconditions: [],

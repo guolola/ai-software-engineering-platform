@@ -669,6 +669,7 @@ function buildRequirementModels(seed: CaseSeed): DiagramModelSpec[] {
         {
           id: "uc-main",
           name: seed.primaryAction,
+          systemBoundaryId: "boundary-main",
           goal: `${seed.actors[0]}完成${seed.primaryAction}`,
           preconditions: [`${seed.entityNames[0]}可用`],
           postconditions: [`${seed.statusEntity}进入${seed.states[1]}`],
@@ -691,6 +692,7 @@ function buildRequirementModels(seed: CaseSeed): DiagramModelSpec[] {
         {
           id: "uc-review",
           name: seed.approvalAction,
+          systemBoundaryId: "boundary-main",
           goal: `${seed.actors[1]}处理${seed.statusEntity}`,
           preconditions: [`${seed.statusEntity}为${seed.states[1]}`],
           postconditions: [`${seed.statusEntity}进入${seed.states[2]}或${seed.states[3]}`],
@@ -703,7 +705,7 @@ function buildRequirementModels(seed: CaseSeed): DiagramModelSpec[] {
       relationships: [
         { id: "rel-1", type: "association", sourceId: "actor-primary", targetId: "uc-main" },
         { id: "rel-2", type: "association", sourceId: "actor-reviewer", targetId: "uc-review" },
-        { id: "rel-3", type: "include", sourceId: "uc-review", targetId: "actor-external", label: "通知" },
+        { id: "rel-3", type: "association", sourceId: "uc-review", targetId: "actor-external", label: "通知" },
       ],
     },
     {
@@ -721,7 +723,7 @@ function buildRequirementModels(seed: CaseSeed): DiagramModelSpec[] {
           { name: "id", type: "string", visibility: "private", required: true, constraints: [] },
           { name: "status", type: "string", visibility: "private", required: index === 1, constraints: [] },
         ],
-        operations: [{ name: index === 1 ? "changeStatus" : "update", returnType: "void", visibility: "public", parameters: [] }],
+        operations: [],
       })),
       interfaces: [],
       enums: [{ id: "enum-status", name: `${seed.statusEntity}状态`, literals: [...seed.states] }],
@@ -794,8 +796,8 @@ function buildDesignModels(seed: CaseSeed): DesignDiagramModelSpec[] {
       summary: "前端原型、业务服务、数据存储和外部系统分层。",
       notes: ["案例模板采用浏览器端模拟数据。"],
       packages: [
-        { id: "pkg-ui", name: "界面层", componentIds: ["cmp-app"] },
-        { id: "pkg-domain", name: "业务层", componentIds: ["cmp-service"] },
+        { id: "pkg-ui", name: "界面层" },
+        { id: "pkg-domain", name: "业务层" },
       ],
       components: [
         { id: "cmp-app", name: seed.dashboardTitle, componentType: "React Page", packageId: "pkg-ui", sourceRequirementIds: [`${seed.id}-R5`] },
@@ -854,6 +856,7 @@ function buildDesignModels(seed: CaseSeed): DesignDiagramModelSpec[] {
       notes: ["案例模板使用前端 mock 数据，表结构用于教学说明。"],
       tables: [
         {
+          relationalConstraints: [{ id: "pk-resource", type: "primary-key", columnIds: ["col-resource-id"] }],
           id: "tbl-resource",
           name: "resources",
           chineseName: seed.entityNames[0],
@@ -864,6 +867,7 @@ function buildDesignModels(seed: CaseSeed): DesignDiagramModelSpec[] {
           ],
         },
         {
+          relationalConstraints: [{ id: "pk-request", type: "primary-key", columnIds: ["col-request-id"] }, { id: "fk-resource", type: "foreign-key", columnIds: ["col-request-resource-id"], referenceTableId: "tbl-resource", referenceColumnIds: ["col-resource-id"] }],
           id: "tbl-request",
           name: "requests",
           chineseName: seed.statusEntity,

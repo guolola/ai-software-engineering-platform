@@ -270,6 +270,21 @@ test("postgres auth repository creates a project and owner membership together",
   assert.match(client.calls[0]?.sql ?? "", /insert into projects/i);
   assert.match(client.calls[1]?.sql ?? "", /from users/i);
   assert.match(client.calls[2]?.sql ?? "", /insert into project_members/i);
+  assert.match(client.calls[3]?.sql ?? "", /insert into user_onboarding_state/i);
+  assert.match(client.calls[3]?.sql ?? "", /where user_onboarding_state.first_project_id is null/i);
+});
+
+test("postgres onboarding writes only the selected tour outcome", async () => {
+  const client = new CapturingClient();
+  client.queueRows(
+    [{ empty_workspace_status: null, first_project_status: null, first_project_id: "project-1" }],
+    [{ empty_workspace_status: "skipped", first_project_status: null, first_project_id: "project-1" }],
+  );
+  const repository = createPostgresAuthRepository(client);
+  assert.equal((await repository.getOnboardingState("user-1")).firstProjectId, "project-1");
+  assert.equal((await repository.setOnboardingOutcome("user-1", "empty-workspace", "skipped")).emptyWorkspace, "skipped");
+  assert.match(client.calls[1]?.sql ?? "", /set empty_workspace_status = excluded.empty_workspace_status/i);
+  assert.doesNotMatch(client.calls[1]?.sql ?? "", /set first_project_status/i);
 });
 
 test("postgres auth repository reads, updates, and lists projects by membership", async () => {

@@ -13,6 +13,8 @@ import {
   accountMfaUpdateRequestSchema,
   accountProfileResponseSchema,
   accountProfileUpdateRequestSchema,
+  onboardingStateResponseSchema,
+  onboardingTourUpdateRequestSchema,
   accountRevokeSessionsResponseSchema,
   accountSecurityUpdateRequestSchema,
   accountSessionsResponseSchema,
@@ -137,6 +139,27 @@ export function registerAccountRoutes({
       generationUsage,
       ipAddress: ipAddressFromRequest(request),
     });
+  });
+
+  app.get("/api/account/onboarding", async (request, reply) => {
+    const auth = await requireAuth(request, reply, authStore);
+    if (isAuthError(auth)) return auth;
+    return onboardingStateResponseSchema.parse(
+      await authStore.getOnboardingState(auth.user.id),
+    );
+  });
+
+  app.put("/api/account/onboarding", async (request, reply) => {
+    const auth = await requireAuth(request, reply, authStore);
+    if (isAuthError(auth)) return auth;
+    const parsed = onboardingTourUpdateRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400);
+      return { message: "Invalid onboarding tour update" };
+    }
+    return onboardingStateResponseSchema.parse(
+      await authStore.setOnboardingOutcome(auth.user.id, parsed.data.tour, parsed.data.outcome),
+    );
   });
 
   app.patch("/api/account/profile", async (request, reply) => {

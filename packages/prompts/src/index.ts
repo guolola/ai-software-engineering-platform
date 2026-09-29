@@ -2,7 +2,6 @@
 export {
   buildGenerateDocumentContentPrompt,
   buildRepairDocumentContentPrompt,
-  buildRepairPlantUmlPrompt,
 } from "./document-prompts.js";
 export {
   buildAnalyzeCodeBusinessLogicPrompt,

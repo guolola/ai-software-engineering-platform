@@ -18,8 +18,11 @@ import {
 } from "../features/user-platform/components/user-platform-pages";
 import { formatProjectDateTimeMinute } from "../features/user-platform/lib/project-presentation";
 import { i18n, LOCALE_PREFERENCE_STORAGE_KEY } from "../shared/i18n";
-import { requestOpenGenerationTask } from "../shared/lib/app-navigation";
+import { requestOpenGenerationTask, requestOpenProjectWorkspaceTarget } from "../shared/lib/app-navigation";
 import { invalidateProviderConfigCache } from "../features/user-platform/services/provider-config-cache";
+
+// Onborda reads the Next router even when tours use only in-page steps.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), back: vi.fn() }) }));
 
 let projectApiMode: "unauthenticated" | "authenticated" | "empty" | "forbidden" | "offline";
 let caseProjectApiMode: "success" | "failure";
@@ -2805,6 +2808,22 @@ describe("App shell routes", () => {
 
     const drawer = await screen.findByRole("dialog", { name: "生成任务" });
     expect(within(drawer).queryByText("run-1")).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe("/projects/library-booking");
+  });
+
+  it("opens connection settings in the account dialog global settings tab", async () => {
+    projectApiMode = "authenticated";
+    authSessionMode = "authenticated";
+    window.history.pushState({}, "", "/projects/library-booking");
+
+    render(withWorkspaceProviders(<Shell />, createRepository()));
+    expect(await screen.findByText("智慧图书馆预约系统")).toBeInTheDocument();
+
+    act(() => requestOpenProjectWorkspaceTarget("provider-settings"));
+
+    const dialog = await screen.findByRole("dialog", { name: "设置" });
+    expect(within(dialog).getByRole("tab", { name: "全局设置" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("dialog", { name: "项目设置" })).not.toBeInTheDocument();
     expect(window.location.pathname).toBe("/projects/library-booking");
   });
 

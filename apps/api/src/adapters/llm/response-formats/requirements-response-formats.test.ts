@@ -100,7 +100,6 @@ test("requirement model response schema includes function MindMap structure", ()
   };
   assert.deepEqual(relationships.items.properties.type.enum, [
     "decomposition",
-    "dependency",
   ]);
 });
 

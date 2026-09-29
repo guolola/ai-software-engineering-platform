@@ -3242,7 +3242,7 @@ describe("createHttpWorkspaceRepository", () => {
     ).toBe(expectedSnapshotFingerprint);
   });
 
-  it("keeps generated repair candidates when saving the rules-only run snapshot", async () => {
+  it("keeps server-synced repair candidates after a rules-only run", async () => {
     const requirement = createAtomicRequirement();
     const baseline = createRequirementBaseline([requirement]);
     const snapshot = createRunSnapshot({
@@ -3259,7 +3259,6 @@ describe("createHttpWorkspaceRepository", () => {
       ],
       requirementBaseline: baseline,
     });
-    let savedState: Record<string, unknown> | null = null;
     const fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
       if (
         url.endsWith("/api/projects/library-booking/workspace") &&
@@ -3269,8 +3268,11 @@ describe("createHttpWorkspaceRepository", () => {
           JSON.stringify({
             projectId: "library-booking",
             version: 4,
+            sourceRunId: "run-rules",
             state: {
               requirementText: "订单需求",
+              rules: snapshot.rules,
+              requirementBaseline: baseline,
               requirementReviewCandidates: {
                 r1: {
                   ruleId: "r1",
@@ -3292,15 +3294,7 @@ describe("createHttpWorkspaceRepository", () => {
         url.endsWith("/api/projects/library-booking/workspace") &&
         options?.method === "PUT"
       ) {
-        savedState = JSON.parse(String(options.body)).state;
-        return new Response(
-          JSON.stringify({
-            projectId: "library-booking",
-            version: 5,
-            state: savedState,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
+        throw new Error("Rules-only results must come from server sync");
       }
       return new Response(JSON.stringify({ message: "unexpected request" }), {
         status: 500,
@@ -3316,14 +3310,9 @@ describe("createHttpWorkspaceRepository", () => {
       durationMs: 100,
     });
 
-    expect(
-      (
-        savedState?.requirementReviewCandidates as Record<
-          string,
-          { status: string }
-        >
-      ).r1.status,
-    ).toBe("pending");
+    const synced = await repository.loadWorkspace();
+    expect(synced.requirementReviewCandidates.r1?.status).toBe("pending");
+    expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PUT")).toBe(false);
   });
 
   it("persists design run snapshots incrementally without deleting existing diagrams", async () => {

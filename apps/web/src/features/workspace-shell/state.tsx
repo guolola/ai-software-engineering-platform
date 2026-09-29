@@ -124,6 +124,7 @@ interface WorkspaceShellState {
   activeTabId: string;
   openWorkspaceTab: (selection: WorkspaceSelection) => void;
   activateWorkspaceTab: (tabId: string) => void;
+  restoreWorkspaceTabs: (tabs: WorkspaceTab[], activeTabId: string) => void;
   closeWorkspaceTab: (tabId: string) => void;
   closeOtherWorkspaceTabs: (tabId: string) => void;
   closeWorkspaceTabsByStage: (tabId: string) => void;
@@ -392,6 +393,15 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
     setActiveTabId(tabId);
   }, []);
 
+  // Guided tours may visit several stages; restore the exact prior tab set on exit.
+  const restoreWorkspaceTabs = useCallback((tabs: WorkspaceTab[], previousActiveTabId: string) => {
+    const restored = tabs.length ? tabs : [defaultTab];
+    setOpenTabs(restored);
+    setActiveTabId(restored.some((tab) => tab.id === previousActiveTabId)
+      ? previousActiveTabId
+      : restored[0].id);
+  }, [defaultTab]);
+
   const closeWorkspaceTab = useCallback(
     (tabId: string) => {
       setOpenTabs((current) => {
@@ -645,6 +655,7 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       activeTabId,
       openWorkspaceTab,
       activateWorkspaceTab,
+      restoreWorkspaceTabs,
       closeWorkspaceTab,
       closeOtherWorkspaceTabs,
       closeWorkspaceTabsByStage,
@@ -700,6 +711,7 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       openRequirementTraceMatrix,
       openWorkspaceTab,
       activateWorkspaceTab,
+      restoreWorkspaceTabs,
       closeWorkspaceTab,
       closeOtherWorkspaceTabs,
       closeWorkspaceTabsByStage,

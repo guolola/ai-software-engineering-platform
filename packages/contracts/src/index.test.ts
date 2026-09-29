@@ -208,6 +208,7 @@ test("contracts describe system notice content and admin permissions", () => {
 
 test("contracts describe structured model rerender requests", () => {
   const request = renderStructuredModelRequestSchema.parse({
+    stage: "requirements",
     model: {
       diagramKind: "usecase",
       title: "登录用例模型",
@@ -993,7 +994,7 @@ test("contracts validate representative stage payloads", () => {
     stage: "render_svg",
     attempt: 1,
     kind: "render_error",
-    diagramKind: "activity",
+    diagramKind: "navigation",
     rawOutputTruncated: false,
     plantUmlSource: "@startuml\nstart\n@enduml",
     errorMessage: "Syntax Error? (line 2)",

@@ -537,6 +537,8 @@ function activityNodeTraceabilityKind(nodeType: unknown) {
       return "activity";
     case "decision":
       return "decision";
+    case "object": return "object-node";
+    case "flow_final": return "flow-final-node";
     case "start":
       return "start-node";
     case "end":
@@ -567,6 +569,7 @@ function prototypeNodeTraceabilityKind(nodeType: unknown) {
 
 function isBusinessTraceabilityKind(kind: string) {
   return ![
+    "flow-final-node", "input-pin", "output-pin", "activation",
     "system-boundary",
     "swimlane",
     "start-node",
@@ -614,6 +617,7 @@ function collectTraceableRefKeys(
       ["tables", "table"],
     ];
     const businessElementIds = new Set<string>();
+    if (model.diagramKind === "activity") for (const node of model.nodes) if (node.type === "activity") for (const pin of [...node.inputPins ?? [], ...node.outputPins ?? []]) businessElementIds.add(pin.id);
 
     for (const [key, defaultKind] of listKeys) {
       const items = Array.isArray(record[key]) ? record[key] : [];
@@ -624,7 +628,7 @@ function collectTraceableRefKeys(
         const kind =
           key === "nodes" && diagramKind === "activity"
             ? activityNodeTraceabilityKind(itemRecord.type)
-            : key === "nodes" && diagramKind === "prototype"
+            : key === "nodes" && (diagramKind === "prototype" || diagramKind === "navigation")
               ? prototypeNodeTraceabilityKind(itemRecord.nodeType)
             : defaultKind;
         if (id && isBusinessTraceabilityKind(kind)) {

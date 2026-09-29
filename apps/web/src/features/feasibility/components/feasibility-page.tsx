@@ -288,7 +288,7 @@ export function FeasibilityPage({
       const parsed = contextDiagramSpecSchema.parse(model);
       validateContextSources(parsed, acceptedFeasibilityRules(workspace).map((rule) => rule.id));
       const contextTraceability = buildContextTraceability(parsed);
-      const rendered = await repository.renderStructuredModel(parsed);
+      const rendered = await repository.renderStructuredModel(parsed, "feasibility");
       // Persist the validated model and every derived artifact together, so a render failure cannot replace the last valid version.
       await repository.updateFeasibility?.({
         contextModel: parsed,

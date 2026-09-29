@@ -84,7 +84,8 @@ import {
 } from "../traceability/trusted-chain-traceability.js";
 
 const MAX_MODEL_REPAIR_ATTEMPTS = 2;
-const MAX_SEQUENCE_USE_CASE_RETRIES = 2;
+// Each sequence model already has two structured repair rounds; do not multiply them in an outer retry loop.
+const MAX_SEQUENCE_USE_CASE_RETRIES = 0;
 const DESIGN_TRACEABILITY_BATCH_SIZE = 24;
 const DEFAULT_DESIGN_SEQUENCE_CONCURRENCY = 2;
 const DEFAULT_MODEL_TASK_IDLE_TIMEOUT_MS = 300_000;
@@ -98,7 +99,7 @@ const DESIGN_DIAGRAM_LABELS: Record<DesignDiagramKind, string> = {
   architecture: "总体架构图",
   sequence: "用例实现设计",
   class: "设计类图",
-  activity: "界面关系图",
+  navigation: "页面导航图",
   component: "组件（构件）关系",
   deployment: "部署设计",
   table: "数据库设计",
@@ -110,7 +111,7 @@ function designDiagramKindFromErrorId(id: string): DesignDiagramKind | null {
     rawKind === "sequence" ||
     rawKind === "architecture" ||
     rawKind === "class" ||
-    rawKind === "activity" ||
+    rawKind === "navigation" ||
     rawKind === "component" ||
     rawKind === "deployment" ||
     rawKind === "table"
@@ -926,7 +927,7 @@ export async function generateDesignModelsWithRepair(
   stage: RunStage,
   options: {
     modelRepairAttempts?: number;
-    skipEmptyModelRepair?: boolean;
+    validateModels?: (models: DesignDiagramModelSpec[]) => void;
     subtaskId?: string;
     subtaskLabel?: string;
   } = {},
@@ -936,7 +937,11 @@ export async function generateDesignModelsWithRepair(
 ) {
   const modelRepairAttempts =
     options.modelRepairAttempts ?? MAX_MODEL_REPAIR_ATTEMPTS;
-  const responseFormat = getGenerateDesignModelsResponseFormat(providerSettings);
+  const responseFormat = getGenerateDesignModelsResponseFormat(providerSettings, selectedDiagrams);
+  const validateSelectedModels = (models: DesignDiagramModelSpec[]) => {
+    if (!models.length || models.some((model) => !selectedDiagrams.includes(model.diagramKind))) throw new Error("模型类型与本次请求不匹配");
+    options.validateModels?.(models);
+  };
   let prompt = initialPrompt;
   let previousOutput = "";
   let lastErrorMessage = "";
@@ -970,6 +975,7 @@ export async function generateDesignModelsWithRepair(
 
     try {
       const parsed = parseDesignDiagramModelsResult(content, requirementModels);
+      validateSelectedModels(parsed.models);
       const filteredModels = parsed.models.filter((model) =>
         selectedDiagrams.includes(model.diagramKind),
       );
@@ -1035,7 +1041,9 @@ export async function generateDesignModelsWithRepair(
     } catch (error) {
       const modelOnly = (() => {
         try {
-          return parseDesignDiagramModelsOnly(content);
+          const result = parseDesignDiagramModelsOnly(content);
+          validateSelectedModels(result.models);
+          return result;
         } catch {
           return null;
         }
@@ -1099,14 +1107,6 @@ export async function generateDesignModelsWithRepair(
         attempt + 1,
       );
       lastErrorMessage = formatParseError(error);
-      if (
-        options.skipEmptyModelRepair &&
-        lastErrorMessage.includes("must return at least one model")
-      ) {
-        throw new Error(
-          `${stage} structured output failed: ${lastErrorMessage}`,
-        );
-      }
       appendDesignTrace(record, {
         stage: traceStage,
         attempt: attempt + 1,
@@ -1118,6 +1118,7 @@ export async function generateDesignModelsWithRepair(
       if (attempt === modelRepairAttempts) {
         throw new Error(
           `${stage} structured output failed: ${lastErrorMessage}`,
+          { cause: error },
         );
       }
 
@@ -1138,6 +1139,8 @@ export async function generateDesignModelsWithRepair(
         previousOutput,
         lastErrorMessage,
       );
+      // Empty or invalid output still needs the original use case and upstream models during repair.
+      prompt += `\n\n本次原始建模任务与权威输入：\n${initialPrompt}`;
     }
   }
 
@@ -1235,7 +1238,7 @@ function sourceRequirementKindsForDesign(
   switch (diagramKind) {
     case "architecture":
       return ["function"];
-    case "activity":
+    case "navigation":
       return ["prototype"];
     case "class":
       return ["class"];
@@ -1427,7 +1430,7 @@ export async function runDesignStagePipeline(
   const selectedDiagramsRequireUseCase =
     selectedDesignDiagrams.has("sequence") ||
     selectedDownstreamDiagrams.some(
-      (diagram) => diagram === "class" || diagram === "activity",
+      (diagram) => diagram === "class" || diagram === "navigation",
     );
   const useCaseModel = findRequirementModel(snapshot.requirementModels, "usecase");
   if (!useCaseModel && selectedDiagramsRequireUseCase) {
@@ -1496,7 +1499,7 @@ export async function runDesignStagePipeline(
                   scopedAnalysisModels,
                 ),
                 "generate_design_sequence",
-                { skipEmptyModelRepair: true, subtaskId: modelId, subtaskLabel: `${useCase.name}的顺序图` },
+                { subtaskId: modelId, subtaskLabel: `${useCase.name}的顺序图`, validateModels: (models) => { for (const model of models) if (model.diagramKind === "sequence") assertSequenceDiffersFromRequirementAnalysis(model, scopedAnalysisModels); } },
                 markActivity,
                 markBlankActivity,
                 abortSignal,
@@ -1626,7 +1629,7 @@ export async function runDesignStagePipeline(
 
   const requestedDownstream = selectedDownstreamDiagrams;
   const sequenceRequiredDiagrams = requestedDownstream.filter(
-    (diagram) => diagram === "class" || diagram === "activity",
+    (diagram) => diagram === "class" || diagram === "navigation",
   );
   if (sequenceRequiredDiagrams.length > 0 && sequenceModels.length === 0) {
     throwRunError(createRunError("RUN_DEPENDENCY_MISSING", "缺少用例实现设计，无法生成所选设计模型；请先生成用例实现设计或在本次请求中包含用例实现设计"));
@@ -1816,7 +1819,7 @@ export async function runDesignStagePipeline(
     const downstreamOrder: Array<Exclude<DesignDiagramKind, "sequence">> = [
       "architecture",
       "class",
-      "activity",
+      "navigation",
       "table",
       "component",
       "deployment",

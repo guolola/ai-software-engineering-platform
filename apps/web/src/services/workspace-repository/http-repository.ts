@@ -169,6 +169,24 @@ export function createHttpWorkspaceRepository(
     return cloneWorkspace(projectWorkspace);
   }
 
+  async function awaitRulesOnlyProjectSync(snapshot: { runId: string }) {
+    const scopedProjectId = requireProjectScope(projectId);
+    // Terminal SSE events can arrive before the run record and server workspace sync finish.
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const response = await requestJson<ProjectWorkspaceResponse>(
+        `/api/projects/${encodeURIComponent(scopedProjectId)}/workspace`,
+        withProjectHeaders(scopedProjectId, { errorKey: "errors.operations.loadWorkspace" }),
+      );
+      if (response.sourceRunId === snapshot.runId) {
+        projectWorkspaceVersion = response.version;
+        projectWorkspace = mergeWorkspaceState(response.state);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw new Error("需求规则已生成，但项目保存尚未确认，请稍后刷新并检查运行历史。");
+  }
+
   async function updateProjectWorkspace(
     mutate: (workspace: WorkspaceRecord) => void,
     sourceRunId?: string | null,
@@ -372,6 +390,8 @@ export function createHttpWorkspaceRepository(
       rules: RequirementRule[],
       metadata?: RequirementRulesUpdateMetadata,
     ) {
+      // A completed project run is persisted by the server; a second browser PUT races its run record.
+      if (projectId && metadata?.sourceRunId) return;
       if (projectId) {
         await updateProjectWorkspace((workspace) => {
           workspace.rules = [...rules];
@@ -493,7 +513,8 @@ export function createHttpWorkspaceRepository(
       ) as RequirementBaseline;
     },
 
-    async updateRequirementReviewCandidates(candidates) {
+    async updateRequirementReviewCandidates(candidates, options) {
+      if (projectId && options?.sourceRunId) return;
       if (projectId) {
         await updateProjectWorkspace((workspace) => {
           workspace.requirementReviewCandidates = structuredClone(
@@ -667,8 +688,8 @@ export function createHttpWorkspaceRepository(
       return renderPlantUmlRequest(diagramKind, plantUmlSource, projectId);
     },
 
-    async renderStructuredModel(model) {
-      return renderStructuredModelRequest(model, projectId);
+    async renderStructuredModel(model, stage) {
+      return renderStructuredModelRequest(model, projectId, stage);
     },
 
     async confirmVisualReview(key, checkedAt) {
@@ -751,7 +772,16 @@ export function createHttpWorkspaceRepository(
 
     async saveRunHistory(snapshot, meta) {
       if (projectId) {
-        await persistSnapshotAsProjectWorkspace(snapshot);
+        const rulesOnly = "selectedDiagrams" in snapshot &&
+          !('files' in snapshot) &&
+          !('designModelTraceability' in snapshot) &&
+          snapshot.selectedDiagrams.length === 0 &&
+          ('models' in snapshot && snapshot.models.length === 0);
+        if (rulesOnly) {
+          if (snapshot.status === "completed") await awaitRulesOnlyProjectSync(snapshot);
+        } else {
+          await persistSnapshotAsProjectWorkspace(snapshot);
+        }
         return {
           id: snapshot.runId,
           createdAt: new Date().toISOString(),

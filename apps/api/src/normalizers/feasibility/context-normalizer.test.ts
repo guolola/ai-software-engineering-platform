@@ -19,10 +19,10 @@ test("normalizes a valid traced context model", () => {
 });
 
 test("rejects an invalid relationship endpoint", () => {
-  assert.throws(() => normalizeContextDiagram({ ...validModel, relationships: [{ ...validModel.relationships[0], targetId: "missing" }] }, new Set(["R1"])), /关系端点无效/u);
+  assert.throws(() => normalizeContextDiagram({ ...validModel, relationships: [{ ...validModel.relationships[0], targetId: "missing" }] }, new Set(["R1"])), /missing-endpoint/u);
 });
 
 test("rejects duplicate elements and unknown rule references", () => {
-  assert.throws(() => normalizeContextDiagram({ ...validModel, externalSystems: [{ id: "customer", name: "重复", sourceRequirementIds: ["R1"] }] }, new Set(["R1"])), /元素编号重复/u);
+  assert.throws(() => normalizeContextDiagram({ ...validModel, externalSystems: [{ id: "customer", name: "重复", sourceRequirementIds: ["R1"] }] }, new Set(["R1"])), /duplicate-id/u);
   assert.throws(() => normalizeContextDiagram({ ...validModel, people: [{ ...validModel.people[0], sourceRequirementIds: ["R404"] }] }, new Set(["R1"])), /不存在的需求规则/u);
 });

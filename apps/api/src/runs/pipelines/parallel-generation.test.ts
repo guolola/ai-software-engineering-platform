@@ -47,18 +47,21 @@ const libraryRules: RequirementRule[] = [
     id: "r1",
     category: "功能需求",
     text: "图书管理员可以办理借书和还书。",
+    sourceFragment: "(1)借书、还书；",
     relatedDiagrams: ["usecase", "activity"],
   },
   {
     id: "r2",
     category: "数据需求",
     text: "系统需要记录图书、读者和借阅记录。",
+    sourceFragment: "(4)找出被某位读者借出的一批书；",
     relatedDiagrams: ["class"],
   },
   {
     id: "r3",
     category: "部署需求",
     text: "系统需要部署为可访问的图书馆管理服务。",
+    sourceFragment: "一个小型图书馆管理系统，需完成以下工作：",
     relatedDiagrams: ["deployment"],
   },
 ];
@@ -72,7 +75,7 @@ function modelForKind(kind: DiagramKind): DiagramModelSpec {
       notes: [],
       nodes: [
         { id: "fn_library", name: "图书馆管理", sourceRequirementIds: ["REQ-001"] },
-        { id: "fn_borrow", name: "借还书", parentId: "fn_library", sourceRequirementIds: ["REQ-001"] },
+        { id: "fn_borrow", name: "借还书", sourceRequirementIds: ["REQ-001"] },
       ],
       relationships: [
         {
@@ -102,6 +105,7 @@ function modelForKind(kind: DiagramKind): DiagramModelSpec {
       useCases: [
         {
           id: "uc_borrow",
+          systemBoundaryId: "boundary_library",
           name: "借书",
           goal: "登记图书借阅",
           preconditions: ["图书未借出"],
@@ -191,7 +195,7 @@ function modelForKind(kind: DiagramKind): DiagramModelSpec {
       {
         id: "node_app",
         name: "图书馆管理服务",
-        nodeType: "server",
+        nodeType: "device",
         environment: "production",
       },
     ],
@@ -799,8 +803,8 @@ test("requirement pipeline reuses contextual use case event flows for analysis-o
             {
               order: 1,
               actor: "actor",
-              action: "提交读者与图书信息",
-              systemResponse: "校验图书可借状态",
+              actorAction: "提交读者与图书信息",
+              systemAction: "校验图书可借状态",
             },
             {
               order: 2,
@@ -988,8 +992,8 @@ test("requirement pipeline records implicit usecase dependency for analysis-only
                       {
                         order: 1,
                         actor: "actor",
-                        action: "提交读者与图书信息",
-                        systemResponse: "校验图书可借状态",
+                        actorAction: "提交读者与图书信息",
+                        systemAction: "校验图书可借状态",
                       },
                     ],
                   },
@@ -1604,6 +1608,11 @@ test("requirement pipeline auto-fills traceability before retrying when LLM trac
   const transport: LlmTransport = {
     async *streamChatCompletion(input: StreamChatCompletionInput) {
       const prompt = String(input.messages.at(-1)?.content ?? "");
+      if (String(input.messages[0]?.content).includes("你是软件需求输入检查器")) {
+        const units = JSON.parse(prompt) as Array<{ id: string }>;
+        yield JSON.stringify({ units: units.map((unit) => ({ id: unit.id, category: "requirement" })) });
+        return;
+      }
       if (prompt.includes("抽取结构化需求规则")) {
         yield JSON.stringify({ rules: libraryRules });
         return;
@@ -1724,7 +1733,7 @@ test("requirement pipeline auto-fills traceability before nullable traceability 
     completed.requirementModelTraceability.every(
       (entry) =>
         entry.target.diagramKind === "usecase" &&
-        entry.target.modelId === undefined,
+        entry.target.modelId === "usecase",
     ),
   );
   assert.equal(
@@ -1738,7 +1747,7 @@ test("requirement pipeline auto-fills traceability before nullable traceability 
   );
 });
 
-test("requirement pipeline skips traceability cleanly when there are no mappable model elements", async () => {
+test("requirement pipeline rejects empty rule extraction before model generation", async () => {
   let traceabilityPromptCount = 0;
   const emptyDeploymentModel: DiagramModelSpec = {
     diagramKind: "deployment",
@@ -1755,6 +1764,11 @@ test("requirement pipeline skips traceability cleanly when there are no mappable
   const transport: LlmTransport = {
     async *streamChatCompletion(input: StreamChatCompletionInput) {
       const prompt = String(input.messages.at(-1)?.content ?? "");
+      if (String(input.messages[0]?.content).includes("你是软件需求输入检查器")) {
+        const units = JSON.parse(prompt) as Array<{ id: string }>;
+        yield JSON.stringify({ units: units.map((unit) => ({ id: unit.id, category: "requirement" })) });
+        return;
+      }
       if (prompt.includes("抽取结构化需求规则")) {
         yield JSON.stringify({ rules: [] });
         return;
@@ -1791,27 +1805,12 @@ test("requirement pipeline skips traceability cleanly when there are no mappable
     terminal: false,
   };
 
-  await runStagePipeline(record, providerSettings, transport, renderClient);
-
-  const completed = record.snapshot as RunSnapshot;
-  assert.equal(completed.status, "completed");
-  assert.equal(completed.diagramErrors.deployment, undefined);
+  await assert.rejects(
+    () => runStagePipeline(record, providerSettings, transport, renderClient),
+    (error) => getRunError(error)?.code === "RUN_REQUIREMENT_RULES_EMPTY",
+  );
   assert.equal(traceabilityPromptCount, 0);
-  assert.equal(completed.requirementModelTraceability.length, 0);
-  assert.equal(
-    completed.models.find((model) => model.diagramKind === "deployment")?.diagramKind,
-    "deployment",
-  );
-  const skippedTrace = completed.requirementTrace.find(
-    (entry) =>
-      entry.kind === "parsed_model" &&
-      Boolean(
-        (entry.parsedData as { skippedRequirementTraceability?: boolean } | undefined)
-          ?.skippedRequirementTraceability,
-      ),
-  );
-  assert.ok(skippedTrace);
-  assert.equal(skippedTrace.attempt, 1);
+  assert.equal(record.snapshot.models.length, 0);
 });
 
 test("design pipeline renders a completed use case sequence before slower sequences finish", async () => {
@@ -2614,35 +2613,26 @@ test("design pipeline accepts downstream model output with empty traceability an
       yield JSON.stringify({
         models: [
           {
-            diagramKind: "activity",
+            diagramKind: "navigation",
             title: "界面关系图",
             summary: "公共日历和活动编辑的界面跳转。",
             notes: [],
-            swimlanes: [{ id: "lane_user", name: "注册用户" }],
             nodes: [
-              { id: "start", type: "start", name: "开始" },
               {
                 id: "act_calendar",
-                type: "activity",
+                nodeType: "screen",
                 name: "查看公共日历",
-                actorOrLane: "lane_user",
-                input: [],
-                output: ["活动列表"],
               },
               {
                 id: "act_edit",
-                type: "activity",
+                nodeType: "screen",
                 name: "编辑活动",
-                actorOrLane: "lane_user",
-                input: ["活动信息"],
-                output: ["活动更新"],
               },
-              { id: "end", type: "end", name: "结束" },
             ],
             relationships: [
               {
                 id: "flow_open_edit",
-                type: "control_flow",
+                type: "navigation",
                 sourceId: "act_calendar",
                 targetId: "act_edit",
                 condition: "打开编辑",
@@ -2674,7 +2664,7 @@ test("design pipeline accepts downstream model output with empty traceability an
     },
   );
   const snapshot = createEmptyDesignSnapshot("run-design-empty-traceability", {
-    selectedDiagrams: ["activity"],
+    selectedDiagrams: ["navigation"],
     requirementBaseline: requirementSnapshot.requirementBaseline!,
     requirementModels: [useCaseModel, prototypeModel],
     requirementModelTraceability: [],
@@ -2692,13 +2682,13 @@ test("design pipeline accepts downstream model output with empty traceability an
   const designSnapshot = record.snapshot as DesignRunSnapshot;
   assert.equal(llmCalls, 1);
   assert.equal(designSnapshot.status, "completed");
-  assert.ok(designSnapshot.models.some((model) => model.diagramKind === "activity"));
+  assert.ok(designSnapshot.models.some((model) => model.diagramKind === "navigation"));
   assert.ok(designSnapshot.designModelTraceability.some(
     (entry) =>
-      entry.source.diagramKind === "activity" &&
+      entry.source.diagramKind === "navigation" &&
       entry.mappingSource === "auto-filled-pending-review",
   ));
-  assert.ok(designSnapshot.svgArtifacts.some((artifact) => artifact.diagramKind === "activity"));
+  assert.ok(designSnapshot.svgArtifacts.some((artifact) => artifact.diagramKind === "navigation"));
 });
 
 test("design pipeline records downstream dependency errors per selected diagram", async () => {

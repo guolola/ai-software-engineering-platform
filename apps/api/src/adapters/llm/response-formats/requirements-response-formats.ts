@@ -23,9 +23,9 @@ export {
 export const requirementModelOneOf = (
   (
     GENERATE_MODELS_RESPONSE_FORMAT.json_schema.schema.properties as {
-      models: { items: { oneOf: Record<string, unknown>[] } };
+      models: { items: { anyOf: Record<string, unknown>[] } };
     }
-  ).models.items.oneOf
+  ).models.items.anyOf
 );
 
 export const GENERATE_REQUIREMENT_TRACEABILITY_RESPONSE_FORMAT: JsonSchemaResponseFormat = {

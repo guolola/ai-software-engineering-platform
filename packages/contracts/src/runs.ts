@@ -90,6 +90,7 @@ export type StartRunRequest = z.infer<typeof startRunRequestSchema>;
 export const startRunCommandSchema = z
   .object({
     projectId: z.string().min(1).optional(),
+    requirementText: z.string().min(1).optional(),
     selectedDiagrams: z.array(diagramKindSchema),
     requestedDiagrams: z.array(diagramKindSchema).optional(),
     dependencyDiagrams: z.array(diagramKindSchema).optional(),
@@ -325,6 +326,10 @@ export const runErrorCodeSchema = z.enum([
   "PLATFORM_PROVIDER_UNAVAILABLE",
   "PLATFORM_PROVIDER_TIMEOUT",
   "RUN_MODEL_OUTPUT_EMPTY",
+  "RUN_REQUIREMENT_INPUT_UNSAFE",
+  "RUN_REQUIREMENT_INPUT_IRRELEVANT",
+  "RUN_REQUIREMENT_SCREENING_FAILED",
+  "RUN_REQUIREMENT_RULES_EMPTY",
   "RUN_STRUCTURED_OUTPUT_INVALID",
   "RUN_DEPENDENCY_MISSING",
   "RUN_RENDER_FAILED",
@@ -445,9 +450,19 @@ export const codeTraceEntrySchema = z.object({
 });
 export type CodeTraceEntry = z.infer<typeof codeTraceEntrySchema>;
 
+export const requirementInputScreeningSchema = z.object({
+  ignoredSpans: z.array(z.object({
+    startOffset: z.number().int().min(0),
+    endOffset: z.number().int().min(0),
+    reason: z.literal("irrelevant"),
+  })),
+});
+export type RequirementInputScreening = z.infer<typeof requirementInputScreeningSchema>;
+
 export const runSnapshotSchema = z.object({
   runId: z.string().min(1),
   requirementText: z.string(),
+  inputScreening: requirementInputScreeningSchema.optional(),
   selectedDiagrams: z.array(diagramKindSchema),
   requestedDiagrams: z.array(diagramKindSchema).optional(),
   dependencyDiagrams: z.array(diagramKindSchema).optional(),

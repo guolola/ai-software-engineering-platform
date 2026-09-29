@@ -1,6 +1,8 @@
 // Registers project and membership endpoints; business rules stay in auth store/guards.
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { ModelSemanticError } from "@uml-platform/contracts";
+import { normalizeWorkspaceModelState } from "../../normalizers/workspace/model-state.js";
 import {
   projectInvitationAcceptResponseSchema,
   projectInvitationCreateRequestSchema,
@@ -175,14 +177,19 @@ export function registerProjectRoutes({
     const input = projectWorkspaceSaveRequestSchema.parse(request.body);
     let result: Awaited<ReturnType<AuthStore["saveProjectWorkspace"]>>;
     try {
+      const currentWorkspace = await authStore.getProjectWorkspace(projectId);
       result = await authStore.saveProjectWorkspace({
         projectId,
         baseVersion: input.baseVersion,
-        state: input.state,
+        state: normalizeWorkspaceModelState(input.state, currentWorkspace.state),
         updatedByUserId: context.user.id,
         sourceRunId: input.sourceRunId ?? null,
       });
     } catch (error) {
+      if (error instanceof ModelSemanticError) {
+        reply.code(400);
+        return { message: "模型未通过语义校验", diagnostics: error.diagnostics };
+      }
       if (isWorkspaceSourceRunConstraintError(error)) {
         reply.code(400);
         return { message: "Source run not found for project workspace" };

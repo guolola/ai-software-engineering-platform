@@ -4,7 +4,7 @@ import { z } from "zod";
 export const codeDesignDiagramKindSchema = z.enum([
   "architecture",
   "sequence",
-  "activity",
+  "navigation",
   "class",
   "component",
   "deployment",

@@ -113,7 +113,7 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
     if (active || actionBusy) return;
     const diagram = id.replace(/^(generate_models|generate_design_models|generate_design_sequence|generate_plantuml|render_svg|verify_diagram_visual):/, "").split(":")[0];
     if (kind === "requirements" && ["function", "usecase", "class", "activity", "deployment", "prototype", "analysis"].includes(diagram)) void session.generateDiagrams([diagram as DiagramKind]);
-    if (kind === "design" && ["architecture", "sequence", "class", "activity", "component", "deployment", "table"].includes(diagram)) void session.generateDesignDiagrams([diagram as DesignDiagramKind]);
+    if (kind === "design" && ["architecture", "sequence", "class", "navigation", "component", "deployment", "table"].includes(diagram)) void session.generateDesignDiagrams([diagram as DesignDiagramKind]);
   };
   const completed = transcript.completed?.snapshot;
   return <GenerationTranscript key={taskKey} taskKey={taskKey} steps={transcript.visibleSteps} active={active} status={transcript.status} queue={queue}

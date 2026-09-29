@@ -40,7 +40,7 @@ export const DESIGN_REQUIREMENT_SOURCE_MAP: Record<
 > = {
   architecture: ["function"],
   sequence: ["usecase", "analysis"],
-  activity: ["prototype"],
+  navigation: ["prototype"],
   class: ["class"],
   component: [],
   deployment: ["deployment"],
@@ -53,7 +53,7 @@ export const DESIGN_MODEL_DEPENDENCY_MAP: Record<
 > = {
   architecture: [],
   sequence: [],
-  activity: ["sequence"],
+  navigation: ["sequence"],
   class: ["sequence"],
   component: ["class"],
   deployment: ["component"],

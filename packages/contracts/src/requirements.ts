@@ -16,7 +16,7 @@ export type DiagramKind = z.infer<typeof diagramKindSchema>;
 export const designDiagramKindSchema = z.enum([
   "architecture",
   "sequence",
-  "activity",
+  "navigation",
   "class",
   "component",
   "deployment",

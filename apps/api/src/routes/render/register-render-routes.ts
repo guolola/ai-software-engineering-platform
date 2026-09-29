@@ -1,4 +1,5 @@
 // Registers render/provider endpoints and delegates external calls to adapters.
+import { validateModelInput, ModelSemanticError } from "@uml-platform/contracts";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   designDiagramModelSpecSchema,
@@ -79,6 +80,7 @@ export function registerRenderRoutes({
       reply.code(400);
       return {
         message: error instanceof Error ? error.message : "Unknown render error",
+        ...(error instanceof ModelSemanticError ? { diagnostics: error.diagnostics } : {}),
       };
     }
   });
@@ -89,18 +91,11 @@ export function registerRenderRoutes({
 
     const input = renderStructuredModelRequestSchema.parse(request.body);
     try {
-      const isRequirementOnlyModel =
-        input.model.diagramKind === "usecase" ||
-        input.model.diagramKind === "prototype" ||
-        input.model.diagramKind === "analysis";
-      const designModel = designDiagramModelSpecSchema.safeParse(input.model);
-      const requirementModel = diagramModelSpecSchema.safeParse(input.model);
-      const [artifact] =
-        isRequirementOnlyModel || !designModel.success
-          ? requirementModel.success
-            ? generatePlantUmlArtifacts([requirementModel.data])
-            : []
-          : generateDesignPlantUmlArtifacts([designModel.data]);
+      const diagnostics = validateModelInput(input.model, input.stage);
+      if (diagnostics.length) throw new ModelSemanticError(diagnostics);
+      const [artifact] = input.stage === "design"
+        ? generateDesignPlantUmlArtifacts([designDiagramModelSpecSchema.parse(input.model)])
+        : generatePlantUmlArtifacts([diagramModelSpecSchema.parse(input.model)]);
       if (!artifact) {
         reply.code(400);
         return { message: "模型无法生成 PlantUML" };
@@ -118,6 +113,7 @@ export function registerRenderRoutes({
       reply.code(400);
       return {
         message: error instanceof Error ? error.message : "Unknown render error",
+        ...(error instanceof ModelSemanticError ? { diagnostics: error.diagnostics } : {}),
       };
     }
   });
@@ -141,6 +137,7 @@ export function registerRenderRoutes({
       reply.code(400);
       return {
         message: error instanceof Error ? error.message : "Unknown render error",
+        ...(error instanceof ModelSemanticError ? { diagnostics: error.diagnostics } : {}),
       };
     }
   });

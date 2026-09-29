@@ -47,12 +47,11 @@ const designClassModel: DesignDiagramModelSpec = {
 };
 
 const interfaceModel: DesignDiagramModelSpec = {
-  diagramKind: "activity",
-  modelId: "activity:design-interface-relations",
+  diagramKind: "navigation",
+  modelId: "navigation:design-interface-relations",
   title: "界面关系图",
   summary: "文章发布界面跳转。",
   notes: [],
-  swimlanes: [],
   nodes: [],
   relationships: [],
 };
@@ -190,6 +189,54 @@ test("terminal requirement snapshots auto-sync into project workspace", async ()
   assert.deepEqual(state.selectedDiagramTypes, []);
 });
 
+test("rules-only drafts commit with successful rules and stay untouched after failure", async () => {
+  const { authStore, project, user, syncProjectWorkspace } =
+    await createWorkspaceSyncFixture();
+  await authStore.saveProjectWorkspace({
+    projectId: project.id,
+    baseVersion: 0,
+    state: { requirementText: "旧需求", rules: [rule] },
+    updatedByUserId: user.id,
+    sourceRunId: null,
+  });
+  for (const status of ["failed", "cancelled"] as const) {
+    const snapshot = createEmptySnapshot(`run-draft-${status}`, "新需求", [], []);
+    snapshot.status = status;
+    await syncProjectWorkspace({
+      snapshot,
+      events: [],
+      listeners: new Set(),
+      terminal: true,
+      metadata: { projectId: project.id, userId: user.id },
+    });
+    const workspace = await authStore.getProjectWorkspace(project.id);
+    assert.equal(workspace.state.requirementText, "旧需求");
+    assert.deepEqual(workspace.state.rules, [rule]);
+  }
+  const empty = createEmptySnapshot("run-draft-empty", "无效草稿", [], []);
+  empty.status = "completed";
+  await syncProjectWorkspace({
+    snapshot: empty,
+    events: [],
+    listeners: new Set(),
+    terminal: true,
+    metadata: { projectId: project.id, userId: user.id },
+  });
+  assert.equal((await authStore.getProjectWorkspace(project.id)).state.requirementText, "旧需求");
+  const completed = createEmptySnapshot("run-draft-completed", "新需求", [], [rule]);
+  completed.status = "completed";
+  await syncProjectWorkspace({
+    snapshot: completed,
+    events: [],
+    listeners: new Set(),
+    terminal: true,
+    metadata: { projectId: project.id, userId: user.id },
+  });
+  const workspace = await authStore.getProjectWorkspace(project.id);
+  assert.equal(workspace.state.requirementText, "新需求");
+  assert.equal(workspace.sourceRunId, completed.runId);
+});
+
 test("older same-kind terminal snapshots do not overwrite newer project workspace source", async () => {
   const { authStore, project, runs, user, syncProjectWorkspace } =
     await createWorkspaceSyncFixture();
@@ -276,8 +323,8 @@ test("terminal design snapshots auto-sync successful design models into project 
     rules: [rule],
   });
   const snapshot = createEmptyDesignSnapshot("run-design-sync", {
-    selectedDiagrams: ["class", "activity", "component", "deployment"],
-    requestedDiagrams: ["activity", "deployment"],
+    selectedDiagrams: ["class", "navigation", "component", "deployment"],
+    requestedDiagrams: ["navigation", "deployment"],
     requirementBaseline: baseline,
     requirementModels: [useCaseModel],
     requirementModelTraceability: [],
@@ -314,7 +361,7 @@ test("terminal design snapshots auto-sync successful design models into project 
   );
   const designModels = state.designModels as Record<string, unknown>;
   assert.ok(designModels["class:design"]);
-  assert.ok(designModels["activity:design-interface-relations"]);
+  assert.ok(designModels["navigation:design-interface-relations"]);
   assert.ok(designModels["component:design"]);
   assert.ok(designModels["deployment:design"]);
   assert.deepEqual(state.selectedDiagramTypes, []);

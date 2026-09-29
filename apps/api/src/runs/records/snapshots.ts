@@ -37,7 +37,7 @@ const DESIGN_DIAGRAM_ORDER: DesignDiagramKind[] = [
   "architecture",
   "sequence",
   "class",
-  "activity",
+  "navigation",
   "table",
   "component",
   "deployment",

@@ -57,6 +57,8 @@ import {
   useProjectOverview,
 } from "../features/user-platform/components/user-platform-pages";
 import { DashboardPage } from "../features/dashboard/components/dashboard-page";
+import { OnboardingTourProvider } from "../features/onboarding/components/onboarding-tour-provider";
+import { useProjectOnboarding } from "../features/onboarding/hooks/use-project-onboarding";
 import {
   AlipayReturnPage,
   AccountBillingPage,
@@ -111,6 +113,7 @@ function ProjectWorkspaceShell({
   routeDrawer,
   activeProjectDrawer,
   onActiveProjectDrawerChange,
+  onOpenProviderSettings,
   onNavigate,
   preferredTaskRunId,
 }: {
@@ -119,6 +122,7 @@ function ProjectWorkspaceShell({
   routeDrawer: ProjectDrawerKind | null;
   activeProjectDrawer: ProjectDrawerKind | null;
   onActiveProjectDrawerChange: (drawer: ProjectDrawerKind | null) => void;
+  onOpenProviderSettings: () => void;
   onNavigate: (route: string) => void;
   preferredTaskRunId?: string | null;
 }) {
@@ -132,6 +136,7 @@ function ProjectWorkspaceShell({
   } = useWorkspaceShell();
   const { setOpenMobile } = useSidebar();
   const projectOverview = useProjectOverview(projectId);
+  const { startProjectTour } = useProjectOnboarding(projectId);
   const projectRuns = projectOverview.runs;
   const activeDrawer = routeDrawer ?? activeProjectDrawer;
   const traceabilityPrefix = t("traceability.title.scoped", { label: "" });
@@ -151,14 +156,14 @@ function ProjectWorkspaceShell({
       if (target === "requirement-models") openRequirementsText();
       if (target === "design-models") openDesignHome();
       if (target === "feasibility") openFeasibilityHome();
-      if (target === "provider-settings") onActiveProjectDrawerChange("settings");
+      if (target === "provider-settings") onOpenProviderSettings();
     };
     window.addEventListener(PROJECT_WORKSPACE_TARGET_REQUEST_EVENT, openRequestedTarget);
     return () => {
       window.removeEventListener(PROJECT_WORKSPACE_TARGET_REQUEST_EVENT, openRequestedTarget);
     };
   }, [
-    onActiveProjectDrawerChange,
+    onOpenProviderSettings,
     openDesignHome,
     openFeasibilityHome,
     openRequirementsText,
@@ -371,6 +376,7 @@ function ProjectWorkspaceShell({
                 onOpenDrawer: onActiveProjectDrawerChange,
                 projectRuns,
                 projectName: projectOverview.project?.name ?? projectId,
+                onStartTour: () => { void startProjectTour(); },
               },
             })
           : header}
@@ -398,6 +404,11 @@ export function Shell({ initialPath }: { initialPath?: string }) {
   const [preferredTaskRunId, setPreferredTaskRunId] = useState<string | null>(null);
   const { generationTasks, selectGenerationTask } = useWorkspaceSession();
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [globalSettingsRequestId, setGlobalSettingsRequestId] = useState(0);
+  const openProviderSettings = useCallback(() => {
+    setGlobalSettingsRequestId((current) => current + 1);
+    setAccountDialogOpen(true);
+  }, []);
   const [loginLoadingRoute, setLoginLoadingRoute] = useState<string | null>(null);
   const [route, setRoute] = useState<AppRoute>(() => {
     const pathname = initialPath ?? (typeof window === "undefined" ? "/" : window.location.pathname);
@@ -513,11 +524,12 @@ export function Shell({ initialPath }: { initialPath?: string }) {
         <ProjectWorkspaceAccessBoundary projectId={route.projectId} onNavigate={navigate}>
           <WorkspaceShellProvider key={route.projectId}>
             <ProjectWorkspaceShell
-              header={<TopBar currentRoute={route.path} onNavigate={navigate} accountDialogOpen={accountDialogOpen} onAccountDialogOpenChange={setAccountDialogOpen} />}
+              header={<TopBar currentRoute={route.path} onNavigate={navigate} accountDialogOpen={accountDialogOpen} onAccountDialogOpenChange={setAccountDialogOpen} globalSettingsRequestId={globalSettingsRequestId} />}
               projectId={route.projectId}
               routeDrawer={route.drawer ?? null}
               activeProjectDrawer={activeProjectDrawer}
               onActiveProjectDrawerChange={setActiveProjectDrawer}
+              onOpenProviderSettings={openProviderSettings}
               onNavigate={navigate}
               preferredTaskRunId={preferredTaskRunId}
             />
@@ -551,8 +563,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
         {routeContent}
     </DefaultPagesLayout>
   ) : routeContent;
-
-  return (
+  const shellContent = (
     <FloatingAlertProvider>
     <SidebarProvider resizable={route.kind === 'project-workspace'} className={route.kind === 'marketing-home' || route.kind === 'not-found' ? 'block min-h-screen w-full' : 'flex min-h-svh w-full flex-col bg-background text-foreground'}>
       <PageErrorBoundary resetKey={route.path}>
@@ -571,6 +582,9 @@ export function Shell({ initialPath }: { initialPath?: string }) {
     </SidebarProvider>
     </FloatingAlertProvider>
   );
+  return route.kind === "projects-index" || route.kind === "project-workspace"
+    ? <OnboardingTourProvider>{shellContent}</OnboardingTourProvider>
+    : shellContent;
 }
 
 function RedirectRoute({

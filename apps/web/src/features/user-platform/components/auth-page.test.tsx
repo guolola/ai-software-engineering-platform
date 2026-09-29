@@ -13,6 +13,23 @@ afterEach(async () => {
   await i18n.changeLanguage("zh-CN");
 });
 
+it("omits the security footnote in both supported languages", async () => {
+  for (const [locale, removedText] of [
+    ["zh-CN", "登录状态由服务端安全会话校验保护。"],
+    ["en", "Your sign-in is protected by server-side session validation."],
+  ] as const) {
+    await i18n.changeLanguage(locale);
+    const { unmount } = render(
+      <AppI18nProvider>
+        <AuthPage path="/login" onNavigate={vi.fn()} />
+      </AppI18nProvider>,
+    );
+    expect(screen.getByTestId("auth-form-panel")).toBeInTheDocument();
+    expect(screen.queryByText(removedText)).not.toBeInTheDocument();
+    unmount();
+  }
+});
+
 it("redirects to login after resetting a password from a reset link", async () => {
   await i18n.changeLanguage("zh-CN");
   window.history.pushState({}, "", "/reset-password?token=reset-token");

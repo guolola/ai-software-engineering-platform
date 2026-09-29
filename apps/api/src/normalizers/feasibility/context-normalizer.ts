@@ -1,6 +1,6 @@
 // Validates context boundaries, identifiers, endpoints, and requirement references before persistence.
 import {
-  contextDiagramSpecSchema,
+  contextDiagramSpecSchema, validateModelInput, ModelSemanticError,
   type ContextDiagramSpec,
 } from "@uml-platform/contracts";
 
@@ -8,6 +8,8 @@ export function normalizeContextDiagram(
   value: unknown,
   validRequirementIds: ReadonlySet<string>,
 ): ContextDiagramSpec {
+  const diagnostics = validateModelInput(value, "feasibility");
+  if (diagnostics.length) throw new ModelSemanticError(diagnostics);
   const model = contextDiagramSpecSchema.parse(value);
   const elementIds = new Set<string>();
   for (const element of [model.system, ...model.people, ...model.externalSystems]) {

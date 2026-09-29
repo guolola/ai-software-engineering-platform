@@ -408,7 +408,7 @@ test("section repair fixes integrations without overwriting valid economics", as
   await app.close();
 });
 
-test("repairs feasibility PlantUML while keeping the context model as source of truth", async () => {
+test("rejects feasibility render failures without requesting a source rewrite", async () => {
   const app = Fastify();
   let renderCalls = 0;
   registerTestRoutes({
@@ -444,10 +444,10 @@ test("repairs feasibility PlantUML while keeping the context model as source of 
   });
   const snapshot = await waitForTerminal(app, start.json().runId);
 
-  assert.equal(snapshot.status, "completed");
+  assert.equal(snapshot.status, "failed");
   assert.equal(snapshot.contextModel.title, "维修预约系统上下文");
-  assert.match(snapshot.contextPlantUml.source, /修复后的上下文/u);
-  assert.equal(snapshot.contextSvg.svg, "<svg>repaired</svg>");
-  assert.equal(renderCalls, 2);
+  assert.doesNotMatch(snapshot.contextPlantUml.source, /修复后的上下文/u);
+  assert.equal(snapshot.contextSvg, null);
+  assert.equal(renderCalls, 1);
   await app.close();
 });

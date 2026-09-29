@@ -71,8 +71,8 @@ function designSnapshot(
   return {
     runId: "run-design-1",
     requirementText: "生成订单系统设计 UML",
-    selectedDiagrams: ["activity"],
-    requestedDiagrams: ["activity"],
+    selectedDiagrams: ["navigation"],
+    requestedDiagrams: ["navigation"],
     rules: [],
     requirementBaseline: null,
     coverageMatrix: null,

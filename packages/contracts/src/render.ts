@@ -20,7 +20,8 @@ export const renderSvgResponseSchema = z.object({
 export type RenderSvgResponse = z.infer<typeof renderSvgResponseSchema>;
 
 export const renderStructuredModelRequestSchema = z.object({
-  model: z.union([diagramModelSpecSchema, designDiagramModelSpecSchema]),
+  stage: z.enum(["feasibility", "requirements", "design"]),
+  model: z.record(z.unknown()),
 });
 export type RenderStructuredModelRequest = z.infer<
   typeof renderStructuredModelRequestSchema

@@ -1,4 +1,5 @@
 // Renders the editable diagram model panel, including element, relation, and delete workflows.
+import { validateModelInput, type ModelingStage } from "@uml-platform/contracts";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { StudioPagination } from "../../../shared/ui/studio-data-table";
@@ -82,6 +83,7 @@ export function ModelEditPanel({
   focusSection,
   sourceRuleOptions = [],
   readOnly = false,
+  stage = "requirements",
 }: {
   draft: Record<string, unknown> | null;
   setDraft: Dispatch<SetStateAction<Record<string, unknown> | null>>;
@@ -90,6 +92,7 @@ export function ModelEditPanel({
   selectedElement?: { kind: string; id: string } | null;
   saving: boolean;
   readOnly?: boolean;
+  stage?: ModelingStage;
   visibleSection?: "all" | "elements" | "relationships";
   focusSection?: "elements" | "relationships" | null;
   sourceRuleOptions?: Array<{ id: string; label: string }>;
@@ -169,8 +172,8 @@ export function ModelEditPanel({
     });
   };
 
-  const collections = editableCollectionsFor(draft);
-  const editorCollections = editableCollectionsFor(editorDraft);
+  const collections = editableCollectionsFor(draft, stage);
+  const editorCollections = editableCollectionsFor(editorDraft, stage);
   const editableItemsById = new Map<string, { collection: EditableCollection; item: Record<string, unknown> }>();
   for (const collection of collections) {
     for (const item of collectionItems(draft, collection)) {
@@ -277,7 +280,7 @@ export function ModelEditPanel({
       const nextRelationships = relationshipItems(current).map((currentRelation) =>
         String(currentRelation.id ?? "") === relationId ? updater(currentRelation) : currentRelation,
       );
-      if (current.diagramKind === "sequence") return { ...current, messages: nextRelationships };
+      if (["sequence", "analysis"].includes(String(current.diagramKind))) return { ...current, messages: nextRelationships };
       return { ...current, relationships: nextRelationships };
     });
   };
@@ -359,7 +362,7 @@ export function ModelEditPanel({
         (currentRelation) => stringValue(currentRelation.id) !== deleteTarget.id,
       );
       nextDraft =
-        draft.diagramKind === "sequence"
+        ["sequence", "analysis"].includes(String(draft.diagramKind))
           ? { ...draft, messages: nextRelationships }
           : { ...draft, relationships: nextRelationships };
     }
@@ -415,10 +418,10 @@ export function ModelEditPanel({
   };
 
   const createRelation = () => {
-    const nextRelation = createRelationshipDraft(draft);
+    const nextRelation = createRelationshipDraft(draft, stage);
     const relationId = stringValue(nextRelation.id);
     const nextDraft =
-      draft.diagramKind === "sequence"
+      ["sequence", "analysis"].includes(String(draft.diagramKind))
         ? { ...draft, messages: [...relationshipItems(draft), nextRelation] }
         : { ...draft, relationships: [...relationshipItems(draft), nextRelation] };
     setRelationEditor({
@@ -485,6 +488,8 @@ export function ModelEditPanel({
   return (
     <>
       <div className="space-y-8">
+        {!readOnly && validateModelInput(draft, stage).length > 0 ? <div role="status" className="rounded border border-amber-500 p-3 text-sm"><p>草稿尚未通过校验，请补齐后保存。当前图保留上次有效结果。</p><ul>{validateModelInput(draft, stage).map((issue, index) => <li key={index}>{issue.elementId ?? issue.path}：{issue.message}</li>)}</ul></div> : null}
+        {draft.diagramKind === "table" ? <p className="text-sm">表间关系由表的外键约束生成，请在表编辑中维护主键、唯一约束和复合外键。</p> : null}
         {visibleSection !== "relationships" ? <div ref={elementsSectionRef} tabIndex={-1} aria-label={t("diagramLists.elements.section")} className="scroll-mt-4 space-y-3 outline-none"><ModelElementListSection
           elementSearch={elementSearch}
           onElementSearchChange={(value) => { setElementSearch(value); setElementPage(1); }}
@@ -514,9 +519,16 @@ export function ModelEditPanel({
           endpointOptionsCount={endpointOptions.length}
           relationshipOrderIds={relationshipOrderIds}
           saving={saving}
-          onCreateRelation={readOnly ? undefined : createRelation}
-          onEditRelation={readOnly ? undefined : editRelation}
-          onDeleteRelation={readOnly ? undefined : deleteRelation}
+          onCreateRelation={readOnly || draft.diagramKind === "table" ? undefined : createRelation}
+          onMoveRelation={!readOnly && ["sequence", "analysis"].includes(String(draft.diagramKind)) ? (id, offset) => {
+            const messages = [...relationshipItems(draft)];
+            const index = messages.findIndex((message) => message.id === id);
+            if (index < 0 || !messages[index + offset]) return;
+            [messages[index], messages[index + offset]] = [messages[index + offset]!, messages[index]!];
+            void onCommitDraft({ ...draft, messages });
+          } : undefined}
+          onEditRelation={readOnly || draft.diagramKind === "table" ? undefined : editRelation}
+          onDeleteRelation={readOnly || draft.diagramKind === "table" ? undefined : deleteRelation}
         /><ModelListPagination page={effectiveRelationPage} pageSize={relationPageSize} total={filteredRelationships.length} onPageChange={setRelationPage} onPageSizeChange={(value) => { setRelationPageSize(value); setRelationPage(1); }} /></div> : null}
       </div>
 
@@ -542,6 +554,7 @@ export function ModelEditPanel({
         renderElementFields={() =>
           elementEditor && editingElement ? (
             <ModelElementEditor
+              stage={stage}
               editorDraft={editorDraft}
               collection={elementEditor.collection}
               item={editingElement}
@@ -560,7 +573,8 @@ export function ModelEditPanel({
           relationEditor && editingRelation ? (
             <div>
               <ModelRelationEditor
-                editorDraft={editorDraft}
+                stage={stage}
+              editorDraft={editorDraft}
                 relation={editingRelation}
                 relationId={relationEditor.relationId}
                 endpointOptions={endpointOptions}

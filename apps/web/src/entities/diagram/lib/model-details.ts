@@ -18,6 +18,7 @@ import type {
   FunctionRelationship,
   FunctionStructureDiagramSpec,
   PrototypeInterfaceDiagramSpec,
+  NavigationDiagramSpec,
   PrototypeInterfaceRelationship,
   SequenceDiagramSpec,
   SequenceMessage,
@@ -42,6 +43,11 @@ export type SemanticElementKind =
   | "merge-node"
   | "fork-node"
   | "join-node"
+  | "object-node"
+  | "flow-final-node"
+  | "input-pin"
+  | "output-pin"
+  | "activation"
   | "swimlane"
   | "deployment-node"
   | "database"
@@ -120,6 +126,11 @@ export const SEMANTIC_KIND_META: Record<
   class: { label: "类", shortLabel: "类" },
   interface: { label: "接口", shortLabel: "接口" },
   enum: { label: "枚举", shortLabel: "枚举" },
+  "object-node": { label: "对象节点", shortLabel: "对象" },
+  "flow-final-node": { label: "分支终止", shortLabel: "分支终止" },
+  "input-pin": { label: "输入引脚", shortLabel: "输入" },
+  "output-pin": { label: "输出引脚", shortLabel: "输出" },
+  activation: { label: "激活区间", shortLabel: "激活" },
   activity: { label: "活动", shortLabel: "活动" },
   decision: { label: "判断", shortLabel: "判断" },
   "start-node": { label: "开始节点", shortLabel: "开始" },
@@ -237,7 +248,7 @@ function deploymentRelationshipLabel(relation: DeploymentRelationship) {
     deployment: "部署",
     communication: "通信",
     dependency: "依赖",
-    hosting: "承载",
+    manifestation: "体现",
   };
   return meta[relation.type];
 }
@@ -246,7 +257,7 @@ function tableRelationshipLabel(relation: TableRelationship) {
   const meta: Record<TableRelationship["type"], string> = {
     "one-to-one": "一对一",
     "one-to-many": "一对多",
-    "many-to-many": "多对多",
+
   };
   return meta[relation.type];
 }
@@ -305,7 +316,7 @@ function buildContextDetailModel(model: ContextDiagramSpec): DiagramDetailModel 
 function functionRelationshipLabel(relation: FunctionRelationship) {
   const meta: Record<FunctionRelationship["type"], string> = {
     decomposition: "功能分解",
-    dependency: "依赖",
+
   };
   return meta[relation.type];
 }
@@ -565,7 +576,7 @@ function buildFunctionDetailModel(model: FunctionStructureDiagramSpec): DiagramD
   const nodeNameById = new Map(model.nodes.map((node) => [node.id, node.name]));
   const items: DiagramDetailItem[] = model.nodes.map((node) => {
     const fields: DetailField[] = [];
-    pushField(fields, "父功能", node.parentId ? nodeNameById.get(node.parentId) ?? node.parentId : "");
+    pushField(fields, "父功能", model.relationships.filter((edge) => edge.targetId === node.id).map((edge) => nodeNameById.get(edge.sourceId) ?? edge.sourceId).join("、"));
     if (node.sourceRequirementIds.length > 0) {
       fields.push({ label: "关联需求", value: joinList(node.sourceRequirementIds) });
     }
@@ -724,6 +735,8 @@ function buildClassDetailModel(model: ClassDiagramSpec): DiagramDetailModel {
 
 function mapActivityNodeKind(node: ActivityNode): SemanticElementKind {
   switch (node.type) {
+    case "object": return "object-node";
+    case "flow_final": return "flow-final-node";
     case "start":
       return "start-node";
     case "end":
@@ -746,6 +759,8 @@ function nodeLabel(node: ActivityNode) {
     return node.name;
   }
   switch (node.type) {
+    case "object": return node.name;
+    case "flow_final": return node.name;
     case "start":
       return "开始";
     case "end":
@@ -776,13 +791,14 @@ function buildActivityDetailModel(model: ActivityDiagramSpec): DiagramDetailMode
       const fields: DetailField[] = [];
       if (node.type === "activity") {
         pushField(fields, "所属泳道", node.actorOrLane);
-        if (node.input.length > 0) {
+        if (node.input?.length > 0) {
           fields.push({ label: "输入", value: joinList(node.input) });
         }
-        if (node.output.length > 0) {
+        if (node.output?.length > 0) {
           fields.push({ label: "输出", value: joinList(node.output) });
         }
       }
+      if (node.type === "object") { pushField(fields, "对象类型", node.dataType); pushField(fields, "状态", node.state); }
       if (node.type === "decision") {
         pushField(fields, "判断条件", node.question);
       }
@@ -796,6 +812,7 @@ function buildActivityDetailModel(model: ActivityDiagramSpec): DiagramDetailMode
     }),
   ];
 
+  for (const node of model.nodes) if (node.type === "activity") for (const key of ["inputPins", "outputPins"] as const) for (const pin of node[key] ?? []) items.push({ kind: key === "inputPins" ? "input-pin" : "output-pin", id: pin.id, label: pin.name, fields: [{ label: "所属动作", value: node.name }, { label: "类型", value: pin.dataType }] });
   const relationships: DiagramRelationshipDetail[] = model.relationships.map(
     (relation) => {
       const fields: DetailField[] = [];
@@ -823,7 +840,7 @@ function buildActivityDetailModel(model: ActivityDiagramSpec): DiagramDetailMode
     "merge-node",
     "fork-node",
     "join-node",
-    "end-node",
+    "end-node", "object-node", "flow-final-node", "input-pin", "output-pin",
   ];
 
   return {
@@ -944,7 +961,7 @@ function mapPrototypeNodeKind(
 }
 
 function buildPrototypeDetailModel(
-  model: PrototypeInterfaceDiagramSpec,
+  model: PrototypeInterfaceDiagramSpec | NavigationDiagramSpec,
 ): DiagramDetailModel {
   const items: DiagramDetailItem[] = model.nodes.map((node) => {
     const fields: DetailField[] = [];
@@ -1043,11 +1060,18 @@ function buildSequenceDetailModel(
       description: fragment.description,
       fields: [
         { label: "类型", value: fragment.type },
+        ...(fragment.parentFragmentId ? [{ label: "父片段", value: fragment.parentFragmentId }] : []),
+        ...(fragment.parentBranchId ? [{ label: "父分支", value: fragment.parentBranchId }] : []),
+        ...(fragment.branches ?? []).map((branch) => ({ label: `分支 ${branch.id}`, value: [branch.label, branch.condition, branch.messageIds.join("、")].filter(Boolean).join("；") })),
         ...(fragment.condition ? [{ label: "条件", value: fragment.condition }] : []),
         ...(fragment.messageIds.length > 0
           ? [{ label: "消息", value: joinList(fragment.messageIds) }]
           : []),
       ],
+    })),
+    ...(model.activations ?? []).map((activation) => ({
+      kind: "activation" as const, id: activation.id, label: `${activation.participantId} 激活`,
+      fields: [{ label: "生命线", value: activation.participantId }, { label: "起始消息", value: activation.startMessageId }, { label: "结束消息", value: activation.endMessageId }],
     })),
   ];
 
@@ -1070,6 +1094,7 @@ function buildSequenceDetailModel(
   return {
     items,
     groups: nonEmptyGroups([
+      { kind: "activation", label: "激活区间", items: items.filter((item) => item.kind === "activation") },
       {
         kind: "participant",
         label: "参与对象",
@@ -1102,6 +1127,7 @@ function buildTableDetailModel(model: TableDiagramSpec): DiagramDetailModel {
       table.type ?? "数据表",
       compactList([
         ...constraintsFrom(table.constraints),
+        ...(table.relationalConstraints ?? []).map((key) => key.type === "check" ? `${key.name ?? key.id}: ${key.expression}` : `${key.type} (${key.columnIds.join(", ")})${key.type === "foreign-key" ? ` → ${key.referenceTableId} (${key.referenceColumnIds.join(", ")})` : ""}`),
         table.columns.length > 0 ? `字段:${table.columns.length}个` : undefined,
         table.columns.some((column) => column.isPrimaryKey) ? "包含主键" : undefined,
         table.columns.some((column) => column.isForeignKey) ? "包含外键" : undefined,
@@ -1140,8 +1166,10 @@ function buildTableDetailModel(model: TableDiagramSpec): DiagramDetailModel {
     (relation) => {
       const fields: DetailField[] = [];
       pushField(fields, "标签", relation.label);
-      pushField(fields, "源字段", relation.sourceColumnId);
-      pushField(fields, "目标字段", relation.targetColumnId);
+      pushField(fields, "源字段", relation.sourceColumnIds?.join("、"));
+      pushField(fields, "源基数", relation.sourceMultiplicity);
+      pushField(fields, "目标字段", relation.targetColumnIds?.join("、"));
+      pushField(fields, "目标基数", relation.targetMultiplicity);
       pushField(fields, "说明", relation.description);
       return {
         id: relation.id,
@@ -1175,8 +1203,8 @@ function buildArchitectureDetailModel(model: ArchitectureDiagramSpec): DiagramDe
     description: item.description,
     fields: [
       ...(item.stereotype ? [{ label: "构造型", value: item.stereotype }] : []),
-      ...(item.componentIds.length > 0
-        ? [{ label: "包含组件", value: joinList(item.componentIds) }]
+      ...(model.components.filter((component) => component.packageId === item.id).map((component) => component.name).length > 0
+        ? [{ label: "包含组件", value: joinList(model.components.filter((component) => component.packageId === item.id).map((component) => component.name)) }]
         : []),
     ],
   }));
@@ -1268,8 +1296,9 @@ function buildComponentDetailModel(model: ComponentRelationshipDiagramSpec): Dia
 }
 
 export function buildDiagramDetailModel(
-  model?: DiagramModelSpec | DesignDiagramModelSpec | null,
+  input?: DiagramModelSpec | DesignDiagramModelSpec | Record<string, unknown> | null,
 ): DiagramDetailModel {
+  const model = input as DiagramModelSpec | DesignDiagramModelSpec | null;
   if (!model) {
     return { items: [], groups: [], relationships: [] };
   }
@@ -1293,6 +1322,7 @@ export function buildDiagramDetailModel(
       return buildActivityDetailModel(model);
     case "deployment":
       return buildDeploymentDetailModel(model);
+    case "navigation":
     case "prototype":
       return buildPrototypeDetailModel(model);
     case "analysis":

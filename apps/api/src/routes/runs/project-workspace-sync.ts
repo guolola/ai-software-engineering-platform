@@ -37,6 +37,13 @@ function snapshotIsFeasibility(snapshot: AnySnapshot): snapshot is FeasibilityRu
   return "selectedArtifacts" in snapshot;
 }
 
+function isRulesOnlyRequirementSnapshot(snapshot: AnySnapshot): snapshot is RunSnapshot {
+  return snapshotIsRestorable(snapshot) &&
+    !("files" in snapshot) &&
+    !("designModelTraceability" in snapshot) &&
+    snapshot.selectedDiagrams.length === 0;
+}
+
 function mergeFeasibilitySnapshot(
   state: Record<string, unknown>,
   snapshot: FeasibilityRunSnapshot,
@@ -140,6 +147,9 @@ export function createProjectWorkspaceSync(
       !userId ||
       (!snapshotIsRestorable(record.snapshot) && !snapshotIsFeasibility(record.snapshot))
     ) return;
+    // Rejected or cancelled draft extraction never changes the committed input.
+    if (isRulesOnlyRequirementSnapshot(record.snapshot) &&
+      (record.snapshot.status !== "completed" || record.snapshot.rules.length === 0)) return;
 
     let current = await authStore.getProjectWorkspace(projectId);
     for (let attempt = 0; attempt < 2; attempt += 1) {

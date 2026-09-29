@@ -1,12 +1,11 @@
 // Owns requirement text, rule editing, and rule version bookkeeping.
 import {
   useCallback,
-  useEffect,
-  useRef,
   useState,
   type SetStateAction,
 } from "react";
 import type { DiagramType } from "../../../entities/diagram/model";
+import type { RequirementInputScreening } from "@uml-platform/contracts";
 import type { RequirementRule } from "../../../entities/requirement-rule/model";
 import type {
   RequirementRulesUpdateMetadata,
@@ -41,6 +40,9 @@ export function ensureUniqueRequirementRuleIds(
 
 export function useRequirementsSlice(repository: WorkspaceRepository) {
   const [requirementText, setRequirementTextRaw] = useState("");
+  const [committedRequirementText, setCommittedRequirementText] = useState("");
+  const [inputScreening, setInputScreening] = useState<RequirementInputScreening | null>(null);
+  const [inputScreeningError, setInputScreeningError] = useState<string | null>(null);
   const [rules, setRulesRaw] = useState<RequirementRule[]>([]);
   const [textVersion, setTextVersion] = useState(0);
   const [rulesVersion, setRulesVersion] = useState(0);
@@ -50,9 +52,6 @@ export function useRequirementsSlice(repository: WorkspaceRepository) {
   const [requirementInputFingerprint, setRequirementInputFingerprint] = useState<
     string | null
   >(null);
-  const pendingTextSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingTextSaveValueRef = useRef<string | null>(null);
-  const pendingTextSavePromiseRef = useRef<Promise<void> | null>(null);
 
   const setRules = useCallback(
     (value: SetStateAction<RequirementRule[]>) => {
@@ -64,80 +63,22 @@ export function useRequirementsSlice(repository: WorkspaceRepository) {
     [],
   );
 
-  useEffect(
-    () => () => {
-      if (pendingTextSaveRef.current) {
-        clearTimeout(pendingTextSaveRef.current);
-      }
-    },
-    [],
-  );
-
-  const persistRequirementText = useCallback(
-    (value: string) => {
-      const savePromise = Promise.resolve(
-        repository.updateRequirementText(value),
-      ).finally(() => {
-        if (pendingTextSavePromiseRef.current === savePromise) {
-          pendingTextSavePromiseRef.current = null;
-        }
-      });
-      pendingTextSavePromiseRef.current = savePromise;
-      return savePromise;
-    },
-    [repository],
-  );
-
-  const savePendingRequirementText = useCallback(
-    async (value: string) => {
-      const priorSave = pendingTextSavePromiseRef.current;
-      if (priorSave) {
-        await priorSave;
-      }
-      await persistRequirementText(value);
-    },
-    [persistRequirementText],
-  );
-
   const setRequirementText = useCallback(
     (value: string) => {
+      setInputScreening(null);
+      setInputScreeningError(null);
       setRequirementTextRaw((prev) => {
         if (prev !== value) {
           setTextVersion((current) => current + 1);
         }
         return value;
       });
-      if (pendingTextSaveRef.current) {
-        clearTimeout(pendingTextSaveRef.current);
-      }
-      pendingTextSaveValueRef.current = value;
-      pendingTextSaveRef.current = setTimeout(() => {
-        pendingTextSaveRef.current = null;
-        const pendingValue = pendingTextSaveValueRef.current;
-        pendingTextSaveValueRef.current = null;
-        if (pendingValue !== null) {
-          void savePendingRequirementText(pendingValue);
-        }
-      }, 500);
     },
-    [savePendingRequirementText],
+    [],
   );
 
-  const flushRequirementTextSave = useCallback(async () => {
-    if (pendingTextSaveRef.current) {
-      clearTimeout(pendingTextSaveRef.current);
-      pendingTextSaveRef.current = null;
-      const pendingValue = pendingTextSaveValueRef.current;
-      pendingTextSaveValueRef.current = null;
-      if (pendingValue !== null) {
-        await savePendingRequirementText(pendingValue);
-        return;
-      }
-    }
-    if (pendingTextSavePromiseRef.current) {
-      await pendingTextSavePromiseRef.current;
-    }
-  }, [savePendingRequirementText]);
+  // The textarea is a draft; a successful rules run commits it with the rules.
+  const flushRequirementTextSave = useCallback(async () => {}, []);
 
   const commitRequirementRules = useCallback(
     (
@@ -256,6 +197,13 @@ export function useRequirementsSlice(repository: WorkspaceRepository) {
 
   return {
     requirementText,
+    committedRequirementText,
+    setCommittedRequirementText,
+    hasUncommittedRequirementDraft: requirementText !== committedRequirementText,
+    inputScreening,
+    setInputScreening,
+    inputScreeningError,
+    setInputScreeningError,
     setRequirementText,
     setRequirementTextRaw,
     rules,

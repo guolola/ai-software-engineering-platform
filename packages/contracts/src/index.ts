@@ -23,6 +23,7 @@ export * from "./documents.js";
 export * from "./fingerprints.js";
 export * from "./feasibility.js";
 export * from "./models.js";
+export * from "./model-semantics.js";
 export * from "./provider-configs.js";
 export * from "./projects.js";
 export * from "./requirements.js";
@@ -31,3 +32,5 @@ export * from "./runs.js";
 export * from "./render.js";
 export * from "./visual-review.js";
 export * from "./system-notices.js";
+
+export * from "./model-json-schema.js";

@@ -1,4 +1,5 @@
 // Requirement, design, model, and traceability prompt builders used by generation pipelines.
+import { getStageModelSchemas, generationResponseSchema } from "@uml-platform/contracts";
 import type {
   DesignDiagramKind,
   DesignDiagramModelSpec,
@@ -61,7 +62,7 @@ function selectedDiagramHardRules(selectedDiagrams: DiagramKind[]) {
     }
     if (kind === "deployment") {
       lines.push(
-        "本次只生成部署需求模型：必须输出部署节点、数据库、组件、外部系统、制品和部署/通信关系，禁止输出原型界面 screen/module/entry-point 结构。",
+        "本次只生成部署需求模型：输出已知设备、运行环境、外部系统与通信约束，components/artifacts 输出空数组，不提前设计实现组件或制品，禁止输出原型界面 screen/module/entry-point 结构。",
       );
     }
     if (kind === "prototype") {
@@ -79,84 +80,13 @@ function selectedDiagramHardRules(selectedDiagrams: DiagramKind[]) {
   return lines.join("\n");
 }
 
+// Prompt fields and enums come from the same contracts as structured provider responses.
+function modelContractLines(stage: "requirements" | "design", selected: string[]) {
+  return getStageModelSchemas(stage).filter((schema) => !selected.length || selected.includes(schema.shape.diagramKind.value))
+    .map((schema) => `- ${schema.shape.diagramKind.value} JSON Schema: ${JSON.stringify(generationResponseSchema(schema))}`);
+}
 function requirementDiagramSchemaLines(selectedDiagrams: DiagramKind[]) {
-  const selected = new Set(selectedDiagrams);
-  const includeAll = selected.size === 0;
-  const include = (diagram: DiagramKind) => includeAll || selected.has(diagram);
-  const lines: string[] = [];
-  if (include("function")) {
-    lines.push(
-      "- function: 必须包含 nodes, relationships，用于 PlantUML MindMap（@startmindmap）表示功能结构图。",
-      "  nodes[].字段：id, name, description(可选), parentId(可选), sourceRequirementIds(string[])。每个节点表示一个功能、子功能或功能分组。",
-      "  relationships[].字段：id, type(decomposition|dependency), sourceId, targetId, label(可选), description(可选)。decomposition 表示功能分解父子关系，dependency 只表示跨功能依赖。",
-      "  功能结构图必须根据文本需求项抽取功能分解，不要输出用例 actors/useCases、流程 swimlanes 或部署节点作为主结构。",
-    );
-  }
-  if (include("usecase")) {
-    lines.push(
-      "- usecase: 必须包含 actors, useCases, systemBoundaries, relationships。",
-      "  actors[].字段：id, name, actorType(human|system|external), description(可选), responsibilities(string[])。",
-      "  useCases[].字段：id, name, goal, description(可选), preconditions(string[]), postconditions(string[]), primaryActorId(可选), supportingActorIds(string[]), eventFlows(array)。",
-      "  useCases[].eventFlows[].字段：id, name, flowType(main|alternative|exception), trigger(可选), condition(可选), steps(array)。每个关键用例至少包含一个 main 事件流；涉及分支或失败时必须补充 alternative/exception。",
-      "  useCases[].eventFlows[].steps[].字段：order(从1递增), actor(actor|system|external), actorAction(可选), systemAction(可选), expectedResult(可选), sourceRequirementId(可选)。事件流必须能直接支撑需求分析模型、用例实现设计和黑盒测试用例。",
-      "  systemBoundaries[].字段：id, name, description(可选)。",
-      "  relationships[].字段：id, type(association|include|extend|generalization), sourceId, targetId, label(可选), condition(可选), description(可选)。",
-    );
-  }
-  if (include("class")) {
-    lines.push(
-      "- class: 必须包含 classes, interfaces, enums, relationships。",
-      "  领域概念模型只允许输出业务名词类；禁止输出 *Service、*Controller、*Repository、*Manager 等服务/技术职责类，例如 ReservationService。classes[].operations 必须输出 [] 或省略，interfaces[].operations 必须输出 [] 或省略。",
-      "  classes[].字段：id, name, chineseName(可选), englishName(可选), type(可选), constraints(string[], 可选), classKind(entity|aggregate|valueObject|other, 可选), stereotype(可选), description(可选), attributes(array), operations(array)。",
-      "  classes[].attributes[].字段：name, chineseName(可选), englishName(可选), type, constraints(string[], 可选), visibility(public|protected|private|package), required(可选), multiplicity(可选), defaultValue(可选), description(可选)。",
-      "  classes[].operations[].字段：name, returnType(可选), visibility(public|protected|private|package), parameters(array), description(可选)。",
-      "  classes[].operations[].parameters[].字段：name, type, required(可选), direction(in|out|inout, 可选)。",
-      "  interfaces[].字段：id, name, chineseName(可选), englishName(可选), type(可选), constraints(string[], 可选), description(可选), operations(array)。",
-      "  enums[].字段：id, name, literals(string[])。",
-      "  relationships[].字段：id, type(association|aggregation|composition|inheritance|implementation|dependency), sourceId, targetId, sourceRole(可选), targetRole(可选), sourceMultiplicity(可选), targetMultiplicity(可选), navigability(none|source-to-target|target-to-source|bidirectional, 可选), label(可选), description(可选)。",
-    );
-  }
-  if (include("activity")) {
-    lines.push(
-      "- activity: 必须包含 swimlanes, nodes, relationships。",
-      "  swimlanes[].字段：id, name, description(可选)。",
-      "  nodes[] 必须按 type 区分结构：",
-      "    start: id, type, name, description(可选)",
-      "    end: id, type, name, description(可选)",
-      "    activity: id, type, name, description(可选), actorOrLane(可选), input(string[]), output(string[])",
-      "    decision: id, type, name(可选), question(可选), description(可选)",
-      "    merge/fork/join: id, type, name(可选), description(可选)",
-      "  relationships[].字段：id, type(control_flow|object_flow), sourceId, targetId, condition(可选), guard(可选), trigger(可选), description(可选)。",
-      "  重复业务步骤必须合并为一个 activity 节点，用多条 relationships 汇入/汇出；不要复制同名片段（例如重复输出“展示座位网格分布”）。",
-    );
-  }
-  if (include("deployment")) {
-    lines.push(
-      "- deployment: 必须包含 nodes, databases, components, externalSystems, artifacts, relationships。",
-      "  nodes[].字段：id, name, nodeType(app|server|device|container|external), environment(可选), description(可选)。",
-      "  databases[].字段：id, name, engine(可选), description(可选)。",
-      "  components[].字段：id, name, componentType(可选), description(可选)。",
-      "  externalSystems[].字段：id, name, description(可选)。",
-      "  artifacts[].字段：id, name, artifactType(可选), description(可选)。",
-      "  relationships[].字段：id, type(deployment|communication|dependency|hosting), sourceId, targetId, protocol(可选), port(可选), direction(one-way|two-way|inbound|outbound, 可选), label(可选), description(可选)。",
-    );
-  }
-  if (include("prototype")) {
-    lines.push(
-      "- prototype: 必须包含 nodes, relationships。",
-      "  nodes[].字段：id, name, nodeType(screen|module|entry-point), route(可选), description(可选), sourceUseCaseIds(string[]), sourceRequirementIds(string[])。",
-      "  relationships[].字段：id, type(navigation|contains|opens|submits|returns|depends-on), sourceId, targetId, label(可选), trigger(可选), condition(可选), description(可选)。",
-    );
-  }
-  if (include("analysis")) {
-    lines.push(
-      "- analysis: 必须包含 modelId, sourceUseCaseId, sourceUseCaseName, participants, messages, fragments；必须为每个输入 useCase 输出一个独立 modelId=analysis:<useCaseId> 的需求分析顺序图，禁止把多个用例合成一个总需求分析模型，且必须基于该 useCase 的 eventFlows。",
-      "  participants[].字段：id, name, participantType(actor|boundary|control|entity|service|database|external), description(可选)。",
-      "  messages[].字段：id, type(sync|async|return|create|destroy), sourceId, targetId, name, parameters(string[]), returnValue(可选), condition(可选), description(可选)。",
-      "  fragments[].字段：id, type(alt|opt|loop|par), label, messageIds(string[]), condition(可选), description(可选)。fragment.id 必须唯一；alt 必须至少包含两个非空分支；loop 只能包裹真实重复步骤，禁止把整段流程包成 loop；不得输出空 messageIds 或空分支。",
-    );
-  }
-  return lines;
+  return modelContractLines("requirements", selectedDiagrams);
 }
 
 const REQUIREMENT_STAGE_SEMANTICS = [
@@ -167,7 +97,9 @@ const REQUIREMENT_STAGE_SEMANTICS = [
   "- 总体业务流程(activity): 描述跨角色的业务活动、分支、并行和结束条件，不表达 UI 页面跳转。",
   "- 部署需求模型(deployment): 描述需求阶段可识别的部署约束、外部系统、网络拓扑和通信协议。",
   "- 原型界面关系(prototype): 描述页面、模块、入口点及它们之间的导航、打开、提交、返回和依赖关系。",
-  "- 需求分析模型(analysis): 以用例事件流为依据，描述需求阶段的参与对象、消息和组合片段，用于支撑用例实现设计。",
+  "- 需求分析模型(analysis): 以用例事件流为依据，只使用 actor/boundary/control/entity 业务职责对象，不引入 Controller、Service、Repository 或数据库实现对象。",
+  "- 活动图允许不同位置同名动作、合法循环、并行、多起点。对象流连接输出引脚/对象节点到输入引脚/对象节点，控制流控制执行。end 结束整个活动，flow_final 只终止当前分支。",
+  "- 用例引用所属 systemBoundaryId；extend 从扩展用例到基础用例，extensionPointIds 引用基础用例的 extensionPoints；include 从包含者到被包含者。",
 ].join("\n");
 
 const REQUIREMENT_TRACEABILITY_RULES = [
@@ -176,24 +108,24 @@ const REQUIREMENT_TRACEABILITY_RULES = [
   "- 禁止把 requirements、requirement、design、model、traceability、page 等阶段名或页面名作为 diagramKind。",
   "- target.elementId 必须引用本次需求模型中真实存在的元素 id 或 relationship id；表字段类元素使用 tableId.columnId 形式。",
   "- 矩阵会展示的每一个需求业务元素和 relationship 都必须至少映射到一条需求规则，不能遗漏。",
-  "- 业务元素范围：功能结构图的功能节点/关系；用例图的角色/用例/关系；类图的类/接口/枚举/关系；总体业务流程的 activity/decision 节点及这些节点之间的关系；部署需求模型的节点/数据库/组件/外部系统/制品/关系；原型界面关系的页面/模块/入口点/关系；需求分析模型的参与对象/消息/组合片段。",
-  "- 不要为 system-boundary、swimlane、start/end/merge/fork/join 等结构元素补映射。",
+  "- 业务元素范围：功能结构图的功能节点/关系；用例图的角色/用例/关系；类图的类/接口/枚举/关系；总体业务流程的 activity/decision/object 节点及其业务流关系；部署需求模型的节点/数据库/组件/外部系统/制品/关系；原型界面关系的页面/模块/入口点/关系；需求分析模型的参与对象/消息/组合片段。",
+  "- 不要为 system-boundary、swimlane、start/end/flow_final/merge/fork/join、输入输出引脚等结构元素补映射。",
   "- 如果错误提示包含非法 diagramKind，必须改成该元素实际所属的具体图类型，不允许继续返回阶段名。",
   "- 可选字段 mappingSource/reviewStatus/confidence/rationale 只用于说明映射来源和复核状态；不确定的低置信映射必须标记 reviewStatus=pending、confidence=low 并写明 rationale。",
 ].join("\n");
 
 const DESIGN_TRACEABILITY_RULES = [
   "设计 traceability 约束：",
-  "- 设计侧 source 必须包含 modelId；用例实现设计元素的 modelId 必须是对应 sequence:<useCaseId>，聚合下游设计模型可使用 architecture/class/activity/component/deployment/table。",
+  "- 设计侧 source 必须包含 modelId；用例实现设计元素的 modelId 必须是对应 sequence:<useCaseId>，聚合下游设计模型可使用 architecture/class/navigation/component/deployment/table。",
   "- 下游聚合设计模型元素如果由用例实现设计推导，必须在 upstreamDesignRefs 中列出参与推导的用例实现设计元素引用。",
-  "- source.diagramKind 只能使用: architecture, sequence, class, activity, component, deployment, table。",
+  "- source.diagramKind 只能使用: architecture, sequence, class, navigation, component, deployment, table。",
   "- targets[].diagramKind 只能使用: function, usecase, class, activity, deployment, prototype, analysis。",
   "- 禁止把 requirements、requirement、design、model、traceability、page 等阶段名或页面名作为 diagramKind。",
   "- source.elementId 必须引用本次设计模型中真实存在的元素 id 或 relationship id；表字段类元素使用 tableId.columnId 形式。",
   "- targets[].elementId 必须引用输入需求模型中真实存在的元素 id 或 relationship id。",
   "- 矩阵会展示的每一个设计业务元素和 relationship 都必须至少映射到一个需求模型元素，不能遗漏。",
-  "- 业务元素范围：总体架构图的包/组件/关系；用例实现设计的参与对象/消息/组合片段；设计类图的类/接口/枚举/关系；界面关系图的 activity/decision 节点及这些节点之间的关系；组件关系图的组件/接口/关系；部署设计的节点/数据库/组件/外部系统/制品/关系；数据库设计的表/字段/关系。",
-  "- 不要为 swimlane、start/end/merge/fork/join 等结构元素补映射。",
+  "- 业务元素范围：总体架构图的包/组件/关系；用例实现设计的参与对象/消息/组合片段；设计类图的类/接口/枚举/关系；页面导航模型的页面/入口/模块及其关系；组件关系图的组件/接口/关系；部署设计的节点/数据库/组件/外部系统/制品/关系；数据库设计的表/字段/关系。",
+  "- 不要为 swimlane、start/end/flow_final/merge/fork/join、输入输出引脚等结构元素补映射。",
   "- 如果错误提示包含非法 diagramKind，必须改成该元素实际所属的具体图类型，不允许继续返回阶段名。",
   "- 可选字段 mappingSource/reviewStatus/confidence/rationale 只用于说明映射来源和复核状态；不确定或派生的低置信映射必须标记 reviewStatus=pending、confidence=low 并写明 rationale。",
 ].join("\n");
@@ -206,11 +138,8 @@ const DESIGN_MODEL_GENERATION_TRACEABILITY_RULES = [
 ].join("\n");
 
 const DIAGRAM_SHORT_LABEL_RULES = [
-  "图上关系短标签约束：",
-  "- relationships[].label、messages[].name、fragments[].label、condition、guard、trigger 只能放短业务短语，建议不超过 12 个汉字或 18 个字符。",
-  "- 长业务解释、覆盖范围、处理细节、多个功能点列表必须放入 description，不能塞进图上的 label/name/condition/guard/trigger。",
-  "- 禁止把协议、端口、多个用例和长说明用 | 串成一条连线文字；deployment 的 protocol、port 必须分别写入 protocol、port 字段。",
-  "- 例：label 写“加密访问”，protocol 写“HTTPS”，port 写“443”，description 才写完整访问范围和业务说明。",
+  "关系名称应简明；condition、guard、trigger、约束正文必须完整保留，不能截断或以省略号替代。",
+  "协议和端口分别写入 protocol、port。允许在图上换行，不得删减语义。",
 ].join("\n");
 
 function formatMissingRefsForPrompt(refs: ModelElementRef[]) {
@@ -229,44 +158,9 @@ function compactPromptText(value: unknown, maxChars = 180) {
   return text.length > maxChars ? `${text.slice(0, maxChars)}...` : text;
 }
 
-function compactDesignModelForPrompt(model: DesignDiagramModelSpec) {
-  if (model.diagramKind === "sequence") {
-    return {
-      diagramKind: model.diagramKind,
-      modelId: model.modelId,
-      sourceUseCaseId: model.sourceUseCaseId,
-      sourceUseCaseName: model.sourceUseCaseName,
-      title: compactPromptText(model.title),
-      summary: compactPromptText(model.summary, 240),
-      participants: model.participants.map((participant) => ({
-        id: participant.id,
-        name: participant.name,
-        participantType: participant.participantType,
-      })),
-      messages: model.messages.map((message) => ({
-        id: message.id,
-        type: message.type,
-        sourceId: message.sourceId,
-        targetId: message.targetId,
-        name: message.name,
-        condition: compactPromptText(message.condition, 120) || undefined,
-        description: compactPromptText(message.description, 160) || undefined,
-      })),
-      fragments: model.fragments.map((fragment) => ({
-        id: fragment.id,
-        type: fragment.type,
-        label: fragment.label,
-        condition: compactPromptText(fragment.condition, 120) || undefined,
-        messageIds: fragment.messageIds,
-      })),
-    };
-  }
-
-  return model;
-}
-
+// Keep model semantics intact in downstream prompts, including nested branches and conditions.
 function formatDesignModelsForPrompt(models: DesignDiagramModelSpec[]) {
-  return JSON.stringify(models.map(compactDesignModelForPrompt), null, 2);
+  return JSON.stringify(models, null, 2);
 }
 
 function promptEnsureArray(value: unknown): unknown[] {
@@ -283,6 +177,8 @@ function promptActivityNodeKind(nodeType: unknown) {
       return "activity";
     case "decision":
       return "decision";
+    case "object": return "object-node";
+    case "flow_final": return "flow-final-node";
     case "start":
       return "start-node";
     case "end":
@@ -313,6 +209,7 @@ function promptPrototypeNodeKind(nodeType: unknown) {
 
 function isPromptBusinessElementKind(kind: string) {
   return ![
+    "flow-final-node", "input-pin", "output-pin", "activation",
     "system-boundary",
     "swimlane",
     "start-node",
@@ -377,6 +274,7 @@ function collectRequirementTraceabilityTargets(models: DiagramModelSpec[]) {
       ["tables", "table"],
     ];
     const businessElementIds = new Set<string>();
+    if (model.diagramKind === "activity") for (const node of model.nodes) if (node.type === "activity") for (const pin of [...node.inputPins ?? [], ...node.outputPins ?? []]) businessElementIds.add(pin.id);
 
     for (const [key, defaultKind] of listKeys) {
       for (const item of promptEnsureArray(record[key])) {
@@ -660,51 +558,23 @@ const DESIGN_STAGE_SEMANTICS = [
   "设计阶段模型职责：",
   "- 总体架构图(architecture): 系统逻辑架构层，根据需求功能结构和 RequirementBaseline 中已确认规则/约束划分包、子系统、核心组件及其依赖，用 PlantUML 包图表示。",
   "- 用例实现设计(sequence): 动态行为层，必须基于用例事件流和需求分析模型，确定对象间具体的方法调用时序，包含正常流程与异常动态行为。",
-  "- 界面关系图(activity): 界面交互层，描述原型界面、模块、入口点与用例实现之间的跳转、提交、打开、返回和状态流转。",
+  "- 页面导航模型(navigation): 界面交互层，描述原型界面、模块、入口点与用例实现之间的跳转、提交、打开、返回和状态流转。",
   "- 类图(class): 静态结构层，定义实体、接口、聚合根的属性、行为及静态关联（1:N、泛化等）。",
   "- 组件（构件）关系(component): 组件结构层，根据设计类图归并服务、接口、模块和实体职责，展示组件与接口依赖。",
-  "- 部署设计(deployment): 物理部署层，展示软件组件在物理节点（K8s Pod、服务器、数据库）上的分布。",
+  "- 部署设计(deployment): 物理部署层，展示设备、执行环境、制品部署及其体现的逻辑组件，技术选择必须有上游依据。",
   "- 数据库设计(table): 数据库表结构层，体现表、字段、主键、外键和表间关联基数。",
 ].join("\n");
 
-const DESIGN_MODEL_SCHEMA_INSTRUCTIONS = [
-  "设计图类型结构约束：",
-  DIAGRAM_SHORT_LABEL_RULES,
-  "- sequence: 必须包含 participants, messages, fragments。",
-  "  sequence 模型还必须包含 modelId, sourceUseCaseId, sourceUseCaseName；modelId 必须是 sequence:<sourceUseCaseId>。",
-  "  participants[].字段：id, name, participantType(actor|boundary|control|entity|service|database|external), description(可选)。",
-  "  sequence 必须体现设计阶段职责拆分，通常包含 boundary/controller/control、service、entity，涉及持久化时必须包含 database 或 Repository 语义的 service/control 参与者。",
-  "  messages[].字段：id, type(sync|async|return|create|destroy), sourceId, targetId, name, parameters(string[]), returnValue(可选), condition(可选), description(可选)。",
-  "  sequence.messages[].name 必须优先使用方法调用语义，例如 deleteEvent、validatePermission、removeEvent、commitChanges；不要原样复用需求分析模型中的业务短语。",
-  "  fragments[].字段：id, type(alt|opt|loop|par), label, messageIds(string[]), condition(可选), description(可选), branches(可选)。",
-  "  多分支 alt 必须优先输出 branches: [{label, condition(可选), messageIds}]，每个分支的 messageIds 不得交叠；渲染时 branches 会生成 PlantUML alt/else/end 分隔线。fragment.id 必须唯一；alt 至少两个非空分支；loop 只包裹真实重复步骤，禁止把整段流程包成 loop；不得输出空 messageIds 或空分支。",
-  "- 所有设计模型都必须包含 notes 字段，且 notes 永远是字符串数组；没有备注时输出 []，不要输出字符串。",
-  "- architecture: 必须包含 packages, components, relationships。",
-  "  packages[].字段：id, name, stereotype(可选), description(可选), componentIds(string[])。",
-  "  components[].字段：id, name, componentType(可选), packageId(可选), description(可选), sourceRequirementIds(string[])。",
-  "  relationships[].字段：id, type(contains|dependency|communication), sourceId, targetId, label(可选), description(可选)。",
-  "- sequence.messages[].type 只能使用 sync|async|return|create|destroy；response/reply/result 必须写 return，request/call 必须写 sync，event/notify 必须写 async。",
-  "- class.classes[].classKind 只能使用 entity|aggregate|valueObject|service|other；不确定时用 other 或省略，不能输出中文、自造枚举或 controller 等非枚举值。",
-  "- activity/class/deployment 必须沿用需求阶段对应图的强类型字段，不允许输出通用 nodes/relations 旧结构。",
-  "  classes[].字段：id, name, chineseName(可选), englishName(可选), type(可选), constraints(string[], 可选), classKind(entity|aggregate|valueObject|service|other, 可选), stereotype(可选), description(可选), attributes(array), operations(array)。",
-  "  classes[].attributes[].字段：name, chineseName(可选), englishName(可选), type, constraints(string[], 可选), visibility(public|protected|private|package), required(可选), multiplicity(可选), defaultValue(可选), description(可选)。",
-  "  interfaces[].字段：id, name, chineseName(可选), englishName(可选), type(可选), constraints(string[], 可选), description(可选), operations(array)。",
-  "- component: 必须包含 components, interfaces, relationships。",
-  "  components[].字段：id, name, componentType(可选), description(可选), sourceClassIds(string[])。",
-  "  interfaces[].字段：id, name, description(可选), operationNames(string[])。",
-  "  relationships[].字段：id, type(dependency|provided-interface|required-interface|composition|communication), sourceId, targetId, label(可选), description(可选)。",
-  "- table: 必须包含 tables, relationships。",
-  "  tables[].字段：id, name, chineseName(可选), englishName(可选), type(可选), constraints(string[], 可选), description(可选), columns(array)。",
-  "  columns[].字段：id, name, chineseName(可选), englishName(可选), dataType, constraints(string[], 可选), isPrimaryKey(boolean), isForeignKey(boolean), nullable(boolean), references(可选), description(可选)。",
-  "  references 字段：tableId, columnId。",
-  "  relationships[].字段：id, type(one-to-one|one-to-many|many-to-many), sourceTableId, targetTableId, sourceColumnId(可选), targetColumnId(可选), label(可选), description(可选)。",
-  "- activity 表达设计阶段界面关系图，应从原型界面关系和用例实现设计推导界面节点、状态节点和跳转关系；重复步骤必须合并为一个节点，用多条关系汇入/汇出。",
-  "- architecture 表达总体架构图，应从功能结构图和 RequirementBaseline 中已确认规则/约束推导包、子系统、核心组件和依赖，不要细化到物理部署节点。",
-  "- class 表达静态结构层，类应包含操作；接口、服务、实体、聚合根要通过 classKind 或 stereotype 标明。",
-  "- component 表达组件（构件）关系，应从设计类图抽取服务组件、实体组件、接口及依赖关系。",
-  "- deployment 表达物理部署层，优先体现 K8s Pod、服务、数据库、外部系统及通信协议，并参考组件（构件）关系分配可部署组件。",
-  "- table 表达数据库表关系，必须从设计类图和用例实现设计中推导表、主键、外键与关联基数。",
-].join("\n");
+function designModelSchemaInstructions(selected: DesignDiagramKind[]) {
+  return ["设计模型结构约束：", DIAGRAM_SHORT_LABEL_RULES, ...modelContractLines("design", selected),
+    "所有标识唯一、所有引用存在。关系方向遵循 sourceId 到 targetId；组合/聚合 sourceId 是整体，继承 sourceId 是特化类型。",
+    "包嵌套使用 parentId，组件归属使用 packageId；contains 关系只能与归属一致。",
+    "sequence/analysis：消息按数组顺序发生；alt/par 至少两个带独立 id 的非空 branches，分支消息不重叠且覆盖片段消息。嵌套片段必须引用 parentFragmentId 和 parentBranchId；片段连续且不得交叉。loop 可以覆盖全部消息。独立激活区间使用 activations。",
+    "navigation 是自定义页面导航模型，包含和模块依赖不代表页面跳转。returns 从当前页面指向返回目的页面。",
+    "deployment：nodeType 表达 UML 类别，technology 表达技术；parentId 表示承载，deployment 从制品到节点，manifestation 从制品到逻辑组件。技术选择必须有上游依据。",
+    "table：relationalConstraints 是主键、唯一、外键、检查约束的唯一来源；每张表一个主键（可联合）。复合外键列顺序对应且引用唯一键。列 PK/FK 标志、references 和 relationships 由系统派生，无需生成。多对多必须建立关联表。",
+  ].join("\n");
+}
 
 export function buildGenerateDesignSequencePrompt(
   requirementBaseline: RequirementBaseline,
@@ -720,7 +590,7 @@ export function buildGenerateDesignSequencePrompt(
     DESIGN_MODEL_GENERATION_TRACEABILITY_RULES,
     "只允许返回一个顶层 JSON 对象，不允许在 JSON 前后输出任何说明、Markdown、代码块或额外文字。",
     DESIGN_STAGE_SEMANTICS,
-    DESIGN_MODEL_SCHEMA_INSTRUCTIONS,
+    designModelSchemaInstructions(["sequence"]),
     "设计阶段禁止使用原始需求文本作为事实来源；除总体架构图可参考 RequirementBaseline 中已确认规则/约束外，不得绕过输入需求模型和上游设计模型补业务对象。",
     "需求模型和上游设计模型是结构来源；RequirementBaseline 只用于约束、验收边界、异常、权限、非功能需求、总体架构边界和可追踪性。",
     "禁止从 RequirementBaseline 生成没有输入需求模型支撑的新业务对象。",
@@ -754,7 +624,7 @@ export function buildGenerateDesignModelsPrompt(
     "本阶段生成的是下游聚合设计模型：总体架构图、设计类图、界面关系图、组件关系图、部署设计、数据库设计都各自保持一张总图，不按用例拆分。",
     "只允许返回一个顶层 JSON 对象，不允许在 JSON 前后输出任何说明、Markdown、代码块或额外文字。",
     DESIGN_STAGE_SEMANTICS,
-    DESIGN_MODEL_SCHEMA_INSTRUCTIONS,
+    designModelSchemaInstructions(selectedDiagrams),
     "设计阶段禁止使用原始需求文本作为事实来源；除总体架构图可参考 RequirementBaseline 中已确认规则/约束外，不得绕过输入需求模型和上游设计模型补业务对象。",
     "需求模型和上游设计模型是结构来源；RequirementBaseline 只用于约束、验收边界、异常、权限、非功能需求和可追踪性。",
     "禁止从 RequirementBaseline 生成没有输入需求模型或上游设计模型支撑的新业务对象。",
@@ -767,7 +637,7 @@ export function buildGenerateDesignModelsPrompt(
     "",
     "映射规则：",
     "- 需求阶段功能结构图 + RequirementBaseline 中已确认规则/约束 -> 设计阶段总体架构图（architecture，包图）。",
-    "- 需求阶段原型界面关系 + 全部用例级用例实现设计 -> 设计阶段界面关系图（activity，界面交互层）。",
+    "- 需求阶段原型界面关系 + 全部用例级用例实现设计 -> 设计阶段页面导航模型（navigation，页面与路由）。",
     "- 需求阶段领域概念模型 + 全部用例级用例实现设计 -> 设计阶段类图（设计类图），类是所有用例实现设计中的类/对象/服务的归并组合。",
     "- 聚合设计类图 -> 设计阶段组件（构件）关系图。",
     "- 需求阶段部署需求模型 + 组件（构件）关系图 -> 设计阶段部署设计。",
@@ -802,7 +672,7 @@ export function buildRepairDesignModelsPrompt(
     "设计阶段禁止使用原始需求文本作为事实来源；除总体架构图可参考 RequirementBaseline 中已确认规则/约束外，不得绕过输入需求模型和上游设计模型补业务对象。",
     "RequirementBaseline 只用于约束、验收边界、异常、权限、非功能需求和可追踪性，禁止补入没有上游模型支撑的新业务对象。",
     DESIGN_STAGE_SEMANTICS,
-    DESIGN_MODEL_SCHEMA_INSTRUCTIONS,
+    designModelSchemaInstructions(selectedDiagrams),
     DESIGN_MODEL_GENERATION_TRACEABILITY_RULES,
     "只生成以下设计图类型：",
     selectedDiagrams.join(", "),

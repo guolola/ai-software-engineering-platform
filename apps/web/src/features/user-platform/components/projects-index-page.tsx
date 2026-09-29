@@ -8,6 +8,7 @@ import {
   Archive,
   ArrowRight,
   Clock3,
+  CircleHelp,
   FileText,
   Lock,
   Plus,
@@ -44,6 +45,7 @@ import {
 } from "../services/platform-api";
 import { useAuthenticatedRouteSession } from "./authenticated-route-session";
 import { ProjectCreateForm } from "./project-create-form";
+import { useOnboardingTours } from "../../onboarding/components/onboarding-tour-provider";
 
 type Navigate = (path: string) => void;
 
@@ -62,6 +64,9 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
   const [projectRecords, setProjectRecords] = useState<PlatformProject[]>([]);
   const [loading, setLoading] = useState(true);
   const authSession = useAuthenticatedRouteSession();
+  const tours = useOnboardingTours();
+  const tourStartAttemptedRef = useRef(false);
+  const startTourRef = useRef<() => void>(() => {});
   const [statusKind, setStatusKind] = useState<"empty" | "loaded" | "authRequired" | "forbidden" | "loadFailed" | null>(null);
   const [statusErrorMessage, setStatusErrorMessage] = useState("");
   const [authRequired, setAuthRequired] = useState(false);
@@ -113,6 +118,23 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
       active = false;
     };
   }, [authSession?.user]);
+
+  const startEmptyTour = () => {
+    tourStartAttemptedRef.current = true;
+    void tours?.startTour("empty-workspace");
+  };
+  startTourRef.current = startEmptyTour;
+
+  useEffect(() => {
+    if (!tours || loading || statusKind !== "empty" || !authSession?.user?.id || tourStartAttemptedRef.current) return;
+    let active = true;
+    // Only a successful server read may trigger the tour automatically.
+    void platformApi.getOnboardingState().then((onboarding) => {
+      if (!active || onboarding.emptyWorkspace !== null || tourStartAttemptedRef.current) return;
+      startTourRef.current();
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [authSession?.user?.id, loading, statusKind, tours]);
 
   const projects = useMemo(
     () =>
@@ -210,10 +232,18 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
           title={t("projects.indexTitle")}
           description={t("projects.indexDescription")}
           actions={
-            <Button type="button" size="lg" onClick={openCreateProject}>
-              <Plus className="size-4" />
-              {authRequired || listError ? t("projects.newProjectAfterLogin") : t("projects.newProject")}
-            </Button>
+            <>
+              {!authRequired && !forbidden && !listError && projects.length === 0 && (
+                <Button type="button" variant="outline" size="lg" onClick={startEmptyTour}>
+                  <CircleHelp className="size-4" />
+                  {t("onboarding.replay")}
+                </Button>
+              )}
+              <Button type="button" size="lg" onClick={openCreateProject}>
+                <Plus className="size-4" />
+                {authRequired || listError ? t("projects.newProjectAfterLogin") : t("projects.newProject")}
+              </Button>
+            </>
           }
         />
 
@@ -430,18 +460,20 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
         )}
 
         {!authRequired && !forbidden && !listError && projects.length === 0 && (
+          <div id="onboarding-empty-state" className="mx-auto w-full max-w-lg">
           <EmptyState
             icon={FileText}
             title={t("projects.emptyTitle")}
             description={t("projects.emptyDescription")}
             className="mx-auto"
             action={
-              <Button type="button" size="lg" onClick={openCreateProject}>
+              <Button id="onboarding-create-first" type="button" size="lg" onClick={openCreateProject}>
                 <Plus className="size-4" />
                 {t("projects.createFirstProject")}
               </Button>
             }
           />
+          </div>
         )}
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogContent className="max-h-[88vh] overflow-auto sm:max-w-3xl">

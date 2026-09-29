@@ -3,6 +3,7 @@ import type {
   CoverageMatrix,
   DesignDiagramKind,
   DiagramKind,
+  DiagramModelSpec,
   ContextDiagramSpec,
   ContextTraceRow,
   ModelElementRef,
@@ -272,6 +273,7 @@ function ensureArray(value: unknown): unknown[] {
 
 function isBusinessTraceabilityKind(kind: string) {
   return ![
+    "flow-final-node", "input-pin", "output-pin", "activation",
     "system-boundary",
     "swimlane",
     "start-node",
@@ -311,6 +313,7 @@ function refsForRequirementModels(
       isBusinessTraceabilityKind(item.kind),
     );
     const businessIds = new Set(items.map((item) => item.id));
+    if (model.diagramKind === "activity") for (const node of (model as Extract<DiagramModelSpec, { diagramKind: "activity" }>).nodes) if (node.type === "activity") for (const pin of [...node.inputPins ?? [], ...node.outputPins ?? []]) businessIds.add(pin.id);
     const relationships = detail.relationships.filter(
       (relationship) =>
         diagram !== "activity" ||
@@ -362,13 +365,7 @@ function refsForDesignModels(
     const items = detail.items.filter((item) =>
       isBusinessTraceabilityKind(item.kind),
     );
-    const businessIds = new Set(items.map((item) => item.id));
-    const relationships = detail.relationships.filter(
-      (relationship) =>
-        diagram !== "activity" ||
-        (businessIds.has(relationship.sourceId) &&
-          businessIds.has(relationship.targetId)),
-    );
+    const relationships = detail.relationships;
     return [
       ...items.map((item) => ({
         ref: {

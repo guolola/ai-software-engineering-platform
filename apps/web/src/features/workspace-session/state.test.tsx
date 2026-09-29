@@ -612,8 +612,7 @@ describe("WorkspaceSessionProvider", () => {
     });
   });
 
-  it("flushes pending requirement text before starting a rules run", async () => {
-    const saveRequirementText = deferred<void>();
+  it("passes an unsaved requirement draft to the rules run and commits after success", async () => {
     const startRun = vi.fn(async () => ({ runId: "run-flushed-rules" }));
     const snapshot = createRunSnapshot({
       runId: "run-flushed-rules",
@@ -624,7 +623,7 @@ describe("WorkspaceSessionProvider", () => {
       loadWorkspace: vi.fn(async () =>
         createWorkspaceRecord({ requirementText: "旧需求" }),
       ),
-      updateRequirementText: vi.fn(() => saveRequirementText.promise),
+      updateRequirementText: vi.fn(async () => {}),
       startRun,
       subscribeToRun: vi.fn(async (_runId, onEvent) => {
         onEvent({ type: "queued" });
@@ -663,14 +662,8 @@ describe("WorkspaceSessionProvider", () => {
       generationPromise = result.current.generateRules();
     });
 
-    await waitFor(() => {
-      expect(repository.updateRequirementText).toHaveBeenCalledWith(
-        "刚输入就生成的需求",
-      );
-    });
-    expect(startRun).not.toHaveBeenCalled();
-
-    saveRequirementText.resolve();
+    expect(repository.updateRequirementText).not.toHaveBeenCalled();
+    expect(result.current.hasUncommittedRequirementDraft).toBe(true);
     await act(async () => {
       await generationPromise;
     });
@@ -682,6 +675,47 @@ describe("WorkspaceSessionProvider", () => {
       }),
     );
     expect(result.current.rules).toHaveLength(1);
+    expect(result.current.hasUncommittedRequirementDraft).toBe(false);
+  });
+
+  it("keeps the prior rules and unsaved draft when project sync fails", async () => {
+    const oldRule = createRule({ id: "old-rule", text: "旧规则" });
+    const snapshot = createRunSnapshot({
+      runId: "run-sync-failed",
+      requirementText: "新需求",
+      rules: [createRule({ id: "new-rule", text: "新规则" })],
+    });
+    const repository: WorkspaceRepository = {
+      loadWorkspace: vi.fn(async () => createWorkspaceRecord({
+        requirementText: "旧需求",
+        rules: [oldRule],
+      })),
+      updateRequirementText: vi.fn(async () => {}),
+      startRun: vi.fn(async () => ({ runId: snapshot.runId })),
+      subscribeToRun: vi.fn(async (_runId, onEvent) => {
+        onEvent({ type: "completed", snapshot });
+      }),
+      getRunSnapshot: vi.fn(async () => snapshot),
+      renderPlantUml: vi.fn(),
+      testProviderSettings: vi.fn(),
+      saveRunHistory: vi.fn(async () => { throw new Error("项目保存失败"); }),
+      listRunHistory: vi.fn(async () => []),
+      restoreRunHistory: vi.fn(async () => null),
+      deleteRunHistory: vi.fn(async () => []),
+      clearRunHistory: vi.fn(async () => {}),
+    };
+    const { result } = renderHook(() => useWorkspaceSession(), {
+      wrapper: ({ children }) => withWorkspaceProviders(children, repository),
+    });
+    await waitFor(() => expect(result.current.workspaceInitialized).toBe(true));
+    act(() => result.current.setRequirementText("新需求"));
+    await act(async () => { await result.current.generateRules(); });
+
+    expect(result.current.requirementText).toBe("新需求");
+    expect(result.current.hasUncommittedRequirementDraft).toBe(true);
+    expect(result.current.rules).toEqual([oldRule]);
+    expect(result.current.runStatus).toBe("failed");
+    expect(repository.updateRequirementText).not.toHaveBeenCalled();
   });
 
   it("drives runs through the repository and tracks stale diagrams after rules refresh", async () => {
@@ -900,11 +934,7 @@ describe("WorkspaceSessionProvider", () => {
     act(() => {
       result.current.setRequirementText("订单系统需求");
     });
-    await waitFor(() => {
-      expect(repository.updateRequirementText).toHaveBeenCalledWith(
-        "订单系统需求",
-      );
-    });
+    expect(repository.updateRequirementText).not.toHaveBeenCalled();
     expect(result.current.textVersion).toBe(1);
 
     await act(async () => {
@@ -1056,11 +1086,7 @@ describe("WorkspaceSessionProvider", () => {
     act(() => {
       result.current.setRequirementText("座位预约系统 v2");
     });
-    await waitFor(() => {
-      expect(repository.updateRequirementText).toHaveBeenCalledWith(
-        "座位预约系统 v2",
-      );
-    });
+    expect(repository.updateRequirementText).not.toHaveBeenCalled();
 
     act(() => {
       emitRunEvent?.({ type: "completed", snapshot: completedSnapshot });
@@ -1278,7 +1304,7 @@ describe("WorkspaceSessionProvider", () => {
     );
   });
 
-  it("keeps restored requirement models fresh when legacy fingerprints use different key order", async () => {
+  it("marks legacy fingerprints stale without upgrading saved models", async () => {
     const rule = createRule({
       id: "r1",
       category: "功能需求",
@@ -1389,8 +1415,8 @@ describe("WorkspaceSessionProvider", () => {
       expect(result.current.workspaceInitialized).toBe(true);
     });
 
-    expect(result.current.isRulesStale).toBe(false);
-    expect(result.current.staleDiagrams).toEqual([]);
+    expect(result.current.isRulesStale).toBe(true);
+    expect(result.current.staleDiagrams).toContain("usecase");
     expect(result.current.designGenerationBlockedReason).toBeNull();
   });
 
@@ -2931,7 +2957,7 @@ describe("WorkspaceSessionProvider", () => {
         }),
       ],
       expect.objectContaining({
-        requirementInputFingerprint: expect.stringMatching(/^fp:v2:/),
+        requirementInputFingerprint: expect.stringMatching(/^fp:v3:/),
         rulesBasedOnTextVersion: 0,
         rulesVersion: 2,
       }),
@@ -4083,6 +4109,7 @@ describe("WorkspaceSessionProvider", () => {
       useCases: [
         {
           id: "uc_login",
+          systemBoundaryId: "system",
           name: "登录",
           goal: "进入系统",
           preconditions: [],
@@ -4108,6 +4135,7 @@ describe("WorkspaceSessionProvider", () => {
         ...originalUseCaseModel.useCases,
         {
           id: "uc_logout",
+          systemBoundaryId: "system",
           name: "退出登录",
           goal: "离开系统",
           preconditions: [],
@@ -4239,7 +4267,7 @@ describe("WorkspaceSessionProvider", () => {
       await result.current.rerenderRequirementModel("usecase");
     });
 
-    expect(renderStructuredModel).toHaveBeenCalledWith(editedUseCaseModel);
+    expect(renderStructuredModel).toHaveBeenCalledWith(editedUseCaseModel, "requirements");
     expect(result.current.plantUml.usecase).toContain("授课教师");
     expect(result.current.svgArtifacts.usecase?.svg).toContain("授课教师");
     expect(result.current.manualModelEditStatus.usecase?.status).toBe(
@@ -4252,6 +4280,7 @@ describe("WorkspaceSessionProvider", () => {
   it("prunes traceability when saving a requirement model with deleted elements", async () => {
     const originalClassModel = {
       diagramKind: "class",
+      title: "领域类", summary: "订单领域", notes: [],
       classes: [
         { id: "order", name: "Order", attributes: [], operations: [] },
         { id: "customer", name: "Customer", attributes: [], operations: [] },

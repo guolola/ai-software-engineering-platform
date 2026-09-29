@@ -5,7 +5,6 @@ import {
   DOCUMENT_CONTENT_RESPONSE_FORMAT,
   EXTRACT_REQUIREMENT_RULES_RESPONSE_FORMAT,
   HEALTHCHECK_RESPONSE_FORMAT,
-  REPAIR_PLANTUML_RESPONSE_FORMAT,
   REPAIR_REQUIREMENT_RULES_RESPONSE_FORMAT,
   REPAIR_REQUIREMENT_RULE_RESPONSE_FORMAT,
 } from "./general-response-formats.js";
@@ -53,8 +52,7 @@ test("general response formats are valid for OpenAI strict JSON Schema", () => {
     REPAIR_REQUIREMENT_RULE_RESPONSE_FORMAT,
     REPAIR_REQUIREMENT_RULES_RESPONSE_FORMAT,
     DOCUMENT_CONTENT_RESPONSE_FORMAT,
-    REPAIR_PLANTUML_RESPONSE_FORMAT,
-    HEALTHCHECK_RESPONSE_FORMAT,
+      HEALTHCHECK_RESPONSE_FORMAT,
   ]) {
     assert.equal(format.type, "json_schema");
     assert.equal(format.json_schema.strict, true);
@@ -69,11 +67,15 @@ test("requirement rule response formats allow function structure mappings", () =
         items: {
           properties: {
             relatedDiagrams: { items: { enum: string[] } };
+            sourceFragment: { type: string };
           };
+          required: string[];
         };
       };
     }
   ).rules;
 
   assert.ok(rules.items.properties.relatedDiagrams.items.enum.includes("function"));
+  assert.equal(rules.items.properties.sourceFragment.type, "string");
+  assert.ok(rules.items.required.includes("sourceFragment"));
 });

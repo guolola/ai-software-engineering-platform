@@ -1,7 +1,7 @@
 // Composes the original Flow homepage blocks; the router continues to manage SEO.
 import { useTranslation } from 'react-i18next';
 import FlowLayout from '../template/flow-layout';
-import Hero from '@/features/marketing-site/template/components/blocks/hero-section/hero-section'
+import Hero from '@/features/marketing-site/template/components/blocks/hero-section/platform-hero-section'
 import TrustedBrands from '@/features/marketing-site/template/components/blocks/trusted-brands/trusted-brands'
 import Features from '@/features/marketing-site/template/components/blocks/features/features'
 import Benefits from '@/features/marketing-site/template/components/blocks/benefits/benefits'

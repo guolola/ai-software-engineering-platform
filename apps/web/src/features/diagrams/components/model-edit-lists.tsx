@@ -254,6 +254,7 @@ export function ModelRelationshipListSection({
   saving,
   onCreateRelation,
   onEditRelation,
+  onMoveRelation,
   onDeleteRelation,
 }: {
   relationSearch: string;
@@ -267,6 +268,7 @@ export function ModelRelationshipListSection({
   relationshipOrderIds: string[];
   saving: boolean;
   onCreateRelation?: () => void;
+  onMoveRelation?: (relationId: string, offset: -1 | 1) => void;
   onEditRelation?: (relationId: string) => void;
   onDeleteRelation?: (relationId: string, displayLabel: string) => void;
 }) {
@@ -391,6 +393,10 @@ export function ModelRelationshipListSection({
                       {targetLabel || t("diagramLists.relations.noTarget")}
                     </div>
                   </div>
+                  {onMoveRelation ? <div className="flex flex-col gap-1">
+                    <Button type="button" variant="ghost" size="sm" aria-label={`上移消息 ${displayLabel}`} disabled={saving || relationshipOrderIds.indexOf(id) === 0} onClick={() => onMoveRelation(id, -1)}>上移</Button>
+                    <Button type="button" variant="ghost" size="sm" aria-label={`下移消息 ${displayLabel}`} disabled={saving || relationshipOrderIds.indexOf(id) === relationshipOrderIds.length - 1} onClick={() => onMoveRelation(id, 1)}>下移</Button>
+                  </div> : null}
                   {onEditRelation && onDeleteRelation && <><Button
                     type="button"
                     size="icon"

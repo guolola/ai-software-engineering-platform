@@ -67,6 +67,8 @@ export const useCaseSpecSchema = z.object({
   description: z.string().min(1).optional(),
   preconditions: noteListSchema,
   postconditions: noteListSchema,
+  systemBoundaryId: z.string().min(1).optional(),
+  extensionPoints: z.array(z.object({ id: z.string().min(1), name: z.string().min(1) })).optional(),
   primaryActorId: z.string().min(1).optional(),
   supportingActorIds: z.array(z.string().min(1)),
   eventFlows: z.array(useCaseEventFlowSchema).default([]),
@@ -89,6 +91,7 @@ export const useCaseRelationshipTypeSchema = z.enum([
 export type UseCaseRelationshipType = z.infer<typeof useCaseRelationshipTypeSchema>;
 
 export const useCaseRelationshipSchema = z.object({
+  extensionPointIds: z.array(z.string().min(1)).optional(),
   id: z.string().min(1),
   type: useCaseRelationshipTypeSchema,
   sourceId: z.string().min(1),
@@ -101,6 +104,7 @@ export type UseCaseRelationship = z.infer<typeof useCaseRelationshipSchema>;
 
 export const useCaseDiagramSpecSchema = z.object({
   diagramKind: z.literal("usecase"),
+  modelId: z.string().min(1).optional(),
   title: z.string().min(1),
   summary: z.string().min(1),
   notes: noteListSchema,
@@ -115,14 +119,12 @@ export const functionNodeSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string().min(1).optional(),
-  parentId: z.string().min(1).optional(),
   sourceRequirementIds: z.array(z.string().min(1)).default([]),
 });
 export type FunctionNode = z.infer<typeof functionNodeSchema>;
 
 export const functionRelationshipTypeSchema = z.enum([
   "decomposition",
-  "dependency",
 ]);
 export type FunctionRelationshipType = z.infer<
   typeof functionRelationshipTypeSchema
@@ -155,6 +157,7 @@ export const classKindSchema = z.enum(["entity", "aggregate", "valueObject", "se
 export type ClassKind = z.infer<typeof classKindSchema>;
 
 export const classAttributeSchema = z.object({
+  isStatic: z.boolean().optional(),
   name: z.string().min(1),
   chineseName: z.string().min(1).optional(),
   englishName: z.string().min(1).optional(),
@@ -177,6 +180,8 @@ export const operationParameterSchema = z.object({
 export type OperationParameter = z.infer<typeof operationParameterSchema>;
 
 export const classOperationSchema = z.object({
+  isStatic: z.boolean().optional(),
+  isAbstract: z.boolean().optional(),
   name: z.string().min(1),
   returnType: z.string().min(1).optional(),
   visibility: visibilitySchema,
@@ -186,6 +191,7 @@ export const classOperationSchema = z.object({
 export type ClassOperation = z.infer<typeof classOperationSchema>;
 
 export const classEntitySchema = z.object({
+  isAbstract: z.boolean().optional(),
   id: z.string().min(1),
   name: z.string().min(1),
   chineseName: z.string().min(1).optional(),
@@ -265,6 +271,8 @@ export const activityNodeTypeSchema = z.enum([
   "merge",
   "fork",
   "join",
+  "object",
+  "flow_final",
 ]);
 export type ActivityNodeType = z.infer<typeof activityNodeTypeSchema>;
 
@@ -275,7 +283,16 @@ export const swimlaneSchema = z.object({
 });
 export type Swimlane = z.infer<typeof swimlaneSchema>;
 
+export const activityPinSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  dataType: z.string().min(1),
+  multiplicity: z.string().min(1).optional(),
+});
+export type ActivityPin = z.infer<typeof activityPinSchema>;
+
 const activityNodeBaseSchema = z.object({
+  actorOrLane: z.string().min(1).optional(),
   id: z.string().min(1),
   description: z.string().min(1).optional(),
 });
@@ -296,8 +313,10 @@ export const activityActionNodeSchema = activityNodeBaseSchema.extend({
   type: z.literal("activity"),
   name: z.string().min(1),
   actorOrLane: z.string().min(1).optional(),
-  input: z.array(z.string().min(1)),
-  output: z.array(z.string().min(1)),
+  input: z.array(z.string().min(1)).default([]),
+  output: z.array(z.string().min(1)).default([]),
+  inputPins: z.array(activityPinSchema).optional(),
+  outputPins: z.array(activityPinSchema).optional(),
 });
 export type ActivityActionNode = z.infer<typeof activityActionNodeSchema>;
 
@@ -326,6 +345,17 @@ export const activityJoinNodeSchema = activityNodeBaseSchema.extend({
 });
 export type ActivityJoinNode = z.infer<typeof activityJoinNodeSchema>;
 
+export const activityObjectNodeSchema = activityNodeBaseSchema.extend({
+  type: z.literal("object"),
+  name: z.string().min(1),
+  dataType: z.string().min(1),
+  state: z.string().min(1).optional(),
+});
+export const activityFlowFinalNodeSchema = activityNodeBaseSchema.extend({
+  type: z.literal("flow_final"),
+  name: z.string().min(1).default("分支结束"),
+});
+
 export const activityNodeSchema = z.discriminatedUnion("type", [
   activityStartNodeSchema,
   activityEndNodeSchema,
@@ -334,6 +364,8 @@ export const activityNodeSchema = z.discriminatedUnion("type", [
   activityMergeNodeSchema,
   activityForkNodeSchema,
   activityJoinNodeSchema,
+  activityObjectNodeSchema,
+  activityFlowFinalNodeSchema,
 ]);
 export type ActivityNode = z.infer<typeof activityNodeSchema>;
 
@@ -364,12 +396,19 @@ export const activityDiagramSpecSchema = z.object({
 });
 export type ActivityDiagramSpec = z.infer<typeof activityDiagramSpecSchema>;
 
+// Feasibility uses a high-level control-flow subset, not the full activity profile.
+export const feasibilityActivityDiagramSpecSchema = activityDiagramSpecSchema.extend({
+  nodes: z.array(z.discriminatedUnion("type", [activityStartNodeSchema, activityEndNodeSchema,
+    activityActionNodeSchema.extend({ inputPins: z.array(activityPinSchema).max(0).optional(), outputPins: z.array(activityPinSchema).max(0).optional() }),
+    activityDecisionNodeSchema, activityMergeNodeSchema, activityForkNodeSchema, activityJoinNodeSchema])),
+  relationships: z.array(activityRelationshipSchema.extend({ type: z.literal("control_flow") })),
+});
+
+
 export const deploymentNodeTypeSchema = z.enum([
-  "app",
-  "server",
+  "node",
   "device",
-  "container",
-  "external",
+  "execution-environment",
 ]);
 export type DeploymentNodeType = z.infer<typeof deploymentNodeTypeSchema>;
 
@@ -377,12 +416,15 @@ export const deploymentNodeSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   nodeType: deploymentNodeTypeSchema,
+  parentId: z.string().min(1).optional(),
+  technology: z.string().min(1).optional(),
   environment: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
 });
 export type DeploymentNode = z.infer<typeof deploymentNodeSchema>;
 
 export const deploymentDatabaseSchema = z.object({
+  parentId: z.string().min(1).optional(),
   id: z.string().min(1),
   name: z.string().min(1),
   engine: z.string().min(1).optional(),
@@ -417,7 +459,7 @@ export const deploymentRelationshipTypeSchema = z.enum([
   "deployment",
   "communication",
   "dependency",
-  "hosting",
+  "manifestation",
 ]);
 export type DeploymentRelationshipType = z.infer<typeof deploymentRelationshipTypeSchema>;
 
@@ -499,24 +541,36 @@ export const sequenceFragmentTypeSchema = z.enum([
 export type SequenceFragmentType = z.infer<typeof sequenceFragmentTypeSchema>;
 
 export const sequenceFragmentBranchSchema = z.object({
+  id: z.string().min(1),
   label: z.string().min(1),
   condition: z.string().min(1).optional(),
+  // An empty operand expresses a legal no-op alternative (for example an else branch).
   messageIds: z.array(z.string().min(1)),
 });
 export type SequenceFragmentBranch = z.infer<typeof sequenceFragmentBranchSchema>;
 
 export const sequenceFragmentSchema = z.object({
+  parentFragmentId: z.string().min(1).optional(),
+  parentBranchId: z.string().min(1).optional(),
   id: z.string().min(1),
   type: sequenceFragmentTypeSchema,
   label: z.string().min(1),
-  messageIds: z.array(z.string().min(1)),
+  messageIds: z.array(z.string().min(1)).min(1),
   condition: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
   branches: z.array(sequenceFragmentBranchSchema).optional(),
 });
 export type SequenceFragment = z.infer<typeof sequenceFragmentSchema>;
 
+export const sequenceActivationSchema = z.object({
+  id: z.string().min(1),
+  participantId: z.string().min(1),
+  startMessageId: z.string().min(1),
+  endMessageId: z.string().min(1),
+});
+
 export const sequenceDiagramSpecSchema = z.object({
+  activations: z.array(sequenceActivationSchema).optional(),
   diagramKind: z.literal("sequence"),
   modelId: z.string().min(1).optional(),
   sourceUseCaseId: z.string().min(1).optional(),
@@ -532,6 +586,7 @@ export type SequenceDiagramSpec = z.infer<typeof sequenceDiagramSpecSchema>;
 
 export const analysisSequenceDiagramSpecSchema = sequenceDiagramSpecSchema.extend({
   diagramKind: z.literal("analysis"),
+  participants: z.array(sequenceParticipantSchema.extend({ participantType: z.enum(["actor", "boundary", "control", "entity"]) })),
 });
 export type AnalysisSequenceDiagramSpec = z.infer<
   typeof analysisSequenceDiagramSpecSchema
@@ -577,6 +632,7 @@ export const prototypeInterfaceRelationshipSchema = z.object({
   sourceId: z.string().min(1),
   targetId: z.string().min(1),
   label: z.string().min(1).optional(),
+  guard: z.string().min(1).optional(),
   trigger: z.string().min(1).optional(),
   condition: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
@@ -598,12 +654,17 @@ export type PrototypeInterfaceDiagramSpec = z.infer<
   typeof prototypeInterfaceDiagramSpecSchema
 >;
 
+export const navigationDiagramSpecSchema = prototypeInterfaceDiagramSpecSchema.extend({
+  diagramKind: z.literal("navigation"),
+});
+export type NavigationDiagramSpec = z.infer<typeof navigationDiagramSpecSchema>;
+
 export const architecturePackageSchema = z.object({
+  parentId: z.string().min(1).optional(),
   id: z.string().min(1),
   name: z.string().min(1),
   stereotype: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
-  componentIds: z.array(z.string().min(1)).default([]),
 });
 export type ArchitecturePackage = z.infer<typeof architecturePackageSchema>;
 
@@ -729,7 +790,25 @@ export const tableColumnSchema = z.object({
 });
 export type TableColumn = z.infer<typeof tableColumnSchema>;
 
+const relationalKeyBaseSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).optional(),
+  columnIds: z.array(z.string().min(1)).min(1),
+});
+export const tableRelationalConstraintSchema = z.discriminatedUnion("type", [
+  relationalKeyBaseSchema.extend({ type: z.literal("primary-key") }),
+  relationalKeyBaseSchema.extend({ type: z.literal("unique") }),
+  relationalKeyBaseSchema.extend({
+    type: z.literal("foreign-key"),
+    referenceTableId: z.string().min(1),
+    referenceColumnIds: z.array(z.string().min(1)).min(1),
+  }),
+  z.object({ id: z.string().min(1), name: z.string().min(1).optional(), type: z.literal("check"), expression: z.string().min(1) }),
+]);
+export type TableRelationalConstraint = z.infer<typeof tableRelationalConstraintSchema>;
+
 export const tableSchema = z.object({
+  relationalConstraints: z.array(tableRelationalConstraintSchema).default([]),
   id: z.string().min(1),
   name: z.string().min(1),
   chineseName: z.string().min(1).optional(),
@@ -744,17 +823,19 @@ export type TableSpec = z.infer<typeof tableSchema>;
 export const tableRelationshipTypeSchema = z.enum([
   "one-to-one",
   "one-to-many",
-  "many-to-many",
 ]);
 export type TableRelationshipType = z.infer<typeof tableRelationshipTypeSchema>;
 
 export const tableRelationshipSchema = z.object({
+  sourceMultiplicity: z.enum(["1", "0..1"]).optional(),
+  targetMultiplicity: z.enum(["0..1", "0..*"]).optional(),
+  identifying: z.boolean().optional(),
+  sourceColumnIds: z.array(z.string().min(1)).optional(),
+  targetColumnIds: z.array(z.string().min(1)).optional(),
   id: z.string().min(1),
   type: tableRelationshipTypeSchema,
   sourceTableId: z.string().min(1),
   targetTableId: z.string().min(1),
-  sourceColumnId: z.string().min(1).optional(),
-  targetColumnId: z.string().min(1).optional(),
   label: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
 });
@@ -767,7 +848,7 @@ export const tableDiagramSpecSchema = z.object({
   summary: z.string().min(1),
   notes: noteListSchema,
   tables: z.array(tableSchema).min(1),
-  relationships: z.array(tableRelationshipSchema),
+  relationships: z.array(tableRelationshipSchema).default([]),
 });
 export type TableDiagramSpec = z.infer<typeof tableDiagramSpecSchema>;
 
@@ -803,13 +884,29 @@ export const contextDiagramSpecSchema = z.object({
 });
 export type ContextDiagramSpec = z.infer<typeof contextDiagramSpecSchema>;
 
+export const requirementClassDiagramSpecSchema = classDiagramSpecSchema.extend({
+  interfaces: z.array(interfaceEntitySchema).max(0),
+  classes: z.array(classEntitySchema.extend({
+    classKind: z.enum(["entity", "aggregate", "valueObject", "other"]).optional(),
+    operations: z.array(classOperationSchema).max(0).default([]),
+  })),
+  relationships: z.array(classRelationshipSchema.extend({ type: z.enum(["association", "aggregation", "composition", "inheritance"]) })),
+});
+
+// Requirements capture known infrastructure, while implementation artifacts belong to design.
+export const requirementDeploymentDiagramSpecSchema = deploymentDiagramSpecSchema.extend({
+  components: z.array(deploymentComponentSchema).max(0),
+  artifacts: z.array(deploymentArtifactSpecSchema).max(0),
+  relationships: z.array(deploymentRelationshipSchema.extend({ type: z.literal("communication") })),
+});
+
 export const diagramModelSpecSchema = z.discriminatedUnion("diagramKind", [
   contextDiagramSpecSchema,
   functionStructureDiagramSpecSchema,
   useCaseDiagramSpecSchema,
-  classDiagramSpecSchema,
+  requirementClassDiagramSpecSchema,
   activityDiagramSpecSchema,
-  deploymentDiagramSpecSchema,
+  requirementDeploymentDiagramSpecSchema,
   prototypeInterfaceDiagramSpecSchema,
   analysisSequenceDiagramSpecSchema,
 ]);
@@ -861,7 +958,7 @@ export const designDiagramModelSpecSchema = z.discriminatedUnion("diagramKind", 
   architectureDiagramSpecSchema,
   sequenceDiagramSpecSchema,
   classDiagramSpecSchema,
-  activityDiagramSpecSchema,
+  navigationDiagramSpecSchema,
   componentRelationshipDiagramSpecSchema,
   deploymentDiagramSpecSchema,
   tableDiagramSpecSchema,
@@ -932,7 +1029,14 @@ export const testGenerationResultSchema = z.object({
 });
 export type TestGenerationResult = z.infer<typeof testGenerationResultSchema>;
 
+export const modelRenderMappingSchema = z.object({
+  mode: z.enum(["native", "explicit-graph"]),
+  elements: z.array(z.object({ elementId: z.string(), alias: z.string() })),
+  relationships: z.array(z.object({ relationshipId: z.string(), sourceId: z.string(), targetId: z.string(), type: z.string() })),
+});
+
 export const plantUmlArtifactSchema = z.object({
+  renderMapping: modelRenderMappingSchema.optional(),
   modelId: z.string().min(1).optional(),
   diagramKind: diagramKindSchema,
   source: z.string().min(1),
@@ -940,6 +1044,7 @@ export const plantUmlArtifactSchema = z.object({
 export type PlantUmlArtifact = z.infer<typeof plantUmlArtifactSchema>;
 
 export const designPlantUmlArtifactSchema = z.object({
+  renderMapping: modelRenderMappingSchema.optional(),
   modelId: z.string().min(1).optional(),
   diagramKind: designDiagramKindSchema,
   source: z.string().min(1),

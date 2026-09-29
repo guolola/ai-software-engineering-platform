@@ -45,6 +45,8 @@ const DESIGN_MODEL_CODES = new Set([
   "DESIGN_MODELS_INVALID",
 ]);
 const FEASIBILITY_CODES = new Set([
+  "FEASIBILITY_BUSINESS_FLOW_MISSING",
+  "FEASIBILITY_BUSINESS_FLOW_STALE",
   "FEASIBILITY_CONTEXT_MISSING",
   "FEASIBILITY_CONTEXT_STALE",
   "FEASIBILITY_IMPLEMENTATION_STALE",
@@ -54,7 +56,10 @@ function actionTargetForCode(code: string): FailureActionTarget | undefined {
   if (code === "REQUIREMENT_REVIEWS_PENDING" || code === "REQUIREMENT_BASELINE_BLOCKED") {
     return "pending-rules";
   }
-  if (code === "REQUIREMENT_SOURCE_MISSING") return "system-requirements";
+  if (code === "REQUIREMENT_SOURCE_MISSING" || code === "RUN_REQUIREMENT_INPUT_UNSAFE" ||
+    code === "RUN_REQUIREMENT_INPUT_IRRELEVANT" || code === "RUN_REQUIREMENT_RULES_EMPTY") {
+    return "system-requirements";
+  }
   if (REQUIREMENT_MODEL_CODES.has(code)) return "requirement-models";
   if (DESIGN_MODEL_CODES.has(code)) return "design-models";
   if (FEASIBILITY_CODES.has(code)) return "feasibility";

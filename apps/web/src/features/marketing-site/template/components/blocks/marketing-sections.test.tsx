@@ -3,25 +3,41 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import Benefits from './benefits/benefits'
+import Features from './features/features'
 import FAQ from './faq/faq'
 import TrustedBrands from './trusted-brands/trusted-brands'
 import Footer from '../layout/footer'
 import { flowText } from '../../../model/flow-copy'
 import { benefits } from '../../content/benefits'
 import { faqItems } from '../../content/faqs'
-import { logos } from '../../content/trusted-brands'
+import { logos, orbitLogos } from '../../content/trusted-brands'
 
 describe('marketing homepage sections', () => {
-  it('uses the seven local software engineering brand logos', () => {
-    render(<TrustedBrands brandLogos={logos} />)
+  it('keeps the three example stages in separate chart columns', () => {
+    render(<Features />)
+
+    const stages = screen.getAllByTestId('feature-stage')
+    expect(stages).toHaveLength(3)
+    expect(stages[0].parentElement).toHaveClass('grid-cols-3')
+    expect(stages[0]).toHaveTextContent('28%')
+    expect(stages[1]).toHaveTextContent('78%')
+    expect(stages[2]).toHaveTextContent('32%')
+  })
+
+  it('shows seven distinct monochrome software brands with neutral copy', () => {
+    const { container } = render(<TrustedBrands brandLogos={logos} />)
 
     expect(logos).toHaveLength(7)
+    expect(orbitLogos).toHaveLength(12)
+    expect(new Set([...orbitLogos, ...logos].map(logo => logo.name)).size).toBe(19)
+    expect(screen.getByText('软件工程领域的工具与平台')).toBeInTheDocument()
     for (const logo of logos) {
       const renderedLogos = screen.getAllByAltText(flowText(logo.name))
       expect(renderedLogos.length).toBeGreaterThan(0)
       expect(renderedLogos[0]).toHaveAttribute('src', logo.image)
-      expect(logo.image).toMatch(/^\/marketing\/logos\/.+\.svg$/u)
+      expect(renderedLogos[0]).toHaveClass('grayscale', 'dark:invert')
     }
+    expect(container.querySelectorAll('#trusted-brands img')).toHaveLength(7 * 4)
   })
 
   it('keeps the original sticky benefits layout while rendering shadcn-studio previews', () => {
@@ -72,7 +88,9 @@ describe('marketing homepage sections', () => {
     expect(screen.queryByLabelText('Twitter Link')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Youtube Link')).not.toBeInTheDocument()
     for (const logo of logos) {
-      expect(screen.getAllByAltText(flowText(logo.name)).at(-1)).toHaveAttribute('src', logo.image)
+      const footerLogo = screen.getAllByAltText(flowText(logo.name)).at(-1)
+      expect(footerLogo).toHaveAttribute('src', logo.image)
+      expect(footerLogo).toHaveClass('grayscale', 'dark:invert')
     }
   })
 })

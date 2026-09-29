@@ -103,7 +103,7 @@ describe("buildDiagramDetailModel", () => {
       notes: [],
       nodes: [
         { id: "fn_root", name: "订单管理", sourceRequirementIds: ["REQ-001"] },
-        { id: "fn_create", name: "创建订单", parentId: "fn_root", sourceRequirementIds: ["REQ-001"] },
+        { id: "fn_create", name: "创建订单", sourceRequirementIds: ["REQ-001"] },
       ],
       relationships: [
         {
@@ -123,7 +123,7 @@ describe("buildDiagramDetailModel", () => {
       summary: "包图",
       notes: [],
       packages: [
-        { id: "pkg_order", name: "订单包", componentIds: ["cmp_order"] },
+        { id: "pkg_order", name: "订单包" },
       ],
       components: [
         {

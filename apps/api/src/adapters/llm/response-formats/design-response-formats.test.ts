@@ -65,53 +65,15 @@ test("design model response format is valid for OpenAI strict JSON Schema", () =
   assertNoOneOf(GENERATE_DESIGN_MODELS_RESPONSE_FORMAT.json_schema.schema);
 });
 
-test("design class response schema exposes localized names and constraints", () => {
-  const modelProperties = (
-    GENERATE_DESIGN_MODELS_RESPONSE_FORMAT.json_schema.schema.properties as {
-      models: { items: { properties: Record<string, unknown> } };
-    }
-  ).models.items.properties;
-  const classProperties = (
-    modelProperties.classes as {
-      items: { properties: Record<string, unknown> };
-    }
-  ).items.properties;
-  const attributeProperties = (
-    classProperties.attributes as {
-      items: { properties: Record<string, unknown> };
-    }
-  ).items.properties;
-  const interfaceProperties = (
-    modelProperties.interfaces as {
-      items: { properties: Record<string, unknown> };
-    }
-  ).items.properties;
-
-  for (const field of ["chineseName", "englishName", "type", "constraints"]) {
-    assert.ok(classProperties[field], `classes[].${field} must be declared`);
-    assert.ok(interfaceProperties[field], `interfaces[].${field} must be declared`);
-  }
-  for (const field of ["chineseName", "englishName", "constraints"]) {
-    assert.ok(attributeProperties[field], `classes[].attributes[].${field} must be declared`);
-  }
-});
-
-test("design model response schema includes architecture and component shapes", () => {
-  const modelProperties = (
-    GENERATE_DESIGN_MODELS_RESPONSE_FORMAT.json_schema.schema.properties as {
-      models: { items: { properties: Record<string, unknown> } };
-    }
-  ).models.items.properties;
-  const diagramKind = modelProperties.diagramKind as { enum: string[] };
-  assert.ok(diagramKind.enum.includes("architecture"));
-  assert.ok(diagramKind.enum.includes("component"));
-  assert.ok(modelProperties.packages);
-  assert.ok(modelProperties.components);
-
-  const relationship = modelProperties.relationships as {
-    items: { properties: { type: { enum: string[] } } };
-  };
-  assert.ok(relationship.items.properties.type.enum.includes("contains"));
-  assert.ok(relationship.items.properties.type.enum.includes("provided-interface"));
-  assert.ok(relationship.items.properties.type.enum.includes("required-interface"));
+test("design variants keep relationship vocabularies separate and expose nested semantics", () => {
+  const variants = (GENERATE_DESIGN_MODELS_RESPONSE_FORMAT.json_schema.schema as any).properties.models.items.anyOf;
+  const byKind = Object.fromEntries(variants.map((item: any) => [item.properties.diagramKind.enum[0], item.properties]));
+  assert.deepEqual(byKind.architecture.relationships.items.properties.type.enum, ["contains", "dependency", "communication"]);
+  assert.ok(byKind.component.relationships.items.properties.type.enum.includes("provided-interface"));
+  assert.ok(byKind.class.classes.items.properties.isAbstract);
+  assert.ok(byKind.class.classes.items.properties.chineseName);
+  assert.ok(byKind.sequence.fragments.items.properties.branches.items.properties.id);
+  assert.ok(byKind.sequence.fragments.items.properties.parentBranchId);
+  assert.ok(byKind.table.tables.items.properties.relationalConstraints);
+  assert.ok(byKind.navigation); assert.equal(byKind.activity, undefined);
 });

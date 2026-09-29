@@ -1,10 +1,12 @@
 // Provides the initial bilingual resource bundle for shared navigation, metadata, and core UI states.
 import type { Resource } from "i18next";
 import { feasibilityResourcesEn, feasibilityResourcesZh } from "./feasibility-resources";
+import { onboardingEn, onboardingZh } from "./onboarding-resources";
 
 export const resources = {
   "zh-CN": {
     translation: {
+      ...onboardingZh,
       generationModel: {
         providerRequired: "未选择模型供应商",
         modelRequired: "请先选择用于生成的模型。",
@@ -105,6 +107,18 @@ export const resources = {
           barFooterStrong: "稳定运行",
           barFooterText: "每日生成任务保持活跃。",
         },
+        table: {
+          user: "用户", role: "角色", plan: "方案", billing: "计费", status: "状态", actions: "操作",
+          filter: "筛选{{field}}", all: "全部", selectAll: "选择本页全部", selectRow: "选择此行",
+          noResults: "没有匹配结果。", pageSummary: "显示第 {{start}}–{{end}} 条，共 {{total}} 条",
+          previous: "上一页", next: "下一页", previousPage: "前往上一页", nextPage: "前往下一页",
+          deleteItem: "删除项目", viewItem: "查看项目", editItem: "编辑项目",
+          delete: "删除", view: "查看", edit: "编辑", duplicate: "复制",
+          roles: { admin: "管理员", author: "创建者", editor: "编辑者", maintainer: "维护者", subscriber: "订阅者" },
+          plans: { basic: "基础版", company: "公司版", enterprise: "企业版", team: "团队版" },
+          billingMethods: { "auto-debit": "自动扣款", "manual-cash": "手动—现金", "manual-paypal": "手动—PayPal" },
+          statuses: { active: "活跃", inactive: "不活跃", pending: "待生成" },
+        },
       },
       nav: {
         dashboard: "仪表盘",
@@ -160,7 +174,7 @@ export const resources = {
           mfaSuccess: "MFA 验证通过，正在进入项目首页。", resetSent: "如果邮箱存在，重置邮件会发送到 {{email}}。", resetTokenMissing: "重置链接缺少 token，请重新申请。",
           resetSuccess: "密码已重置，请重新登录。", verifySuccessRedirect: "邮箱验证已完成，正在前往登录。", verifyResentToken: "验证邮件已重新发送，请复制邮件中的短期 token 到本页完成验证。",
           verifySuccess: "邮箱验证已完成。", verifyResent: "验证邮件已重新发送。", requestFailed: "认证请求失败。",
-          loginNoticeTitle: "请先登录", loginRequiredNotice: "此页面需要登录，请登录后继续。", sessionExpiredNotice: "登录状态已失效，请重新登录后继续。", sessionCheckFailedNotice: "暂时无法确认登录状态，请重新登录后再试。", securityFootnote: "登录状态由服务端安全会话校验保护。", panelDescription: "面向课程实验与团队协作的一体化软件工程工作台。", capabilityModels: "需求、UML 模型与追踪关系集中管理", capabilityWorkflow: "从需求分析到代码与说明书的阶段化流程", capabilityArtifacts: "可审查、可复用、可导出的工程产物",
+          loginNoticeTitle: "请先登录", loginRequiredNotice: "此页面需要登录，请登录后继续。", sessionExpiredNotice: "登录状态已失效，请重新登录后继续。", sessionCheckFailedNotice: "暂时无法确认登录状态，请重新登录后再试。", panelDescription: "面向课程实验与团队协作的一体化软件工程工作台。", capabilityModels: "需求、UML 模型与追踪关系集中管理", capabilityWorkflow: "从需求分析到代码与说明书的阶段化流程", capabilityArtifacts: "可审查、可复用、可导出的工程产物",
         },
         invitationAccept: { tokenMissing: "邀请链接缺少 token，请检查邮件中的链接。", invalid: "邀请链接无效或已过期。", accepted: "已加入项目，正在进入项目首页。", failed: "接受邀请失败。", projectFallback: "受邀项目", emailFallback: "你的邮箱", title: "接受项目邀请", description: "请确认邀请信息后加入项目。若尚未登录，请先使用被邀请邮箱登录或注册。", loading: "正在读取邀请信息...", project: "项目", email: "邀请邮箱", role: "项目角色", accept: "接受邀请", register: "注册新账号", backToLogin: "返回登录" },
       },
@@ -375,6 +389,10 @@ export const resources = {
           PLATFORM_PROVIDER_UNAVAILABLE: "当前模型服务暂不可用，请稍后重试。",
           PLATFORM_PROVIDER_TIMEOUT: "当前模型服务响应超时，请稍后重试。",
           RUN_MODEL_OUTPUT_EMPTY: "模型未生成有效结果，请重试或检查模型输出。",
+          RUN_REQUIREMENT_INPUT_UNSAFE: "需求文本第 {{line}} 行包含疑似指挥模型改变任务的内容，请修改后重试。",
+          RUN_REQUIREMENT_INPUT_IRRELEVANT: "未发现可用于抽取的软件需求，请补充功能、业务规则或约束后重试。",
+          RUN_REQUIREMENT_SCREENING_FAILED: "需求输入检查未完成，请稍后重试。",
+          RUN_REQUIREMENT_RULES_EMPTY: "未提取到有来源依据的需求规则，请检查需求描述或重试。",
           RUN_STRUCTURED_OUTPUT_INVALID: "模型返回的结构化结果不合法，请重试。",
           RUN_DEPENDENCY_MISSING: "生成依赖缺失，请先补齐前置结果。",
           RUN_RENDER_FAILED: "图形渲染失败，请检查模型结果后重试。",
@@ -613,7 +631,7 @@ export const resources = {
         sourceStatus: { stale: "需更新", available: "可用", missing: "未生成" },
         sources: {
           architecture: "需求阶段功能结构图 + 需求规则", sequence: "需求阶段用例模型事件流 + 需求分析模型",
-          activity: "需求阶段原型界面关系 + 设计阶段用例实现设计", class: "需求阶段领域概念模型 + 设计阶段用例实现设计",
+          navigation: "需求阶段原型界面关系 + 设计阶段用例实现设计", class: "需求阶段领域概念模型 + 设计阶段用例实现设计",
           component: "设计阶段设计类图", deployment: "需求阶段部署需求模型 + 设计阶段组件（构件）关系", table: "设计阶段设计类图",
         },
         guide: {
@@ -680,9 +698,14 @@ export const resources = {
         autoFillSources: { rules: "需求规则", mapping: "规则映射" },
         source: {
           projectDescription: "项目需求描述",
+          ignoredSummary: "{{count}} 处无关内容未参与需求规则抽取。",
+          ignoredTitle: "以下内容未参与抽取",
+          screeningErrorTitle: "需求输入需要修改",
           description: "需求描述",
           placeholder: "用一段话描述你的系统：做什么、给谁用、有哪些角色和关键流程，越具体越能抽出准确的需求规则",
           changed: "需求已修改",
+          draft: "未提交草稿",
+          draftNotice: "需求文本尚未保存。点击“更新需求规则”并成功完成后，文本和规则才会一起保存；失败时刷新页面将恢复原文本。",
           clear: "清空",
           updateRules: "更新需求规则",
           generateRules: "生成需求规则",
@@ -1198,7 +1221,7 @@ export const resources = {
           architecture: { label: "总体架构图", description: "包、子系统、核心组件与依赖" },
           sequence: { label: "用例实现设计", description: "基于事件流的对象调用时序与动态行为" },
           class: { label: "设计类图", description: "实体、接口、聚合根及静态关联" },
-          activity: { label: "界面关系图", description: "界面节点、状态与跳转关系" },
+          navigation: { label: "页面导航模型", description: "页面、入口、模块与导航关系" },
           table: { label: "数据库设计", description: "数据库表、主键、外键与表间关联" },
           component: { label: "组件（构件）关系", description: "组件、接口与构件依赖关系" },
           deployment: { label: "部署设计", description: "组件在 Pod、服务器、数据库上的分布" },
@@ -1211,6 +1234,11 @@ export const resources = {
           class: { label: "类", shortLabel: "类" },
           interface: { label: "接口", shortLabel: "接口" },
           enum: { label: "枚举", shortLabel: "枚举" },
+          "object-node": { label: "对象节点", shortLabel: "对象" },
+          "flow-final-node": { label: "分支终止", shortLabel: "分支终止" },
+          "input-pin": { label: "输入引脚", shortLabel: "输入" },
+          "output-pin": { label: "输出引脚", shortLabel: "输出" },
+          activation: { label: "激活区间", shortLabel: "激活" },
           activity: { label: "活动", shortLabel: "活动" },
           decision: { label: "判断", shortLabel: "判断" },
           "start-node": { label: "开始节点", shortLabel: "开始" },
@@ -1518,6 +1546,7 @@ export const resources = {
   },
   en: {
     translation: {
+      ...onboardingEn,
       generationModel: {
         providerRequired: "No model provider selected",
         modelRequired: "Select a model for generation first.",
@@ -1618,6 +1647,18 @@ export const resources = {
           barFooterStrong: "Running steadily",
           barFooterText: "Daily generation tasks stay active.",
         },
+        table: {
+          user: "User", role: "Role", plan: "Plan", billing: "Billing", status: "Status", actions: "Actions",
+          filter: "Select {{field}}", all: "All", selectAll: "Select all on this page", selectRow: "Select row",
+          noResults: "No results.", pageSummary: "Showing {{start}} to {{end}} of {{total}} entries",
+          previous: "Previous", next: "Next", previousPage: "Go to previous page", nextPage: "Go to next page",
+          deleteItem: "Delete item", viewItem: "View item", editItem: "Edit item",
+          delete: "Delete", view: "View", edit: "Edit", duplicate: "Duplicate",
+          roles: { admin: "Admin", author: "Author", editor: "Editor", maintainer: "Maintainer", subscriber: "Subscriber" },
+          plans: { basic: "Basic", company: "Company", enterprise: "Enterprise", team: "Team" },
+          billingMethods: { "auto-debit": "Auto debit", "manual-cash": "Manual - cash", "manual-paypal": "Manual - PayPal" },
+          statuses: { active: "Active", inactive: "Inactive", pending: "Pending" },
+        },
       },
       nav: {
         dashboard: "Dashboard",
@@ -1673,7 +1714,7 @@ export const resources = {
           mfaSuccess: "MFA verified. Opening your projects.", resetSent: "If the email exists, a reset email will be sent to {{email}}.", resetTokenMissing: "The reset link has no token. Request a new one.",
           resetSuccess: "Password reset. Log in again.", verifySuccessRedirect: "Email verified. Redirecting to login.", verifyResentToken: "Verification email resent. Paste its short-lived token here to finish verification.",
           verifySuccess: "Email verified.", verifyResent: "Verification email resent.", requestFailed: "Authentication request failed.",
-          loginNoticeTitle: "Sign in required", loginRequiredNotice: "Please log in to continue to this page.", sessionExpiredNotice: "Your session has expired. Log in again to continue.", sessionCheckFailedNotice: "We could not verify your session. Log in again and retry.", securityFootnote: "Your sign-in is protected by server-side session validation.", panelDescription: "An integrated software engineering workspace for coursework and team collaboration.", capabilityModels: "Manage requirements, UML models, and traceability together", capabilityWorkflow: "Move from analysis to code and documents in guided stages", capabilityArtifacts: "Review, reuse, and export trusted engineering artifacts",
+          loginNoticeTitle: "Sign in required", loginRequiredNotice: "Please log in to continue to this page.", sessionExpiredNotice: "Your session has expired. Log in again to continue.", sessionCheckFailedNotice: "We could not verify your session. Log in again and retry.", panelDescription: "An integrated software engineering workspace for coursework and team collaboration.", capabilityModels: "Manage requirements, UML models, and traceability together", capabilityWorkflow: "Move from analysis to code and documents in guided stages", capabilityArtifacts: "Review, reuse, and export trusted engineering artifacts",
         },
         invitationAccept: { tokenMissing: "The invitation link has no token. Check the link in the email.", invalid: "The invitation link is invalid or expired.", accepted: "Joined the project. Opening your projects.", failed: "Failed to accept the invitation.", projectFallback: "Invited project", emailFallback: "Your email", title: "Accept project invitation", description: "Review the invitation before joining. If you are not signed in, log in or register with the invited email address first.", loading: "Loading invitation...", project: "Project", email: "Invited email", role: "Project role", accept: "Accept invitation", register: "Create account", backToLogin: "Back to login" },
       },
@@ -1888,6 +1929,10 @@ export const resources = {
           PLATFORM_PROVIDER_UNAVAILABLE: "The model service is temporarily unavailable. Try again later.",
           PLATFORM_PROVIDER_TIMEOUT: "The model service timed out. Try again later.",
           RUN_MODEL_OUTPUT_EMPTY: "The model returned no valid result. Retry or inspect the model output.",
+          RUN_REQUIREMENT_INPUT_UNSAFE: "Line {{line}} contains text that may redirect the model. Edit it and try again.",
+          RUN_REQUIREMENT_INPUT_IRRELEVANT: "No software requirements were found. Add a feature, business rule, or constraint and try again.",
+          RUN_REQUIREMENT_SCREENING_FAILED: "The requirement input check did not finish. Please try again later.",
+          RUN_REQUIREMENT_RULES_EMPTY: "No source-backed requirement rules were extracted. Check the text or try again.",
           RUN_STRUCTURED_OUTPUT_INVALID: "The model returned an invalid structured result. Try again.",
           RUN_DEPENDENCY_MISSING: "A generation dependency is missing. Complete the prerequisite first.",
           RUN_RENDER_FAILED: "Diagram rendering failed. Inspect the model result and try again.",
@@ -2129,7 +2174,7 @@ export const resources = {
         sourceStatus: { stale: "Update required", available: "Available", missing: "Not generated" },
         sources: {
           architecture: "Requirement function structure + requirement rules", sequence: "Requirement use-case event flows + requirement analysis model",
-          activity: "Requirement prototype relationships + use-case implementation design", class: "Requirement domain model + use-case implementation design",
+          navigation: "Requirement prototype relationships + use-case implementation design", class: "Requirement domain model + use-case implementation design",
           component: "Design class diagram", deployment: "Requirement deployment model + design component relationships", table: "Design class diagram",
         },
         guide: {
@@ -2196,9 +2241,14 @@ export const resources = {
         autoFillSources: { rules: "requirement rules", mapping: "rule mapping" },
         source: {
           projectDescription: "Project requirements",
+          ignoredSummary: "{{count}} unrelated passage(s) were excluded from rule extraction.",
+          ignoredTitle: "Excluded from extraction",
+          screeningErrorTitle: "Edit the requirement input",
           description: "Requirement description",
           placeholder: "Describe what the system does, who uses it, its roles, and key workflows. More detail produces more accurate requirement rules.",
           changed: "Requirements changed",
+          draft: "Unsaved draft",
+          draftNotice: "The requirement text is not saved yet. It and the rules are saved together only after a successful update; if the update fails, refreshing restores the previous text.",
           clear: "Clear",
           updateRules: "Update requirement rules",
           generateRules: "Generate requirement rules",
@@ -2714,7 +2764,7 @@ export const resources = {
           architecture: { label: "Architecture Diagram", description: "Packages, subsystems, core components, and dependencies" },
           sequence: { label: "Use Case Realization Design", description: "Object call sequences and dynamic behavior based on event flows" },
           class: { label: "Design Class Diagram", description: "Entities, interfaces, aggregate roots, and static associations" },
-          activity: { label: "Interface Relationship Diagram", description: "Interface nodes, states, and transitions" },
+          navigation: { label: "Page Navigation", description: "Pages, entries, modules and navigation" },
           table: { label: "Database Design", description: "Tables, primary keys, foreign keys, and relationships" },
           component: { label: "Component Relationships", description: "Components, interfaces, and component dependencies" },
           deployment: { label: "Deployment Design", description: "Component distribution across pods, servers, and databases" },
@@ -2727,6 +2777,11 @@ export const resources = {
           class: { label: "Class", shortLabel: "Class" },
           interface: { label: "Interface", shortLabel: "Interface" },
           enum: { label: "Enum", shortLabel: "Enum" },
+          "object-node": { label: "Object Node", shortLabel: "Object" },
+          "flow-final-node": { label: "Flow Final", shortLabel: "Flow Final" },
+          "input-pin": { label: "Input Pin", shortLabel: "Input" },
+          "output-pin": { label: "Output Pin", shortLabel: "Output" },
+          activation: { label: "Activation", shortLabel: "Activation" },
           activity: { label: "Activity", shortLabel: "Activity" },
           decision: { label: "Decision", shortLabel: "Decision" },
           "start-node": { label: "Start node", shortLabel: "Start" },

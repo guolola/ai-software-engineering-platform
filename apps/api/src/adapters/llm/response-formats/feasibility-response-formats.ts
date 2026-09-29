@@ -5,7 +5,7 @@ import {
   type ModelCapabilitySource,
 } from "../../../model-capabilities.js";
 import { toOpenAiStrictJsonSchema } from "./openai-strict-schema.js";
-import { GENERATE_MODELS_RESPONSE_FORMAT } from "./requirement-model-response-format.js";
+import { feasibilityBusinessFlowSchema, contractResponseSchema } from "@uml-platform/contracts";
 
 const stringSchema = { type: "string" };
 const stringArraySchema = { type: "array", items: stringSchema };
@@ -40,18 +40,7 @@ export const GENERATE_FEASIBILITY_BUSINESS_FLOW_RESPONSE_FORMAT: JsonSchemaRespo
   json_schema: {
     name: "feasibility_business_flow_result",
     strict: true,
-    schema: toOpenAiStrictJsonSchema(strictObject({
-      // The strict-schema converter represents the diagram alternatives as anyOf.
-      model: (GENERATE_MODELS_RESPONSE_FORMAT.json_schema.schema.properties as {
-        models: { items: { anyOf: Array<{ properties: { diagramKind: { enum: string[] } } }> } };
-      }).models.items.anyOf.find((schema) =>
-        (schema.properties as { diagramKind: { enum: string[] } }).diagramKind.enum.includes("activity")),
-      traceability: { type: "array", items: strictObject({
-        requirementId: stringSchema,
-        targetId: stringSchema,
-        targetKind: { type: "string", enum: ["swimlane", "node", "relationship"] },
-      }) },
-    })),
+    schema: toOpenAiStrictJsonSchema(contractResponseSchema(feasibilityBusinessFlowSchema)),
   },
 };
 
