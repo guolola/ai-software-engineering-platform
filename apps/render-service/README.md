@@ -28,6 +28,8 @@ PDF 先生成 SVG，再通过 PDFKit 与 svg-to-pdfkit 转成单页矢量图；�
 
 启动、构建和测试前会准备固定版本 Noto Sans CJK Sans2.004 的简体中文常规、粗体字体及许可证，缓存到忽略目录 `.runtime/pdf-fonts/`，复制到 `dist/assets/pdf-fonts/`。首次准备需要联网，缓存存在后可离线运行。字体二进制不纳入源代码管理，发布时随 `dist` 复制。
 
+生产部署会从 Actions 已验证的构建产物打包字体及许可证，通过发布连接传到服务器，并在源码清理后恢复缓存。服务器构建复用这份缓存，无需再次下载字体。
+
 `UML_PDF_FONT_REGULAR` 和 `UML_PDF_FONT_BOLD` 可指定运行环境提供的字体文件，供准备脚本和运行时覆盖默认配置。转换缺少字体会返回明确错误，PNG 与 SVG 不受影响。
 
 ## 验证

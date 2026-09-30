@@ -283,6 +283,11 @@ jobs:
             exit 1
           fi
           remote_bundle="/tmp/uml-platform-${GITHUB_SHA}.bundle"
+          font_bundle="${RUNNER_TEMP}/uml-pdf-fonts-${GITHUB_SHA}.tar.gz"
+          remote_fonts="/tmp/uml-pdf-fonts-${GITHUB_SHA}.tar.gz"
+          # Ship validated build assets so server builds do not download fonts from GitHub.
+          tar -czf "$font_bundle" -C apps/render-service/dist/assets/pdf-fonts \
+            NotoSansCJKsc-Regular.otf NotoSansCJKsc-Bold.otf LICENSE.txt
           SSH_OPTIONS=(
             -o ServerAliveInterval=30
             -o ServerAliveCountMax=6
@@ -292,9 +297,11 @@ jobs:
           )
           scp "${SSH_OPTIONS[@]}" -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" \
             "$DEPLOY_BUNDLE" "$DEPLOY_USER@$DEPLOY_HOST:$remote_bundle"
+          scp "${SSH_OPTIONS[@]}" -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" \
+            "$font_bundle" "$DEPLOY_USER@$DEPLOY_HOST:$remote_fonts"
           ssh "${SSH_OPTIONS[@]}" -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH='$DEPLOY_PATH' RELEASE_SHA='${GITHUB_SHA}' DEPLOY_BUNDLE='$remote_bundle' bash -s" <<'REMOTE_DEPLOY'
+            "DEPLOY_PATH='$DEPLOY_PATH' RELEASE_SHA='${GITHUB_SHA}' DEPLOY_BUNDLE='$remote_bundle' PDF_FONT_BUNDLE='$remote_fonts' bash -s" <<'REMOTE_DEPLOY'
           set -Eeuo pipefail
 
           SOURCE_DIR="$DEPLOY_PATH/shared/source"
@@ -314,9 +321,18 @@ jobs:
           git -C "$SOURCE_DIR" checkout --force "$RELEASE_SHA"
           git -C "$SOURCE_DIR" clean -fdx
 
+          # Restore the font cache after checkout cleanup and before render-service prebuild.
+          font_cache="$SOURCE_DIR/apps/render-service/.runtime/pdf-fonts"
+          mkdir -p "$font_cache"
+          tar -xzf "$PDF_FONT_BUNDLE" -C "$font_cache" \
+            NotoSansCJKsc-Regular.otf NotoSansCJKsc-Bold.otf LICENSE.txt
+          for font_asset in NotoSansCJKsc-Regular.otf NotoSansCJKsc-Bold.otf LICENSE.txt; do
+            test -s "$font_cache/$font_asset"
+          done
+
           DEPLOY_PATH="$DEPLOY_PATH" \
             RELEASE_SHA="$RELEASE_SHA" \
             SOURCE_DIR="$SOURCE_DIR" \
             bash "$SOURCE_DIR/scripts/deploy/baota-pm2-git-deploy.sh"
-          rm -f "$DEPLOY_BUNDLE"
+          rm -f "$DEPLOY_BUNDLE" "$PDF_FONT_BUNDLE"
           REMOTE_DEPLOY
