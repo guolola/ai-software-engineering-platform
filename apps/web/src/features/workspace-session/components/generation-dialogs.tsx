@@ -197,7 +197,7 @@ export function GenerationConfirmationDialog({
               </p>
             )}
         </div>
-        <DialogFooter className="shrink-0 flex-row justify-end gap-3">
+        <DialogFooter className="shrink-0 flex-row justify-center gap-3 sm:justify-center">
           <Button
             type="button"
             variant="ghost"
