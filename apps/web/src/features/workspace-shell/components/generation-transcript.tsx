@@ -6,7 +6,6 @@ import { Button } from "../../../shared/ui/button";
 import { Badge } from "../../../shared/ui/badge";
 import { ScrollArea } from "../../../shared/ui/scroll-area";
 import { Spinner } from "../../../shared/ui/spinner";
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "../../../shared/ui/ai/reasoning";
 import { ChainOfThought, ChainOfThoughtContent, ChainOfThoughtHeader, ChainOfThoughtImage, ChainOfThoughtStep } from "../../../shared/ui/ai/chain-of-thought";
 import { Shimmer } from "../../../shared/ui/ai/shimmer";
 import { cn } from "../../../shared/ui/utils";
@@ -57,6 +56,7 @@ function QueueProgress({ queue }: { queue: GenerationQueueDetails }) {
 function ProcessCall({ call, showTitle }: { call: TranscriptCall; showTitle: boolean }) {
   const Icon = call.status === "completed" ? Check : call.status === "failed" ? X : Circle;
   const prose = readableOutput(call);
+  // Mount only readable results; large reasoning and raw payloads slow down batch-task drawers.
   return <div data-slot="generation-call" className="min-w-0 space-y-2 text-sm leading-6 text-muted-foreground">
     {showTitle && <div className="flex items-start gap-2">
       <Icon aria-hidden="true" className={cn("mt-1.5 size-3 shrink-0", call.status === "failed" && "text-destructive")} />
@@ -66,18 +66,9 @@ function ProcessCall({ call, showTitle }: { call: TranscriptCall; showTitle: boo
     {call.inputImages?.filter((image) => /^(?:https?:\/\/|data:image\/(?:png|jpe?g|gif|webp);base64,)/i.test(image.url)).map((image) => <ChainOfThoughtImage key={image.url} caption={image.caption ?? `${call.title}使用的图片`}>
       <img src={image.url} alt={image.caption ?? `${call.title}的输入图片`} className="max-h-80 max-w-full object-contain" loading="lazy" />
     </ChainOfThoughtImage>)}
-    {call.summary && <p className="whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">模型推理摘要：{call.summary}</p>}
-    {call.reasoning && <Reasoning isStreaming={call.thinking && call.status === "running"} data-slot="generation-reasoning">
-      <ReasoningTrigger aria-label={`思考过程 · ${call.title}`} />
-      <ReasoningContent>{call.reasoning}</ReasoningContent>
-    </Reasoning>}
     {prose && <div data-reading-anchor=""><TranscriptMarkdown text={prose} compact /></div>}
     {call.review && <DiagramReviewDetails review={call.review} />}
     {call.message && !["failed", "pending_review"].includes(call.status) && /修复|重试|补跑|人工确认|跳过/.test(call.message) && <p className="break-words">{call.message}</p>}
-    {call.technical && call.output && <details>
-      <summary className="w-fit cursor-pointer text-xs leading-6">查看技术原文 · {call.title}</summary>
-      <pre className="mt-2 whitespace-pre-wrap break-all font-mono text-xs leading-6 text-black dark:text-foreground">{call.output}</pre>
-    </details>}
   </div>;
 }
 

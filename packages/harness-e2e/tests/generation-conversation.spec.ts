@@ -37,10 +37,12 @@ for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as 
         await page.evaluate((event) => (window as unknown as { emitDemoEvent: (event: unknown) => void }).emitDemoEvent(event), event);
       };
       await emit("reasoning", "先核对参与者。");
-      await expect(transcript.getByText("先核对参与者。", { exact: true })).toBeVisible();
-      await page.screenshot({ path: info.outputPath("provider-reasoning.png") });
+      await expect(transcript.getByText("正在分析", { exact: true })).toBeVisible();
+      await expect(transcript.getByText("先核对参与者。", { exact: true })).toHaveCount(0);
+      await page.screenshot({ path: info.outputPath("task-progress.png") });
       await emit("reasoning", "然后整理预约关系。");
-      await expect(transcript.getByText("先核对参与者。然后整理预约关系。", { exact: true })).toBeVisible();
+      await expect(transcript.getByText("先核对参与者。然后整理预约关系。", { exact: true })).toHaveCount(0);
+      await expect(transcript.getByRole("button", { name: "思考过程 · 整理用例图" })).toHaveCount(0);
       await emit("output", "已读取学生");
       await expect(transcript.getByText("已读取学生", { exact: true })).toBeVisible();
       await expect(transcript.getByText("正在生成", { exact: true })).toBeVisible();
@@ -202,7 +204,7 @@ for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as 
       await page.screenshot({ path: info.outputPath("stage-reading.png") });
     });
 
-    test("context task has one chain with nested reasoning and input image, followed by its final summary", async ({ page }, info) => {
+    test("context task keeps its stages and input image without reasoning or raw payloads", async ({ page }, info) => {
       await mockProjectApi(page);
       const runId = "run-context-chain";
       const createdAt = "2026-09-30T08:00:00.000Z";
@@ -245,9 +247,10 @@ for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as 
       const review = chain.getByTestId("generation-task-step").last();
       const image = review.getByRole("img", { name: "系统环境图使用的图片 1" });
       await expect.poll(() => image.evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBe(520);
-      const reasoning = review.getByRole("button", { name: "思考过程 · 系统环境图" });
-      await reasoning.click();
-      await expect(review.getByText("对照结构化模型核对学生、管理员与系统节点及其关系。")).toBeVisible();
+      await expect(review.getByRole("button", { name: "思考过程 · 系统环境图" })).toHaveCount(0);
+      await expect(review.getByText("对照结构化模型核对学生、管理员与系统节点及其关系。")).toHaveCount(0);
+      await expect(transcript.getByText(/查看技术原文/)).toHaveCount(0);
+      await expect(transcript.getByText('{"passed":true,"issues":[]}', { exact: true })).toHaveCount(0);
       await expect(transcript.getByRole("region", { name: "输出总结" })).toBeVisible();
       await expect(chain.getByRole("region", { name: "输出总结" })).toHaveCount(0);
       expect(await transcript.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);

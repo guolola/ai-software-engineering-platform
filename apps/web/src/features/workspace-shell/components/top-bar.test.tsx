@@ -2195,10 +2195,9 @@ describe("TopBar", () => {
     expect(transcript.querySelector('[data-slot="card"]')).toBeNull();
     expect(screen.queryByTestId("generation-task-error-card")).not.toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "我知道了" }));
-    await user.click(within(transcript).getByText("查看技术原文 · 生成需求模型"));
-    const output = within(transcript).getByText((content) => content.includes(longStream.slice(0, 30)));
-    expect(output).toHaveClass("break-all");
-    expect(output.closest("pre")).not.toHaveClass("overflow-auto");
+    expect(within(transcript).queryByText(/查看技术原文/)).not.toBeInTheDocument();
+    expect(transcript).not.toHaveTextContent(longStream);
+    expect(transcript.querySelector("pre")).toBeNull();
     expect(transcript.querySelector('[data-slot="scroll-area-viewport"]')).toBeInTheDocument();
   });
 

@@ -41,7 +41,7 @@ describe("stage reading surface", () => {
     rerender(<GenerationTranscript taskKey="a" steps={[{ ...output[0], finished: true, status: "completed" }]} active={false} finalMessage="完成" />);
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(toggle).toHaveAccessibleName("思考过程");
-    expect(screen.getByText("模型推理摘要：核对参与者")).not.toBeVisible();
+    expect(screen.queryByText("模型推理摘要：核对参与者")).not.toBeInTheDocument();
     expect(screen.getByText("开始输出正文")).not.toBeVisible();
     expect(screen.getByRole("region", { name: "输出总结" })).toHaveTextContent("完成");
     expect(screen.getByRole("region", { name: "输出总结" })).toBeVisible();
@@ -84,26 +84,24 @@ describe("stage reading surface", () => {
     expect(screen.queryByRole("button", { name: "回到最新" })).not.toBeInTheDocument();
   });
 
-  it("shows actual streamed reasoning separately and keeps it available after completion", () => {
+  it("omits streamed reasoning and provider summaries during generation and after completion", () => {
     const withReasoning: TranscriptStep[] = [{ ...steps[0], calls: [{ ...steps[0].calls[0], reasoning: "先检查参与者。", thinking: true }] }];
-    const { rerender } = render(<GenerationTranscript taskKey="reasoning" steps={withReasoning} active finalMessage="" />);
-    const trigger = screen.getByRole("button", { name: "思考过程 · 分析参与者与用例" });
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("先检查参与者。")).toBeVisible();
-    expect(screen.getByText("先检查参与者。").closest('[data-slot="collapsible-content"]')).toHaveClass("text-muted-foreground");
-    expect(screen.getByText("模型推理摘要：核对参与者")).toHaveClass("text-muted-foreground");
+    const { container, rerender } = render(<GenerationTranscript taskKey="reasoning" steps={withReasoning} active finalMessage="" />);
+    expect(screen.queryByRole("button", { name: "思考过程 · 分析参与者与用例" })).not.toBeInTheDocument();
+    expect(screen.queryByText("先检查参与者。")).not.toBeInTheDocument();
+    expect(screen.queryByText("模型推理摘要：核对参与者")).not.toBeInTheDocument();
     expect(screen.getByText("模型正文").closest('[data-slot="transcript-prose"]')).toHaveClass("text-black", "dark:text-foreground");
     rerender(<GenerationTranscript taskKey="reasoning" steps={[{ ...withReasoning[0], status: "completed", finished: true, calls: [{ ...withReasoning[0].calls[0], status: "completed", thinking: false, output: "模型正文" }] }]} active={false} finalMessage="完成" />);
-    fireEvent.click(trigger);
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(trigger);
-    expect(screen.getByText("先检查参与者。")).toBeVisible();
-    expect(screen.getAllByText("模型正文").length).toBeGreaterThan(0);
+    expect(container.querySelector('[data-slot="generation-reasoning"]')).toBeNull();
+    expect(screen.queryByText("先检查参与者。")).not.toBeInTheDocument();
+    expect(screen.queryByText("模型推理摘要：核对参与者")).not.toBeInTheDocument();
+    expect(screen.getByText("模型正文")).toBeVisible();
+    expect(screen.getByRole("region", { name: "输出总结" })).toHaveTextContent("完成");
   });
 
-  it("shows provider summaries without inventing reasoning for calls without it", () => {
+  it("omits provider summaries for calls without reasoning", () => {
     render(<GenerationTranscript taskKey="summary-only" steps={[{ ...steps[0], calls: [{ ...steps[0].calls[0], reasoning: "", summary: "核对参与者", thinking: false }] }]} active finalMessage="" />);
-    expect(screen.getByText("模型推理摘要：核对参与者")).toBeVisible();
+    expect(screen.queryByText("模型推理摘要：核对参与者")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /思考过程/ })).not.toBeInTheDocument();
   });
 
@@ -138,19 +136,25 @@ describe("stage reading surface", () => {
     expect(chain.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("preserves nested reasoning choices through task folding and new streamed content", () => {
-    const withReasoning = [{ ...steps[0], calls: [{ ...steps[0].calls[0], reasoning: "先检查参与者。" }] }];
-    const { rerender } = render(<GenerationTranscript taskKey="folding" steps={withReasoning} active finalMessage="" />);
-    const reasoning = screen.getByRole("button", { name: "思考过程 · 分析参与者与用例" });
-    fireEvent.click(reasoning);
-    const chain = screen.getByRole("button", { name: "正在思考" });
-    fireEvent.click(chain);
-    rerender(<GenerationTranscript taskKey="folding" steps={[{ ...withReasoning[0], calls: [{ ...withReasoning[0].calls[0], reasoning: "先检查参与者。再核对关系。" }] }]} active finalMessage="" />);
-    expect(chain).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(chain);
-    expect(reasoning).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(reasoning);
-    expect(screen.getByText("先检查参与者。再核对关系。")).toBeVisible();
+  it("keeps batch technical payloads out of the DOM while showing readable results and call status", () => {
+    const reasoning = "批量推理内容".repeat(10_000);
+    const calls = Array.from({ length: 20 }, (_, index) => ({
+      ...steps[0].calls[0], id: `model-${index}`, title: `模型 ${index + 1}`, technical: true,
+      reasoning, summary: "批量推理摘要",
+      output: JSON.stringify({ summary: `模型 ${index + 1} 已生成`, source: "技术原文内容".repeat(10_000) }),
+    }));
+    const { container } = render(<GenerationTranscript taskKey="batch" steps={[{ ...steps[0], calls }]} active finalMessage="" />);
+    expect(container.querySelectorAll('[data-slot="generation-call"]')).toHaveLength(20);
+    expect(screen.getByText("模型 20 已生成")).toBeVisible();
+    expect(screen.getAllByText("正在处理")).toHaveLength(20);
+    expect(container).not.toHaveTextContent("批量推理内容");
+    expect(container).not.toHaveTextContent("批量推理摘要");
+    expect(container).not.toHaveTextContent("技术原文内容");
+    expect(container.querySelector("pre")).toBeNull();
+    expect(screen.queryByText(/查看技术原文/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "正在思考" }));
+    fireEvent.click(screen.getByRole("button", { name: "正在思考" }));
+    expect(container).not.toHaveTextContent("技术原文内容");
   });
 
   it("shows real queue metadata and collapses queued items", () => {
