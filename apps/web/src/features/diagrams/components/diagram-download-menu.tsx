@@ -28,7 +28,6 @@ export function DiagramDownloadMenu({ diagramKind, diagramId, fileStem, svg, sou
     if (format !== "puml" && !repository.exportDiagram) return t("diagrams.detail.downloadUnsupported");
     return "";
   };
-  const reasons = [...new Set((["svg", "png", "pdf", "puml"] as const).map(reason).filter(Boolean))];
 
   useEffect(() => {
     const cancel = () => {
@@ -90,6 +89,5 @@ export function DiagramDownloadMenu({ diagramKind, diagramId, fileStem, svg, sou
       </DropdownMenuContent>
     </DropdownMenu>
     {busy && <span role="status" className="text-xs text-muted-foreground">{t("diagrams.detail.downloadPreparing")}</span>}
-    {reasons.map((message) => <p key={message} className="max-w-52 whitespace-normal text-xs text-muted-foreground">{message}</p>)}
   </div>;
 }

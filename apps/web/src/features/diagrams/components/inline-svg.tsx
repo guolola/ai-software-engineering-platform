@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Alert } from '../../../shared/ui/alert';
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -83,13 +83,6 @@ export function InlineSvg({
       }
     }
 
-    const existingStyle = (svgEl.getAttribute("style") ?? "").trim();
-    const layoutStyle = `width:${Math.round(scale * 10000) / 100}%;max-width:none;height:auto;display:block;overflow:visible;`;
-    svgEl.setAttribute(
-      "style",
-      existingStyle ? `${existingStyle}${existingStyle.endsWith(";") ? "" : ";"}${layoutStyle}` : layoutStyle,
-    );
-
     svgEl
       .querySelectorAll<SVGElement>(".pum-highlight, .pum-dim")
       .forEach((n) => n.classList.remove("pum-highlight", "pum-dim"));
@@ -153,6 +146,14 @@ export function InlineSvg({
           --uml-highlight-strong: var(--info);
           --uml-highlight-soft: color-mix(in srgb, var(--info) 22%, transparent);
         }
+        /* Saved SVGs carry pixel sizes; keep fitting and zooming stable when markup is reinserted. */
+        .uml-inline-svg > svg {
+          width: var(--uml-svg-width, 100%) !important;
+          max-width: none !important;
+          height: auto !important;
+          display: block;
+          overflow: visible;
+        }
         .pum-highlight rect,
         .pum-highlight ellipse,
         .pum-highlight circle,
@@ -185,6 +186,7 @@ export function InlineSvg({
       <div
         ref={containerRef}
         className={["uml-inline-svg", className].filter(Boolean).join(" ")}
+        style={{ "--uml-svg-width": `${Math.round(scale * 10000) / 100}%` } as CSSProperties}
         dangerouslySetInnerHTML={{ __html: sanitizedSvg }}
       />
     </>

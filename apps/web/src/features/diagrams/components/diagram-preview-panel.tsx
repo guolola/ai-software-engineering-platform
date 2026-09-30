@@ -31,7 +31,6 @@ type DiagramPreviewError = {
 } | null;
 
 type DiagramPreviewPanelProps = {
-  description: string;
   stage: "requirements" | "design" | "feasibility";
   type: DiagramType | DesignDiagramType;
   exportFileStem?: string;
@@ -68,7 +67,6 @@ type DiagramPreviewPanelProps = {
 };
 
 export function DiagramPreviewPanel({
-  description,
   stage,
   type,
   exportFileStem,
@@ -113,7 +111,6 @@ export function DiagramPreviewPanel({
       <div className="flex flex-col gap-3 rounded-t-xl border-b border-border p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h3 className="text-sm font-semibold text-foreground">{t("diagrams.detail.preview")}</h3>
-          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         </div>
         <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto pb-1">
           <Button
@@ -174,7 +171,7 @@ export function DiagramPreviewPanel({
           ref={svgCanvasRef}
           data-testid="svg-preview-canvas"
           className={cn(
-            "h-[560px] overflow-hidden select-none touch-none sm:h-[720px]",
+            "h-[560px] w-full min-w-0 overflow-hidden select-none touch-none sm:h-[720px]",
             svgMarkup && (isPanning ? "cursor-grabbing" : "cursor-grab"),
           )}
           onPointerDown={onStartPan}
@@ -184,7 +181,7 @@ export function DiagramPreviewPanel({
         >
           {normalizedSvgMarkup ? (
             <div
-              className="flex min-h-full min-w-full items-center justify-center"
+              className="flex min-h-full w-full min-w-0 items-center justify-center"
               style={{
                 transform: `translate(${svgPanOffset.x}px, ${svgPanOffset.y}px)`,
               }}
@@ -195,7 +192,7 @@ export function DiagramPreviewPanel({
                 highlightLabel={highlighted?.label}
                 highlightAliases={highlightAliases}
                 highlightKey={highlightRequestId}
-                className="w-full select-none [&_*]:select-none [&>svg]:drop-shadow-sm"
+                className="w-full min-w-0 shrink-0 select-none [&_*]:select-none [&>svg]:drop-shadow-sm"
               />
             </div>
           ) : diagramError ? (

@@ -341,6 +341,9 @@ describe("DiagramView", () => {
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "用例模型", level: 1 })).toBeInTheDocument());
     expect(screen.getByText("尚未生成 SVG")).toBeInTheDocument();
+    const preview = screen.getByTestId("diagram-preview-section");
+    expect(within(preview).queryByText("系统边界、角色与用例关系")).not.toBeInTheDocument();
+    expect(within(preview).queryByText("PlantUML 源码尚未生成")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "下载" }));
     expect(await screen.findByRole("menuitem", { name: /PlantUML/ })).toHaveAttribute("aria-disabled", "true");
     expect(screen.queryByText(/尚未生成。请回到/)).not.toBeInTheDocument();

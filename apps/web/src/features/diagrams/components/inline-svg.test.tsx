@@ -30,11 +30,23 @@ describe("InlineSvg", () => {
       const svgEl = container.querySelector("svg");
       expect(svgEl).not.toBeNull();
       expect(svgEl?.getAttribute("viewBox")).toBe("0 0 209 111");
-      expect(svgEl?.getAttribute("style")).toContain("width:100%");
-      expect(svgEl?.getAttribute("style")).toContain("height:auto");
-      expect(svgEl?.getAttribute("style")).toContain("display:block");
-      expect(svgEl?.getAttribute("style")).toContain("overflow:visible");
+      expect((container.querySelector(".uml-inline-svg") as HTMLElement).style.getPropertyValue("--uml-svg-width")).toBe("100%");
+      expect(container.querySelector("style")?.textContent).toContain("width: var(--uml-svg-width, 100%) !important");
+      expect(container.querySelector("style")?.textContent).toContain("height: auto !important");
     });
+  });
+
+  it("preserves fitting and zoom when saved markup with pixel dimensions is reinserted", () => {
+    const svg = '<svg viewBox="0 0 3185 968" style="width:3185px;height:968px;background:#fff"><text>总体业务流程</text></svg>';
+    const { container, rerender } = render(<InlineSvg svg={svg} />);
+    const viewportWidth = () => (container.querySelector(".uml-inline-svg") as HTMLElement).style.getPropertyValue("--uml-svg-width");
+    expect(viewportWidth()).toBe("100%");
+    rerender(<InlineSvg svg={svg} scale={1.25} />);
+    expect(viewportWidth()).toBe("125%");
+    rerender(<InlineSvg svg={svg.replace("#fff", "#fafafa")} scale={1} />);
+    expect(viewportWidth()).toBe("100%");
+    expect(container.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 3185 968");
+    expect(container.querySelector("svg")?.style.background).toBe("rgb(250, 250, 250)");
   });
 
   it("marks the matching SVG text and shape with a high contrast highlight", async () => {

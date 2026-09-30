@@ -660,7 +660,7 @@ function DiagramDetailView({
             key={`${stage}:${type}:${highlighted ? highlighted.id : "all"}`}
             value={activeTab}
             onValueChange={(value) => setActiveTab(value as typeof activeTab)}
-            className="gap-0"
+            className="min-w-0 flex-col gap-0"
           >
             {compactViewport || highlightedRelationshipId ? (
             <div className="border-b border-border px-3 sm:px-5">
@@ -711,10 +711,9 @@ function DiagramDetailView({
             </div>
             ) : null}
 
-            <TabsContent value="diagram" className="m-0 p-0">
+            <TabsContent value="diagram" className="m-0 w-full min-w-0 p-0">
               <DiagramPreviewPanel
                   diagramId={`${visualTaskKind}:${visualId}`}
-                  description={metaDescription}
                   stage={isFeasibility ? "feasibility" : stage}
                   type={type}
                   exportFileStem={isBusinessFlow ? "feasibility-business-flow" : isFeasibility ? "context" : undefined}

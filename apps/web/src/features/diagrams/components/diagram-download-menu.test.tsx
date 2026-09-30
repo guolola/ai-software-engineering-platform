@@ -51,18 +51,23 @@ it.each([
 
 it("explains missing artifacts and unsupported conversion without blocking SVG", async () => {
   render(view(createMockWorkspaceRepository(), { ...props, source: "" }));
-  expect(screen.getByText("PlantUML 源码尚未生成")).toBeInTheDocument();
+  expect(screen.queryByText("PlantUML 源码尚未生成")).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "下载" }));
   expect(await screen.findByRole("menuitem", { name: "SVG" })).not.toHaveAttribute("aria-disabled", "true");
-  for (const name of ["PNG", "PDF", "PlantUML"]) expect(screen.getByRole("menuitem", { name: new RegExp(name) })).toHaveAttribute("aria-disabled", "true");
+  for (const name of ["PNG", "PDF", "PlantUML"]) {
+    const item = screen.getByRole("menuitem", { name: new RegExp(name) });
+    expect(item).toHaveAttribute("aria-disabled", "true");
+    expect(item).toHaveAttribute("aria-description", "PlantUML 源码尚未生成");
+  }
 });
 
 it("keeps source download available when SVG is missing and conversion is unsupported", async () => {
   render(view(createMockWorkspaceRepository(), { ...props, svg: "" }));
-  expect(screen.getByText(/当前环境暂不支持 PNG、PDF 下载/)).toBeInTheDocument();
+  expect(screen.queryByText(/当前环境暂不支持 PNG、PDF 下载/)).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "下载" }));
   expect(await screen.findByRole("menuitem", { name: /SVG/ })).toHaveAttribute("aria-disabled", "true");
   expect(screen.getByRole("menuitem", { name: "PlantUML" })).not.toHaveAttribute("aria-disabled", "true");
+  expect(screen.getByRole("menuitem", { name: "PNG" })).toHaveAttribute("aria-description", "当前环境暂不支持 PNG、PDF 下载");
 });
 
 it("blocks duplicate conversions and permits retry after failure", async () => {
