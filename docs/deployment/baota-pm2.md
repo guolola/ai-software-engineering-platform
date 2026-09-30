@@ -38,6 +38,12 @@
 
 在构建与切换 `current` 前，脚本先只读预检站点匹配、路由形态和配置写权限。Nginx 迁移由 root 执行；非 root 部署账号需要对新的 `nginx-next-routing.mjs` helper 具有现成的 `sudo -n` 权限，构建、环境变量加载和 PM2 仍由原部署账号执行。脚本不修改 sudoers 或证书权限，也不请求密码；权限不足会提前停止并保留线上版本。路由恢复失败不会阻止应用回滚，但部署仍报告失败，需人工处理配置。
 
+### PDF 字体
+
+工作流比较本次构建字体及许可证与服务器缓存的 SHA-256。内容一致时，在清理源码目录前将缓存暂存为部署归档；缺失或不一致时上传构建产物。服务器恢复归档后离线准备 PDF 字体，字体二进制不进入 Git。
+
+源码包传输上限为 120 秒，字体缓存检查上限为 60 秒，必要的字体上传上限为 600 秒。日志分别标记源码传输、字体复用或上传、服务器构建与健康检查，超时会报告失败。
+
 ## 操作与维护
 
 1. 在服务器准备 Node.js 22、Java 21、Graphviz、PM2、PostgreSQL、Redis 和 Nginx。
@@ -63,6 +69,8 @@ curl http://127.0.0.1:4003/
 `/api/version` 的 `releaseSha` 应与部署提交一致。公网还应检查首页、`/tutorial`、登录流程和一次完整生成。
 
 路由迁移的本地回归检查为 `node --test scripts/deploy/nginx-next-routing.test.mjs`。
+
+字体缓存复用、内容变化或缺失时拒绝复用，以及离线字体准备的回归检查为 `node --test scripts/deploy/pdf-font-assets.test.mjs`。
 
 ## 相关文档
 

@@ -295,10 +295,25 @@ jobs:
             -o StrictHostKeyChecking=accept-new
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
           )
-          scp "${SSH_OPTIONS[@]}" -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" \
+          echo "Uploading source bundle ..."
+          timeout 120 scp "${SSH_OPTIONS[@]}" -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" \
             "$DEPLOY_BUNDLE" "$DEPLOY_USER@$DEPLOY_HOST:$remote_bundle"
-          scp "${SSH_OPTIONS[@]}" -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" \
-            "$font_bundle" "$DEPLOY_USER@$DEPLOY_HOST:$remote_fonts"
+          font_digest="$(
+            cd apps/render-service/dist/assets/pdf-fonts
+            cat NotoSansCJKsc-Regular.otf NotoSansCJKsc-Bold.otf LICENSE.txt | sha256sum | cut -d ' ' -f 1
+          )"
+          echo "Checking server PDF font cache ..."
+          if timeout 60 ssh "${SSH_OPTIONS[@]}" -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash -s -- '$DEPLOY_PATH/shared/source/apps/render-service/.runtime/pdf-fonts' '$font_digest' '$remote_fonts'" \
+            < scripts/deploy/reuse-pdf-font-cache.sh; then
+            echo "Font transfer skipped: server assets match this build."
+          else
+            echo "Uploading PDF font assets (cache missing or different) ..."
+            timeout 600 scp "${SSH_OPTIONS[@]}" -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" \
+              "$font_bundle" "$DEPLOY_USER@$DEPLOY_HOST:$remote_fonts"
+          fi
+          echo "Starting server build and health checks ..."
           ssh "${SSH_OPTIONS[@]}" -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" \
             "$DEPLOY_USER@$DEPLOY_HOST" \
             "DEPLOY_PATH='$DEPLOY_PATH' RELEASE_SHA='${GITHUB_SHA}' DEPLOY_BUNDLE='$remote_bundle' PDF_FONT_BUNDLE='$remote_fonts' bash -s" <<'REMOTE_DEPLOY'
