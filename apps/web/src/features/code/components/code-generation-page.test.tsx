@@ -159,20 +159,22 @@ vi.mock("@codesandbox/sandpack-react", () => ({
 }));
 
 function stubCompactViewport(matches: boolean) {
+  const listeners = new Set<() => void>();
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     writable: true,
     value: vi.fn((query: string) => ({
-      matches,
+      get matches() { return matches; },
       media: query,
       onchange: null,
       addListener: vi.fn(),
       removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
+      addEventListener: vi.fn((_type: string, listener: () => void) => listeners.add(listener)),
+      removeEventListener: vi.fn((_type: string, listener: () => void) => listeners.delete(listener)),
       dispatchEvent: vi.fn(() => false),
     })),
   });
+  return (next: boolean) => { matches = next; listeners.forEach(listener => listener()); };
 }
 
 function createRepository(
@@ -297,6 +299,8 @@ describe("CodeGenerationPage", () => {
   it("renders prototype files as a collapsible tree", async () => {
     render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
     fireEvent.click(await screen.findByRole("tab", { name: "代码" }));
+    expect(screen.queryByTestId("code-file-tabs")).not.toBeInTheDocument();
+    expect(screen.getByRole("tree", { name: "文件" })).toBeInTheDocument();
 
     expect(await screen.findByTestId("file-tree-dir-/src")).toBeInTheDocument();
     expect(screen.getByTestId("file-tree-dir-/src/components")).toBeInTheDocument();
@@ -350,7 +354,7 @@ describe("CodeGenerationPage", () => {
     expect(screen.queryByText("业务规则说明")).not.toBeInTheDocument();
   });
 
-  it("keeps scrollable file tabs and the editor available on mobile while hiding the file tree", async () => {
+  it("only exposes preview on mobile without mounting the code editor", async () => {
     stubCompactViewport(true);
 
     render(
@@ -371,11 +375,38 @@ describe("CodeGenerationPage", () => {
     expect(screen.queryByTestId("monaco-editor")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "全屏预览" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "运行预览" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "代码" }));
-    expect(await screen.findByTestId("monaco-editor")).toBeVisible();
-    expect(screen.getByTestId("code-file-tabs")).toHaveClass("overflow-x-auto");
+    expect(screen.queryByRole("tab", { name: "代码" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "预览" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("file-tree-dir-/src")).not.toBeInTheDocument();
-    expect(screen.getByTestId("code-preview-region")).not.toBeVisible();
+    expect(screen.getByTestId("code-preview-region")).toBeVisible();
+  });
+
+  it("preserves the desktop file, draft and iframe when resizing through mobile", async () => {
+    const resize = stubCompactViewport(false);
+    render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
+    await screen.findByTestId("sandpack-provider");
+    const iframe = document.querySelector('iframe[title="Prototype Preview"]');
+    fireEvent.click(screen.getByRole("tab", { name: "代码" }));
+    fireEvent.click(screen.getByTestId("file-tree-file-/src/components/WorkspaceShell.tsx"));
+    fireEvent.click(screen.getByTestId("mock-edit-app-file"));
+    const editor = screen.getByTestId("monaco-editor");
+    const originalDocument = iframe?.getAttribute("srcdoc");
+    const activeItem = screen.getByRole("treeitem", { name: "WorkspaceShell.tsx" });
+    expect(activeItem).toHaveAttribute("aria-selected", "true");
+    monacoMocks.updateFile.mockClear();
+    act(() => resize(true));
+    expect(screen.queryByRole("tab", { name: "代码" })).not.toBeInTheDocument();
+    expect(editor).not.toBeVisible();
+    expect(screen.getByTestId("code-preview-region")).toBeVisible();
+    expect(document.querySelector('iframe[title="Prototype Preview"]')).toBe(iframe);
+    expect(iframe?.getAttribute("srcdoc")).toBe(originalDocument);
+    act(() => resize(false));
+    expect(screen.getByRole("tab", { name: "代码" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("monaco-editor")).toBe(editor);
+    expect(editor).toBeVisible();
+    expect(activeItem).toHaveAttribute("aria-selected", "true");
+    expect(monacoMocks.models.get("file:///src/components/WorkspaceShell.tsx")?.getValue()).toContain("Edited preview text");
+    expect(monacoMocks.updateFile).not.toHaveBeenCalled();
   });
 
   it("shows a clear preview-ready status once generated files exist", async () => {

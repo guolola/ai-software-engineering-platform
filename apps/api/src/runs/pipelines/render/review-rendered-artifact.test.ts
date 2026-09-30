@@ -220,3 +220,26 @@ test("keeps deterministic source and full issues after one advisory review", asy
   assert.deepEqual(result.review.issues, ["标签不可读"]);
   assert.doesNotMatch(result.rendered.artifact.source, /A --> B/);
 });
+
+test("layout-only negative verdicts do not create pending problems or repair attempts", async () => {
+  const run = record(); let calls = 0;
+  const transport: LlmTransport = { async *streamChatCompletion(input) {
+    calls++;
+    assert.match(JSON.stringify(input.messages), /不检查或报告位置、间距、交叉/);
+    yield JSON.stringify({ passed: false, issues: ["连线交叉；字号太小", "节点位置需要调整"], findings: [{ id: "spacing", layer: "image", code: "layout", category: "other", modelId: "usecase", observation: "节点间距太大", evidence: [], verification: "verified", repairable: true }] });
+  } };
+  const checked = await reviewRenderedArtifact({ record: run, providerSettings: settings, llmTransport: transport, renderClient, pngRenderClient, model, basis: { stage: "requirements" }, mutable: true });
+  assert.equal(calls, 2); assert.equal(checked.review.status, "passed"); assert.equal(checked.review.repairAttempts, 0);
+  assert.deepEqual(checked.review.issues, []); assert.deepEqual(checked.review.findings, []);
+});
+
+test("uncertain image evidence is categorized and cannot authorize removal", async () => {
+  const run = record();
+  const checked = await reviewRenderedArtifact({ record: run, providerSettings: settings, llmTransport: { async *streamChatCompletion() {
+    yield JSON.stringify({ passed: false, issues: ["图中关系端点无法核实"], findings: [{ id: "missing", layer: "image", code: "missing-node", category: "model_structure", modelId: "usecase", observation: "标签无法辨认，节点是否缺失无法核实", evidence: [], verification: "verified", repairable: true }] });
+  } }, renderClient, pngRenderClient, model, mutable: true });
+  assert.equal(checked.review.checkOutcome, "inconclusive"); assert.equal(checked.review.repairAttempts, 0);
+  assert.equal(checked.review.findings?.[0].category, "check_execution");
+  assert.equal(checked.review.findings?.[0].verification, "inconclusive"); assert.equal(checked.review.findings?.[0].repairable, false);
+  assert.deepEqual(checked.model, model);
+});

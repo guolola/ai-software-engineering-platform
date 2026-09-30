@@ -58,7 +58,7 @@ describe("workspace-session generation task helpers", () => {
         class: { status: "pending_review", issues: [], reason: "需要人工核对", attempts: 1, checkedAt: "2026-09-23T00:00:00.000Z" },
       } }),
     }, { queued: "排队中", completed: "生成完成" });
-    expect(next.subtasks.find((item) => item.id === "verify_diagram_visual:usecase")?.message).toBe("标签不可读；连线交叉");
+    expect(next.subtasks.find((item) => item.id === "verify_diagram_visual:usecase")?.message).toBe("标签不可读");
     expect(next.subtasks.find((item) => item.id === "verify_diagram_visual:class")?.message).toBe("需要人工核对");
   });
   it("keeps a rules-only task running after extraction until local repair completes", () => {

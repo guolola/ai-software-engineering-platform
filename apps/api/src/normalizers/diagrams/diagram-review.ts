@@ -1,6 +1,6 @@
 // Verifies review claims and derives the exact changes authorized by confirmed facts.
 import { createHash } from "node:crypto";
-import { deriveTableModel, getModelGraphElements, validateModelInput, type DiagramModelSpec, type DesignDiagramModelSpec, type DiagramReviewFinding, type ModelingStage, type RequirementBaseline } from "@uml-platform/contracts";
+import { classifyDiagramReviewIssue, isExcludedDiagramReviewIssue, isUnverifiableReviewText, deriveTableModel, getModelGraphElements, validateModelInput, type DiagramModelSpec, type DesignDiagramModelSpec, type DiagramReviewFinding, type ModelingStage, type RequirementBaseline } from "@uml-platform/contracts";
 
 export type ReviewModel = DiagramModelSpec | DesignDiagramModelSpec;
 export interface DiagramReviewBasis {
@@ -54,7 +54,7 @@ export function deriveAuthorizedRepairs(model: ReviewModel, basis: DiagramReview
     const actual = at(expectedModel, path);
     if (stableJson(actual) === stableJson(expected)) return;
     const id = `${modelId}:${code}:${elementId ?? path}`;
-    findings.push({ id, layer: "model", code, modelId, elementId, path, expected, actual, evidence: [{ source: "confirmed-field-or-derived-rule", reference, detail }], observation: detail, verification: "verified", repairable: true });
+    findings.push({ id, layer: "model", code, category: classifyDiagramReviewIssue(detail, "model", code), modelId, elementId, path, expected, actual, evidence: [{ source: "confirmed-field-or-derived-rule", reference, detail }], observation: detail, verification: "verified", repairable: true });
     put(expectedModel, path, expected); changes.push(`${elementId ?? modelId} · ${path}: ${stableJson(actual)} → ${stableJson(expected)}`);
   };
   // Constraints are the authoritative input; derived flags/edges cannot authorize changes to constraints.
@@ -114,13 +114,18 @@ export function verifyReviewClaims(claims: DiagramReviewFinding[], model: Review
   const elements = new Set(getModelGraphElements(model).map((item) => item.id));
   const relationships = new Set(("messages" in model ? model.messages : model.relationships).map((item) => item.id));
   const authorized = basis ? deriveAuthorizedRepairs(model, basis).findings : [];
-  return claims.map((claim) => {
+  return claims.filter((claim) => !isExcludedDiagramReviewIssue(claim.observation)).map((claim) => {
     const proof = authorized.find((item) => item.path === claim.path && stableJson(item.expected) === stableJson(claim.expected));
     if (proof) return { ...proof, id: claim.id };
-    const unreadable = /布局|间距|绕行|交叉|遮挡|不可辨|无法辨|位置|layout|spacing|overlap|illegible/i.test(`${claim.code} ${claim.observation}`);
+    const unreadable = isUnverifiableReviewText(`${claim.code} ${claim.observation}`);
+    const inferred = classifyDiagramReviewIssue(claim.observation, claim.layer, claim.code);
     // Provider evidence is retained as an observation, never promoted to service authorization.
-    return { ...claim, verification: unreadable ? "inconclusive" : "unverified", repairable: false, evidence: claim.evidence.map((item) => ({ ...item, source: `provider-observation:${item.source}` })), ...(claim.elementId && !elements.has(claim.elementId) ? { elementId: undefined } : {}), ...(claim.relationshipId && !relationships.has(claim.relationshipId) ? { relationshipId: undefined } : {}) };
+    return { ...claim, category: inferred === "other" ? claim.category ?? inferred : inferred, verification: unreadable ? "inconclusive" : "unverified", repairable: false, evidence: claim.evidence.map((item) => ({ ...item, source: `provider-observation:${item.source}` })), ...(claim.elementId && !elements.has(claim.elementId) ? { elementId: undefined } : {}), ...(claim.relationshipId && !relationships.has(claim.relationshipId) ? { relationshipId: undefined } : {}) };
   });
+}
+
+export function filterDiagramReviewIssues(issues: string[]): string[] {
+  return [...new Set(issues.flatMap((issue) => issue.split(/[；;\n]+/)).map((issue) => issue.trim()).filter((issue) => issue && !isExcludedDiagramReviewIssue(issue)))];
 }
 
 export function acceptRepairCandidate(candidate: ReviewModel, before: ReviewModel, authorized: AuthorizedRepair, basis: DiagramReviewBasis, validate?: (model: ReviewModel) => void) {

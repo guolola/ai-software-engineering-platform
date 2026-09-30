@@ -37,10 +37,10 @@ export function offlineFeasibilityAdapters(record: RunRecord) {
       if (Array.isArray(current) && current.some((part) => part.type === "image_url")) {
         const prompt = current.find((part) => part.type === "text");
         const context = prompt?.type === "text" && prompt.text.includes("模型 ID：context\n");
-        input.onReasoningChunk?.("演示推理片段：将本次 PNG 与模型及绘图映射核对；标签不可辨认时保留待确认，位置、间距和绕行交给 PlantUML。");
+        input.onReasoningChunk?.("演示推理片段：将本次 PNG 与模型及绘图映射核对；只检查结构和业务内容，无法辨认的输入不作为增删依据。");
         input.onReasoningSummary?.(context ? "演示摘要：模型结构通过，部分关系标签无法核实，未启动纠错。" : "演示摘要：流程节点、分支、连线方向与模型一致。");
         yield JSON.stringify(context ? {
-          passed: false, issues: [], findings: [{ id: "context:demo-unreadable-label", layer: "image", code: "unreadable-label", modelId: "context",
+          passed: false, issues: [], findings: [{ id: "context:demo-unreadable-label", layer: "image", code: "unreadable-label", category: "check_execution", modelId: "context",
             observation: "演示：部分交互标签不可辨认，无法从图片核实连线归属。",
             evidence: [{ source: "demo-image-observation", reference: "student-notice", detail: "固定待确认案例，不作为自动增删或布局修改依据。" }],
             verification: "unverified", repairable: false }],

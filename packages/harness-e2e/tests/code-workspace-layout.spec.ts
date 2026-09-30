@@ -61,6 +61,7 @@ for (const theme of ["light", "dark"]) {
         codeFiles: {
           "/src/App.tsx": "export default function App() { return <main>Layout preview</main>; }",
           "/src/main.tsx": previewSource,
+          "/VeryLongGeneratedPrototypeComponentNameThatShouldBeTruncated.tsx": "export const value = 1;",
         },
         codeEntryFile: "/src/main.tsx",
         codeDiagnostics: Array.from({ length: 18 }, (_, index) => ({ stage: "plan_code_ui", message: `界面规划诊断 ${index + 1}`, at: "2026-09-21T00:00:00.000Z" })),
@@ -77,7 +78,10 @@ for (const theme of ["light", "dark"]) {
       const codeTab = navigation.getByRole("tab", { name: "代码", exact: true });
       const iframe = page.locator('iframe[title="Prototype Preview"]');
       const preview = page.frameLocator('iframe[title="Prototype Preview"]');
-      await expect(previewTab).toHaveAttribute("aria-selected", "true");
+      if (width < 768) {
+        await expect(codeTab).toHaveCount(0);
+        await expect(previewTab).toHaveCount(0);
+      } else await expect(previewTab).toHaveAttribute("aria-selected", "true");
       await expect(page.getByTestId("code-editor-region")).toHaveCount(0);
       await expect(iframe).toHaveAttribute("sandbox", "allow-scripts allow-forms");
       await expect(workspace.getByRole("progressbar", { name: "预览正在编译" })).toBeVisible();
@@ -106,17 +110,24 @@ for (const theme of ["light", "dark"]) {
       await page.screenshot({ path: info.outputPath("preview.png"), fullPage: true });
 
       // Arrow-key focus and Enter activation must preserve the iframe's live counter.
+      if (width < 768) {
+        const mobileDocument = await iframe.getAttribute("srcdoc");
+        await page.setViewportSize({ width: 1440, height: 1000 });
+        await expect(previewTab).toHaveAttribute("aria-selected", "true");
+        expect(await iframe.getAttribute("srcdoc")).toBe(mobileDocument);
+      }
       await previewTab.focus();
       await page.keyboard.press("ArrowLeft");
       await expect(codeTab).toBeFocused();
       await page.keyboard.press("Enter");
       await expect(codeTab).toHaveAttribute("aria-selected", "true");
-      await expect(page.getByTestId("code-file-tabs")).toBeVisible();
+      await expect(page.getByTestId("code-file-tabs")).toHaveCount(0);
       await expect(page.getByTestId("code-preview-region")).toBeHidden();
-      if (width < 768) await expect(page.getByTestId("file-tree-dir-/src")).toHaveCount(0);
-      else await expect(page.getByTestId("file-tree-dir-/src")).toBeVisible();
+      await expect(page.getByTestId("file-tree-dir-/src")).toBeVisible();
       await expect(page.locator(".monaco-editor textarea")).toBeVisible({ timeout: 30_000 });
-      await page.getByTestId("code-file-tabs").getByRole("button", { name: "main.tsx", exact: true }).click();
+      const mainFile = page.getByRole("treeitem", { name: "main.tsx", exact: true });
+      await mainFile.focus();
+      await page.keyboard.press("Enter");
       await expect(page.locator(".monaco-editor")).toContainText("console.warn");
       const input = page.locator(".monaco-editor textarea");
       await input.focus();
@@ -125,11 +136,20 @@ for (const theme of ["light", "dark"]) {
       await expect(workspace.getByRole("status")).toContainText("当前编辑内容尚未构建到预览");
       const previousDocument = await iframe.getAttribute("srcdoc");
       await page.screenshot({ path: info.outputPath("code.png"), fullPage: true });
+      await page.setViewportSize({ width: 390, height: 1000 });
+      await expect(codeTab).toHaveCount(0);
+      await expect(page.getByTestId("code-editor-region")).toBeHidden();
+      await expect(preview.getByRole("button", { name: "Clicks: 1" })).toBeVisible();
+      expect(await iframe.getAttribute("srcdoc")).toBe(previousDocument);
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await expect(codeTab).toHaveAttribute("aria-selected", "true");
+      await expect(mainFile).toHaveAttribute("aria-selected", "true");
+      await expect(page.locator(".monaco-editor")).toContainText("Edited preview");
       await previewTab.click();
       await expect(preview.getByRole("button", { name: "Clicks: 1" })).toBeVisible();
       expect(await iframe.getAttribute("srcdoc")).toBe(previousDocument);
       await codeTab.click();
-      await expect(page.getByTestId("code-file-tabs").getByRole("button", { name: "main.tsx", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect(mainFile).toHaveAttribute("aria-selected", "true");
       await expect(page.locator(".monaco-editor")).toContainText("Edited preview");
       await navigation.getByRole("button", { name: "运行预览" }).click();
       await expect(previewTab).toHaveAttribute("aria-selected", "true");
@@ -141,6 +161,7 @@ for (const theme of ["light", "dark"]) {
       await expect(preview.getByRole("button", { name: "Clicks: 0" })).toBeVisible();
       await expect(workspace.getByText("clicked 1", { exact: false })).toHaveCount(0);
 
+      await page.setViewportSize({ width, height: 1000 });
       const popupPromise = context.waitForEvent("page");
       await navigation.getByRole("button", { name: "在新窗口打开" }).click();
       const popup = await popupPromise;

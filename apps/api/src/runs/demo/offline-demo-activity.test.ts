@@ -45,8 +45,10 @@ test("demo generation preserves ordinary output and labels fixture reasoning for
   const checks = events.filter((event) => event.modelId === "activity" && event.operation === "visual_check" && event.phase === "started");
   assert.equal(checks.length, 2); assert.notEqual(checks[0].inputImages?.[0].url, checks[1].inputImages?.[0].url);
   assert.equal(review.repairHistory?.[0].callId, events.find((event) => event.operation === "render_repair" && event.phase === "started")?.callId);
-  assert.equal(run.snapshot.visualReviews.usecase.checkOutcome, "inconclusive");
-  assert.equal(run.snapshot.visualReviews.usecase.repairAttempts, 0);
+  assert.equal(run.snapshot.visualReviews.usecase.checkOutcome, "differences");
+  assert.equal(run.snapshot.visualReviews.usecase.repairAttempts, 1);
+  assert.equal(run.snapshot.visualReviews.usecase.repairHistory?.[0].status, "rejected");
+  assert.deepEqual(run.snapshot.visualReviews.usecase.findings?.map((finding) => finding.category), ["model_structure", "business_constraint", "render_mismatch"]);
   assert.match(run.snapshot.visualReviews.usecase.stopReason!, /证据不足/);
 });
 
@@ -64,6 +66,10 @@ test("design demo shows FK structure correction with independently attributed ca
   assert.deepEqual(events.map((event) => event.operation), ["structure_check", "model_repair", "structure_check", "visual_check"]);
   assert.equal(new Set(events.map((event) => event.callId)).size, 4);
   assert.ok(run.events.every((event) => runEventSchema.safeParse(event).success));
+  const incomplete = run.snapshot.visualReviews["sequence:uc-submit-reservation"];
+  assert.equal(incomplete.checkOutcome, "not_completed");
+  assert.deepEqual(incomplete.findings?.map((finding) => finding.category), ["check_execution", "other"]);
+  assert.equal(incomplete.repairAttempts, 0);
 });
 
 test("default demo pacing waits before output and stops promptly when cancelled", async (t) => {

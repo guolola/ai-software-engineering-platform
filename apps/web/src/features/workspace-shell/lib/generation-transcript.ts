@@ -423,7 +423,7 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       const latestCalls = new Map(step.calls.filter((call) => call.subtaskId).map((call) => [call.subtaskId!, call]));
       for (const [subtaskId, call] of latestCalls) {
         const review = completed.snapshot.visualReviews?.[subtaskId];
-        if (review?.checkOutcome) {
+        if (review) {
           call.review = review;
           call.status = review.status === "pending_review" && !isConfirmedVisualReview(review, currentVisualReviews[subtaskId]) ? "pending_review" : "completed";
           call.message = isConfirmedVisualReview(review, currentVisualReviews[subtaskId])

@@ -21,7 +21,10 @@ describe("stage reading surface", () => {
     const { container } = render(<GenerationTranscript taskKey="review-details" steps={reviewSteps} active={false} finalMessage="生成完成，问题待确认。" />);
     const details = container.querySelector('[data-slot="diagram-review-details"]') as HTMLElement;
     expect(details).toHaveTextContent("结构核对 2 次 · 图片检查 1 次 · 纠错尝试 1 次");
-    expect(details).toHaveTextContent("已核实：字段标记与约束不同（依据：fk-order）");
+    expect(details).toHaveTextContent("业务约束（1）");
+    expect(details).toHaveTextContent("已核实：字段标记与约束不同");
+    fireEvent.click(within(details).getByText("查看问题依据与处理详情"));
+    expect(within(details).getByText("依据：fk-order · 明确外键")).toBeVisible();
     expect(details).toHaveTextContent("第 1 轮结构纠错：已拒绝 · 越过授权字段");
     expect(details).toHaveTextContent("停止原因：候选越界，保留上一份有效模型");
     expect(details.closest('[data-slot="chain-of-thought-step-content"]')).not.toBeNull();

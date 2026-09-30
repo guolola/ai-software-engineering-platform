@@ -134,7 +134,8 @@ describe("generation transcript", () => {
         usecase: { status: "pending_review", issues: ["标签不可读", "连线交叉"], reason: "视觉检查仍有问题，请人工确认", attempts: 3, checkedAt: "2026-09-23T00:00:00.000Z" },
       } }) },
     ], "completed", [{ id: "verify_diagram_visual:usecase", label: "用例模型", status: "pending_review", message: "视觉检查仍有问题，请人工确认", errorMessage: null }]);
-    expect(result.visibleSteps[0].calls[0].message).toBe("标签不可读；连线交叉");
+    expect(result.visibleSteps[0].calls[0].message).toBe("标签不可读");
+    expect(result.visibleSteps[0].calls[0].review?.issues).toEqual(["标签不可读", "连线交叉"]);
   });
   it("shows human acceptance for the matching historical visual check", () => {
     const review = { status: "pending_review" as const, issues: ["标签不可读"], reason: "请人工确认", attempts: 3, checkedAt: "check-1" };

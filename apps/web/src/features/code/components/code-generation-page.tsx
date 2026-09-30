@@ -367,7 +367,7 @@ export function CodeGenerationPage() {
               onRunPreview={runPreview}
               previewRef={previewRef}
               logs={previewLogs}
-              editor={<PrototypeEditor files={files} activeFile={activeFile} sortedFiles={sortedFiles} fileTree={fileTree} expandedDirs={expandedDirs} onSelectFile={setActiveFile} onToggleDirectory={toggleDirectory} onChange={handleFileChange} />}
+              editor={<PrototypeEditor files={files} activeFile={activeFile} fileTree={fileTree} expandedDirs={expandedDirs} onSelectFile={setActiveFile} onToggleDirectory={toggleDirectory} onChange={handleFileChange} />}
               preview={<LocalPrototypePreview ref={previewRef} files={previewFiles} entryFile="/src/main.tsx" onBuildError={handlePreviewBuildError} onBuildReady={handlePreviewBuildReady} onBuildStart={handlePreviewBuildStart} onConsoleLog={handlePreviewConsoleLog} />}
             />
           </SandpackProvider>

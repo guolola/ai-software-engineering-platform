@@ -14,6 +14,8 @@ import type { TranscriptCall, TranscriptStep } from "../lib/generation-transcrip
 import { readableOutput } from "../lib/generation-transcript";
 import { useTranscriptScroll } from "../lib/use-transcript-scroll";
 import { TranscriptMarkdown } from "./transcript-markdown";
+import { DiagramReviewDetails } from "../../../entities/diagram/components/diagram-review-details";
+import { reviewProblemGroups } from "../../../entities/diagram/lib/review-presentation";
 
 const statusText: Record<TranscriptCall["status"], string> = {
   queued: "排队中", running: "正在处理", completed: "已完成", failed: "未完成", cancelled: "已停止", pending_review: "待确认",
@@ -70,15 +72,7 @@ function ProcessCall({ call, showTitle }: { call: TranscriptCall; showTitle: boo
       <ReasoningContent>{call.reasoning}</ReasoningContent>
     </Reasoning>}
     {prose && <div data-reading-anchor=""><TranscriptMarkdown text={prose} compact /></div>}
-    {call.review && <div className="space-y-2 text-xs leading-5" data-slot="diagram-review-details">
-      <p>结构核对 {call.review.structureAttempts ?? 0} 次 · 图片检查 {call.review.attempts} 次 · 纠错尝试 {call.review.repairAttempts ?? 0} 次</p>
-      {call.review.findings?.map((finding) => <p key={finding.id}>{finding.verification === "verified" ? "已核实" : finding.verification === "inconclusive" ? "无法核实" : "待确认"}：{finding.observation}{finding.evidence.length > 0 && <span>（依据：{finding.evidence.map((item) => item.reference).join("、")}）</span>}</p>)}
-      {call.review.repairHistory?.map((repair) => <div key={`${repair.round}:${repair.target}`}>
-        <p>第 {repair.round} 轮{repair.target === "model" ? "结构纠错" : "图形重建"}：{repair.status === "accepted" ? "已接受" : repair.status === "rejected" ? "已拒绝" : "未完成"} · {repair.reason}</p>
-        {repair.changes.map((change) => <p key={change} className="break-words">{change}</p>)}
-      </div>)}
-      {call.review.stopReason && <p>停止原因：{call.review.stopReason}</p>}
-    </div>}
+    {call.review && <DiagramReviewDetails review={call.review} />}
     {call.message && !["failed", "pending_review"].includes(call.status) && /修复|重试|补跑|人工确认|跳过/.test(call.message) && <p className="break-words">{call.message}</p>}
     {call.technical && call.output && <details>
       <summary className="w-fit cursor-pointer text-xs leading-6">查看技术原文 · {call.title}</summary>
@@ -107,7 +101,7 @@ function TaskIssues({ steps, canRetry, onRetry }: { steps: TranscriptStep[]; can
   // Actionable results remain visible when the reader folds the task's timeline.
   return <div className="space-y-3" data-slot="generation-task-issues">
     {issues.map(({ call, key }) => <div key={key} className={cn("text-sm leading-6", call.status === "failed" ? "text-destructive" : "text-warning")}>
-      <p>{call.title}：{call.message || (call.status === "failed" ? "本次处理未完成。" : "有追踪关系需要确认。")}</p>
+      <p>{call.title}：{call.review ? `结构检查有 ${reviewProblemGroups(call.review).reduce((count, group) => count + group.items.length, 0)} 条记录，请在思考过程中按分类查看。` : call.message || (call.status === "failed" ? "本次处理未完成。" : "有追踪关系需要确认。")}</p>
       {canRetry && call.status === "failed" && call.subtaskId && onRetry && <Button size="sm" variant="link" className="h-auto px-0 py-0" title={call.subtaskId.includes(":") ? "当前重试按模型类型执行，会重试同类模型而不是单个实例" : "重试此模型"} onClick={() => onRetry(call.subtaskId!)}>{call.subtaskId.includes(":") ? "重试全部同类模型" : "重试此模型"}</Button>}
     </div>)}
   </div>;

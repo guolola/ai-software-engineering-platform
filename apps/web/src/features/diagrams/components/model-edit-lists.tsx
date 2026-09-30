@@ -77,8 +77,8 @@ export function ModelElementListSection({
           className="mt-3 flex flex-wrap items-center justify-between gap-3 pb-1"
           aria-label={t("diagramLists.elements.toolbar")}
         >
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            <label className="relative min-w-0 flex-1 sm:flex-none">
+          <div className="contents sm:flex sm:min-w-0 sm:flex-1 sm:flex-wrap sm:items-center sm:gap-2">
+            <label className="relative w-full min-w-0 sm:w-auto sm:flex-none">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label={t("diagramLists.elements.search")}
@@ -95,8 +95,8 @@ export function ModelElementListSection({
                 onValueChange={(value) => onElementKindFilterChange(value as "all" | SemanticElementKind)}
                 className="w-36 shrink-0"
                 options={[
-                  { value: "all", label: `${t("diagramLists.elements.allTypes")} ${detailItemCount}` },
-                  ...detailGroups.map((group) => ({ value: group.kind, label: `${t(`diagrams.semantic.${group.kind}.label`)} ${group.items.length}` })),
+                  { value: "all", label: t("diagramLists.elements.allTypes") },
+                  ...detailGroups.map((group) => ({ value: group.kind, label: t(`diagrams.semantic.${group.kind}.label`) })),
                 ]}
               />
             ) : null}
@@ -264,8 +264,8 @@ export function ModelRelationshipListSection({
           className="mt-3 flex flex-wrap items-center justify-between gap-3 pb-1"
           aria-label={t("diagramLists.relations.toolbar")}
         >
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            <label className="relative min-w-0 flex-1 sm:flex-none">
+          <div className="contents sm:flex sm:min-w-0 sm:flex-1 sm:flex-wrap sm:items-center sm:gap-2">
+            <label className="relative w-full min-w-0 sm:w-auto sm:flex-none">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label={t("diagramLists.relations.search")}
@@ -282,8 +282,8 @@ export function ModelRelationshipListSection({
                 onValueChange={onRelationKindFilterChange}
                 className="w-36 shrink-0"
                 options={[
-                  { value: "all", label: `${t("diagramLists.relations.allTypes")} ${relationshipsCount}` },
-                  ...relationFilterOptions.map((option) => ({ value: option.value, label: `${option.label} ${option.count}` })),
+                  { value: "all", label: t("diagramLists.relations.allTypes") },
+                  ...relationFilterOptions.map((option) => ({ value: option.value, label: option.label })),
                 ]}
               />
             ) : null}

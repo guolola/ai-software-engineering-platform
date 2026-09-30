@@ -23,6 +23,7 @@ import {
 import { Button } from "../../../shared/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../shared/ui/tabs";
 import { Badge } from "../../../shared/ui/badge";
+import { SelectControl } from "../../../shared/ui/select";
 import { DiagramDetailHeader } from "./diagram-detail-header";
 import { ModelNotices, type ModelNotice } from "./model-notices";
 import { DiagramPreviewPanel } from "./diagram-preview-panel";
@@ -550,6 +551,7 @@ function DiagramDetailView({
     issues: savedVisualReview?.status === "pending_review" ? savedVisualReview.issues.filter((issue) => issue.trim()) : undefined,
     checks: savedVisualReview?.attempts,
     repairs: savedVisualReview?.repairAttempts,
+    review: savedVisualReview ?? taskVisualReview,
     reviewCheckedAt: savedVisualReview?.status === "pending_review" && !visualConfirmed ? savedVisualReview.checkedAt : undefined,
     confirmed: visualConfirmed,
   });
@@ -833,39 +835,16 @@ function DiagramDetailView({
                           placeholder={t("diagrams.detail.searchPlaceholder")}
                         />
                       </label>
-                      <div
-                        className="flex flex-wrap gap-2"
+                      <SelectControl
                         aria-label={t("diagrams.detail.kindFilter")}
-                        role="group"
-                      >
-                        <Button
-                          type="button"
-                          variant={elementKindFilter === "all" ? "default" : "outline"}
-                          size="sm"
-                          className="h-8 px-3 text-xs"
-                          onClick={() => setElementKindFilter("all")}
-                        >
-                          {t("diagrams.detail.allKinds")}
-                          <span className="ml-1 font-mono text-[10px] opacity-75">
-                            {items.length}
-                          </span>
-                        </Button>
-                        {groups.map((group) => (
-                          <Button
-                            key={group.kind}
-                            type="button"
-                            variant={elementKindFilter === group.kind ? "default" : "outline"}
-                            size="sm"
-                            className="h-8 px-3 text-xs"
-                            onClick={() => setElementKindFilter(group.kind)}
-                          >
-                            {semanticElementLabel(group.kind, t)}
-                            <span className="ml-1 font-mono text-[10px] opacity-75">
-                              {group.items.length}
-                            </span>
-                          </Button>
-                        ))}
-                      </div>
+                        className="w-36 shrink-0"
+                        value={elementKindFilter}
+                        onValueChange={(value) => setElementKindFilter(value as typeof elementKindFilter)}
+                        options={[
+                          { value: "all", label: t("diagrams.detail.allKinds") },
+                          ...groups.map((group) => ({ value: group.kind, label: semanticElementLabel(group.kind, t) })),
+                        ]}
+                      />
                     </div>
                   ) : null}
                 </div>

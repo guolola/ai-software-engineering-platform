@@ -1,13 +1,13 @@
 // Coordinates requirement/model and image/model checks with one per-model repair budget.
 import { z } from "zod";
-import { diagramReviewFindingSchema, diagramVisualReviewSchema, stageProgressRunEventSchema, validateModelInput, type DiagramVisualReview, type ProviderSettings } from "@uml-platform/contracts";
+import { classifyDiagramReviewIssue, isUnverifiableReviewText, diagramReviewFindingSchema, diagramVisualReviewSchema, stageProgressRunEventSchema, validateModelInput, type DiagramVisualReview, type ProviderSettings } from "@uml-platform/contracts";
 import { JSON_ONLY_SYSTEM_PROMPT } from "@uml-platform/prompts";
 import type { ChatMessage, LlmTransport } from "../../../llm.js";
 import type { PngRenderClient } from "../../../adapters/render/png-render-client.js";
 import type { RenderClient } from "../../../adapters/render/render-client.js";
 import { generateDesignPlantUmlArtifacts, generatePlantUmlArtifacts } from "../../../plantuml.js";
 import { parseJson } from "../../../normalizers/json/parse-json.js";
-import { acceptRepairCandidate, deriveAuthorizedRepairs, reviewFingerprint, verifyReviewClaims, type DiagramReviewBasis, type ReviewModel } from "../../../normalizers/diagrams/diagram-review.js";
+import { acceptRepairCandidate, deriveAuthorizedRepairs, filterDiagramReviewIssues, reviewFingerprint, verifyReviewClaims, type DiagramReviewBasis, type ReviewModel } from "../../../normalizers/diagrams/diagram-review.js";
 import { emitEvent, type RunRecord } from "../../records/run-record-store.js";
 import { readDiagramReviewCounters } from "../../records/diagram-review-record.js";
 import { isRunCancelled, isRunCancelledError, RunCancelledError, throwIfRunCancelled } from "../../records/run-cancellation.js";
@@ -21,6 +21,7 @@ import { renderArtifactWithRepair } from "./render-artifact-with-repair.js";
 type Rendered = Extract<Awaited<ReturnType<typeof renderArtifactWithRepair>>, { status: "success" }>;
 const judgmentSchema = z.object({ passed: z.boolean(), issues: z.array(z.string()).default([]), findings: z.array(diagramReviewFindingSchema).default([]) });
 const findingInstructions = '返回 JSON {"passed":boolean,"issues":string[],"findings":[{"id":string,"layer":"model"或"image","code":string,"modelId":string,"elementId"?:string,"relationshipId"?:string,"path"?:string,"expected"?:任意值,"actual"?:任意值,"evidence":[{"source":string,"reference":string,"detail":string}],"observation":string,"verification":"unverified","repairable":false}]}。未知图形可无元素 ID，但必须描述观察到的标签或位置。';
+const categoryInstructions = '每个 finding 填写 category：model_structure（模型结构）、business_constraint（业务约束）、render_mismatch（图形与模型不一致）、check_execution（检查未完成或异常）、other（其他待分类）。只检查结构和业务内容；不检查或报告位置、间距、交叉、绕线、绕行、遮挡、字体大小及可读性建议。无法辨认输入中的结构时，仅报告对应元素或关系无法核实，不推断缺失，也不提出布局修改。';
 function unsupportedImage(error: unknown) { return /image.*(?:not supported|unsupported)|(?:not supported|unsupported).*image|does not support.*vision|不支持.*(?:图片|图像|视觉)/i.test(String(error)); }
 export class DiagramReviewRenderError extends Error {
   constructor(message: string, public readonly review: DiagramVisualReview) { super(message); this.name = "DiagramReviewRenderError"; }
@@ -76,11 +77,11 @@ export async function reviewRenderedArtifact(input: {
   if (basis) for (;;) {
     progress("正在核对模型与已确认需求", "running");
     const authorized = deriveAuthorizedRepairs(model, basis); let reported: typeof findings = [];
-    const diagnostics = validateModelInput(model, basis.stage).filter((issue) => issue.severity === "error").map((issue) => ({ id: `${modelId}:${issue.code}:${issue.path}`, layer: "model" as const, code: issue.code, modelId, elementId: issue.elementId, path: issue.path, evidence: [{ source: "stage-contract", reference: basis.stage, detail: issue.message }], observation: issue.message, verification: "verified" as const, repairable: false }));
+    const diagnostics = validateModelInput(model, basis.stage).filter((issue) => issue.severity === "error").map((issue) => ({ id: `${modelId}:${issue.code}:${issue.path}`, layer: "model" as const, code: issue.code, category: classifyDiagramReviewIssue(issue.message, "model", issue.code), modelId, elementId: issue.elementId, path: issue.path, evidence: [{ source: "stage-contract", reference: basis.stage, detail: issue.message }], observation: issue.message, verification: "verified" as const, repairable: false }));
     try {
-      const judgment = await call("structure_check", repairs, [{ role: "system", content: JSON_ONLY_SYSTEM_PROMPT }, { role: "user", content: `核对模型对需求的遗漏、无依据元素、引用、关系类型端点归属及业务约束。位置布局不属于问题。只提出问题或建议，不改写模型。\n${findingInstructions}\n依据：${JSON.stringify(basis)}\n模型：${JSON.stringify(model)}` }], (raw) => judgmentSchema.parse(parseJson(raw)));
-      reported = verifyReviewClaims(judgment.findings, model, basis); issues = judgment.issues;
-      if (!judgment.passed && !issues.length && !reported.length) issues.push("模型对需求的核对未确认通过");
+      const judgment = await call("structure_check", repairs, [{ role: "system", content: JSON_ONLY_SYSTEM_PROMPT }, { role: "user", content: `核对模型对需求的遗漏、无依据元素、引用、关系类型端点归属及业务约束。只提出问题或建议，不改写模型。\n${findingInstructions}\n${categoryInstructions}\n依据：${JSON.stringify(basis)}\n模型：${JSON.stringify(model)}` }], (raw) => judgmentSchema.parse(parseJson(raw)));
+      reported = verifyReviewClaims(judgment.findings, model, basis); issues = filterDiagramReviewIssues(judgment.issues);
+      if (!judgment.passed && !judgment.issues.length && !judgment.findings.length) issues.push("模型对需求的核对未确认通过");
     } catch (error) { cancelOrReport(error); outcome = "not_completed"; issues = [`结构核对未完成：${String(error)}`]; }
     findings = [...authorized.findings, ...diagnostics, ...reported.filter((item) => !authorized.findings.some((proof) => proof.path === item.path))];
     if (!authorized.changes.length) break;
@@ -109,7 +110,7 @@ export async function reviewRenderedArtifact(input: {
     return (candidate.artifact.renderMapping?.elements ?? []).filter((element) => !identifiers.has(element.alias) && !identifiers.has(`elem_${element.alias}`));
   };
   if (missing().length) {
-    const proof = missing().map((element) => ({ id: `${modelId}:svg:${element.elementId}`, layer: "render" as const, code: "missing-svg-element", modelId, elementId: element.elementId, expected: element.alias, actual: null, evidence: [{ source: "svg-entity-id", reference: element.alias, detail: element.statement ?? "模型声明" }], observation: `SVG 缺少模型元素 ${element.label ?? element.elementId}`, verification: "verified" as const, repairable: true }));
+    const proof = missing().map((element) => ({ id: `${modelId}:svg:${element.elementId}`, layer: "render" as const, code: "missing-svg-element", category: "render_mismatch" as const, modelId, elementId: element.elementId, expected: element.alias, actual: null, evidence: [{ source: "svg-entity-id", reference: element.alias, detail: element.statement ?? "模型声明" }], observation: `SVG 缺少模型元素 ${element.label ?? element.elementId}`, verification: "verified" as const, repairable: true }));
     findings.push(...proof);
     if (input.mutable && repairs < 2) {
       const history: typeof repairHistory[number] = { round: repairs + 1, target: "render", issueIds: proof.map((item) => item.id), beforeFingerprint: fingerprint(), status: "failed", changes: [], reason: "统一转换重建" };
@@ -133,12 +134,12 @@ export async function reviewRenderedArtifact(input: {
   else try {
     const image = await bounded((signal) => pngRenderClient(rendered!.artifact, signal)); throwIfRunCancelled(record); imageHash = reviewFingerprint(image.png.toString("base64"));
     const judged = await call("visual_check", repairs, [{ role: "system", content: JSON_ONLY_SYSTEM_PROMPT }, { role: "user", content: [
-      { type: "text", text: `核对图对模型：节点、标签、连线、方向、归属和 UML 符号。系统边界、泳道、分支、片段、注释、图例是合法辅助符号，按用途判断。位置、间距和绕行交给 PlantUML；遮挡或不可辨认报告无法核实，不推断缺失。不增删业务元素。\n${findingInstructions}\n模型 ID：${modelId}\n图类型：${model.diagramKind}\n结构化模型：${JSON.stringify(model)}\nPlantUML 源码：${rendered.artifact.source}\n绘图映射：${JSON.stringify(rendered.artifact.renderMapping)}` },
+      { type: "text", text: `核对图对模型：节点、标签内容、连线、方向、归属和 UML 符号。系统边界、泳道、分支、片段、注释、图例是合法辅助符号，按模型规则核对。不增删业务元素。\n${findingInstructions}\n${categoryInstructions}\n模型 ID：${modelId}\n图类型：${model.diagramKind}\n结构化模型：${JSON.stringify(model)}\nPlantUML 源码：${rendered.artifact.source}\n绘图映射：${JSON.stringify(rendered.artifact.renderMapping)}` },
       { type: "image_url", image_url: { url: `data:image/png;base64,${image.png.toString("base64")}` } },
     ] }], (raw) => judgmentSchema.parse(parseJson(raw)));
-    findings.push(...verifyReviewClaims(judged.findings, model, basis)); issues.push(...judged.issues);
+    findings.push(...verifyReviewClaims(judged.findings, model, basis)); issues.push(...filterDiagramReviewIssues(judged.issues));
     if (!judged.passed && !judged.issues.length && !judged.findings.length) issues.push("视觉模型未确认图面正确");
-    if (outcome !== "not_completed") outcome = findings.some((item) => item.verification === "inconclusive") || issues.some((item) => /不可读|不可辨|遮挡|无法核实/.test(item)) ? "inconclusive" : issues.length || findings.length ? "differences" : "verified";
+    if (outcome !== "not_completed") outcome = findings.some((item) => item.verification === "inconclusive") || issues.some(isUnverifiableReviewText) ? "inconclusive" : issues.length || findings.length ? "differences" : "verified";
   } catch (error) {
     cancelOrReport(error);
     if (unsupportedImage(error)) { if (outcome !== "not_completed") outcome = "skipped"; stopReason ||= "本次模型明确拒绝图片输入"; }

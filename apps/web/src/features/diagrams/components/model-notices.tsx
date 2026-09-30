@@ -1,5 +1,7 @@
 // Shows model freshness, visual review, and the next action as a compact status flow.
 import { useState } from "react";
+import type { DiagramVisualReview } from "@uml-platform/contracts";
+import { DiagramReviewDetails } from "../../../entities/diagram/components/diagram-review-details";
 import { Button } from "../../../shared/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../../shared/ui/dialog";
 import { PageNoticeButton, type PageNoticeTone } from "../../../shared/ui/page-notice-button";
@@ -17,6 +19,7 @@ export interface ModelNotice {
   repairs?: number;
   reviewCheckedAt?: string;
   confirmed?: boolean;
+  review?: DiagramVisualReview;
 }
 
 export function ModelNotices({ notices, canConfirm, onConfirm }: {
@@ -75,9 +78,10 @@ export function ModelNotices({ notices, canConfirm, onConfirm }: {
         <StatusFlow aria-label="模型状态流程">
           {stages.map((stage) => (
             <StatusFlowItem key={stage.id} title={stage.title} tone={stage.tone} data-notice-stage={stage.id}>
-              <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{stage.detail}</p>
-              {stage.issues?.length ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{stage.issues.map((issue, index) => <li key={`${index}:${issue}`}>{issue}</li>)}</ul> : null}
-              {stage.checks !== undefined ? <p className="mt-2 text-xs text-muted-foreground">已检查 {stage.checks} 次；{stage.repairs === undefined ? "自动修复次数未记录" : `已尝试自动修复 ${stage.repairs} 次`}</p> : null}
+              {stage.kind === "visual" && (stage.review || stage.checks !== undefined) ? <DiagramReviewDetails confirmed={stage.confirmed} review={stage.review ?? {
+                status: "pending_review", reason: stage.detail, issues: stage.issues ?? [], attempts: stage.checks ?? 0,
+                repairAttempts: stage.repairs, checkedAt: stage.reviewCheckedAt ?? "",
+              }} /> : <p className="mt-1 whitespace-pre-wrap break-words text-sm text-black dark:text-foreground">{stage.detail}</p>}
               {stage.reviewCheckedAt && !stage.confirmed ? <Button type="button" size="sm" className="mt-2" disabled={busy || !canConfirm} onClick={() => void confirm(stage.reviewCheckedAt!)}>确认当前图</Button> : null}
             </StatusFlowItem>
           ))}
