@@ -35,6 +35,8 @@ export const Shimmer = memo(function Shimmer({ children, as = "span", className,
     className={cn(
       "relative inline-block bg-[length:250%_100%,auto] bg-clip-text text-transparent",
       "[background-repeat:no-repeat,padding-box] forced-colors:text-current forced-colors:bg-none",
+      // CSS also handles a motion preference changed after this component was mounted.
+      "motion-reduce:bg-none! motion-reduce:text-muted-foreground!",
       reduceMotion && "bg-none text-muted-foreground",
       className,
     )}

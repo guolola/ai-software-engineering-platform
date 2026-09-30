@@ -6,6 +6,11 @@ import { isConfirmedVisualReview } from "../../features/workspace-session/lib/vi
 const review = { status: "pending_review" as const, issues: ["标签不可读"], reason: "请人工确认", attempts: 3, checkedAt: "check-1" };
 
 describe("visual review acceptance", () => {
+  it("never inherits human confirmation when input fingerprints differ even with the same timestamp", () => {
+    const current = { ...review, inputFingerprint: "before", confirmedAt: "confirmed" };
+    expect(isConfirmedVisualReview({ ...review, inputFingerprint: "after" }, current)).toBe(false);
+    expect(isConfirmedVisualReview({ ...review, inputFingerprint: "before" }, current)).toBe(true);
+  });
   it("persists acceptance without changing the automated verdict and rejects stale checks", async () => {
     const repository = createMockWorkspaceRepository({ visualReviews: { "requirements:usecase": review } });
     const saved = await repository.confirmVisualReview!("requirements:usecase", "check-1");

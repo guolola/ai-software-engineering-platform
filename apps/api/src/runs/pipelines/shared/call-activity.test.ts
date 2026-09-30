@@ -58,6 +58,22 @@ test("transport reasoning, summaries, and answer text remain distinct and ordere
   assert.equal(activity(run).at(-1)?.phase, "completed");
 });
 
+test("records input images once with the consuming call and restores the same images", async () => {
+  const run = record();
+  const url = "data:image/png;base64,cG5n";
+  await collectTextResult({ async *streamChatCompletion() { yield "图面检查结果"; } },
+    { apiBaseUrl: "https://example.com", apiKey: "test", model: "test" }, [
+      { role: "user", content: [{ type: "text", text: "核对环境图" }, { type: "image_url", image_url: { url } }, { type: "image_url", image_url: { url } }] },
+    ], createRunLlmChunkHandlers({ record: run, stage: "verify_diagram_visual", subtaskId: "context", subtaskLabel: "系统环境图" }));
+  const events = activity(run);
+  assert.deepEqual(events[0].inputImages, [{ url, caption: "系统环境图使用的图片 1" }]);
+  assert.equal(events.filter((event) => event.inputImages?.length).length, 1);
+  assert.equal(new Set(events.map((event) => event.callId)).size, 1);
+  events.forEach((event) => assert.equal(runEventSchema.safeParse(event).success, true));
+  const store = createRunRecordStore(); store.set(run.snapshot.runId, run);
+  assert.deepEqual(createRunRecordStore(serializeRunRecordStore(store)).get(run.snapshot.runId)!.events, run.events);
+});
+
 test("interleaved parallel reasoning stays attached to each model call", () => {
   const run = record();
   const first = createRunLlmChunkHandlers({ record: run, stage: "generate_models", subtaskId: "usecase" });

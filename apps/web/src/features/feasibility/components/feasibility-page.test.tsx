@@ -174,8 +174,10 @@ describe("FeasibilityPage", () => {
     const notice = await screen.findByRole("dialog", { name: "模型提示" });
     expect(within(notice).getByText("此图基于旧规则生成，可能已过时。")).toBeInTheDocument();
     await userEvent.click(within(notice).getByRole("button", { name: "知道了" }));
-    expect(screen.getByRole("button", { name: /PlantUML/ })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "SVG" })).toBeEnabled();
+    await userEvent.setup().click(screen.getByRole("button", { name: "下载" }));
+    expect(screen.getByRole("menuitem", { name: "PlantUML" })).not.toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: "SVG" })).not.toHaveAttribute("aria-disabled", "true");
+    await userEvent.setup().keyboard("{Escape}");
   });
 
   it("shows context and implementation as ordered overview artifacts", async () => {
@@ -458,8 +460,10 @@ describe("FeasibilityPage", () => {
     expect(screen.queryByLabelText("模型标题")).not.toBeInTheDocument();
     expect(screen.getByTestId("diagram-preview-section")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "打开模型概览" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "SVG" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "PlantUML" })).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "下载" }));
+    expect(screen.getByRole("menuitem", { name: "SVG" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "PlantUML" })).toBeInTheDocument();
+    await userEvent.setup().keyboard("{Escape}");
     expect(screen.getByText("元素清单")).toBeInTheDocument();
     expect(screen.getByText("关系说明")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "添加人员" })).toBeInTheDocument();
@@ -606,7 +610,9 @@ describe("business flow shared detail workspace", () => {
     expect(screen.getByRole("heading", { name: "关系说明" })).toBeInTheDocument();
     expect(screen.getByLabelText("元素清单工具栏")).toBeInTheDocument();
     expect(screen.getByLabelText("关系说明工具栏")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "SVG" })).toBeEnabled();
+    await userEvent.setup().click(screen.getByRole("button", { name: "下载" }));
+    expect(screen.getByRole("menuitem", { name: "SVG" })).not.toHaveAttribute("aria-disabled", "true");
+    await userEvent.setup().keyboard("{Escape}");
     await userEvent.setup().click(screen.getByRole("button", { name: "定位元素：处理业务" }));
     expect(screen.getByRole("button", { name: "定位元素：处理业务" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByRole("button", { name: "添加关系" })).not.toBeInTheDocument();

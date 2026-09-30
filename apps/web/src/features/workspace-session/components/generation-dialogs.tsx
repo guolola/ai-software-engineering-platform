@@ -1,6 +1,9 @@
 // Renders generation result and confirmation dialogs used by the workspace session provider.
 import { useTranslation } from "react-i18next";
+import { CircleAlert } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
+import { StatusFlow, StatusFlowItem } from "../../../shared/ui/status-flow";
+import { cn } from "../../../shared/ui/utils";
 import {
   FeedbackDialog,
   type FeedbackDialogAction,
@@ -116,15 +119,15 @@ export function GenerationResultDialog({
   );
 }
 
-function SummaryGroup({ label, items }: { label: string; items: string[] }) {
+function DependencySummary({ label, items }: { label: string; items: string[] }) {
   const { t } = useTranslation();
   if (items.length === 0) return null;
   return (
-    <div className="rounded-[8px] border border-border bg-muted/40 p-3 text-left">
-      <div className="text-[13px] font-medium text-foreground">{label}</div>
-      <div className="mt-1 text-[13px] leading-5 text-muted-foreground">
+    <div className="text-left text-sm">
+      <p className="font-medium text-foreground">{label}</p>
+      <p className="mt-1 whitespace-pre-wrap break-words leading-5 text-muted-foreground">
         {items.join(t("generation.dialog.listSeparator"))}
-      </div>
+      </p>
     </div>
   );
 }
@@ -141,10 +144,18 @@ export function GenerationConfirmationDialog({
   const { t } = useTranslation();
   if (!confirmation) return null;
 
+  // Present the plan's categories in review order; dependencies retain their own meaning below.
+  const groups = [
+    { id: "kept", title: t("generation.dialog.groups.kept"), tone: "success", items: confirmation.keptLabels },
+    { id: "updated", title: t("generation.confirmationFlow.updated"), tone: "warning", items: confirmation.regeneratedLabels },
+    { id: "added", title: t("generation.confirmationFlow.added"), tone: "info", items: confirmation.newLabels },
+  ] as const;
+  const visibleGroups = groups.filter((group) => group.items.length > 0);
+
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="max-w-[calc(100%-2rem)] rounded-[12px] border-border/60 bg-card p-6 shadow-lg sm:max-w-[520px]">
-        <DialogHeader className="space-y-2 text-left">
+      <DialogContent className="flex max-h-[85vh] max-w-[calc(100%-2rem)] flex-col gap-6 overflow-hidden rounded-[12px] border-border/60 bg-card p-6 shadow-lg sm:max-w-[520px]">
+        <DialogHeader className="shrink-0 space-y-2 text-left">
           <DialogTitle className="text-[20px] font-semibold leading-[28px] text-foreground">
             {confirmation.title}
           </DialogTitle>
@@ -152,36 +163,41 @@ export function GenerationConfirmationDialog({
             {confirmation.description}
           </DialogDescription>
         </DialogHeader>
-        <div className="mt-5 grid gap-3">
-          <SummaryGroup
+        <div data-testid="generation-confirmation-body" className="-mx-1 min-h-0 space-y-6 overflow-y-auto px-1 py-1 text-sm">
+          {visibleGroups.length > 0 && (
+            <StatusFlow aria-label={t("generation.confirmationFlow.label")}>
+              {visibleGroups.map((group) => (
+                <StatusFlowItem key={group.id} title={group.title} tone={group.tone} icon={group.id === "added" ? CircleAlert : undefined} data-generation-category={group.id}>
+                  <p className={cn("mt-1 whitespace-pre-wrap break-words leading-5", group.id === "kept" ? "text-muted-foreground" : "font-semibold text-foreground")}>
+                    {group.items.join(t("generation.dialog.listSeparator"))}
+                  </p>
+                </StatusFlowItem>
+              ))}
+            </StatusFlow>
+          )}
+          <DependencySummary
             label={t("generation.dialog.groups.rules")}
             items={confirmation.ruleDependencyLabels ?? []}
           />
-          <SummaryGroup
+          <DependencySummary
             label={t("generation.dialog.groups.requirements")}
             items={confirmation.requirementDependencyLabels ?? []}
           />
-          <SummaryGroup label={t("generation.dialog.groups.new")} items={confirmation.newLabels} />
-          <SummaryGroup
-            label={t("generation.dialog.groups.regenerated")}
-            items={confirmation.regeneratedLabels}
-          />
-          <SummaryGroup
+          <DependencySummary
             label={t("generation.dialog.groups.designDependencies")}
             items={confirmation.dependencyLabels}
           />
-          <SummaryGroup label={t("generation.dialog.groups.kept")} items={confirmation.keptLabels} />
           {(confirmation.ruleDependencyLabels?.length ?? 0) === 0 &&
             (confirmation.requirementDependencyLabels?.length ?? 0) === 0 &&
             confirmation.newLabels.length === 0 &&
             confirmation.regeneratedLabels.length === 0 &&
             confirmation.dependencyLabels.length === 0 && (
-              <div className="rounded-[8px] border border-border bg-muted/40 p-3 text-left text-[13px] leading-5 text-muted-foreground">
+              <p className="text-left text-sm leading-5 text-muted-foreground">
                 {t("generation.dialog.noModels")}
-              </div>
+              </p>
             )}
         </div>
-        <DialogFooter className="mt-6 flex-row justify-end gap-3">
+        <DialogFooter className="shrink-0 flex-row justify-end gap-3">
           <Button
             type="button"
             variant="ghost"

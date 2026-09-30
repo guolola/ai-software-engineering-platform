@@ -91,10 +91,12 @@ export function FeedbackDialog({
   feedback,
   open,
   onClose,
+  children,
 }: {
   feedback: FeedbackDialogState | null;
   open: boolean;
   onClose: () => void;
+  children?: ReactNode;
 }) {
   const { t } = useTranslation();
   if (!feedback) return null;
@@ -125,9 +127,12 @@ export function FeedbackDialog({
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent
         data-testid="feedback-dialog"
-        className="max-w-[calc(100%-2rem)] gap-0 overflow-hidden rounded-[12px] border-border/60 bg-card p-[33px] text-center shadow-lg sm:max-w-[448px] [&_[data-slot=dialog-close]]:hidden"
+        className={cn(
+          "max-w-[calc(100%-2rem)] gap-0 overflow-hidden rounded-[12px] border-border/60 bg-card p-[33px] text-center shadow-lg sm:max-w-[448px] [&_[data-slot=dialog-close]]:hidden",
+          children && "flex max-h-[85vh] flex-col",
+        )}
       >
-        <DialogHeader className="items-center gap-0 space-y-0 text-center sm:text-center">
+        <DialogHeader className="shrink-0 items-center gap-0 space-y-0 text-center sm:text-center">
           <div className="mb-6 h-[80px] w-[80px]">
             <div
               aria-label={iconLabel}
@@ -154,7 +159,13 @@ export function FeedbackDialog({
             {message}
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="mt-6 flex-row flex-wrap justify-center gap-3 sm:justify-center">
+        {children ? (
+          // Detailed guidance scrolls independently so the shared summary and actions stay visible.
+          <div data-slot="feedback-details" className="mt-6 min-h-0 overflow-y-auto text-left">
+            {children}
+          </div>
+        ) : null}
+        <DialogFooter className="mt-6 shrink-0 flex-row flex-wrap justify-center gap-3 sm:justify-center">
           {feedback.secondaryAction ? (
             <Button
               type="button"

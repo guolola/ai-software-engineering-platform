@@ -1,5 +1,5 @@
 // Projects ordered run events into user-readable steps, keeping parallel calls and retries separate.
-import type { DiagramVisualReview, RunEvent, RunStage } from "@uml-platform/contracts";
+import type { DiagramVisualReview, RunEvent, RunInputImage, RunStage } from "@uml-platform/contracts";
 import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 import { formatStageForDiagnostics, sanitizeDiagnosticText } from "../../workspace-session/lib/diagnostics";
 import { isConfirmedVisualReview, visualReviewDetail } from "../../workspace-session/lib/visual-review-message";
@@ -16,10 +16,14 @@ export interface TranscriptCall {
   finishedAt?: string;
   output: string;
   reasoning?: string;
+  inputImages?: RunInputImage[];
   summary: string;
   thinking: boolean;
   technical: boolean;
   message?: string;
+  review?: DiagramVisualReview;
+  operation?: string;
+  round?: number;
 }
 export interface TranscriptStep {
   id?: string;
@@ -161,7 +165,13 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
     if (event.type === "run_activity") {
       const step = getStep(event.stage);
       const call = getCall(step, event.callId, at, event.subtaskId, event.subtaskLabel);
+      if (event.operation) {
+        call.operation = event.operation; call.round = event.round;
+        const operationNames = { structure_check: "结构核对", model_repair: "结构纠错", render_repair: "重建图形", visual_check: event.round ? "视觉复查" : "视觉检查" };
+        call.title = `${callTitle(event.stage, event.subtaskId, event.subtaskLabel)} · ${operationNames[event.operation]}${event.round ? ` · 第 ${event.round} 轮` : ""}`;
+      }
       call.technical = event.format === "technical";
+      if (event.inputImages?.length) call.inputImages = [...new Map([...(call.inputImages ?? []), ...event.inputImages].map((image) => [image.url, image])).values()];
       if (event.phase === "output") { call.output += event.text ?? ""; call.thinking = false; }
       if (event.phase === "reasoning") { call.reasoning = (call.reasoning ?? "") + (event.text ?? ""); call.thinking = true; }
       if (event.phase === "summary" && !legacyDemoSummaryCalls.has(event.callId)) {
@@ -380,7 +390,7 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       }
     }
     for (const call of step.calls) {
-      if (step.stage === "verify_diagram_visual" && call.subtaskId && completed && "visualReviews" in completed.snapshot &&
+      if (step.stage === "verify_diagram_visual" && call.status !== "failed" && call.subtaskId && completed && "visualReviews" in completed.snapshot &&
         isConfirmedVisualReview(completed.snapshot.visualReviews?.[call.subtaskId], currentVisualReviews[call.subtaskId])) {
         call.status = "completed";
         call.message = "已人工确认当前图";
@@ -401,11 +411,32 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       if (!actual) continue;
       if (["failed", "pending_review"].includes(mirror.status) && (mirrorOrder.get(mirror) ?? startedOrder.get(mirror) ?? -1) >= (startedOrder.get(actual) ?? 0)) {
         actual.status = mirror.status; actual.message = mirror.message;
+      } else if (step.stage === "verify_diagram_visual" && mirror.status === "completed" && mirror.message?.includes("跳过")) {
+        // Unsupported image input is a handled skip; preserve the trace without presenting a failed task.
+        actual.status = "completed"; actual.message = mirror.message; actual.thinking = false;
       } else if (!actual.message && mirror.message && /修复|重试|补跑/.test(mirror.message)) actual.message = mirror.message;
       redundant.add(mirror.id);
     }
     step.calls = step.calls.filter((call) => !redundant.has(call.id));
     step.entries = step.entries?.filter((entry) => entry.kind !== "call" || !redundant.has(entry.id));
+    if (step.stage === "verify_diagram_visual" && completed && "visualReviews" in completed.snapshot) {
+      const latestCalls = new Map(step.calls.filter((call) => call.subtaskId).map((call) => [call.subtaskId!, call]));
+      for (const [subtaskId, call] of latestCalls) {
+        const review = completed.snapshot.visualReviews?.[subtaskId];
+        if (review?.checkOutcome) {
+          call.review = review;
+          call.status = review.status === "pending_review" && !isConfirmedVisualReview(review, currentVisualReviews[subtaskId]) ? "pending_review" : "completed";
+          call.message = isConfirmedVisualReview(review, currentVisualReviews[subtaskId])
+            ? "已人工确认当前图" : visualReviewDetail(review) ?? undefined;
+          call.thinking = false;
+        }
+        if (review?.status === "skipped") {
+          call.status = "completed";
+          call.message = review.reason.includes("跳过") ? review.reason : `已跳过视觉检查：${review.reason}`;
+          call.thinking = false;
+        }
+      }
+    }
     if (!step.finished) {
       step.status = terminal ? status === "cancelled" ? "cancelled" : status === "completed" ? "completed" : "failed" : "running";
     }

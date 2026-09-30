@@ -29,6 +29,7 @@ import type { BillingService } from "../billing/billing-service.js";
 import type { RunRecord, RunRecordStore } from "../runs/records/run-record-store.js";
 import type { RenderClient } from "../adapters/render/render-client.js";
 import type { PngRenderClient } from "../adapters/render/png-render-client.js";
+import type { PdfRenderClient } from "../adapters/render/pdf-render-client.js";
 import type { LlmTransport } from "../llm.js";
 import type { LlmScheduler } from "../adapters/llm/llm-scheduler.js";
 import type { RunQueue } from "../runs/queue/run-queue.js";
@@ -73,6 +74,7 @@ export type RegisterApiRoutesOptions = {
   llmTransport: LlmTransport;
   renderClient: RenderClient;
   pngRenderClient: PngRenderClient;
+  pdfRenderClient?: PdfRenderClient;
   systemNoticeStore: SystemNoticeStore;
   analyticsStore: AdminAnalyticsStore;
   databaseProbe?: () => Promise<void>;
@@ -112,6 +114,7 @@ export function registerApiRoutes({
   llmTransport,
   renderClient,
   pngRenderClient,
+  pdfRenderClient,
   systemNoticeStore,
   analyticsStore,
   databaseProbe,
@@ -398,6 +401,7 @@ export function registerApiRoutes({
     app,
     renderClient,
     pngRenderClient,
+    pdfRenderClient,
     resolveUserId: activeUserIdFromRequest,
     projectMembershipGuard,
   });

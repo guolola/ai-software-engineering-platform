@@ -5,7 +5,7 @@ import { runEventSchema, startRunRequestSchema, type RunActivityEvent } from "@u
 import { createEmptySnapshot, createEmptyDocumentSnapshot } from "../records/snapshots.js";
 import { createRunRecordStore, emitEvent, serializeRunRecordStore, type RunRecord } from "../records/run-record-store.js";
 import { emitOfflineDemoActivity } from "./offline-demo-activity.js";
-import { completeOfflineDemoRequirementRun, createOfflineDemoDocumentInput } from "./offline-demo-runs.js";
+import { completeOfflineDemoDesignRun, completeOfflineDemoRequirementRun, createOfflineDemoDocumentInput } from "./offline-demo-runs.js";
 import { fallbackDocumentSections } from "../../documents/context/document-context.js";
 import { startDocumentRunRequestSchema } from "@uml-platform/contracts";
 
@@ -14,7 +14,7 @@ function record(): RunRecord {
 }
 function activities(run: RunRecord) { return run.events.filter((e): e is RunActivityEvent => e.type === "run_activity"); }
 
-test("demo generation emits output without invented reasoning for parallel models", async (t) => {
+test("demo generation preserves ordinary output and labels fixture reasoning for visual checks", async (t) => {
   const previous = process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS;
   process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS = "0";
   t.after(() => { if (previous === undefined) delete process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS; else process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS = previous; });
@@ -31,11 +31,39 @@ test("demo generation emits output without invented reasoning for parallel model
     const call = events.filter((e) => e.callId === id);
     assert.equal(call[0].phase, "started");
     assert.ok(call.filter((e) => e.phase === "output").length > 1);
-    assert.ok(call.every((event) => !["thinking", "reasoning", "summary"].includes(event.phase)));
+    if (call[0].stage === "verify_diagram_visual") {
+      assert.ok(call.filter((event) => event.phase === "reasoning").map((event) => event.text).join("").startsWith("演示推理片段："));
+    } else assert.ok(call.every((event) => !["thinking", "reasoning", "summary"].includes(event.phase)));
     assert.equal(call.at(-1)?.phase, "completed");
   }
   const store = createRunRecordStore(); store.set(run.snapshot.runId, run);
   assert.deepEqual(createRunRecordStore(serializeRunRecordStore(store)).get(run.snapshot.runId)?.events, run.events);
+  if (!("visualReviews" in run.snapshot)) throw new Error("fixture");
+  const review = run.snapshot.visualReviews.activity;
+  assert.equal(review.attempts, 2); assert.equal(review.repairAttempts, 1);
+  assert.equal(review.repairHistory?.[0].status, "accepted");
+  const checks = events.filter((event) => event.modelId === "activity" && event.operation === "visual_check" && event.phase === "started");
+  assert.equal(checks.length, 2); assert.notEqual(checks[0].inputImages?.[0].url, checks[1].inputImages?.[0].url);
+  assert.equal(review.repairHistory?.[0].callId, events.find((event) => event.operation === "render_repair" && event.phase === "started")?.callId);
+  assert.equal(run.snapshot.visualReviews.usecase.checkOutcome, "inconclusive");
+  assert.equal(run.snapshot.visualReviews.usecase.repairAttempts, 0);
+  assert.match(run.snapshot.visualReviews.usecase.stopReason!, /证据不足/);
+});
+
+test("design demo shows FK structure correction with independently attributed calls and counters", async (t) => {
+  const previous = process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS;
+  process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS = "0";
+  t.after(() => { if (previous === undefined) delete process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS; else process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS = previous; });
+  const run = record();
+  await completeOfflineDemoDesignRun(run, { selectedDiagrams: ["table", "sequence"] } as Parameters<typeof completeOfflineDemoDesignRun>[1]);
+  if (!("visualReviews" in run.snapshot)) throw new Error("fixture");
+  const review = run.snapshot.visualReviews["table:seat-reservation-db"];
+  assert.equal(review.status, "passed"); assert.equal(review.structureAttempts, 2); assert.equal(review.attempts, 1);
+  assert.equal(review.repairAttempts, 1); assert.match(review.repairHistory?.[0].changes.join("") ?? "", /外键标记/);
+  const events = activities(run).filter((event) => event.modelId === "table:seat-reservation-db" && event.phase === "started");
+  assert.deepEqual(events.map((event) => event.operation), ["structure_check", "model_repair", "structure_check", "visual_check"]);
+  assert.equal(new Set(events.map((event) => event.callId)).size, 4);
+  assert.ok(run.events.every((event) => runEventSchema.safeParse(event).success));
 });
 
 test("default demo pacing waits before output and stops promptly when cancelled", async (t) => {

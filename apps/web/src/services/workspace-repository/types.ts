@@ -1,6 +1,7 @@
 // Defines the workspace repository contract shared by HTTP, mock, and React provider adapters.
 import type {
   GenerationExecutionMode,
+  UmlDiagramKind,
   CodeRunSnapshot,
   DesignDiagramModelSpec,
   DesignRunSnapshot,
@@ -59,6 +60,7 @@ export interface RequirementRulesUpdateMetadata {
 }
 
 export interface WorkspaceRepository {
+  exportDiagram?(input: { diagramKind: UmlDiagramKind; plantUmlSource: string; format: "png" | "pdf" }, signal?: AbortSignal): Promise<Blob>;
   loadWorkspace(): Promise<WorkspaceRecord>;
   getProjectAccess?(): Promise<{
     capabilities: string[];

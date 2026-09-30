@@ -8,7 +8,7 @@ import type {
   DocumentLibraryItem,
   DocumentRunSnapshot,
 } from "@uml-platform/contracts";
-import { feasibilityInputsSchema, snapshotInputFingerprint, buildFeasibilityImplementationFingerprint } from "@uml-platform/contracts";
+import { feasibilityInputsSchema, feasibilityImplementationPlanSchema, snapshotInputFingerprint, buildFeasibilityImplementationFingerprint } from "@uml-platform/contracts";
 import { useTheme } from "../../../shared/ui/theme-provider";
 import {
   createMockWorkspaceRepository,
@@ -288,7 +288,7 @@ function createReadyFeasibilityWorkspace() {
     }],
   };
   const feasibilityInputs = feasibilityInputsSchema.parse({});
-  const feasibilityImplementationPlan = {
+  const feasibilityImplementationPlan = feasibilityImplementationPlanSchema.parse({
     overview: "采用模块化 Web 实现。",
     candidates: [{
       id: "option-a",
@@ -300,12 +300,15 @@ function createReadyFeasibilityWorkspace() {
       estimatedSchedule: "8 周",
       sourceRequirementIds: ["R1"],
       implementation: {
-        architecture: { summary: "分层架构。", modules: [] },
+        architecture: {
+          summary: "分层架构。",
+          modules: [{ id: "booking", name: "预约模块", responsibility: "处理维修预约", sourceRequirementIds: ["R1"] }],
+        },
         dataStrategy: { summary: "关系数据存储。", sourceRequirementIds: ["R1"] },
         integrations: [],
         deploymentAndOperations: { summary: "容器化部署。", sourceRequirementIds: ["R1"] },
         securityAndCompliance: { summary: "最小权限。", sourceRequirementIds: ["R1"] },
-        milestones: [],
+        milestones: [{ id: "delivery", name: "交付预约模块", timeframe: "8 周", deliverables: ["预约模块"], sourceRequirementIds: ["R1"] }],
         risks: [],
         verdicts: [
           { category: "technical" as const, verdict: "feasible" as const, rationale: "技术成熟。" },
@@ -320,7 +323,7 @@ function createReadyFeasibilityWorkspace() {
     }],
     recommendedCandidateId: "option-a",
     recommendationRationale: "适合当前规模。",
-  };
+  });
   return {
     rules,
     feasibilityInputs,
@@ -370,8 +373,13 @@ describe("InstructionDocumentsPage", () => {
     const card = templateCard("可行性研究报告");
     const button = within(card).getByRole("button", { name: /生成并打开/ });
     expect(button).toBeDisabled();
-    expect(within(card).getByText("未选择模型供应商")).toBeInTheDocument();
-    await userEvent.setup().click(button);
+    expect(within(card).queryByText("未选择模型供应商")).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "有 3 项需要处理" }));
+    const guidance = screen.getByRole("dialog", { name: "有 3 项需要处理" });
+    expect(guidance).toHaveTextContent("未选择模型供应商");
+    await user.keyboard("{Escape}");
+    await user.click(button);
     expect(repository.startDocumentRun).not.toHaveBeenCalled();
     act(() => patchUserSettings({ providerConfigId: "provider-1", defaultModel: "model-1", providerModelOptions: ["model-1"] }));
     expect(button).toBeEnabled();
@@ -499,14 +507,32 @@ describe("InstructionDocumentsPage", () => {
       screen.queryByRole("checkbox", { name: /同时生成软件设计说明书/i }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    await user.click(
-      within(requirementsCard).getByRole("button", { name: "有 1 项需要处理" }),
-    );
+    const notice = screen.getByRole("button", { name: "有 3 项需要处理" });
+    expect(screen.getAllByRole("button", { name: /有 \d+ 项需要处理/ })).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: "说明书", level: 1 }).parentElement).toContainElement(notice);
+    for (const card of [feasibilityCard, requirementsCard, designCard]) {
+      expect(within(card).queryByRole("button", { name: /需要处理/ })).not.toBeInTheDocument();
+      expect(within(card).queryByText(/请先|生成后可进入 Word 编辑器/)).not.toBeInTheDocument();
+      expect(within(card).getByRole("button", { name: "生成并打开" })).toBeDisabled();
+    }
+    await user.click(notice);
     const feedback = screen.getByRole("dialog", {
-      name: "需求规格说明书暂时无法生成",
+      name: "有 3 项需要处理",
     });
+    expect(feedback).toHaveTextContent("可行性研究报告暂时无法生成");
+    expect(feedback).toHaveTextContent("需求规格说明书暂时无法生成");
+    expect(feedback).toHaveTextContent("软件设计说明书暂时无法生成");
+    expect(feedback).toHaveTextContent("请先生成系统环境图和实现方案");
+    expect(feedback).toHaveTextContent("请先在需求模型页生成需求模型");
+    expect(feedback).toHaveTextContent("请先在设计模型页生成设计模型");
+    expect(within(feedback).getByRole("button", { name: "前往需求模型" })).toBeInTheDocument();
+    expect(within(feedback).getByRole("button", { name: "前往设计模型" })).toBeInTheDocument();
     expect(feedback).not.toHaveTextContent("影响：");
     expect(feedback).not.toHaveTextContent("技术详情");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(notice);
+    expect(screen.getByRole("dialog", { name: "有 3 项需要处理" })).toHaveTextContent("请先在设计模型页生成设计模型");
   });
 
   it("enables the feasibility report from current analysis without requirement or design models", async () => {
@@ -526,6 +552,29 @@ describe("InstructionDocumentsPage", () => {
     expect(
       within(templateCard("软件设计说明书")).getByRole("button", { name: /生成并打开/i }),
     ).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: /需要处理/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "有 2 项需要处理" })).toBeInTheDocument();
+    expect(within(templateCard("可行性研究报告")).queryByText("生成后可进入 Word 编辑器。")).not.toBeInTheDocument();
+  });
+
+  it("hides the header notice when all document prerequisites are satisfied", async () => {
+    const repository = createMockWorkspaceRepository({
+      ...createReadyFeasibilityWorkspace(),
+      models: { usecase: requirementModel as never },
+      designModels: { sequence: designModel as never },
+    });
+    repository.listDocuments = vi.fn(async () => []);
+    render(withWorkspaceProviders(<InstructionDocumentsPage />, repository));
+
+    await screen.findByRole("heading", { name: "已生成说明书" });
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /需要处理/ })).not.toBeInTheDocument();
+    });
+    expect(screen.getAllByRole("button", { name: "生成并打开" })).toHaveLength(3);
+    screen.getAllByRole("button", { name: "生成并打开" }).forEach((button) => {
+      expect(button).toBeEnabled();
+    });
+    expect(screen.queryByText("生成后可进入 Word 编辑器。")).not.toBeInTheDocument();
   });
 
   it("explains stale feasibility artifacts and opens analysis with both selected", async () => {
@@ -562,10 +611,10 @@ describe("InstructionDocumentsPage", () => {
     ).toBeDisabled();
 
     await user.click(
-      within(feasibilityCard).getByRole("button", { name: "有 1 项需要处理" }),
+      screen.getByRole("button", { name: "有 3 项需要处理" }),
     );
     const guidance = await screen.findByRole("dialog", {
-      name: "可行性研究报告暂时无法生成",
+      name: "有 3 项需要处理",
     });
     expect(guidance).toHaveTextContent(
       "需求规则已更新，系统环境图和实现方案需要重新生成",
@@ -597,12 +646,11 @@ describe("InstructionDocumentsPage", () => {
     );
 
     await screen.findByRole("heading", { name: "已生成说明书" });
-    const feasibilityCard = templateCard("可行性研究报告");
     await user.click(
-      within(feasibilityCard).getByRole("button", { name: "有 1 项需要处理" }),
+      screen.getByRole("button", { name: "有 3 项需要处理" }),
     );
     const guidance = await screen.findByRole("dialog", {
-      name: "可行性研究报告暂时无法生成",
+      name: "有 3 项需要处理",
     });
     expect(guidance).toHaveTextContent(
       "需求规则、上下文或补充资料已更新，实现方案需要重新生成",
@@ -739,6 +787,16 @@ describe("InstructionDocumentsPage", () => {
       await screen.findByRole("dialog", { name: "说明书暂时无法读取" }),
     ).toBeInTheDocument();
     expect(vi.mocked(repository.listDocuments!).mock.calls.length).toBeGreaterThanOrEqual(2);
+    await user.keyboard("{Escape}");
+    const notice = screen.getByRole("button", { name: "有 4 项需要处理" });
+    expect(screen.getAllByRole("button", { name: /需要处理/ })).toHaveLength(1);
+    expect(notice).toHaveClass("text-destructive");
+    await user.click(notice);
+    const overview = screen.getByRole("dialog", { name: "有 4 项需要处理" });
+    expect(overview).toHaveTextContent("说明书暂时无法读取");
+    expect(overview).toHaveTextContent("需求规格说明书暂时无法生成");
+    await user.click(within(overview).getByRole("button", { name: "重试" }));
+    expect(await screen.findByRole("dialog", { name: "说明书暂时无法读取" })).toBeInTheDocument();
   });
 
   it("loads OnlyOffice config with the project theme and passes it to the editor", async () => {

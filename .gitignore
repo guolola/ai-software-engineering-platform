@@ -84,7 +84,9 @@ apps/api/.local-documents/
 tmp/
 uml-run-snapshot.json
 uml-run-report.md
-data/
+# Root runtime data; keep packaged skill data under apps/ versioned.
+/data/
+/apps/api/data/
 需求规格说明书*.docx
 软件设计说明书*.docx
 docs/e2e/evidence-*
@@ -101,6 +103,7 @@ plantuml/**
 !plantuml/build/
 !plantuml/build/libs/
 !plantuml/build/libs/plantuml-1.2026.3beta8.jar
+apps/render-service/.runtime/
 
 opencode/
 opencode/**

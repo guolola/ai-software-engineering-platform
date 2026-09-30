@@ -1,10 +1,13 @@
-// Presents business stages as a stable reading surface with one active status and reader-owned disclosures.
+// Presents one task timeline with nested stage details and a separate final result.
 import { useState, type ReactNode } from "react";
-import { ArrowDown, Bot, Check, ChevronDown, Circle, Clock3, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { ArrowDown, Bot, Check, ChevronDown, Circle, Clock3, FileText, ImageIcon, LoaderCircle, ScanEye, X } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
+import { Badge } from "../../../shared/ui/badge";
 import { ScrollArea } from "../../../shared/ui/scroll-area";
 import { Spinner } from "../../../shared/ui/spinner";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "../../../shared/ui/ai/reasoning";
+import { ChainOfThought, ChainOfThoughtContent, ChainOfThoughtHeader, ChainOfThoughtImage, ChainOfThoughtStep } from "../../../shared/ui/ai/chain-of-thought";
 import { Shimmer } from "../../../shared/ui/ai/shimmer";
 import { cn } from "../../../shared/ui/utils";
 import type { TranscriptCall, TranscriptStep } from "../lib/generation-transcript";
@@ -14,10 +17,6 @@ import { TranscriptMarkdown } from "./transcript-markdown";
 
 const statusText: Record<TranscriptCall["status"], string> = {
   queued: "排队中", running: "正在处理", completed: "已完成", failed: "未完成", cancelled: "已停止", pending_review: "待确认",
-};
-
-const taskStatusText: Record<string, string> = {
-  queued: "排队中", running: "生成中", completed: "已完成", failed: "未完成", cancelled: "已停止", interrupted: "服务中断，可重试", pending_review: "待确认",
 };
 
 export interface GenerationQueueDetails {
@@ -53,78 +52,95 @@ function QueueProgress({ queue }: { queue: GenerationQueueDetails }) {
   </section>;
 }
 
-function ProcessCall({ call }: { call: TranscriptCall }) {
+function ProcessCall({ call, showTitle }: { call: TranscriptCall; showTitle: boolean }) {
   const Icon = call.status === "completed" ? Check : call.status === "failed" ? X : Circle;
-  return <div data-slot="generation-call" className="min-w-0 space-y-1">
-    <div className="flex items-start gap-2">
+  const prose = readableOutput(call);
+  return <div data-slot="generation-call" className="min-w-0 space-y-2 text-sm leading-6 text-muted-foreground">
+    {showTitle && <div className="flex items-start gap-2">
       <Icon aria-hidden="true" className={cn("mt-1.5 size-3 shrink-0", call.status === "failed" && "text-destructive")} />
       <span className="min-w-0 flex-1 break-words">{call.title}</span>
       <span className="shrink-0 text-xs leading-6">{statusText[call.status]}</span>
-    </div>
-    {call.summary && <p className="ml-5 whitespace-pre-wrap break-words">模型推理摘要：{call.summary}</p>}
-    {call.reasoning && <Reasoning isStreaming={call.thinking && call.status === "running"} className="ml-5 rounded-md border border-border/70 bg-muted/20 px-3 py-2" data-slot="generation-reasoning">
+    </div>}
+    {call.inputImages?.filter((image) => /^(?:https?:\/\/|data:image\/(?:png|jpe?g|gif|webp);base64,)/i.test(image.url)).map((image) => <ChainOfThoughtImage key={image.url} caption={image.caption ?? `${call.title}使用的图片`}>
+      <img src={image.url} alt={image.caption ?? `${call.title}的输入图片`} className="max-h-80 max-w-full object-contain" loading="lazy" />
+    </ChainOfThoughtImage>)}
+    {call.summary && <p className="whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">模型推理摘要：{call.summary}</p>}
+    {call.reasoning && <Reasoning isStreaming={call.thinking && call.status === "running"} data-slot="generation-reasoning">
       <ReasoningTrigger aria-label={`思考过程 · ${call.title}`} />
       <ReasoningContent>{call.reasoning}</ReasoningContent>
     </Reasoning>}
-    {call.message && !["failed", "pending_review"].includes(call.status) && /修复|重试|补跑|人工确认/.test(call.message) && <p className="ml-5 break-words">{call.message}</p>}
-    {call.technical && call.output && <details className="ml-5">
+    {prose && <div data-reading-anchor=""><TranscriptMarkdown text={prose} compact /></div>}
+    {call.review && <div className="space-y-2 text-xs leading-5" data-slot="diagram-review-details">
+      <p>结构核对 {call.review.structureAttempts ?? 0} 次 · 图片检查 {call.review.attempts} 次 · 纠错尝试 {call.review.repairAttempts ?? 0} 次</p>
+      {call.review.findings?.map((finding) => <p key={finding.id}>{finding.verification === "verified" ? "已核实" : finding.verification === "inconclusive" ? "无法核实" : "待确认"}：{finding.observation}{finding.evidence.length > 0 && <span>（依据：{finding.evidence.map((item) => item.reference).join("、")}）</span>}</p>)}
+      {call.review.repairHistory?.map((repair) => <div key={`${repair.round}:${repair.target}`}>
+        <p>第 {repair.round} 轮{repair.target === "model" ? "结构纠错" : "图形重建"}：{repair.status === "accepted" ? "已接受" : repair.status === "rejected" ? "已拒绝" : "未完成"} · {repair.reason}</p>
+        {repair.changes.map((change) => <p key={change} className="break-words">{change}</p>)}
+      </div>)}
+      {call.review.stopReason && <p>停止原因：{call.review.stopReason}</p>}
+    </div>}
+    {call.message && !["failed", "pending_review"].includes(call.status) && /修复|重试|补跑|人工确认|跳过/.test(call.message) && <p className="break-words">{call.message}</p>}
+    {call.technical && call.output && <details>
       <summary className="w-fit cursor-pointer text-xs leading-6">查看技术原文 · {call.title}</summary>
-      <pre className="mt-2 whitespace-pre-wrap break-all font-mono text-xs leading-6">{call.output}</pre>
+      <pre className="mt-2 whitespace-pre-wrap break-all font-mono text-xs leading-6 text-black dark:text-foreground">{call.output}</pre>
     </details>}
   </div>;
 }
 
-function Stage({ step, active, canRetry, onRetry }: { step: TranscriptStep; active: boolean; canRetry: boolean; onRetry?: (id: string) => void }) {
-  const [expanded, setExpanded] = useState(true);
-  const prose = step.calls.map((call) => ({ call, text: readableOutput(call) })).filter(({ text }) => text);
-  const issues = step.calls.filter((call) => ["failed", "pending_review"].includes(call.status));
-  const currentStatus = active ? step.calls.some((call) => call.thinking) ? "正在分析" : prose.length ? "正在生成" : "正在处理" : statusText[step.status];
+function Stage({ step, active }: { step: TranscriptStep; active: boolean }) {
+  const hasProse = step.calls.some((call) => readableOutput(call));
+  const currentStatus = active ? step.calls.some((call) => call.thinking) ? "正在分析" : hasProse ? "正在生成" : "正在处理" : statusText[step.status];
   // Retain repair explanations, but avoid filling the reading surface with successive progress notices.
-  const messages = step.messages.filter((message, index) => /修复|重试|失败|复核/.test(message) || index === step.messages.length - 1);
-  return <section aria-label={step.title} className="min-w-0 space-y-4" data-testid="generation-task-step" data-active-step={active}>
-    <h3 className="flex items-center gap-2 text-base font-medium leading-7">
-      {active && <Spinner aria-hidden="true" className="size-3.5" />}
-      {active ? <Shimmer>{step.title}</Shimmer> : <span>{step.title}</span>}
-      <span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground">{currentStatus}</span>
-    </h3>
-    {(step.calls.length > 0 || messages.length > 0) && <div className="text-sm leading-6 text-muted-foreground">
-      <Button type="button" variant="ghost" aria-expanded={expanded} onClick={() => setExpanded(!expanded)} className="h-auto gap-2 px-0 py-0 text-sm font-normal text-muted-foreground hover:bg-transparent hover:text-foreground">
-        执行过程<ChevronDown aria-hidden="true" className={cn("size-3.5 transition-transform motion-reduce:transition-none", expanded && "rotate-180")} />
-      </Button>
-      <div hidden={!expanded} className="mt-3 space-y-3 border-l border-border/70 pl-4">
-        {messages.map((message) => <p key={message} className="whitespace-pre-wrap break-words">{message}</p>)}
-        {step.calls.map((call) => <ProcessCall key={call.id} call={call} />)}
-      </div>
-    </div>}
-    {issues.map((call) => <div key={call.id} className={cn("text-sm leading-6", call.status === "failed" ? "text-destructive" : "text-warning")}>
+  const messages = step.messages.filter((message, index) => /修复|重试|失败|复核/.test(message) || (!hasProse && index === step.messages.length - 1));
+  const Icon = active ? LoaderCircle : step.status === "failed" ? X : step.stage.includes("verify") ? ScanEye : step.stage.includes("render") ? ImageIcon : FileText;
+  return <ChainOfThoughtStep aria-label={step.title} data-testid="generation-task-step" data-active-step={active}
+    icon={Icon} iconClassName={active ? "animate-spin motion-reduce:animate-none" : undefined}
+    label={active ? <Shimmer>{step.title}</Shimmer> : step.title} status={active ? "active" : step.status === "queued" ? "pending" : "complete"} statusLabel={currentStatus}>
+    {messages.map((message) => <p key={message} className="whitespace-pre-wrap break-words">{message}</p>)}
+    {step.calls.map((call) => <ProcessCall key={call.id} call={call} showTitle={step.calls.length > 1} />)}
+  </ChainOfThoughtStep>;
+}
+
+function TaskIssues({ steps, canRetry, onRetry }: { steps: TranscriptStep[]; canRetry: boolean; onRetry?: (id: string) => void }) {
+  const issues = steps.flatMap((step) => step.calls.filter((call) => ["failed", "pending_review"].includes(call.status)).map((call) => ({ call, key: `${step.id ?? step.stage}:${call.id}` })));
+  if (!issues.length) return null;
+  // Actionable results remain visible when the reader folds the task's timeline.
+  return <div className="space-y-3" data-slot="generation-task-issues">
+    {issues.map(({ call, key }) => <div key={key} className={cn("text-sm leading-6", call.status === "failed" ? "text-destructive" : "text-warning")}>
       <p>{call.title}：{call.message || (call.status === "failed" ? "本次处理未完成。" : "有追踪关系需要确认。")}</p>
       {canRetry && call.status === "failed" && call.subtaskId && onRetry && <Button size="sm" variant="link" className="h-auto px-0 py-0" title={call.subtaskId.includes(":") ? "当前重试按模型类型执行，会重试同类模型而不是单个实例" : "重试此模型"} onClick={() => onRetry(call.subtaskId!)}>{call.subtaskId.includes(":") ? "重试全部同类模型" : "重试此模型"}</Button>}
     </div>)}
-    {prose.map(({ call, text }, index) => <div key={call.id} data-reading-anchor={index === 0 ? "" : undefined} className="min-w-0 space-y-2 pt-1">
-      {prose.length > 1 && <h4 className="text-sm font-medium leading-6">{call.title}</h4>}
-      <TranscriptMarkdown text={text} />
-    </div>)}
-  </section>;
+  </div>;
 }
 
-export function GenerationTranscript({ taskKey, steps, active, status, queue, introduction, finalMessage, children, onRetry }: {
-  taskKey: string; steps: TranscriptStep[]; active: boolean; status?: string; queue?: GenerationQueueDetails | null; introduction: string; finalMessage: string;
+export function GenerationTranscript({ taskKey, steps, active, kind, model, queue, emptyMessage, finalMessage, children, onRetry }: {
+  taskKey: string; steps: TranscriptStep[]; active: boolean; kind?: string | null; model?: string | null; queue?: GenerationQueueDetails | null; emptyMessage?: string; finalMessage: string;
   children?: ReactNode; onRetry?: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const { viewportRef, contentRef, away, returnToLatest } = useTranscriptScroll(taskKey, steps);
-  const activeSteps = active ? steps.filter((step) => !step.finished) : [];
+  const assistantKind = kind && ["requirements", "design", "code", "document", "feasibility"].includes(kind) ? kind : "unknown";
+  const thoughtLabel = t(`generation.thoughtProcess.${active ? "active" : "finished"}`);
   return <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" data-testid="generation-transcript">
     <ScrollArea className="min-h-0 flex-1" viewportRef={viewportRef} viewportClassName="[overflow-anchor:none]" contentClassName="!block">
       <div ref={contentRef} data-slot="ai-conversation" className="min-w-0 space-y-8 pb-12 pr-4 text-base leading-7">
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Bot className="size-4" aria-hidden="true" />Agent</div>
-          <p className="text-lg font-medium">{introduction}</p>
-          {status && <p role="status" className="text-sm text-muted-foreground">任务状态：{taskStatusText[status] ?? status}{activeSteps.length > 0 ? ` · 进行中：${activeSteps.map((step) => step.title).join("、")}` : ""}</p>}
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium" data-slot="generation-assistant-header">
+            <span className="flex min-w-0 items-center gap-2"><Bot className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span>{t(`generation.assistants.${assistantKind}`)}</span></span>
+            {model?.trim() && <Badge variant="secondary" title={model} className="max-w-full min-w-0 truncate font-mono" data-slot="generation-model">{model}</Badge>}
+          </div>
+          {emptyMessage && <p className="text-sm text-muted-foreground">{emptyMessage}</p>}
         </div>
         {queue && <QueueProgress queue={queue} />}
-        {steps.map((step) => <Stage key={step.id ?? step.stage} step={step} active={active && !step.finished} canRetry={!active} onRetry={onRetry} />)}
+        {steps.length > 0 && <ChainOfThought key={taskKey} defaultOpen>
+          <ChainOfThoughtHeader aria-label={thoughtLabel}>{thoughtLabel}</ChainOfThoughtHeader>
+          <ChainOfThoughtContent>
+            {steps.map((step) => <Stage key={step.id ?? step.stage} step={step} active={active && !step.finished} />)}
+          </ChainOfThoughtContent>
+        </ChainOfThought>}
         {active && steps.length === 0 && !queue && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner aria-hidden="true" className="size-3.5" /><Shimmer>等待任务开始，执行过程会在这里逐段显示。</Shimmer></p>}
-        {finalMessage && <p role="status" className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{finalMessage}</p>}
+        {finalMessage && <section aria-label="输出总结" data-slot="generation-task-summary" className="text-black dark:text-foreground"><p role="status" className="whitespace-pre-wrap break-words">{finalMessage}</p></section>}
+        <TaskIssues steps={steps} canRetry={!active} onRetry={onRetry} />
         {children}
       </div>
     </ScrollArea>

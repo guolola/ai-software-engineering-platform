@@ -10,7 +10,6 @@ import {
 } from "../../../entities/diagram/lib/model-details";
 import {
   AlertTriangle,
-  Download,
   ExternalLink,
   Maximize2,
   PanelRightOpen,
@@ -19,10 +18,9 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
-import { floatingAlert } from "../../../shared/ui/floating-alert";
 import { Badge } from "../../../shared/ui/badge";
 import { cn } from "../../../shared/ui/utils";
-import { downloadTextFile } from "../../../shared/lib/download";
+import { DiagramDownloadMenu } from "./diagram-download-menu";
 import { InlineSvg } from "./inline-svg";
 import { getRelationDisplayLabel } from "../lib/diagram-detail-view-model";
 import { diagramDetailFieldLabel, semanticElementLabel } from "../lib/diagram-presentation";
@@ -37,6 +35,7 @@ type DiagramPreviewPanelProps = {
   stage: "requirements" | "design" | "feasibility";
   type: DiagramType | DesignDiagramType;
   exportFileStem?: string;
+  diagramId?: string;
   plantUmlSource: string;
   normalizedSvgMarkup: string;
   svgMarkup: string;
@@ -73,6 +72,7 @@ export function DiagramPreviewPanel({
   stage,
   type,
   exportFileStem,
+  diagramId,
   plantUmlSource,
   normalizedSvgMarkup,
   svgMarkup,
@@ -164,36 +164,9 @@ export function DiagramPreviewPanel({
                   <ExternalLink className="size-3.5" /> <span className="hidden sm:inline">{t("diagrams.detail.newTab")}</span>
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="size-8 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-3"
-                aria-label="SVG"
-                title="SVG"
-                onClick={() => {
-                  downloadTextFile(`${fileStem}.svg`, normalizedSvgMarkup, "image/svg+xml");
-                  floatingAlert.success(t("diagrams.detail.exported", { file: `${fileStem}.svg` }));
-                }}
-              >
-                <Download className="size-3.5" /> <span className="hidden sm:inline">SVG</span>
-              </Button>
             </>
           ) : null}
-          {plantUmlSource.trim() ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="size-8 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-3"
-              aria-label="PlantUML"
-              title="PlantUML"
-              onClick={() => {
-                downloadTextFile(`${fileStem}.puml`, plantUmlSource, "text/plain");
-                floatingAlert.success(t("diagrams.detail.exported", { file: `${fileStem}.puml` }));
-              }}
-            >
-              <Download className="size-3.5" /> <span className="hidden sm:inline">PlantUML</span>
-            </Button>
-          ) : null}
+          <DiagramDownloadMenu diagramKind={type} diagramId={diagramId} fileStem={fileStem} svg={normalizedSvgMarkup} source={plantUmlSource} />
         </div>
       </div>
       <div className="relative">

@@ -774,6 +774,13 @@ export const runActionRunEventSchema = z.object({
   createdAt: z.string().min(1),
 });
 
+// Images belong to the exact model call that consumed them, including during replay.
+export const runInputImageSchema = z.object({
+  url: z.string().min(1),
+  caption: z.string().optional(),
+});
+export type RunInputImage = z.infer<typeof runInputImageSchema>;
+
 // User-visible execution records are separate from bounded technical diagnostics.
 export const runActivityEventSchema = z.object({
   type: z.literal("run_activity"),
@@ -782,11 +789,15 @@ export const runActivityEventSchema = z.object({
   runId: z.string().min(1),
   stage: runStageSchema,
   callId: z.string().min(1),
+  modelId: z.string().optional(),
+  operation: z.enum(["structure_check", "visual_check", "model_repair", "render_repair"]).optional(),
+  round: z.number().int().min(0).max(2).optional(),
   subtaskId: z.string().optional(),
   subtaskLabel: z.string().optional(),
   phase: z.enum(["started", "output", "thinking", "reasoning", "summary", "completed", "failed"]),
   format: z.enum(["text", "technical"]).default("technical"),
   text: z.string().optional(),
+  inputImages: z.array(runInputImageSchema).optional(),
 });
 export type RunActivityEvent = z.infer<typeof runActivityEventSchema>;
 

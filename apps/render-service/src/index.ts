@@ -9,6 +9,10 @@ import { fileURLToPath } from "node:url";
 import {
   renderPngRequestSchema,
   renderPngResponseSchema,
+  renderPdfRequestSchema,
+  renderPdfResponseSchema,
+  type RenderPdfRequest,
+  type RenderPdfResponse,
   renderSvgRequestSchema,
   renderSvgResponseSchema,
   type RenderPngRequest,
@@ -16,6 +20,7 @@ import {
   type RenderSvgRequest,
   type RenderSvgResponse,
 } from "@uml-platform/contracts";
+import { pdfFontsReady, svgToVectorPdf } from "./pdf/vector-pdf.js";
 
 const DEFAULT_PORT = Number(process.env.RENDER_SERVICE_PORT ?? 4002);
 const DEFAULT_HOST = process.env.RENDER_SERVICE_HOST ?? "127.0.0.1";
@@ -37,6 +42,7 @@ const DEFAULT_JAVA_ARGS = ["-Xmx128m"];
 type RenderServerOptions = {
   renderSvg?: (input: RenderSvgRequest) => Promise<RenderSvgResponse>;
   renderPng?: (input: RenderPngRequest) => Promise<RenderPngResponse>;
+  renderPdf?: (input: RenderPdfRequest) => Promise<RenderPdfResponse>;
 };
 
 function positiveInteger(value: string | undefined, fallback: number) {
@@ -185,6 +191,17 @@ export async function renderPngWithPlantUml(
   });
 }
 
+export async function renderPdfWithPlantUml(input: RenderPdfRequest): Promise<RenderPdfResponse> {
+  renderPdfRequestSchema.parse(input);
+  const startedAt = Date.now();
+  const rendered = await renderSvgWithPlantUml(input);
+  const pdf = await svgToVectorPdf(rendered.svg);
+  return renderPdfResponseSchema.parse({
+    pdfBase64: pdf.toString("base64"),
+    renderMeta: { ...rendered.renderMeta, engine: "plantuml+svg-to-pdfkit", durationMs: Date.now() - startedAt },
+  });
+}
+
 export async function createRenderServiceServer(options: RenderServerOptions = {}) {
   const app = Fastify({ logger: true });
   await app.register(cors, {
@@ -206,6 +223,7 @@ export async function createRenderServiceServer(options: RenderServerOptions = {
       status: "ok",
       jarPath: DEFAULT_JAR_PATH,
       jarAvailable,
+      pdfFontsReady: await pdfFontsReady(),
       renderConcurrency: positiveInteger(process.env.UML_RENDER_CONCURRENCY, 1),
       javaArgs: readJavaArgs(),
     };
@@ -215,6 +233,7 @@ export async function createRenderServiceServer(options: RenderServerOptions = {
   );
   const renderSvg = options.renderSvg ?? renderSvgWithPlantUml;
   const renderPng = options.renderPng ?? renderPngWithPlantUml;
+  const renderPdf = options.renderPdf ?? renderPdfWithPlantUml;
 
   app.post("/render/svg", async (request, reply) => {
     try {
@@ -241,6 +260,17 @@ export async function createRenderServiceServer(options: RenderServerOptions = {
       return {
         message: error instanceof Error ? error.message : "Unknown render error",
       };
+    }
+  });
+
+  app.post("/render/pdf", async (request, reply) => {
+    try {
+      const input = renderPdfRequestSchema.parse(request.body);
+      return await renderQueue(() => renderPdf(input));
+    } catch (error) {
+      request.log.error(error);
+      reply.code(400);
+      return { message: error instanceof Error ? error.message : "Unknown PDF render error" };
     }
   });
 

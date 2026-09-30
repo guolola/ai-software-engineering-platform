@@ -73,17 +73,18 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
-  const [sidebarWidth, setSidebarWidth] = React.useState(() => {
-    if (typeof window === 'undefined') return SIDEBAR_WIDTH_DEFAULT_PX
+  const [sidebarWidth, setSidebarWidth] = React.useState(SIDEBAR_WIDTH_DEFAULT_PX)
+  React.useEffect(() => {
+    // Hydration must start at the server width before restoring browser-only preferences.
     try {
       const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY))
-      return Number.isFinite(stored) && stored >= SIDEBAR_WIDTH_MIN_PX && stored <= SIDEBAR_WIDTH_MAX_PX
-        ? stored
-        : SIDEBAR_WIDTH_DEFAULT_PX
+      if (Number.isFinite(stored) && stored >= SIDEBAR_WIDTH_MIN_PX && stored <= SIDEBAR_WIDTH_MAX_PX) {
+        setSidebarWidth(stored)
+      }
     } catch {
-      return SIDEBAR_WIDTH_DEFAULT_PX
+      // Keep the default width when browser storage is unavailable.
     }
-  })
+  }, [])
   const [isResizing, setIsResizing] = React.useState(false)
   const saveSidebarWidth = React.useCallback((width: number) => {
     try {

@@ -296,6 +296,7 @@ describe("CodeGenerationPage", () => {
 
   it("renders prototype files as a collapsible tree", async () => {
     render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
+    fireEvent.click(await screen.findByRole("tab", { name: "代码" }));
 
     expect(await screen.findByTestId("file-tree-dir-/src")).toBeInTheDocument();
     expect(screen.getByTestId("file-tree-dir-/src/components")).toBeInTheDocument();
@@ -325,21 +326,19 @@ describe("CodeGenerationPage", () => {
     );
   });
 
-  it("places preview actions after regenerate and stacks full-width workspace regions", async () => {
+  it("defaults to the official preview workspace and keeps preview actions in its navigation", async () => {
     render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
     const toolbar = await screen.findByTestId("code-generation-toolbar");
-    const regenerate = within(toolbar).getByRole("button", { name: /重新生成/ });
-    const fullscreen = within(toolbar).getByRole("button", { name: "全屏预览" });
-    const run = within(toolbar).getByRole("button", { name: "运行预览" });
-    expect(regenerate.compareDocumentPosition(fullscreen) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(fullscreen.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const editor = screen.getByTestId("code-editor-region");
-    const preview = screen.getByTestId("code-preview-region");
-    expect(editor.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(editor).toHaveClass("w-full");
-    expect(preview).toHaveClass("w-full");
-    expect(within(preview).queryByRole("button", { name: "运行预览" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "全屏预览" })).toHaveLength(1);
+    expect(within(toolbar).queryByRole("button", { name: "运行预览" })).not.toBeInTheDocument();
+    const navigation = screen.getByTestId("code-preview-navigation");
+    expect(within(navigation).getByRole("button", { name: "全屏预览" })).toBeInTheDocument();
+    expect(within(navigation).getByRole("button", { name: "在新窗口打开" })).toBeInTheDocument();
+    expect(within(navigation).getByRole("button", { name: "运行预览" })).toBeInTheDocument();
+    expect(within(navigation).getByRole("textbox", { name: "预览地址" })).toHaveAttribute("readonly");
+    expect(screen.getByRole("tab", { name: "预览" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("monaco-editor")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Console" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByTestId("code-workspace-content")).toHaveClass("h-[560px]", "lg:h-[680px]");
   });
 
   it("keeps explanatory skill/rule chrome out of the code page", async () => {
@@ -351,7 +350,7 @@ describe("CodeGenerationPage", () => {
     expect(screen.queryByText("业务规则说明")).not.toBeInTheDocument();
   });
 
-  it("hides the mobile file tree and editor while keeping preview actions available", async () => {
+  it("keeps scrollable file tabs and the editor available on mobile while hiding the file tree", async () => {
     stubCompactViewport(true);
 
     render(
@@ -372,6 +371,11 @@ describe("CodeGenerationPage", () => {
     expect(screen.queryByTestId("monaco-editor")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "全屏预览" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "运行预览" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "代码" }));
+    expect(await screen.findByTestId("monaco-editor")).toBeVisible();
+    expect(screen.getByTestId("code-file-tabs")).toHaveClass("overflow-x-auto");
+    expect(screen.queryByTestId("file-tree-dir-/src")).not.toBeInTheDocument();
+    expect(screen.getByTestId("code-preview-region")).not.toBeVisible();
   });
 
   it("shows a clear preview-ready status once generated files exist", async () => {
@@ -459,7 +463,7 @@ describe("CodeGenerationPage", () => {
     monacoMocks.updateFile.mockClear();
     expect(iframe?.getAttribute("sandbox")).toBe("allow-scripts allow-forms");
     expect(iframe?.getAttribute("srcdoc") ?? "").not.toContain("Edited preview text");
-
+    fireEvent.click(screen.getByRole("tab", { name: "代码" }));
     fireEvent.click(screen.getByTestId("mock-edit-app-file"));
 
     expect(await screen.findByText("有未运行的修改")).toBeInTheDocument();
@@ -468,6 +472,17 @@ describe("CodeGenerationPage", () => {
       "/src/App.tsx",
       expect.stringContaining("Edited preview text"),
     );
+
+    const editor = screen.getByTestId("monaco-editor");
+    const originalDocument = iframe?.getAttribute("srcdoc");
+    fireEvent.click(screen.getByRole("tab", { name: "预览" }));
+    expect(document.querySelector('iframe[title="Prototype Preview"]')).toBe(iframe);
+    expect(iframe?.getAttribute("srcdoc")).toBe(originalDocument);
+    expect(editor).not.toBeVisible();
+    fireEvent.click(screen.getByRole("tab", { name: "代码" }));
+    expect(screen.getByTestId("monaco-editor")).toBe(editor);
+    expect(editor).toBeVisible();
+    expect(monacoMocks.models.get("file:///src/App.tsx")?.getValue()).toContain("Edited preview text");
 
     fireEvent.click(screen.getByRole("button", { name: "运行预览" }));
 
@@ -478,6 +493,7 @@ describe("CodeGenerationPage", () => {
       );
     });
     expect(screen.getByText("预览已更新")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "预览" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("shows build errors from a manually run preview without marking it updated", async () => {
@@ -490,6 +506,7 @@ describe("CodeGenerationPage", () => {
       ).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole("tab", { name: "代码" }));
     fireEvent.click(screen.getByTestId("mock-break-app-file"));
     fireEvent.click(screen.getByRole("button", { name: "运行预览" }));
 
@@ -520,6 +537,7 @@ describe("CodeGenerationPage", () => {
       ).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole("tab", { name: "代码" }));
     fireEvent.click(screen.getByTestId("mock-break-app-file"));
     fireEvent.click(screen.getByRole("button", { name: "运行预览" }));
 
@@ -531,6 +549,7 @@ describe("CodeGenerationPage", () => {
       ]);
     });
 
+    fireEvent.click(screen.getByRole("tab", { name: "代码" }));
     fireEvent.click(screen.getByTestId("mock-edit-app-file"));
 
     await waitFor(() => {
@@ -539,7 +558,7 @@ describe("CodeGenerationPage", () => {
     expect(screen.getByText("有未运行的修改")).toBeInTheDocument();
   });
 
-  it("opens the full preview from the preview title", async () => {
+  it("opens the current built preview in a separate window", async () => {
     render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
 
     await waitFor(() => {
@@ -548,7 +567,8 @@ describe("CodeGenerationPage", () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "全屏预览" }));
+    await screen.findByText("预览已更新");
+    fireEvent.click(screen.getByRole("button", { name: "在新窗口打开" }));
 
     await waitFor(() => {
       expect(window.open).toHaveBeenCalledWith(
@@ -626,6 +646,55 @@ describe("CodeGenerationPage", () => {
     }
   });
 
+  it("keeps the opened document available when noopener returns no window handle", async () => {
+    render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
+    await screen.findByText("预览已更新");
+    vi.mocked(window.open).mockReturnValue(null);
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "在新窗口打开" }));
+    expect(window.open).toHaveBeenCalledWith("blob:preview", "_blank", "noopener,noreferrer");
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    expect(screen.queryByText("新窗口被浏览器拦截，请允许弹窗后重试")).not.toBeInTheDocument();
+  });
+
+  it("expands the same workspace with keyboard-accessible controls and restores focus on Escape", async () => {
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
+    const fullscreen = await screen.findByRole("button", { name: "全屏预览" });
+    const iframe = screen.getByTitle("Prototype Preview");
+    fullscreen.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByTestId("code-workspace-frame")).toHaveAttribute("data-fullscreen", "true");
+    expect(screen.getByRole("button", { name: "退出全屏" })).toBeInTheDocument();
+    expect(window.open).not.toHaveBeenCalled();
+    expect(screen.getByTitle("Prototype Preview")).toBe(iframe);
+    await user.keyboard("{Escape}");
+    expect(screen.getByTestId("code-workspace-frame")).toHaveAttribute("data-fullscreen", "false");
+    expect(fullscreen).toHaveFocus();
+    expect(document.body.style.overflow).not.toBe("hidden");
+  });
+
+  it("uses native fullscreen when the browser supports it", async () => {
+    render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
+    const root = await screen.findByTestId("code-workspace-frame");
+    const requestFullscreen = vi.fn(async () => {
+      Object.defineProperty(document, "fullscreenElement", { configurable: true, value: root });
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+    Object.defineProperty(root, "requestFullscreen", { configurable: true, value: requestFullscreen });
+    const exitFullscreen = vi.fn(async () => {
+      Object.defineProperty(document, "fullscreenElement", { configurable: true, value: null });
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+    Object.defineProperty(document, "exitFullscreen", { configurable: true, value: exitFullscreen });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "全屏预览" })));
+    expect(requestFullscreen).toHaveBeenCalledOnce();
+    expect(root).toHaveAttribute("data-fullscreen", "true");
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "退出全屏" })));
+    expect(exitFullscreen).toHaveBeenCalledOnce();
+    expect(root).toHaveAttribute("data-fullscreen", "false");
+  });
+
   it("surfaces local preview build errors instead of leaving a blank preview", async () => {
     render(
       withWorkspaceProviders(
@@ -646,6 +715,7 @@ describe("CodeGenerationPage", () => {
 
   it("configures Monaco TypeScript for React prototype files", async () => {
     render(withWorkspaceProviders(<CodeGenerationPage />, createRepository()));
+    fireEvent.click(await screen.findByRole("tab", { name: "代码" }));
 
     await screen.findByTestId("monaco-editor");
 

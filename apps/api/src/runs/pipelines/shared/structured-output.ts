@@ -1,5 +1,5 @@
 // Owns shared LLM text collection and structured output parse diagnostics.
-import { type ProviderSettings, type RunStage } from "@uml-platform/contracts";
+import { type ProviderSettings, type RunInputImage, type RunStage } from "@uml-platform/contracts";
 import {
   type ChatCompletionResponseFormat,
   type ChatMessage,
@@ -11,8 +11,9 @@ import { formatParseError } from "../../../normalizers/json/parse-json.js";
 const RAW_OUTPUT_LOG_LIMIT = 8000;
 
 export interface LlmChunkHandlers {
+  callId?: string;
   onChunk: (chunk: string) => void;
-  onStart?: () => void;
+  onStart?: (inputImages?: RunInputImage[]) => void;
   onComplete?: () => void;
   onError?: () => void;
   onReasoningChunk?: (chunk: string) => void;
@@ -22,6 +23,13 @@ export interface LlmChunkHandlers {
 }
 
 type LlmChunkSink = ((chunk: string) => void) | LlmChunkHandlers;
+
+function inputImages(messages: ChatMessage[]): RunInputImage[] | undefined {
+  // Record current user image inputs once per call; do not copy text prompts or credentials.
+  const urls = new Set(messages.flatMap((message) => message.role === "user" && Array.isArray(message.content)
+    ? message.content.flatMap((part) => part.type === "image_url" ? [part.image_url.url] : []) : []));
+  return urls.size ? [...urls].map((url) => ({ url })) : undefined;
+}
 
 export type StructuredOutputFailureType =
   | "json_parse"
@@ -154,7 +162,7 @@ export async function collectStructuredResult<T>(
 ) {
   let content = "";
   const observer = typeof onChunk === "function" ? undefined : onChunk;
-  observer?.onStart?.();
+  observer?.onStart?.(inputImages(messages));
   const stopNoVisibleChunkHeartbeat =
     typeof onChunk === "function"
       ? undefined
@@ -205,7 +213,7 @@ export async function collectTextResult(
 ) {
   let content = "";
   const observer = typeof onChunk === "function" ? undefined : onChunk;
-  observer?.onStart?.();
+  observer?.onStart?.(inputImages(messages));
   const stopNoVisibleChunkHeartbeat =
     typeof onChunk === "function"
       ? undefined

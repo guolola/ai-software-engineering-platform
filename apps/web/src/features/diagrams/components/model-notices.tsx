@@ -1,9 +1,9 @@
 // Shows model freshness, visual review, and the next action as a compact status flow.
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../../shared/ui/dialog";
 import { PageNoticeButton, type PageNoticeTone } from "../../../shared/ui/page-notice-button";
+import { StatusFlow, StatusFlowItem } from "../../../shared/ui/status-flow";
 import { cn } from "../../../shared/ui/utils";
 
 export interface ModelNotice {
@@ -18,13 +18,6 @@ export interface ModelNotice {
   reviewCheckedAt?: string;
   confirmed?: boolean;
 }
-
-const tonePresentation = {
-  warning: { icon: AlertTriangle, className: "bg-warning/10 text-warning" },
-  success: { icon: CheckCircle2, className: "bg-success/10 text-success" },
-  destructive: { icon: XCircle, className: "bg-destructive/10 text-destructive" },
-  info: { icon: Info, className: "bg-info/10 text-info" },
-} as const;
 
 export function ModelNotices({ notices, canConfirm, onConfirm }: {
   notices: ModelNotice[];
@@ -79,19 +72,16 @@ export function ModelNotices({ notices, canConfirm, onConfirm }: {
           <DialogTitle>模型提示</DialogTitle>
           <DialogDescription>查看当前模型和图形的状态。</DialogDescription>
         </DialogHeader>
-        <ol className="relative ml-3 border-l border-border" aria-label="模型状态流程">
-          {stages.map((stage) => {
-            const { icon: Icon, className } = tonePresentation[stage.tone];
-            return <li key={stage.id} className="relative pb-5 pl-6 last:pb-0" data-notice-stage={stage.id}>
-              <span className={cn("absolute -left-3.5 top-0 flex size-7 items-center justify-center rounded-full", className)} aria-hidden="true"><Icon className="size-4" /></span>
-              <h3 className="font-medium text-foreground">{stage.title}</h3>
+        <StatusFlow aria-label="模型状态流程">
+          {stages.map((stage) => (
+            <StatusFlowItem key={stage.id} title={stage.title} tone={stage.tone} data-notice-stage={stage.id}>
               <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{stage.detail}</p>
               {stage.issues?.length ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">{stage.issues.map((issue, index) => <li key={`${index}:${issue}`}>{issue}</li>)}</ul> : null}
               {stage.checks !== undefined ? <p className="mt-2 text-xs text-muted-foreground">已检查 {stage.checks} 次；{stage.repairs === undefined ? "自动修复次数未记录" : `已尝试自动修复 ${stage.repairs} 次`}</p> : null}
               {stage.reviewCheckedAt && !stage.confirmed ? <Button type="button" size="sm" className="mt-2" disabled={busy || !canConfirm} onClick={() => void confirm(stage.reviewCheckedAt!)}>确认当前图</Button> : null}
-            </li>;
-          })}
-        </ol>
+            </StatusFlowItem>
+          ))}
+        </StatusFlow>
         {otherNotices.length > 0 ? <ul className="divide-y border-t text-sm">{otherNotices.map((notice) => <li key={notice.id} className="py-3"><strong className={cn("font-medium", notice.tone === "destructive" ? "text-destructive" : notice.tone === "warning" ? "text-warning" : "text-info")}>{notice.title}</strong><p className="mt-1 text-muted-foreground">{notice.detail}</p></li>)}</ul> : null}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>知道了</Button></DialogFooter>

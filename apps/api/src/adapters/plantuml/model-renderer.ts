@@ -4,7 +4,9 @@ import {
   type AnyDiagramModel, type ModelingStage, type DiagramModelSpec, type DesignDiagramModelSpec,
   type PlantUmlArtifact, type DesignPlantUmlArtifact, type ClassAttribute, type ClassOperation,
   type SequenceDiagramSpec, type AnalysisSequenceDiagramSpec,
+  type ModelRenderMapping,
 } from "@uml-platform/contracts";
+import { completeRenderMapping } from "./render-mapping.js";
 import { renderActivityGraph } from "./activity-renderer.js";
 import { umlAlias as alias, umlLabel as quote, umlText as text } from "./plantuml-text.js";
 
@@ -21,16 +23,17 @@ function render(model: AnyDiagramModel, stage: ModelingStage) {
   assertValidModel(model, stage);
   if (model.diagramKind === "table") model = deriveTableModel(model);
   const lines: string[] = ["@startuml", "skinparam shadowing false"];
-  const emitted = new Map<string, { elementId: string; alias: string }>();
-  const connections = new Map<string, { relationshipId: string; sourceId: string; targetId: string; type: string }>();
+  const emitted = new Map<string, ModelRenderMapping["elements"][number]>();
+  const connections = new Map<string, ModelRenderMapping["relationships"][number]>();
   const element = (id: string, statement: string) => {
     if (emitted.has(id)) throw new Error(`Duplicate rendering of ${id}`);
-    emitted.set(id, { elementId: id, alias: alias(id) }); lines.push(statement);
+    emitted.set(id, { elementId: id, alias: alias(id), statement }); lines.push(statement);
   };
   const connection = (id: string, source: string, target: string, type: string, arrow: string, wording?: string, left?: string, right?: string) => {
     if (connections.has(id)) throw new Error(`Duplicate rendering of ${id}`);
-    connections.set(id, { relationshipId: id, sourceId: source, targetId: target, type });
-    lines.push(`${alias(source)}${left ? ` ${quote(left)}` : ""} ${arrow}${right ? ` ${quote(right)}` : ""} ${alias(target)}${wording ? ` : ${wording}` : ""}`);
+    const statement = `${alias(source)}${left ? ` ${quote(left)}` : ""} ${arrow}${right ? ` ${quote(right)}` : ""} ${alias(target)}${wording ? ` : ${wording}` : ""}`;
+    connections.set(id, { relationshipId: id, sourceId: source, targetId: target, type, symbol: arrow, statement });
+    lines.push(statement);
   };
   const containment = (id: string, source: string, target: string, type: string) => {
     connections.set(id, { relationshipId: id, sourceId: source, targetId: target, type });
@@ -98,7 +101,7 @@ function render(model: AnyDiagramModel, stage: ModelingStage) {
         if (!source.includes(`${alias(edge.sourceId)} --> ${alias(edge.targetId)}`)) throw new Error(`Activity rendering omitted ${edge.id}`);
         connections.set(edge.id, { relationshipId: edge.id, sourceId: edge.sourceId, targetId: edge.targetId, type: edge.type });
       }
-      return { source, renderMapping: { elements: [...emitted.values()], relationships: [...connections.values()], mode: "explicit-graph" as const } };
+      return { source, renderMapping: completeRenderMapping(model, source, { elements: [...emitted.values()], relationships: [...connections.values()], mode: "explicit-graph" }) };
     }
     case "analysis": case "sequence": {
       renderSequence(model, lines, element, connection); break;
@@ -176,7 +179,8 @@ function render(model: AnyDiagramModel, stage: ModelingStage) {
   for (const edge of edges) if (!connections.has(edge.id)) throw new Error(`Rendering omitted relationship ${edge.id}`);
   if (model.notes.length && model.diagramKind !== "function") lines.push(`legend bottom\n${model.notes.map(text).join("\n")}\nendlegend`);
   lines.push(model.diagramKind === "function" ? "@endmindmap" : "@enduml");
-  return { source: lines.join("\n"), renderMapping: { elements: [...emitted.values()], relationships: [...connections.values()], mode: "native" as const } };
+  const source = lines.join("\n");
+  return { source, renderMapping: completeRenderMapping(model, source, { elements: [...emitted.values()], relationships: [...connections.values()], mode: "native" }) };
 }
 
 function renderSequence(
@@ -222,8 +226,8 @@ function renderSequence(
   if (rendered.size !== model.messages.length || renderedFragments.size !== model.fragments.length) throw new Error("Sequence rendering omitted messages or fragments");
 }
 
-export function generatePlantUmlArtifacts(models: DiagramModelSpec[]): PlantUmlArtifact[] {
-  return models.map((model) => ({ modelId: "modelId" in model ? model.modelId : undefined, diagramKind: model.diagramKind, ...render(model, "requirements") }));
+export function generatePlantUmlArtifacts(models: DiagramModelSpec[], stage: "requirements" | "feasibility" = "requirements"): PlantUmlArtifact[] {
+  return models.map((model) => ({ modelId: "modelId" in model ? model.modelId : undefined, diagramKind: model.diagramKind, ...render(model, stage) }));
 }
 export function generateDesignPlantUmlArtifacts(models: DesignDiagramModelSpec[]): DesignPlantUmlArtifact[] {
   return models.map((model) => ({ modelId: model.modelId, diagramKind: model.diagramKind, ...render(model, "design") }));

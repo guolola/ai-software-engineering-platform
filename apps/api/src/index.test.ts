@@ -47,8 +47,9 @@ function createTestApiServer(options?: Parameters<typeof createApiServer>[0]) {
   // Existing pipeline fixtures model extraction; answer the new preflight with source ids.
   const screeningTransport: LlmTransport | undefined = options?.llmTransport ? {
     async *streamChatCompletion(input: Parameters<LlmTransport["streamChatCompletion"]>[0]) {
-      if (lastPromptText(input.messages).startsWith("请对照结构化模型检查此 UML 图")) {
-        yield JSON.stringify({ passed: true, issues: [] });
+      const prompt = lastPromptText(input.messages);
+      if (/^(请对照结构化模型检查此 UML 图|核对模型对需求|核对图对模型)/.test(prompt)) {
+        yield JSON.stringify({ passed: true, issues: [], findings: [] });
         return;
       }
       if (String(input.messages[0]?.content).includes("你是软件需求输入检查器")) {

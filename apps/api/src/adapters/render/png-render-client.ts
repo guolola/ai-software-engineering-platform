@@ -5,7 +5,7 @@ import {
 } from "@uml-platform/contracts";
 import type { AnyPlantUmlArtifact } from "./render-client.js";
 
-export type PngRenderClient = (artifact: AnyPlantUmlArtifact) => Promise<{
+export type PngRenderClient = (artifact: AnyPlantUmlArtifact, abortSignal?: AbortSignal) => Promise<{
   png: Buffer;
   renderMeta: RenderPngResponse["renderMeta"];
 }>;
@@ -13,9 +13,11 @@ export type PngRenderClient = (artifact: AnyPlantUmlArtifact) => Promise<{
 export async function createPngRenderClient(
   baseUrl: string,
   artifact: AnyPlantUmlArtifact,
+  abortSignal?: AbortSignal,
 ): Promise<Awaited<ReturnType<PngRenderClient>>> {
   const response = await fetch(`${baseUrl}/render/png`, {
     method: "POST",
+    signal: abortSignal,
     headers: {
       "Content-Type": "application/json",
     },

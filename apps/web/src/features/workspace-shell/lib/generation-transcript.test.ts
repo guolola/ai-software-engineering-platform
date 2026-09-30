@@ -11,6 +11,47 @@ const activity = (id: string, callId: string, phase: RunActivityEvent["phase"], 
 });
 
 describe("generation transcript", () => {
+  it("retains manual confirmation only for the same fingerprint in new review replay", () => {
+    const check = { ...activity("check", "image", "completed"), stage: "verify_diagram_visual" as const, subtaskId: "usecase", operation: "visual_check" as const, round: 1 };
+    const review = { status: "pending_review" as const, issues: ["待确认标签"], reason: "待确认", attempts: 1, checkedAt: "check-1", checkOutcome: "differences" as const, inputFingerprint: "new" };
+    const events: RunEvent[] = [check, { type: "completed", snapshot: createRunSnapshot({ status: "completed", visualReviews: { usecase: review } }) }];
+    const accepted = projectGenerationTranscript(events, "completed", [], { usecase: { ...review, confirmedAt: "confirmed" } });
+    expect(accepted.steps[0].calls[0]).toMatchObject({ status: "completed", message: "已人工确认当前图", review });
+    const changed = projectGenerationTranscript(events, "completed", [], { usecase: { ...review, inputFingerprint: "old", confirmedAt: "confirmed" } });
+    expect(changed.steps[0].calls[0].status).toBe("pending_review");
+  });
+  it("restores model operation, repair round and structured findings under the latest image call", () => {
+    const started = { ...activity("check", "structure", "started"), stage: "verify_diagram_visual" as const, modelId: "usecase", subtaskId: "usecase", operation: "structure_check" as const, round: 0 };
+    const repair = { ...started, eventId: "repair", callId: "repair", operation: "model_repair" as const, round: 1 };
+    const image = { ...started, eventId: "image", callId: "image", operation: "visual_check" as const, round: 1, inputImages: [{ url: "data:image/png;base64,YQ==" }] };
+    const review = { status: "passed" as const, issues: [], reason: "通过", attempts: 1, repairAttempts: 1, structureAttempts: 2, checkedAt: "check-1", checkOutcome: "verified" as const, inputFingerprint: "new", repairHistory: [{ round: 1, target: "model" as const, issueIds: ["comparator"], beforeFingerprint: "old", afterFingerprint: "new", callId: "repair", status: "accepted" as const, changes: ["比较符 > 改为 >="], reason: "已确认条件" }] };
+    const events: RunEvent[] = [started, repair, image, { type: "completed", snapshot: createRunSnapshot({ status: "completed", visualReviews: { usecase: review } }) }];
+    const calls = projectGenerationTranscript(JSON.parse(JSON.stringify(events))).steps[0].calls;
+    expect(calls.map((call) => call.operation)).toEqual(["structure_check", "model_repair", "visual_check"]);
+    expect(calls[0].title).toContain("结构核对"); expect(calls[1].title).toContain("第 1 轮");
+    expect(calls[0].review).toBeUndefined(); expect(calls[2].review).toEqual(review);
+    expect(calls[2].inputImages).toEqual(image.inputImages);
+  });
+  it("keeps a handled image-input skip from becoming a task failure, including persisted replay", () => {
+    const started = { ...activity("start", "visual", "started"), stage: "verify_diagram_visual" as const, subtaskId: "usecase", inputImages: [{ url: "data:image/png;base64,YQ==" }] };
+    const events: RunEvent[] = [started, { ...started, eventId: "failed", phase: "failed" },
+      { type: "stage_progress", stage: "verify_diagram_visual", progress: 98, subtaskId: "usecase", subtaskStatus: "completed", message: "已跳过视觉检查：不支持图片输入" }];
+    const live = projectGenerationTranscript(events).steps[0].calls[0];
+    expect(live).toMatchObject({ id: "visual", status: "completed", message: "已跳过视觉检查：不支持图片输入", inputImages: started.inputImages });
+    const restored = projectGenerationTranscript([events[0], events[1], { type: "completed", snapshot: createRunSnapshot({ status: "completed", visualReviews: {
+      usecase: { status: "skipped", issues: [], reason: "不支持图片输入", attempts: 1, checkedAt: "2026-09-30T08:00:00.000Z" },
+    } }) }]);
+    expect(restored.steps[0].calls[0]).toMatchObject({ status: "completed", message: "已跳过视觉检查：不支持图片输入" });
+  });
+  it("replays input images under their own parallel calls without mixing stages", () => {
+    const first = { url: "data:image/png;base64,YQ==", caption: "环境图" };
+    const second = { url: "data:image/png;base64,Yg==", caption: "流程图" };
+    const a = { ...activity("image-a", "context", "started"), stage: "verify_diagram_visual" as const, inputImages: [first] };
+    const b = { ...activity("image-b", "flow", "started"), stage: "verify_diagram_visual" as const, inputImages: [second] };
+    const transcript = projectGenerationTranscript([a, b, a, { ...a, eventId: "duplicate-image" }]);
+    expect(transcript.steps[0].calls.map((call) => call.inputImages)).toEqual([[first], [second]]);
+    expect(projectGenerationTranscript([activity("legacy", "a", "started")]).steps[0].calls[0].inputImages).toBeUndefined();
+  });
   it("shows client rule repair after extraction without exposing the empty model phase", () => {
     const events: RunEvent[] = [
       { type: "stage_started", stage: "extract_rules", tracksCompletion: true },

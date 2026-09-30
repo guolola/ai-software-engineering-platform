@@ -9,8 +9,8 @@ export function visualReviewDetail(review: {
 }
 
 export function isConfirmedVisualReview(
-  review: { checkedAt?: string; status?: string } | null | undefined,
-  current: { checkedAt?: string; confirmedAt?: string } | null | undefined,
+  review: { checkedAt?: string; status?: string; inputFingerprint?: string } | null | undefined,
+  current: { checkedAt?: string; confirmedAt?: string; inputFingerprint?: string } | null | undefined,
 ) {
-  return review?.status === "pending_review" && Boolean(review.checkedAt && current?.confirmedAt && current.checkedAt === review.checkedAt);
+  return review?.status === "pending_review" && Boolean(review.checkedAt && current?.confirmedAt && current.checkedAt === review.checkedAt && current.inputFingerprint === review.inputFingerprint);
 }

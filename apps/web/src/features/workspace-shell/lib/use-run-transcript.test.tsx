@@ -27,14 +27,15 @@ describe("restored task transcript", () => {
     let signalA!: AbortSignal;
     vi.mocked(readRunTranscript).mockImplementation(async (_project, runId, signal) => {
       if (runId === "a") { signalA = signal; return new Promise((resolve) => { resolveA = resolve; }); }
-      return { events: [event("b", "b1")], run: { status: "completed" } };
+      return { events: [event("b", "b1")], run: { status: "completed", model: "deepseek-flash" } };
     });
     const { result, rerender } = renderHook(({ id }) => useRunTranscript("project", id, "requirements"), { initialProps: { id: "a" } });
     rerender({ id: "b" });
     await waitFor(() => expect(result.current.events[0]?.eventId).toBe("b1"));
-    await act(async () => resolveA({ events: [event("a", "a1")], run: { status: "completed" } }));
+    await act(async () => resolveA({ events: [event("a", "a1")], run: { status: "completed", model: "old-model" } }));
     expect(signalA.aborted).toBe(true);
     expect(result.current.events.map((item) => item.eventId)).toEqual(["b1"]);
+    expect(result.current.model).toBe("deepseek-flash");
   });
 
   it("reconnects after transport failure while retaining the existing conversation", async () => {

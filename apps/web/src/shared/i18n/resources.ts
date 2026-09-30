@@ -427,6 +427,7 @@ export const resources = {
       },
       generation: {
         resultStale: "结果基于生成开始时的内容，期间修改不会自动合并到本次结果",
+        confirmationFlow: { label: "模型生成范围", updated: "更新", added: "新增" },
         dialog: { thisRequirement: "这条需求", thisRule: "这条规则", thisRun: "本次运行", smartRepair: "智能修复", technicalHidden: "未能提供可安全展示的错误详情，请携带请求或任务编号联系管理员。", problem: "任务遇到内部错误，请携带请求或任务编号联系管理员。", completedWithFailures: "生成已完成，但有 {{count}} 个模型生成失败，可在当前页面查看错误并重试。", completed: "生成完成。", qualityHints: "另有 {{count}} 项质量提示，可在当前页面查看。", result: "生成结果", failure: "操作失败", success: "操作成功", listSeparator: "、", groups: { rules: "需求规则补齐", requirements: "需求模型补齐 / 更新", new: "新生成", regenerated: "重新生成", designDependencies: "设计依赖补齐", kept: "保留不变" }, noModels: "本次没有需要生成的模型。", confirmGeneration: "确认生成", titles: { cancelled: "任务已取消", failed: "生成失败", requirementsPartial: "需求模型部分生成", rulesCompleted: "需求规则已生成", requirementsCompleted: "需求模型已生成", designPartial: "设计模型部分生成", designCompleted: "设计模型已生成", codeCompleted: "代码原型已生成", documentMissing: "说明书已生成但缺图", documentCompleted: "说明书已生成" }, repairFailedCount: "生成完成，但有 {{count}} 条需求规则修复失败，请重试后确认。", repairPendingCount: "生成完成，已生成 {{count}} 条修复候选，请确认后继续生成模型。", labels: { rules: "需求规则", requirementModels: "需求模型", currentText: "当前需求文本", selectedRequirementModels: "已选需求模型", designModels: "设计模型", selectedDesignModels: "已选设计图", codePrototype: "代码原型", currentCodePrototype: "当前代码原型", document: "说明书" }, codeNoChanges: "本次未产生文件变更。", codeRegenerated: "代码重新生成完成。", codeCompleted: "代码生成完成。", documentMissing: "{{title}}已生成，但有 {{count}} 项图源缺失，请复核后交付。", documentCompleted: "{{title}}已生成。" },
         status: {
           idle: "暂无任务", queued: "排队中", running: "运行中", completed: "已完成",
@@ -461,6 +462,11 @@ export const resources = {
           requirements: "需求模型生成", design: "设计模型生成", code: "代码生成", document: "说明书生成",
           feasibility: "可行性分析生成", unknown: "项目生成任务",
         },
+        assistants: {
+          requirements: "需求建模助手", design: "设计建模助手", code: "代码生成助手", document: "文档编写助手",
+          feasibility: "可研分析助手", unknown: "生成助手",
+        },
+        thoughtProcess: { active: "正在思考", finished: "思考过程" },
         drawer: {
           serverRuns: "服务端运行中", taskList: "任务列表", clearCompleted: "清理已完成",
           status: "状态", progress: "进度", message: "消息", noActiveTask: "暂无进行中的任务",
@@ -658,7 +664,7 @@ export const resources = {
         generatedHint: "生成后可进入 Word 编辑器。", generateKind: "生成{{title}}", generateAndOpen: "生成并打开", download: "下载", openEditor: "打开编辑器", backToList: "返回说明书列表",
         readingDocumentInfo: "正在读取文档信息", editorLoading: "正在加载 OnlyOffice 编辑器...", editorNotReady: "OnlyOffice 编辑器尚未就绪", editorConfigurationHint: "请确认 API 已配置 ONLYOFFICE_DOCUMENT_SERVER_URL，并且 Document Server 可以访问 PUBLIC_API_BASE_URL。", downloadCurrent: "下载当前 DOCX",
         downloaded: "已下载 {{fileName}}", kinds: { requirementsSpec: "需求规格说明书", softwareDesignSpec: "软件设计说明书", feasibilityStudy: "可行性研究报告" },
-        guidance: { listErrorTitle: "说明书暂时无法读取", editorMessage: "在线编辑器暂时不可用，可以下载现有说明书后继续处理。", prerequisiteTitle: "{{title}}暂时无法生成" },
+        guidance: { overviewDescription: "查看说明书的生成条件和需要处理的问题。", listErrorTitle: "说明书暂时无法读取", editorMessage: "在线编辑器暂时不可用，可以下载现有说明书后继续处理。", prerequisiteTitle: "{{title}}暂时无法生成" },
         prerequisites: {
           requirements: "请先在需求模型页生成需求模型",
           design: "请先在设计模型页生成设计模型",
@@ -1147,6 +1153,13 @@ export const resources = {
           fitWidth: "适应宽度",
           newTab: "新标签",
           exported: "已导出 {{file}}",
+          download: "下载",
+          downloadPreparing: "正在准备下载",
+          downloadNoSvg: "SVG 尚未生成",
+          downloadNoSource: "PlantUML 源码尚未生成",
+          downloadUnsupported: "当前环境暂不支持 PNG、PDF 下载",
+          downloadFailed: "图表下载失败",
+          downloadError: "图表下载失败：{{error}}",
           noSvg: "尚未生成 SVG",
           invalidSvg: "SVG 内容无效",
           renderFailed: "渲染失败：{{error}}",
@@ -1427,13 +1440,18 @@ export const resources = {
           runPreview: "运行预览",
           diagnostics: "诊断（{{count}}）",
         },
+        views: { label: "代码与预览", code: "代码", preview: "预览" },
         panes: {
           files: "文件",
           editor: "编辑",
           preview: "预览",
         },
         preview: {
-          openWindow: "全屏预览",
+          openWindow: "在新窗口打开",
+          fullscreen: "全屏预览",
+          exitFullscreen: "退出全屏",
+          refresh: "刷新预览",
+          address: "预览地址",
           compiling: "预览正在编译",
           notReady: "预览还没有准备好",
           popupBlocked: "新窗口被浏览器拦截，请允许弹窗后重试",
@@ -1453,7 +1471,7 @@ export const resources = {
           },
           building: {
             title: "正在构建预览",
-            message: "正在把当前编辑内容构建到下方预览。",
+            message: "正在把当前编辑内容构建到预览视图。",
           },
           error: {
             title: "预览构建失败",
@@ -1967,6 +1985,7 @@ export const resources = {
       },
       generation: {
         resultStale: "This result uses the content from when generation started; later edits are not merged automatically.",
+        confirmationFlow: { label: "Model generation scope", updated: "Updated", added: "New" },
         dialog: { thisRequirement: "this requirement", thisRule: "this rule", thisRun: "this run", smartRepair: "smart repair", technicalHidden: "No error details are safe to display. Contact an administrator with the request or task ID.", problem: "The task encountered an internal error. Contact an administrator with the request or task ID.", completedWithFailures: "Generation completed, but {{count}} models failed. Review and retry them on this page.", completed: "Generation completed.", qualityHints: "There are also {{count}} quality hints to review on this page.", result: "Generation result", failure: "Operation failed", success: "Operation succeeded", listSeparator: ", ", groups: { rules: "Requirement-rule dependencies", requirements: "Requirement-model dependencies / updates", new: "New", regenerated: "Regenerated", designDependencies: "Design dependencies", kept: "Kept unchanged" }, noModels: "No models need to be generated this time.", confirmGeneration: "Confirm generation", titles: { cancelled: "Task cancelled", failed: "Generation failed", requirementsPartial: "Requirement models partially generated", rulesCompleted: "Requirement rules generated", requirementsCompleted: "Requirement models generated", designPartial: "Design models partially generated", designCompleted: "Design models generated", codeCompleted: "Code prototype generated", documentMissing: "Document generated with missing diagrams", documentCompleted: "Document generated" }, repairFailedCount: "Generation completed, but {{count}} requirement-rule repairs failed. Retry and confirm them.", repairPendingCount: "Generation completed with {{count}} repair candidates. Confirm them before generating models.", labels: { rules: "Requirement rules", requirementModels: "Requirement models", currentText: "Current requirement text", selectedRequirementModels: "Selected requirement models", designModels: "Design models", selectedDesignModels: "Selected design diagrams", codePrototype: "Code prototype", currentCodePrototype: "Current code prototype", document: "Document" }, codeNoChanges: "No files changed in this run.", codeRegenerated: "Code regeneration completed.", codeCompleted: "Code generation completed.", documentMissing: "{{title}} was generated, but {{count}} diagram sources are missing. Review them before delivery.", documentCompleted: "{{title}} was generated." },
         status: {
           idle: "No tasks", queued: "Queued", running: "Running", completed: "Completed",
@@ -2001,6 +2020,11 @@ export const resources = {
           requirements: "Requirement model generation", design: "Design model generation", code: "Code generation", document: "Document generation",
           feasibility: "Feasibility analysis generation", unknown: "Project generation task",
         },
+        assistants: {
+          requirements: "Requirements Modeling Assistant", design: "Design Modeling Assistant", code: "Code Generation Assistant", document: "Documentation Assistant",
+          feasibility: "Feasibility Study Assistant", unknown: "Generation Assistant",
+        },
+        thoughtProcess: { active: "Thinking", finished: "Thought process" },
         drawer: {
           serverRuns: "Server runs", taskList: "Tasks", clearCompleted: "Clear completed",
           status: "Status", progress: "Progress", message: "Message", noActiveTask: "No active task",
@@ -2201,7 +2225,7 @@ export const resources = {
         generatedHint: "Generate the document to open it in the Word editor.", generateKind: "Generate {{title}}", generateAndOpen: "Generate and open", download: "Download", openEditor: "Open editor", backToList: "Back to documents",
         readingDocumentInfo: "Loading document information", editorLoading: "Loading the OnlyOffice editor...", editorNotReady: "The OnlyOffice editor is not ready", editorConfigurationHint: "Confirm that ONLYOFFICE_DOCUMENT_SERVER_URL is configured and the Document Server can access PUBLIC_API_BASE_URL.", downloadCurrent: "Download current DOCX",
         downloaded: "Downloaded {{fileName}}", kinds: { requirementsSpec: "Requirements specification", softwareDesignSpec: "Software design specification", feasibilityStudy: "Feasibility report" },
-        guidance: { listErrorTitle: "Documents cannot be loaded right now", editorMessage: "The online editor is temporarily unavailable. You can download the existing document and continue working.", prerequisiteTitle: "{{title}} cannot be generated yet" },
+        guidance: { overviewDescription: "Review document prerequisites and issues that need attention.", listErrorTitle: "Documents cannot be loaded right now", editorMessage: "The online editor is temporarily unavailable. You can download the existing document and continue working.", prerequisiteTitle: "{{title}} cannot be generated yet" },
         prerequisites: {
           requirements: "Generate requirement models first",
           design: "Generate design models first",
@@ -2690,6 +2714,13 @@ export const resources = {
           fitWidth: "Fit width",
           newTab: "New tab",
           exported: "Exported {{file}}",
+          download: "Download",
+          downloadPreparing: "Preparing download",
+          downloadNoSvg: "SVG has not been generated",
+          downloadNoSource: "PlantUML source has not been generated",
+          downloadUnsupported: "PNG and PDF downloads are unavailable in this environment",
+          downloadFailed: "Diagram download failed",
+          downloadError: "Diagram download failed: {{error}}",
           noSvg: "SVG has not been generated",
           invalidSvg: "The SVG content is invalid",
           renderFailed: "Rendering failed: {{error}}",
@@ -2970,13 +3001,18 @@ export const resources = {
           runPreview: "Run preview",
           diagnostics: "Diagnostics ({{count}})",
         },
+        views: { label: "Code and preview", code: "Code", preview: "Preview" },
         panes: {
           files: "Files",
           editor: "Editor",
           preview: "Preview",
         },
         preview: {
-          openWindow: "Fullscreen preview",
+          openWindow: "Open in new window",
+          fullscreen: "Fullscreen preview",
+          exitFullscreen: "Exit fullscreen",
+          refresh: "Refresh preview",
+          address: "Preview address",
           compiling: "Compiling preview",
           notReady: "The preview is not ready yet",
           popupBlocked: "The browser blocked the new window. Allow pop-ups and try again.",

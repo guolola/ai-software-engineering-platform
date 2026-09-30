@@ -22,12 +22,14 @@ import {
   type MailAdapter,
 } from "../mail/mail-adapter.js";
 import { DEFAULT_RENDER_SERVICE_BASE_URL } from "./defaults.js";
+import { createPdfRenderClient, type PdfRenderClient } from "../adapters/render/pdf-render-client.js";
 
 export type ApiExternalAdapterOverrides = {
   llmTransport?: LlmTransport;
   llmScheduler?: LlmScheduler;
   renderClient?: RenderClient;
   pngRenderClient?: PngRenderClient;
+  pdfRenderClient?: PdfRenderClient;
   renderServiceBaseUrl?: string;
   mailAdapter?: MailAdapter;
 };
@@ -38,6 +40,7 @@ export type ApiExternalAdapters = {
   renderServiceBaseUrl: string;
   renderClient: RenderClient;
   pngRenderClient: PngRenderClient;
+  pdfRenderClient: PdfRenderClient;
   mailAdapter: MailAdapter;
 };
 
@@ -54,12 +57,12 @@ export function createApiExternalAdapters(
     overrides.renderServiceBaseUrl ?? DEFAULT_RENDER_SERVICE_BASE_URL;
   const renderClient: RenderClient =
     overrides.renderClient ??
-    ((artifact: AnyPlantUmlArtifact) =>
-      createRenderClient(renderServiceBaseUrl, artifact));
+    ((artifact: AnyPlantUmlArtifact, abortSignal?: AbortSignal) =>
+      createRenderClient(renderServiceBaseUrl, artifact, abortSignal));
   const pngRenderClient: PngRenderClient =
     overrides.pngRenderClient ??
-    ((artifact: AnyPlantUmlArtifact) =>
-      createPngRenderClient(renderServiceBaseUrl, artifact));
+    ((artifact: AnyPlantUmlArtifact, abortSignal?: AbortSignal) =>
+      createPngRenderClient(renderServiceBaseUrl, artifact, abortSignal));
   const mailAdapter = overrides.mailAdapter ?? createMailAdapterFromEnv();
 
   return {
@@ -68,6 +71,7 @@ export function createApiExternalAdapters(
     renderServiceBaseUrl,
     renderClient,
     pngRenderClient,
+    pdfRenderClient: overrides.pdfRenderClient ?? ((artifact, signal) => createPdfRenderClient(renderServiceBaseUrl, artifact, signal)),
     mailAdapter,
   };
 }

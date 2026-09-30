@@ -138,6 +138,19 @@ test("18 composite primary/foreign keys and association tables derive faithful c
   assert.ok(source.includes("||--o{")); assert.ok(source.includes("FOREIGN KEY (order, tenant)")); assert.ok(source.includes("id > 0 AND tenant > 0"));
   compile(source);
 });
+test("review mapping preserves labels, symbols, ownership and distinct parallel guard statements", () => {
+  const model = modelFixture("requirements", "activity"); if (model.diagramKind !== "activity") throw new Error("fixture");
+  model.relationships[1]!.guard = "数量>=10";
+  model.relationships.push({ ...model.relationships[1]!, id: "alternate", guard: "数量<10" });
+  const artifact = draw(model, "requirements");
+  assert.equal(artifact.renderMapping?.relationships.find((item) => item.relationshipId === "r2")?.label, "数量>=10");
+  assert.ok(artifact.renderMapping?.relationships.find((item) => item.relationshipId === "r2")?.statement?.includes("数量>=10"));
+  assert.ok(artifact.renderMapping?.relationships.find((item) => item.relationshipId === "alternate")?.statement?.includes("数量<10"));
+  assert.equal(artifact.renderMapping?.relationships[0]?.symbol, "-->");
+  assert.equal(artifact.renderMapping?.elements.find((item) => item.elementId === "work")?.ownerId, "system");
+  assert.ok(artifact.renderMapping?.auxiliary?.some((item) => item.kind === "legend"));
+  compile(artifact.source);
+});
 
 test("parallel control and object flows preserve multiple pins and cross-partition endpoints", () => {
   const model = parallelObjectActivityFixture(), artifact = draw(model, "requirements"), svg = compile(artifact.source);

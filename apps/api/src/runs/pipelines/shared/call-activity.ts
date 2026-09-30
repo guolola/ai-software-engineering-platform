@@ -1,6 +1,6 @@
 // Batches durable user-visible output and records the lifetime of one real model call.
 import { randomUUID } from "node:crypto";
-import type { RunActivityEvent, RunStage } from "@uml-platform/contracts";
+import type { RunActivityEvent, RunInputImage, RunStage } from "@uml-platform/contracts";
 import { emitEvent, type RunRecord } from "../../records/run-record-store.js";
 
 export function createCallActivity(input: {
@@ -9,6 +9,9 @@ export function createCallActivity(input: {
   subtaskId?: string;
   subtaskLabel?: string;
   format?: "text" | "technical";
+  modelId?: string;
+  operation?: RunActivityEvent["operation"];
+  round?: number;
 }) {
   const callId = randomUUID();
   let started = false;
@@ -17,18 +20,20 @@ export function createCallActivity(input: {
   let pending = "";
   let pendingPhase: "output" | "reasoning" | "summary" | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const emit = (phase: RunActivityEvent["phase"], text?: string) => {
+  const emit = (phase: RunActivityEvent["phase"], text?: string, inputImages?: RunInputImage[]) => {
     emitEvent(input.record, {
       type: "run_activity", eventId: randomUUID(), createdAt: new Date().toISOString(),
       runId: input.record.snapshot.runId, stage: input.stage, callId,
+      modelId: input.modelId, operation: input.operation, round: input.round,
       subtaskId: input.subtaskId, subtaskLabel: input.subtaskLabel,
       format: input.format ?? "technical", phase, text,
+      ...(inputImages?.length ? { inputImages } : {}),
     });
   };
-  const start = () => {
+  const start = (images?: RunInputImage[]) => {
     if (started || ended || input.record.terminal) return;
     started = true;
-    emit("started");
+    emit("started", undefined, images?.map((image, index) => ({ ...image, caption: image.caption ?? `${input.subtaskLabel ?? "此阶段"}使用的图片 ${index + 1}` })));
   };
   const flush = () => {
     clearTimeout(timer);
@@ -62,6 +67,7 @@ export function createCallActivity(input: {
   const beforeTerminal = () => { flush(); ended = true; };
   (input.record.beforeTerminal ??= new Set()).add(beforeTerminal);
   return {
+    callId,
     onStart: start,
     onChunk(chunk: string) {
       if (ended || input.record.terminal) return;

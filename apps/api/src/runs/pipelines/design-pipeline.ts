@@ -57,7 +57,7 @@ import {
   throwIfRunCancelled,
 } from "../records/run-cancellation.js";
 import { renderArtifactWithRepair } from "./render/render-artifact-with-repair.js";
-import { reviewRenderedArtifact } from "./render/review-rendered-artifact.js";
+import { DiagramReviewRenderError, reviewRenderedArtifact } from "./render/review-rendered-artifact.js";
 import type { PngRenderClient } from "../../adapters/render/png-render-client.js";
 import { withConversationBranch } from "./shared/conversation-context.js";
 import { stageProgressValue } from "./shared/pipeline-events.js";
@@ -1311,115 +1311,56 @@ export async function runDesignStagePipeline(
     ...snapshot.designModelTraceability,
   ];
   let diagramErrors: Record<string, DiagramError> = {};
-  let plantUml: DesignPlantUmlArtifact[] = [];
-  let svgArtifacts: DesignSvgArtifact[] = [];
+  let plantUml: DesignPlantUmlArtifact[] = [...snapshot.plantUml];
+  let svgArtifacts: DesignSvgArtifact[] = [...snapshot.svgArtifacts];
   const renderFailures: string[] = [];
   const publishDesignModelSnapshot = () => {
     snapshot.models = models;
     snapshot.designModelTraceability = designModelTraceability;
     snapshot.diagramErrors = diagramErrors;
   };
-  const renderDesignModelArtifact = async (model: DesignDiagramModelSpec) => {
+  const renderDesignModelArtifact = async <T extends DesignDiagramModelSpec>(model: T, traceability: typeof designModelTraceability) => {
     throwIfRunCancelled(record);
-    const artifacts = generateDesignPlantUmlArtifacts([model]);
-    for (const artifact of artifacts) {
-      const subtaskLabel = designArtifactSubtaskLabel(model, artifact);
-      appendDesignTrace(record, {
-        stage: "generate_plantuml",
-        attempt: 1,
-        kind: "plantuml_source",
-        diagramKind: artifact.diagramKind,
-        plantUmlSource: artifact.source,
+    try {
+      const checked = await reviewRenderedArtifact({
+        record, providerSettings, llmTransport, renderClient, pngRenderClient, model, mutable: true,
+        basis: { stage: "design", baseline: snapshot.requirementBaseline,
+          upstreamModels: snapshot.requirementModels, traceability, requirementTraceability: snapshot.requirementModelTraceability },
+        reconcileTraceability: (candidate) => {
+          const normalized = normalizeDesignTraceabilityWithCoverage(traceability, [candidate as DesignDiagramModelSpec], snapshot.requirementModels);
+          const derived = deriveDesignRelationshipTraceability(normalized.traceability, [candidate as DesignDiagramModelSpec]);
+          const coverage = normalizeDesignTraceabilityWithCoverage(derived, [candidate as DesignDiagramModelSpec], snapshot.requirementModels);
+          if (coverage.missingSources.length) throw new Error("修复后的设计模型缺少有效追踪关系");
+          return coverage.traceability;
+        },
       });
-      plantUml = replaceDesignPlantUmlArtifact(plantUml, artifact);
-      snapshot.plantUml = plantUml;
-      emitEvent(
-        record,
-        artifactReadyRunEventSchema.parse({
-          type: "artifact_ready",
-          stage: "generate_plantuml",
-          artifactKind: "plantuml",
-          diagramKind: artifact.diagramKind,
-          modelId: artifact.modelId,
-          subtaskId: artifact.modelId ?? artifact.diagramKind,
-          subtaskLabel,
-          subtaskStatus: "completed",
-        }),
-      );
-
-      emitEvent(
-        record,
-        stageProgressRunEventSchema.parse({
-          type: "stage_progress",
-          stage: "render_svg",
-          progress: stageProgressValue("render_svg"),
-          message: `正在渲染：${subtaskLabel}`,
-          diagramKind: artifact.diagramKind,
-          modelId: artifact.modelId,
-          subtaskId: artifact.modelId ?? artifact.diagramKind,
-          subtaskLabel,
-          subtaskStatus: "rendering",
-        }),
-      );
-      let rendered = await renderArtifactWithRepair(
-        record,
-        providerSettings,
-        llmTransport,
-        renderClient,
-        model,
-        artifact,
-      );
       throwIfRunCancelled(record);
-      if (rendered.status === "success") {
-        svgArtifacts = replaceDesignSvgArtifact(svgArtifacts, rendered.svgArtifact as DesignSvgArtifact);
-        snapshot.svgArtifacts = svgArtifacts;
-        emitEvent(record, artifactReadyRunEventSchema.parse({
-          type: "artifact_ready", stage: "render_svg", artifactKind: "svg",
-          diagramKind: artifact.diagramKind, modelId: artifact.modelId,
-          subtaskId: artifact.modelId ?? artifact.diagramKind, subtaskStatus: "completed",
-        }));
-        const checked = await reviewRenderedArtifact({ record, providerSettings, llmTransport, renderClient, pngRenderClient, model, rendered });
-        rendered = checked.rendered;
-        snapshot.visualReviews[artifact.modelId ?? artifact.diagramKind] = checked.review;
+      // Publish the accepted tuple together; rejected candidates stay private.
+      models = mergeDesignModels(models, [checked.model as DesignDiagramModelSpec]);
+      const acceptedTrace = (checked.traceability ?? traceability) as typeof designModelTraceability;
+      designModelTraceability = [...designModelTraceability.filter((entry) => model.modelId ? entry.source.modelId !== model.modelId : entry.source.diagramKind !== model.diagramKind), ...acceptedTrace.filter((entry) => model.modelId ? entry.source.modelId === model.modelId : entry.source.diagramKind === model.diagramKind)];
+      snapshot.models = models; snapshot.designModelTraceability = designModelTraceability;
+      plantUml = replaceDesignPlantUmlArtifact(plantUml, checked.rendered.artifact as DesignPlantUmlArtifact);
+      svgArtifacts = replaceDesignSvgArtifact(svgArtifacts, checked.rendered.svgArtifact as DesignSvgArtifact);
+      snapshot.plantUml = plantUml; snapshot.svgArtifacts = svgArtifacts;
+      snapshot.visualReviews[model.modelId ?? model.diagramKind] = checked.review;
+      appendDesignTrace(record, { stage: "generate_plantuml", attempt: 1, kind: "plantuml_source", diagramKind: model.diagramKind, plantUmlSource: checked.rendered.artifact.source });
+      for (const [stage, artifactKind] of [["generate_plantuml", "plantuml"], ["render_svg", "svg"]] as const) {
+        emitEvent(record, artifactReadyRunEventSchema.parse({ type: "artifact_ready", stage, artifactKind,
+          diagramKind: model.diagramKind, modelId: model.modelId, subtaskId: model.modelId ?? model.diagramKind,
+          subtaskLabel: model.title, subtaskStatus: "completed" }));
       }
-      plantUml = replaceDesignPlantUmlArtifact(
-        plantUml,
-        rendered.artifact as DesignPlantUmlArtifact,
-      );
-      snapshot.plantUml = plantUml;
-      if (rendered.status === "success") {
-        svgArtifacts = replaceDesignSvgArtifact(
-          svgArtifacts,
-          rendered.svgArtifact as DesignSvgArtifact,
-        );
-        snapshot.svgArtifacts = svgArtifacts;
-        delete diagramErrors[artifact.modelId ?? artifact.diagramKind];
-        delete diagramErrors[artifact.diagramKind];
-        snapshot.diagramErrors = diagramErrors;
-        continue;
+      return checked.model as T;
+    } catch (error) {
+      throwIfRunCancelled(record);
+      if (error instanceof DiagramReviewRenderError) {
+        snapshot.visualReviews[model.modelId ?? model.diagramKind] = error.review;
+        renderFailures.push(error.message);
+        const runError = createRunError("RUN_RENDER_FAILED", error.message);
+        diagramErrors[model.diagramKind] = diagramErrorSchema.parse({ stage: "render_svg", error: runError });
+        snapshot.diagramErrors = diagramErrors; throwRunError(runError);
       }
-
-      renderFailures.push(rendered.errorMessage);
-      const renderError = createRunError("RUN_RENDER_FAILED", rendered.errorMessage);
-      diagramErrors[artifact.modelId ?? artifact.diagramKind] = diagramErrorSchema.parse({
-        stage: "render_svg",
-        error: renderError,
-      });
-      snapshot.diagramErrors = diagramErrors;
-      emitEvent(
-        record,
-        stageProgressRunEventSchema.parse({
-          type: "stage_progress",
-          stage: "render_svg",
-          progress: stageProgressValue("render_svg"),
-          message: rendered.errorMessage,
-          error: renderError,
-          diagramKind: artifact.diagramKind,
-          modelId: artifact.modelId,
-          subtaskId: artifact.modelId ?? artifact.diagramKind,
-          subtaskStatus: "failed",
-        }),
-      );
+      throw error;
     }
   };
   const selectedDesignDiagrams = new Set(snapshot.selectedDiagrams);
@@ -1516,6 +1457,8 @@ export async function runDesignStagePipeline(
               result.models[0]!,
               scopedAnalysisModels,
             );
+            result.models = await Promise.all(result.models.map((model) => renderDesignModelArtifact(model, result.designModelTraceability)));
+            result.designModelTraceability = designModelTraceability.filter((entry) => result.models.some((model) => model.modelId ? entry.source.modelId === model.modelId : entry.source.diagramKind === model.diagramKind)) as typeof result.designModelTraceability;
             models = mergeDesignModels(models, result.models);
             designModelTraceability = [
               ...designModelTraceability.filter(
@@ -1539,13 +1482,15 @@ export async function runDesignStagePipeline(
                 subtaskStatus: "completed",
               }),
             );
-            await Promise.all(result.models.map(renderDesignModelArtifact));
+
             record.conversationContext?.commitValidatedBranch(`design:${modelId}`, JSON.stringify(result.models));
             return result;
           } catch (error) {
             throwIfRunCancelled(record);
             lastRunError = normalizeRunError(error);
             lastErrorMessage = lastRunError.message;
+            // Rendering failures use the render gate and never restart model generation.
+            if (lastRunError.code === "RUN_RENDER_FAILED") break;
           }
         }
 
@@ -1553,7 +1498,7 @@ export async function runDesignStagePipeline(
         const runError = lastRunError ?? createRunError("RUN_MODEL_OUTPUT_EMPTY", message);
         sequenceRunErrors.push(runError);
         diagramErrors[modelId] = diagramErrorSchema.parse({
-          stage: "generate_design_sequence",
+          stage: runError.code === "RUN_RENDER_FAILED" ? "render_svg" : "generate_design_sequence",
           error: runError,
         });
         publishDesignModelSnapshot();
@@ -1738,6 +1683,8 @@ export async function runDesignStagePipeline(
           },
         );
         throwIfRunCancelled(record);
+        result.models = await Promise.all(result.models.map((model) => renderDesignModelArtifact(model, result.designModelTraceability)));
+        result.designModelTraceability = designModelTraceability.filter((entry) => result.models.some((model) => model.modelId ? entry.source.modelId === model.modelId : entry.source.diagramKind === model.diagramKind)) as typeof result.designModelTraceability;
         models = mergeDesignModels(models, result.models);
         designModelTraceability = [
           ...designModelTraceability.filter(
@@ -1758,7 +1705,7 @@ export async function runDesignStagePipeline(
             subtaskStatus: "completed",
           }),
         );
-        await Promise.all(result.models.map(renderDesignModelArtifact));
+
         record.conversationContext?.commitValidatedBranch(`design:${diagram}`, JSON.stringify(result.models));
         return result;
       } catch (error) {
@@ -1766,7 +1713,7 @@ export async function runDesignStagePipeline(
         const runError = normalizeRunError(error);
         const message = runError.message || `${designDiagramLabel(diagram)}生成失败`;
         diagramErrors[diagram] = diagramErrorSchema.parse({
-          stage: "generate_design_models",
+          stage: runError.code === "RUN_RENDER_FAILED" ? "render_svg" : "generate_design_models",
           error: runError,
         });
         publishDesignModelSnapshot();

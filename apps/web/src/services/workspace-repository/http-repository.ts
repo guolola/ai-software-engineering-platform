@@ -70,6 +70,7 @@ import {
 } from "./workspace-state";
 import {
   renderPlantUmlRequest,
+  exportDiagramRequest,
   renderStructuredModelRequest,
   repairRequirementRuleRequest,
   repairRequirementRulesRequest,
@@ -686,6 +687,10 @@ export function createHttpWorkspaceRepository(
 
     async renderPlantUml(diagramKind, plantUmlSource) {
       return renderPlantUmlRequest(diagramKind, plantUmlSource, projectId);
+    },
+
+    exportDiagram(input, signal) {
+      return exportDiagramRequest(input, projectId, signal);
     },
 
     async renderStructuredModel(model, stage) {

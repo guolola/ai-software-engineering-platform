@@ -175,6 +175,13 @@ copy_release_payload() {
   cp "$SOURCE_DIR/apps/web/package.json" "$TMP_DIR/apps/web/"
   cp -R "$SOURCE_DIR/apps/api/dist" "$TMP_DIR/apps/api/dist"
   cp -R "$SOURCE_DIR/apps/render-service/dist" "$TMP_DIR/apps/render-service/dist"
+  # Vector PDF fonts and their license are generated runtime assets shipped with dist.
+  for font_asset in NotoSansCJKsc-Regular.otf NotoSansCJKsc-Bold.otf LICENSE.txt; do
+    if [[ ! -s "$TMP_DIR/apps/render-service/dist/assets/pdf-fonts/$font_asset" ]]; then
+      echo "PDF font asset missing from render-service build: $font_asset" >&2
+      exit 1
+    fi
+  done
   mkdir -p "$TMP_DIR/apps/web/.next"
   cp -R "$SOURCE_DIR/apps/web/.next/standalone" "$TMP_DIR/apps/web/.next/standalone"
   mkdir -p "$TMP_DIR/apps/web/.next/standalone/apps/web/.next"

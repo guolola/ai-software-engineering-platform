@@ -42,3 +42,11 @@ export const renderPngResponseSchema = z.object({
   renderMeta: svgArtifactSchema.shape.renderMeta,
 });
 export type RenderPngResponse = z.infer<typeof renderPngResponseSchema>;
+
+export const renderPdfRequestSchema = renderSvgRequestSchema;
+export type RenderPdfRequest = z.infer<typeof renderPdfRequestSchema>;
+export const renderPdfResponseSchema = z.object({
+  pdfBase64: z.string().min(1),
+  renderMeta: svgArtifactSchema.shape.renderMeta,
+});
+export type RenderPdfResponse = z.infer<typeof renderPdfResponseSchema>;

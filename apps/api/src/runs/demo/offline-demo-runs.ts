@@ -34,6 +34,7 @@ import {
 import { emitEvent, type RunRecord } from "../records/run-record-store.js";
 import { throwIfRunCancelled } from "../records/run-cancellation.js";
 import { emitOfflineDemoActivity } from "./offline-demo-activity.js";
+import { emitOfflineDemoDiagramReviews } from "./offline-demo-diagram-review.js";
 import { createStageLifecycle } from "../pipelines/shared/stage-lifecycle.js";
 import { stageProgressValue } from "../pipelines/shared/pipeline-events.js";
 import { librarySeatDemoFixture } from "./fixtures/library-seat-demo-fixture.js";
@@ -351,6 +352,10 @@ export async function completeOfflineDemoRequirementRun(
       }),
     );
   }
+  if (selectedKinds.length > 0) {
+    await emitDemoStage(record, stages, "verify_diagram_visual", "离线演示：核对结构、修复有依据的问题并复查图片");
+    await emitOfflineDemoDiagramReviews(record);
+  }
   completeRecord(record, runSnapshotSchema.parse(snapshot));
 }
 
@@ -413,6 +418,10 @@ export async function completeOfflineDemoDesignRun(
       artifactKind: "svg",
     }),
   );
+  if (snapshot.models.length > 0) {
+    await emitDemoStage(record, stages, "verify_diagram_visual", "离线演示：核对设计约束、记录结构纠错及图片复查");
+    await emitOfflineDemoDiagramReviews(record);
+  }
   completeRecord(record, designRunSnapshotSchema.parse(snapshot));
 }
 

@@ -95,7 +95,6 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
       estimatedWaitMs: subtask.estimatedWaitMs, reason: subtask.queueReason,
     })),
   } : null;
-  const title = t(`generation.taskKinds.${kind ?? "unknown"}`);
   const perform = async (action: () => Promise<void>) => {
     if (actionBusy) return;
     setActionBusy(true);
@@ -116,8 +115,10 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
     if (kind === "design" && ["architecture", "sequence", "class", "navigation", "component", "deployment", "table"].includes(diagram)) void session.generateDesignDiagrams([diagram as DesignDiagramKind]);
   };
   const completed = transcript.completed?.snapshot;
-  return <GenerationTranscript key={taskKey} taskKey={taskKey} steps={transcript.visibleSteps} active={active} status={transcript.status} queue={queue}
-    introduction={runId || selectedLocal ? title : "暂无生成任务。发起生成后，执行过程会在这里逐段显示。"}
+  // Historical tasks use their saved model; changing global model settings cannot relabel a past run.
+  const providerModel = restored.model ?? selectedRemote?.model ?? diagnostics?.providerModel;
+  return <GenerationTranscript key={taskKey} taskKey={taskKey} steps={transcript.visibleSteps} active={active} kind={kind} model={providerModel} queue={queue}
+    emptyMessage={runId || selectedLocal ? undefined : "暂无生成任务。发起生成后，执行过程会在这里逐段显示。"}
     finalMessage={transcript.finalMessage || (!active && runId ? t(`generation.status.${transcript.status === "interrupted" ? "interruptedDetail" : transcript.status}`) : "")}
     onRetry={kind === "requirements" || kind === "design" ? retrySubtask : undefined}>
     {restored.loading && <p role="status" className="text-sm text-muted-foreground">正在恢复任务过程…</p>}

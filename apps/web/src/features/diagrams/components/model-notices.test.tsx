@@ -9,6 +9,17 @@ const notices: ModelNotice[] = [
 ];
 
 describe("model notices", () => {
+  it("preserves positive and neutral fallback stages in the shared status flow", () => {
+    render(<ModelNotices notices={[{ id: "context", kind: "info", tone: "info", title: "状态", detail: "模型已加载" }]} canConfirm onConfirm={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "提示（1）" }));
+    const flow = screen.getByRole("list", { name: "模型状态流程" });
+    const stages = within(flow).getAllByRole("listitem");
+    expect(stages.map(stage => within(stage).getByRole("heading").textContent)).toEqual(["模型当前有效", "视觉检查", "下一步"]);
+    expect(stages.map(stage => stage.dataset.flowTone)).toEqual(["success", "info", "success"]);
+    expect(stages[1].querySelector("svg")).toHaveClass("lucide-info");
+    expect(screen.queryByRole("button", { name: "确认当前图" })).not.toBeInTheDocument();
+  });
+
   it("keeps all notice content in one dialog and only closes nonvisual notices", () => {
     render(<ModelNotices notices={notices} canConfirm onConfirm={vi.fn()} />);
     expect(screen.getByRole("button", { name: "提示（2）" })).toBeVisible();

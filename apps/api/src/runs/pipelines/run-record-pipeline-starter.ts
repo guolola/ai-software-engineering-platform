@@ -424,7 +424,7 @@ export function startFeasibilityRecordPipeline({
         providerSettings,
         conversation.transport,
         demo?.renderClient ?? renderClient,
-        pngRenderClient,
+        demo?.pngRenderClient ?? pngRenderClient,
       );
     } catch (error) {
       terminalError = handleRunPipelineError(record, error, () => undefined);
@@ -516,7 +516,7 @@ export async function runRunRecordPipeline({
             providerSettings,
             conversation.transport,
             demo?.renderClient ?? renderClient,
-            pngRenderClient,
+            demo?.pngRenderClient ?? pngRenderClient,
           )
         : taskType === "document_generation"
         ? runDocumentStagePipeline(

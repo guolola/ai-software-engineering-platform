@@ -287,7 +287,8 @@ describe("DiagramView", () => {
     expect(await screen.findByText("预览")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /PlantUML/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/@startuml/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "PlantUML" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "下载" }));
+    expect(await screen.findByRole("menuitem", { name: "PlantUML" })).toBeInTheDocument();
     expect(screen.queryByText("溯源·需求规则")).not.toBeInTheDocument();
     expect(screen.queryByText("用户可以查看公开活动。")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /JSON/i })).not.toBeInTheDocument();
@@ -340,7 +341,8 @@ describe("DiagramView", () => {
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "用例模型", level: 1 })).toBeInTheDocument());
     expect(screen.getByText("尚未生成 SVG")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "PlantUML" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "下载" }));
+    expect(await screen.findByRole("menuitem", { name: /PlantUML/ })).toHaveAttribute("aria-disabled", "true");
     expect(screen.queryByText(/尚未生成。请回到/)).not.toBeInTheDocument();
     expect(screen.getByText("查看活动安排")).toBeInTheDocument();
   });
@@ -1211,7 +1213,8 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
 
-    await userEvent.click(await screen.findByRole("button", { name: "SVG" }));
+    await userEvent.click(await screen.findByRole("button", { name: "下载" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "SVG" }));
 
     expect(downloadTextFileMock).toHaveBeenCalledWith(
       "requirements-usecase.svg",
@@ -1245,7 +1248,8 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
 
-    await userEvent.click(await screen.findByRole("button", { name: "PlantUML" }));
+    await userEvent.click(await screen.findByRole("button", { name: "下载" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "PlantUML" }));
 
     expect(downloadTextFileMock).toHaveBeenCalledWith(
       "requirements-usecase.puml",
@@ -2457,8 +2461,10 @@ describe("DiagramView", () => {
       ),
     );
 
-    await userEvent.click(await screen.findByRole("button", { name: "SVG" }));
-    await userEvent.click(screen.getByRole("button", { name: "PlantUML" }));
+    await userEvent.click(await screen.findByRole("button", { name: "下载" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "SVG" }));
+    await userEvent.click(await screen.findByRole("button", { name: "下载" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "PlantUML" }));
     expect(downloadTextFileMock).toHaveBeenNthCalledWith(
       1,
       "context.svg",
@@ -2489,8 +2495,10 @@ describe("DiagramView", () => {
       })),
     ));
 
-    await userEvent.click(await screen.findByRole("button", { name: "SVG" }));
-    await userEvent.click(screen.getByRole("button", { name: "PlantUML" }));
+    await userEvent.click(await screen.findByRole("button", { name: "下载" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "SVG" }));
+    await userEvent.click(await screen.findByRole("button", { name: "下载" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "PlantUML" }));
     expect(downloadTextFileMock).toHaveBeenNthCalledWith(
       1, "feasibility-business-flow.svg", expect.stringContaining("业务流程"), "image/svg+xml",
     );

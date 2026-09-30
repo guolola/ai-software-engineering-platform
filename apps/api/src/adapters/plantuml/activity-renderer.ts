@@ -37,7 +37,8 @@ export function renderActivityGraph(model: ActivityDiagramSpec): string {
   for (const node of model.nodes.filter((node) => !node.actorOrLane)) renderNode(node);
   for (const edge of model.relationships) {
     const semantics = [edge.type === "object_flow" ? "«object flow»" : "", edge.guard && `[${edge.guard}]`, edge.condition && `[${edge.condition}]`, edge.trigger].filter(Boolean).map((value) => umlText(String(value)));
-    lines.push(`${umlAlias(edge.sourceId)} --> ${umlAlias(edge.targetId)}${semantics.length ? ` : ${semantics.join("\\n")}` : ""}`);
+    // Preserve edge identity even when several guards connect the same pair of nodes.
+    lines.push(`' @relationship ${umlAlias(edge.id)}`, `${umlAlias(edge.sourceId)} --> ${umlAlias(edge.targetId)}${semantics.length ? ` : ${semantics.join("\\n")}` : ""}`);
   }
   lines.push(`legend left\n活动图：显式图形映射；方形端点表示动作输入/输出引脚。\n${model.notes.map(umlText).join("\n")}\nendlegend`, "@enduml");
   return lines.join("\n");

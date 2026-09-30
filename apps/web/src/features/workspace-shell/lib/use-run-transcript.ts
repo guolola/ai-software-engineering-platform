@@ -7,7 +7,7 @@ import { mergeTranscriptEvents } from "../../workspace-session/lib/run-transcrip
 
 export function useRunTranscript(projectId?: string | null, runId?: string | null, kind?: string | null) {
   const key = `${projectId ?? ""}:${runId ?? ""}`;
-  const [state, setState] = useState<{ key: string; events: RunEvent[]; status?: string; loading: boolean; disconnected: boolean; unavailable: boolean }>({ key, events: [], loading: false, disconnected: false, unavailable: false });
+  const [state, setState] = useState<{ key: string; events: RunEvent[]; status?: string; model?: string | null; loading: boolean; disconnected: boolean; unavailable: boolean }>({ key, events: [], loading: false, disconnected: false, unavailable: false });
   useEffect(() => {
     if (!projectId || !runId) return;
     const controller = new AbortController();
@@ -24,7 +24,7 @@ export function useRunTranscript(projectId?: string | null, runId?: string | nul
         const result = await readRunTranscript(projectId, runId, controller.signal);
         if (controller.signal.aborted) return;
         update(result.events);
-        setState((current) => ({ ...current, status: result.run.status }));
+        setState((current) => ({ ...current, status: result.run.status, model: result.run.model }));
         if (!["queued", "running"].includes(result.run.status)) return;
         await streamRunTranscript(projectId, runId, result.run.runKind ?? kind ?? "requirements", (event) => { delay = 1000; update([event]); }, controller.signal);
       } catch (error) {

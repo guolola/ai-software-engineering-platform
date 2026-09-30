@@ -27,7 +27,7 @@ function demoRecord(): RunRecord {
 
 async function runDemo(record: RunRecord) {
   const adapters = offlineFeasibilityAdapters(record)!;
-  await runFeasibilityStagePipeline(record, offlineDemoProviderSettings, adapters.llmTransport, adapters.renderClient);
+  await runFeasibilityStagePipeline(record, offlineDemoProviderSettings, adapters.llmTransport, adapters.renderClient, adapters.pngRenderClient);
   return record.snapshot as FeasibilityRunSnapshot;
 }
 
@@ -36,6 +36,14 @@ test("fixed demo yields current environment, business flow and two complete impl
   const snapshot = await runDemo(record);
   assert.equal(snapshot.status, "completed");
   assert.equal(snapshot.implementationPlan!.candidates.length, 2);
+  assert.equal(snapshot.visualReviews.context.checkOutcome, "inconclusive");
+  assert.equal(snapshot.visualReviews.context.attempts, 1);
+  assert.equal(snapshot.visualReviews.context.repairAttempts, 0);
+  assert.match(snapshot.visualReviews.context.stopReason!, /唯一确定/);
+  assert.equal(snapshot.visualReviews["feasibility-business-flow"].status, "passed");
+  const imageCalls = record.events.filter((event) => event.type === "run_activity" && event.operation === "visual_check" && event.phase === "started");
+  assert.equal(imageCalls.length, 2);
+  assert.ok(imageCalls.every((event) => event.type === "run_activity" && event.inputImages?.[0].url.startsWith("data:image/png;base64,")));
   assert.ok(snapshot.contextSvg!.svg.includes("图书馆管理员"));
   assert.ok(snapshot.businessFlow!.svg.svg.includes("未通过"));
   assert.deepEqual(normalizeFeasibilityBusinessFlow(librarySeatFeasibilityFlow, new Set(snapshot.rules.map((rule) => rule.id))), librarySeatFeasibilityFlow);

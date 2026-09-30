@@ -32,6 +32,7 @@ import type { SystemNoticeStore } from "./system-notices/records/system-notice-s
 import type { RunRecordStore } from "./runs/records/run-record-store.js";
 import type { RenderClient } from "./adapters/render/render-client.js";
 import type { PngRenderClient } from "./adapters/render/png-render-client.js";
+import type { PdfRenderClient } from "./adapters/render/pdf-render-client.js";
 import {
   createBullMqRunQueue,
   createRunQueueConfigFromEnv,
@@ -42,6 +43,7 @@ export async function createApiServer(options?: {
   imageClient?: ImageGenerationClient;
   renderClient?: RenderClient;
   pngRenderClient?: PngRenderClient;
+  pdfRenderClient?: PdfRenderClient;
   renderServiceBaseUrl?: string;
   providerConfigStore?: ProviderConfigStore;
   authStore?: AuthStore;
@@ -69,6 +71,7 @@ export async function createApiServer(options?: {
     renderServiceBaseUrl,
     renderClient,
     pngRenderClient,
+    pdfRenderClient,
     mailAdapter,
   } = createApiExternalAdapters({
     llmTransport: options?.llmTransport,
@@ -76,6 +79,7 @@ export async function createApiServer(options?: {
     renderServiceBaseUrl: options?.renderServiceBaseUrl,
     renderClient: options?.renderClient,
     pngRenderClient: options?.pngRenderClient,
+    pdfRenderClient: options?.pdfRenderClient,
     mailAdapter: options?.mailAdapter,
   });
   const {
@@ -184,6 +188,7 @@ export async function createApiServer(options?: {
     llmTransport,
     renderClient,
     pngRenderClient,
+    pdfRenderClient,
     systemNoticeStore,
     testRunAccessContext,
     disableBillingEntitlementGuard: options?.disableBillingEntitlementGuard,

@@ -61,7 +61,7 @@ import {
   throwIfRunCancelled,
 } from "../records/run-cancellation.js";
 import { renderArtifactWithRepair } from "./render/render-artifact-with-repair.js";
-import { reviewRenderedArtifact } from "./render/review-rendered-artifact.js";
+import { DiagramReviewRenderError, reviewRenderedArtifact } from "./render/review-rendered-artifact.js";
 import type { PngRenderClient } from "../../adapters/render/png-render-client.js";
 import { withConversationBranch } from "./shared/conversation-context.js";
 import { stageProgressValue } from "./shared/pipeline-events.js";
@@ -1105,111 +1105,51 @@ export async function runStagePipeline(
   let requirementModelTraceability: RunSnapshot["requirementModelTraceability"] = [
     ...snapshot.requirementModelTraceability,
   ];
-  let plantUml: PlantUmlArtifact[] = [];
-  let svgArtifacts: SvgArtifact[] = [];
+  let plantUml: PlantUmlArtifact[] = [...snapshot.plantUml];
+  let svgArtifacts: SvgArtifact[] = [...snapshot.svgArtifacts];
   const renderFailures: string[] = [];
   let diagramErrors: Partial<Record<DiagramKind, DiagramError>> = {};
 
-  const renderRequirementModelArtifact = async (model: DiagramModelSpec) => {
+  const renderRequirementModelArtifact = async <T extends DiagramModelSpec>(model: T, traceability: typeof requirementModelTraceability) => {
     throwIfRunCancelled(record);
-    const artifacts = generatePlantUmlArtifacts([model]);
-    for (const artifact of artifacts) {
-      const subtaskLabel = requirementArtifactSubtaskLabel(model, artifact);
-      appendRequirementTrace(record, {
-        stage: "generate_plantuml",
-        attempt: 1,
-        kind: "plantuml_source",
-        diagramKind: artifact.diagramKind,
-        plantUmlSource: artifact.source,
+    try {
+      const checked = await reviewRenderedArtifact({
+        record, providerSettings, llmTransport, renderClient, pngRenderClient, model, mutable: true,
+        basis: { stage: "requirements", baseline: snapshot.requirementBaseline, rules: snapshot.rules,
+          upstreamModels: models, traceability },
+        reconcileTraceability: (candidate) => {
+          const coverage = normalizeRequirementTraceabilityWithCoverage(traceability, rules, [candidate as DiagramModelSpec]);
+          if (coverage.missingTargets.length) throw new Error("修复后的需求模型缺少有效追踪关系");
+          return coverage.traceability;
+        },
       });
-      plantUml = replaceRequirementPlantUmlArtifact(plantUml, artifact);
-      snapshot.plantUml = plantUml;
-      emitEvent(
-        record,
-        artifactReadyRunEventSchema.parse({
-          type: "artifact_ready",
-          stage: "generate_plantuml",
-          artifactKind: "plantuml",
-          diagramKind: artifact.diagramKind,
-          modelId: artifact.modelId,
-          subtaskId: artifact.modelId ?? artifact.diagramKind,
-          subtaskLabel,
-          subtaskStatus: "completed",
-        }),
-      );
-
-      emitEvent(
-        record,
-        stageProgressRunEventSchema.parse({
-          type: "stage_progress",
-          stage: "render_svg",
-          progress: stageProgressValue("render_svg"),
-          message: `正在渲染：${subtaskLabel}`,
-          diagramKind: artifact.diagramKind,
-          modelId: artifact.modelId,
-          subtaskId: artifact.modelId ?? artifact.diagramKind,
-          subtaskLabel,
-          subtaskStatus: "rendering",
-        }),
-      );
-      let rendered = await renderArtifactWithRepair(
-        record,
-        providerSettings,
-        llmTransport,
-        renderClient,
-        model,
-        artifact,
-      );
       throwIfRunCancelled(record);
-      if (rendered.status === "success") {
-        svgArtifacts = replaceRequirementSvgArtifact(svgArtifacts, rendered.svgArtifact as SvgArtifact);
-        snapshot.svgArtifacts = svgArtifacts;
-        emitEvent(record, artifactReadyRunEventSchema.parse({
-          type: "artifact_ready", stage: "render_svg", artifactKind: "svg",
-          diagramKind: artifact.diagramKind, modelId: artifact.modelId,
-          subtaskId: artifact.modelId ?? artifact.diagramKind, subtaskStatus: "completed",
-        }));
-        const checked = await reviewRenderedArtifact({ record, providerSettings, llmTransport, renderClient, pngRenderClient, model, rendered });
-        rendered = checked.rendered;
-        snapshot.visualReviews[artifact.modelId ?? artifact.diagramKind] = checked.review;
+      // Publish the accepted tuple together; rejected candidates stay private.
+      models = mergeRequirementModels(models, [checked.model as DiagramModelSpec]);
+      const acceptedTrace = (checked.traceability ?? traceability) as typeof requirementModelTraceability;
+      requirementModelTraceability = [...requirementModelTraceability.filter((entry) => model.modelId ? entry.target.modelId !== model.modelId : entry.target.diagramKind !== model.diagramKind), ...acceptedTrace.filter((entry) => model.modelId ? entry.target.modelId === model.modelId : entry.target.diagramKind === model.diagramKind)];
+      snapshot.models = models; snapshot.requirementModelTraceability = requirementModelTraceability;
+      plantUml = replaceRequirementPlantUmlArtifact(plantUml, checked.rendered.artifact as PlantUmlArtifact);
+      svgArtifacts = replaceRequirementSvgArtifact(svgArtifacts, checked.rendered.svgArtifact as SvgArtifact);
+      snapshot.plantUml = plantUml; snapshot.svgArtifacts = svgArtifacts;
+      snapshot.visualReviews[model.modelId ?? model.diagramKind] = checked.review;
+      appendRequirementTrace(record, { stage: "generate_plantuml", attempt: 1, kind: "plantuml_source", diagramKind: model.diagramKind, plantUmlSource: checked.rendered.artifact.source });
+      for (const [stage, artifactKind] of [["generate_plantuml", "plantuml"], ["render_svg", "svg"]] as const) {
+        emitEvent(record, artifactReadyRunEventSchema.parse({ type: "artifact_ready", stage, artifactKind,
+          diagramKind: model.diagramKind, modelId: model.modelId, subtaskId: model.modelId ?? model.diagramKind,
+          subtaskLabel: model.title, subtaskStatus: "completed" }));
       }
-      plantUml = replaceRequirementPlantUmlArtifact(
-        plantUml,
-        rendered.artifact as PlantUmlArtifact,
-      );
-      snapshot.plantUml = plantUml;
-      if (rendered.status === "success") {
-        svgArtifacts = replaceRequirementSvgArtifact(
-          svgArtifacts,
-          rendered.svgArtifact as SvgArtifact,
-        );
-        snapshot.svgArtifacts = svgArtifacts;
-        delete diagramErrors[artifact.diagramKind];
-        snapshot.diagramErrors = diagramErrors;
-        continue;
+      return checked.model as T;
+    } catch (error) {
+      throwIfRunCancelled(record);
+      if (error instanceof DiagramReviewRenderError) {
+        snapshot.visualReviews[model.modelId ?? model.diagramKind] = error.review;
+        renderFailures.push(error.message);
+        const runError = createRunError("RUN_RENDER_FAILED", error.message);
+        diagramErrors[model.diagramKind] = diagramErrorSchema.parse({ stage: "render_svg", error: runError });
+        snapshot.diagramErrors = diagramErrors; throwRunError(runError);
       }
-
-      renderFailures.push(rendered.errorMessage);
-      const renderError = createRunError("RUN_RENDER_FAILED", rendered.errorMessage);
-      diagramErrors[artifact.diagramKind] = diagramErrorSchema.parse({
-        stage: "render_svg",
-        error: renderError,
-      });
-      snapshot.diagramErrors = diagramErrors;
-      emitEvent(
-        record,
-        stageProgressRunEventSchema.parse({
-          type: "stage_progress",
-          stage: "render_svg",
-          progress: stageProgressValue("render_svg"),
-          message: rendered.errorMessage,
-          error: renderError,
-          diagramKind: artifact.diagramKind,
-          modelId: artifact.modelId,
-          subtaskId: artifact.modelId ?? artifact.diagramKind,
-          subtaskStatus: "failed",
-        }),
-      );
+      throw error;
     }
   };
 
@@ -1397,6 +1337,8 @@ export async function runStagePipeline(
             "（精简重试）",
           );
         }
+        result.models = await Promise.all(result.models.map((model) => renderRequirementModelArtifact(model, result.requirementModelTraceability)));
+        result.requirementModelTraceability = requirementModelTraceability.filter((entry) => result.models.some((model) => model.modelId ? entry.target.modelId === model.modelId : entry.target.diagramKind === model.diagramKind)) as typeof result.requirementModelTraceability;
         models = [
           ...models.filter((model) => model.diagramKind !== diagram),
           ...result.models,
@@ -1423,7 +1365,6 @@ export async function runStagePipeline(
           }),
         );
         throwIfRunCancelled(record);
-        await Promise.all(result.models.map(renderRequirementModelArtifact));
         record.conversationContext?.commitValidatedBranch(`requirement:${diagram}`, JSON.stringify(result.models));
         return { diagram, result };
       } catch (error) {
@@ -1431,7 +1372,7 @@ export async function runStagePipeline(
         const runError = normalizeRunError(error);
         const message = runError.message || `${diagram} 模型生成失败`;
         diagramErrors[diagram] = diagramErrorSchema.parse({
-          stage: "generate_models",
+          stage: runError.code === "RUN_RENDER_FAILED" ? "render_svg" : "generate_models",
           error: runError,
         });
         snapshot.diagramErrors = diagramErrors;
@@ -1507,18 +1448,7 @@ export async function runStagePipeline(
           targetUseCaseIds.size > 0 &&
           !analysisModelMatchesTarget(model, targetUseCaseIds),
       );
-      models = models.filter(
-        (model) =>
-          model.diagramKind !== "analysis" ||
-          (targetUseCaseIds.size > 0 &&
-            !analysisModelMatchesTarget(model as AnalysisRequirementModel, targetUseCaseIds)),
-      );
-      requirementModelTraceability = requirementModelTraceability.filter(
-        (entry) =>
-          entry.target.diagramKind !== "analysis" ||
-          (targetUseCaseIds.size > 0 &&
-            !analysisTraceabilityMatchesTarget(entry, targetUseCaseIds)),
-      );
+
 
       const generateAnalysisForUseCase = async (useCase: UseCaseForAnalysis) => {
         throwIfRunCancelled(record);
@@ -1594,6 +1524,8 @@ export async function runStagePipeline(
             );
           }
           const result = coerceAnalysisModelForUseCase(rawResult, useCase);
+          result.models = await Promise.all(result.models.map((model) => renderRequirementModelArtifact(model, result.requirementModelTraceability)));
+        result.requirementModelTraceability = requirementModelTraceability.filter((entry) => result.models.some((model) => model.modelId ? entry.target.modelId === model.modelId : entry.target.diagramKind === model.diagramKind)) as typeof result.requirementModelTraceability;
           models = mergeRequirementModels(models, result.models);
           requirementModelTraceability = [
             ...requirementModelTraceability.filter(
@@ -1618,7 +1550,6 @@ export async function runStagePipeline(
               subtaskStatus: "completed",
             }),
           );
-          await Promise.all(result.models.map(renderRequirementModelArtifact));
           record.conversationContext?.commitValidatedBranch(`requirement:${modelId}`, JSON.stringify(result.models));
           return result;
         } catch (error) {
@@ -1626,7 +1557,7 @@ export async function runStagePipeline(
           const runError = normalizeRunError(error);
           const message = runError.message || `${useCase.name}需求分析模型生成失败`;
           diagramErrors.analysis = diagramErrorSchema.parse({
-            stage: "generate_models",
+            stage: runError.code === "RUN_RENDER_FAILED" ? "render_svg" : "generate_models",
             error: runError,
           });
           snapshot.diagramErrors = diagramErrors;
@@ -1729,11 +1660,7 @@ export async function runStagePipeline(
       }
       validateUseCaseAnalysisCoverage(analysisModels, useCaseModel, targetUseCaseIds);
       models = mergeRequirementModels(models, analysisModels);
-      requirementModelTraceability = [
-        ...requirementModelTraceability.filter(
-          (entry) => entry.target.diagramKind !== "analysis",
-        ),
-      ];
+      // Per-model commits already reconciled valid analysis traceability.
     }
     await Promise.all(prerequisiteTasks.values());
     throwIfRunCancelled(record);

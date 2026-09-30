@@ -278,6 +278,11 @@ test("requirement auto-fill rotates fallback rules and marks low-confidence revi
     ),
   );
 });
+test("even strong name similarity remains pending and cannot become confirmed authority", () => {
+  const filled = autoFillRequirementTraceability([{ diagramKind: "class", elementId: "订单", elementKind: "class", label: "订单" }], [{ id: "R1", category: "数据需求", text: "系统保存订单信息和订单状态", relatedDiagrams: ["class"] }]);
+  assert.equal(filled[0]?.mappingSource, "auto-filled-pending-review");
+  assert.equal(filled[0]?.reviewStatus, "pending");
+});
 
 test("requirement traceability preserves pending review metadata", () => {
   const normalized = normalizeRequirementTraceability(

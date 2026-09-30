@@ -638,33 +638,6 @@ export function TextRequirementView({
         </div>
       )}
 
-      {view !== "system" && showStaleBanner && staleDiagrams.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 text-sm text-warning">
-          <span>
-            {t("requirements.stale.modelCount", { count: staleDiagrams.length, reason: staleDiagramReason })}
-            {staleDiagrams.map((diagram) => getDiagramLabel(diagram, t)).join(t("traceability.refSeparator"))}
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="ml-auto h-7"
-            onClick={() => runGenerateDiagrams(staleDiagrams)}
-            disabled={
-              generating ||
-              Boolean(requirementReviewBlockedReason) ||
-              !canRunGeneration || Boolean(generationModelBlockedReason)
-            }
-            title={
-              !canRunGeneration || Boolean(generationModelBlockedReason)
-                ? generationBlockedByPermissionReason
-                : generationBlockedTitle
-            }
-          >
-            <RefreshCw className="size-3.5" /> {t("requirements.stale.updateModels")}
-          </Button>
-        </div>
-      )}
-
       <PageContainer className="flex flex-col gap-5">
           <PageHeader
             title={

@@ -15,12 +15,23 @@ import type { RenderClient } from "../../adapters/render/render-client.js";
 import { createEmptyDesignSnapshot, createEmptySnapshot } from "../records/snapshots.js";
 import type { RunRecord } from "../records/run-record-store.js";
 import { RunCancelledError } from "../records/run-cancellation.js";
-import { runDesignStagePipeline } from "./design-pipeline.js";
-import { runStagePipeline } from "./requirements-pipeline.js";
+import { runDesignStagePipeline as runDesignWithChecks } from "./design-pipeline.js";
+import { runStagePipeline as runRequirementsWithChecks } from "./requirements-pipeline.js";
 import { createRunLlmChunkHandlers } from "./shared/llm-chunk-events.js";
 import { withModelTaskTimeout } from "./shared/model-task-timeout.js";
 import { collectTextResult } from "./shared/structured-output.js";
 import { getRunError } from "./shared/errors.js";
+
+// Generation-count tests exclude the new independent review operation; its calls have dedicated coverage.
+function withStructureReview(transport: LlmTransport): LlmTransport {
+  return { async *streamChatCompletion(input) {
+    const prompt = input.messages.at(-1)?.content;
+    if (typeof prompt === "string" && prompt.startsWith("核对模型对需求")) yield '{"passed":true,"issues":[],"findings":[]}';
+    else yield* transport.streamChatCompletion(input);
+  } };
+}
+const runStagePipeline = (...args: Parameters<typeof runRequirementsWithChecks>) => { args[2] = withStructureReview(args[2]); return runRequirementsWithChecks(...args); };
+const runDesignStagePipeline = (...args: Parameters<typeof runDesignWithChecks>) => { args[2] = withStructureReview(args[2]); return runDesignWithChecks(...args); };
 
 const LIBRARY_REQUIREMENT_TEXT = `一个小型图书馆管理系统，需完成以下工作：
 (1)借书、还书；

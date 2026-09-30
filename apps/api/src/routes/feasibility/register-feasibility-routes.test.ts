@@ -8,12 +8,12 @@ import { createRunRecordStore } from "../../runs/records/run-record-store.js";
 import { registerFeasibilityRoutes } from "./register-feasibility-routes.js";
 import { librarySeatDemoFixture } from "../../runs/demo/fixtures/library-seat-demo-fixture.js";
 
-function acceptedBaseline() {
+function acceptedBaseline(condition: string | null = null) {
   return {
     runId: "requirements-run",
     sourceDocumentId: "inline",
     createdAt: "2026-07-19T00:00:00.000Z",
-    requirements: [{ id: "REQ-009", sourceRuleId: "R9", sourceFragment: "计算总成本", sourceLocation: { section: "input", startOffset: 0, endOffset: 5 }, type: "functional", actor: "技工", subject: "系统", action: "计算", object: "总成本", condition: null, outcome: "得到总成本", confidence: 1, status: "accepted", criticality: "high", acceptanceCriteria: ["得到总成本"], priority: "must", fieldProvenance: {} }],
+    requirements: [{ id: "REQ-009", sourceRuleId: "R9", sourceFragment: "计算总成本", sourceLocation: { section: "input", startOffset: 0, endOffset: 5 }, type: "functional", actor: "技工", subject: "系统", action: "计算", object: "总成本", condition, outcome: "得到总成本", confidence: 1, status: "accepted", criticality: "high", acceptanceCriteria: ["得到总成本"], priority: "must", fieldProvenance: {} }],
     assumptions: [], conflicts: [],
     qualityReport: { runId: "requirements-run", status: "accepted", summary: "已确认", issues: [], blockingIssueIds: [], reviewRequiredRequirementIds: [] },
   };
@@ -126,7 +126,11 @@ function registerTestRoutes(input: {
     app: input.app,
     runs,
     renderClient: input.renderClient ?? (async (artifact) => ({ svg: `<svg>${artifact.diagramKind}</svg>`, renderMeta: { engine: "plantuml", generatedAt: "2026-07-19T00:00:00.000Z", sourceLength: artifact.source.length, durationMs: 1 } })),
-    llmTransport: { async *streamChatCompletion(input) { prompts.push(input.messages.map((message) => message.content).join("\n")); yield outputs.shift() ?? "{}"; } },
+    llmTransport: { async *streamChatCompletion(input) {
+      const current = input.messages.at(-1)?.content;
+      if (typeof current === "string" && current.startsWith("核对模型对需求")) { yield '{"passed":true,"issues":[],"findings":[]}'; return; }
+      prompts.push(input.messages.map((message) => message.content).join("\n")); yield outputs.shift() ?? "{}";
+    } },
     providerConfigs: providerConfigs() as never,
     defaultSseAllowOrigin: "http://localhost:5173",
     resolveUserId: async (request) => request.headers.authorization === "Bearer test" ? "user-1" : null,
@@ -445,9 +449,39 @@ test("rejects feasibility render failures without requesting a source rewrite", 
   const snapshot = await waitForTerminal(app, start.json().runId);
 
   assert.equal(snapshot.status, "failed");
-  assert.equal(snapshot.contextModel.title, "维修预约系统上下文");
-  assert.doesNotMatch(snapshot.contextPlantUml.source, /修复后的上下文/u);
+  assert.equal(snapshot.contextModel, null);
+  assert.equal(snapshot.contextPlantUml, null);
   assert.equal(snapshot.contextSvg, null);
   assert.equal(renderCalls, 1);
+  await app.close();
+});
+test("feasibility commits a confirmed boundary repair and implementation receives the corrected flow", async () => {
+  const app = Fastify();
+  const baseline = acceptedBaseline("数量>=10");
+  baseline.qualityReport.status = "passed";
+  baseline.requirements[0]!.fieldProvenance = { condition: { source: "manual", status: "accepted" } };
+  const flow = JSON.parse(businessFlowOutput);
+  flow.model.nodes.splice(1, 0, { id: "decision", type: "decision", question: "数量边界" });
+  flow.model.relationships = [
+    { id: "initial", type: "control_flow", sourceId: "start", targetId: "decision" },
+    { id: "yes", type: "control_flow", sourceId: "decision", targetId: "calculate", guard: "数量>10" },
+    { id: "no", type: "control_flow", sourceId: "decision", targetId: "end", guard: "数量<=10" },
+    { id: "done", type: "control_flow", sourceId: "calculate", targetId: "end" },
+  ];
+  flow.traceability.push({ requirementId: "R9", targetId: "yes", targetKind: "relationship" });
+  flow.traceability.push({ requirementId: "R9", targetId: "decision", targetKind: "node" });
+  const repaired = structuredClone(flow.model); repaired.relationships[1].guard = "数量>=10"; repaired.relationships[2].guard = "数量<10";
+  const fixture = registerTestRoutes({ app, outputs: [contextOutput, JSON.stringify(flow), JSON.stringify({ model: repaired }), implementationOutput], state: {
+    name: "维修预约系统", rules: [{ id: "R9", category: "功能需求", text: "数量>=10时计算总成本", relatedDiagrams: ["context", "activity"] }], requirementBaseline: baseline,
+  } });
+  const start = await app.inject({ method: "POST", url: "/api/feasibility-runs", headers: { authorization: "Bearer test" }, payload: { projectId: "project-1", selectedArtifacts: ["context", "business-flow", "implementation"], providerSettings: { providerConfigId: "provider-1", model: "test-model" } } });
+  const snapshot = await waitForTerminal(app, start.json().runId);
+  assert.equal(snapshot.status, "completed", JSON.stringify(snapshot.error));
+  assert.equal(snapshot.businessFlow.model.relationships[1].guard, "数量>=10");
+  assert.equal(snapshot.businessFlow.model.relationships[2].guard, "数量<10");
+  assert.equal(snapshot.visualReviews[flow.model.modelId].repairAttempts, 1);
+  assert.equal(snapshot.visualReviews[flow.model.modelId].repairHistory[0].status, "accepted");
+  assert.ok(fixture.prompts.at(-1)?.includes("数量>=10"));
+  assert.ok(fixture.prompts.at(-1)?.includes("数量<10"));
   await app.close();
 });

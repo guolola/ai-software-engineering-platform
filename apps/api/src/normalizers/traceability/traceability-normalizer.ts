@@ -511,8 +511,9 @@ export function autoFillRequirementTraceability(
       {
         ruleId: best.id,
         target,
-        mappingSource: deterministic ? "llm" : "auto-filled-pending-review",
-        reviewStatus: deterministic ? "confirmed" : "pending",
+        // Text similarity is a suggested link even when its score is high.
+        mappingSource: "auto-filled-pending-review",
+        reviewStatus: "pending",
         confidence: deterministic ? "medium" : "low",
         rationale: deterministic
           ? "由需求规则文本与模型元素名称相似度建立映射。"

@@ -1031,9 +1031,11 @@ export type TestGenerationResult = z.infer<typeof testGenerationResultSchema>;
 
 export const modelRenderMappingSchema = z.object({
   mode: z.enum(["native", "explicit-graph"]),
-  elements: z.array(z.object({ elementId: z.string(), alias: z.string() })),
-  relationships: z.array(z.object({ relationshipId: z.string(), sourceId: z.string(), targetId: z.string(), type: z.string() })),
+  elements: z.array(z.object({ elementId: z.string(), alias: z.string(), label: z.string().optional(), kind: z.string().optional(), ownerId: z.string().optional(), statement: z.string().optional() })),
+  relationships: z.array(z.object({ relationshipId: z.string(), sourceId: z.string(), targetId: z.string(), type: z.string(), label: z.string().optional(), symbol: z.string().optional(), statement: z.string().optional() })),
+  auxiliary: z.array(z.object({ kind: z.string(), elementId: z.string().optional(), ownerId: z.string().optional(), label: z.string().optional(), alias: z.string().optional() })).optional(),
 });
+export type ModelRenderMapping = z.infer<typeof modelRenderMappingSchema>;
 
 export const plantUmlArtifactSchema = z.object({
   renderMapping: modelRenderMappingSchema.optional(),

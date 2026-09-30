@@ -49,6 +49,7 @@ import {
   mobileTouchTargetClass,
 } from "../../workspace-shell/components/mobile-density";
 import { DocumentStyleDialog } from "./document-style-dialog";
+import { DocumentGuidanceDialog } from "./document-guidance-dialog";
 import { OnlyOfficeEditorHost } from "./only-office-editor-host";
 import { cloneDefaultDocumentStyle } from "../lib/document-style";
 import { useTheme } from "../../../shared/ui/theme-provider";
@@ -270,7 +271,6 @@ function TemplateDocumentCard({
   documentStyle,
   onOpenStyle,
   onGenerate,
-  blockedFeedback,
 }: {
   definition: (typeof DOCUMENT_DEFINITIONS)[number];
   disabledReason: string | null;
@@ -278,7 +278,6 @@ function TemplateDocumentCard({
   documentStyle: DocumentStyleSettings;
   onOpenStyle: () => void;
   onGenerate: () => void;
-  blockedFeedback?: FeedbackDialogState;
 }) {
   const { t } = useTranslation();
   return (
@@ -288,19 +287,7 @@ function TemplateDocumentCard({
         documentStyle={documentStyle}
         onOpenStyle={onOpenStyle}
       />
-      <div className="flex flex-1 flex-col gap-2 border-t border-border bg-card p-3 sm:gap-3 sm:p-4">
-        <div className="mt-auto flex min-h-9 items-center justify-between gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground sm:text-xs">
-          {!blockedFeedback ? (
-            <span className="min-w-0">{t("documentsPage.generatedHint")}</span>
-          ) : null}
-          {blockedFeedback ? (
-            <FeedbackReopenButton
-              feedback={blockedFeedback}
-              label={t("feedback.needsAttention")}
-            />
-          ) : null}
-        </div>
-        {disabledReason && <p role="status" className="text-xs text-muted-foreground">{disabledReason}</p>}
+      <div className="flex flex-1 flex-col justify-end border-t border-border bg-card p-3 sm:p-4">
         <Button
           type="button"
           size="sm"
@@ -715,6 +702,11 @@ export function InstructionDocumentsPage({
     openRequirementsText,
     t,
   ]);
+  // Keep every document's recovery action available through the single header notice.
+  const pageNotices = [
+    listErrorFeedback,
+    ...DOCUMENT_DEFINITIONS.map((definition) => prerequisiteFeedbackByKind[definition.kind]),
+  ].filter((notice): notice is FeedbackDialogState => Boolean(notice));
   if (activeDocumentId) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-background">
@@ -800,9 +792,7 @@ export function InstructionDocumentsPage({
         <PageHeader
           title={t("documentsPage.title")}
           description={t("documentsPage.description")}
-          notice={listErrorFeedback?.keepReopenEntry ? (
-            <FeedbackReopenButton feedback={listErrorFeedback} />
-          ) : null}
+          notice={<DocumentGuidanceDialog notices={pageNotices} />}
         />
 
         <section>
@@ -868,7 +858,6 @@ export function InstructionDocumentsPage({
                     documentStyle={documentStyle}
                     onOpenStyle={() => setDocumentStyleDialogOpen(true)}
                     onGenerate={() => void generateDocument(definition.kind)}
-                    blockedFeedback={prerequisiteFeedbackByKind[definition.kind]}
                   />
                 );
               })}

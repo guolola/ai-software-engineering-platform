@@ -9,7 +9,7 @@ const endpoints: Record<string, string> = {
 };
 
 export async function readRunTranscript(projectId: string, runId: string, signal: AbortSignal) {
-  const result = await requestJson<{ events?: unknown[]; run: { status: string; runKind?: string | null } }>(
+  const result = await requestJson<{ events?: unknown[]; run: { status: string; runKind?: string | null; model?: string | null } }>(
     `/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}?includeEvents=true`, { signal },
   );
   const events = (result.events ?? []).flatMap((item) => {

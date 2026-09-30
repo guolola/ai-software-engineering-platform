@@ -266,7 +266,7 @@ function DiagramDetailView({
     : undefined;
   const savedReview = visualReviews[`${visualTaskKind}:${visualId}`];
   // A newer task may already be inspecting another render while the old workspace review is still loaded.
-  const savedVisualReview = !visualTask || taskVisualReview?.checkedAt === savedReview?.checkedAt ? savedReview : undefined;
+  const savedVisualReview = !visualTask || (taskVisualReview?.checkedAt === savedReview?.checkedAt && taskVisualReview?.inputFingerprint === savedReview?.inputFingerprint) ? savedReview : undefined;
   const subtaskVisualMessage = visualSubtask?.message?.trim();
   const savedVisualDetail = visualReviewDetail(savedVisualReview);
   const visualConfirmed = savedVisualReview?.status === "pending_review" && Boolean(savedVisualReview.confirmedAt) &&
@@ -713,6 +713,7 @@ function DiagramDetailView({
 
             <TabsContent value="diagram" className="m-0 p-0">
               <DiagramPreviewPanel
+                  diagramId={`${visualTaskKind}:${visualId}`}
                   description={metaDescription}
                   stage={isFeasibility ? "feasibility" : stage}
                   type={type}

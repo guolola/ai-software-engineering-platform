@@ -1,6 +1,7 @@
 // Builds the local iframe preview document and rewrites generated module imports.
 
 import type * as TypeScript from "typescript";
+import { installPreviewConsole } from "./preview-console";
 
 export type PreviewBuildResult = {
   srcDoc: string;
@@ -200,6 +201,9 @@ export async function buildLocalPreviewDocument(
     '<html lang="zh-CN">',
     "  <head>",
     '    <meta charset="UTF-8" />',
+    "    <script>",
+    `      (${installPreviewConsole.toString()})(${JSON.stringify(buildId)});`,
+    "    </script>",
     '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
     "    <style>",
     "      html, body, #root { min-height: 100%; margin: 0; }",

@@ -4,11 +4,8 @@ import * as React from 'react'
 const MOBILE_BREAKPOINT = 768
 
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(() => {
-    if (typeof window === 'undefined') return undefined
-
-    return window.innerWidth < MOBILE_BREAKPOINT
-  })
+  // Use the desktop shell for both server HTML and the first hydration render.
+  const [isMobile, setIsMobile] = React.useState(false)
 
   React.useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
@@ -18,6 +15,7 @@ export function useIsMobile() {
     }
 
     mql.addEventListener('change', onChange)
+    onChange()
 
     return () => mql.removeEventListener('change', onChange)
   }, [])

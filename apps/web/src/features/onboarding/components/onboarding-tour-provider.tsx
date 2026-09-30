@@ -4,6 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Onborda, OnbordaProvider, useOnborda, type CardComponentProps, type Step } from "onborda";
+import confetti from "canvas-confetti";
 import type { OnboardingTour, OnboardingTourOutcome } from "@uml-platform/contracts";
 import { Button } from "../../../shared/ui/button";
 import { floatingAlert } from "../../../shared/ui/floating-alert";
@@ -146,6 +147,14 @@ function TourRuntime({ children }: { children: ReactNode }) {
     void platformApi.saveOnboardingOutcome(session.accountTour, outcome).catch(() => {
       floatingAlert.error(t("onboarding.saveFailed"));
     });
+    // Celebrate completion immediately, independently of account persistence.
+    if (outcome === "completed") {
+      void confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+    }
   }, [closeOnborda, t]);
 
   const startTour = useCallback(async (id: TourId, options: StartTourOptions = {}) => {

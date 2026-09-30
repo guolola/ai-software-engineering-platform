@@ -1,7 +1,8 @@
 // Validates the task conversation against the real project shell with deterministic run events.
 import { expect, test } from "@playwright/test";
 import { mockProjectApi, projectId } from "./fixtures/project-workspace";
-import { createEmptySnapshot } from "../../../apps/api/src/runs/records/snapshots";
+import { createEmptyFeasibilitySnapshot, createEmptySnapshot } from "../../../apps/api/src/runs/records/snapshots";
+import { feasibilityInputsSchema } from "@uml-platform/contracts";
 
 for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as const) {
   test.describe(`${width} ${colorScheme}`, () => {
@@ -43,13 +44,13 @@ for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as 
       await emit("output", "已读取学生");
       await expect(transcript.getByText("已读取学生", { exact: true })).toBeVisible();
       await expect(transcript.getByText("正在生成", { exact: true })).toBeVisible();
-      const summary = transcript.getByRole("button", { name: "执行过程" });
+      const summary = transcript.getByRole("button", { name: "正在思考" });
       await expect(summary).toHaveAttribute("aria-expanded", "true");
       await emit("output", "与管理员的用例。");
       await expect(transcript.getByText("已读取学生与管理员的用例。", { exact: true })).toBeVisible();
       await summary.click();
       await expect(summary).toHaveAttribute("aria-expanded", "false");
-      await expect(transcript.getByText("已读取学生与管理员的用例。", { exact: true })).toBeVisible();
+      await expect(transcript.getByText("已读取学生与管理员的用例。", { exact: true })).toBeHidden();
       await summary.click();
       await emit("completed", "");
       await expect(transcript.locator('[data-slot="generation-call"] [data-slot="spinner"]')).toHaveCount(0);
@@ -79,30 +80,29 @@ for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as 
       const transcript = page.getByTestId("generation-transcript");
       const heading = transcript.locator("h3").getByText("生成需求模型", { exact: true });
       await expect(heading).toBeVisible();
-      const row = heading.locator("..");
-      const spinner = row.locator('[data-slot="spinner"]');
+      const spinner = transcript.getByTestId("generation-task-step").first().locator("svg.animate-spin");
       await expect(spinner).toBeVisible();
-      await expect(heading).toHaveCSS("animation-name", "ui-text-shimmer");
-      await expect(heading).toHaveCSS("animation-duration", "2s");
+      await expect(heading).toHaveAttribute("data-slot", "ai-shimmer");
       await expect(transcript.getByText("生成预约活动图", { exact: true })).toHaveCSS("animation-name", "none");
       await expect(transcript.getByText("正在生成", { exact: true })).toHaveCSS("animation-name", "none");
       await expect(transcript.getByText("正在核对参与者与预约规则。", { exact: true })).toHaveCSS("animation-name", "none");
-      // With a background twice the text width, decreasing its percentage moves the bright band right.
+      // The shared AI Elements shimmer uses Motion's background tween, rather than CSS keyframes.
       const sweep = await heading.evaluate((element) => {
-        const animation = element.getAnimations()[0];
-        animation.pause();
-        animation.currentTime = 500;
-        const early = parseFloat(getComputedStyle(element).backgroundPositionX);
-        animation.currentTime = 1500;
-        const late = parseFloat(getComputedStyle(element).backgroundPositionX);
-        animation.play();
-        return { early, late, size: getComputedStyle(element).backgroundSize };
+        return new Promise<{ positions: number[]; size: string }>((resolve) => {
+          const positions: number[] = [];
+          const sample = () => {
+            positions.push(parseFloat(getComputedStyle(element).backgroundPositionX));
+            if (positions.length < 5) setTimeout(sample, 100);
+            else resolve({ positions, size: getComputedStyle(element).backgroundSize });
+          };
+          sample();
+        });
       });
-      expect(sweep.early).toBeGreaterThan(sweep.late);
-      expect(sweep.size).toBe("200% 100%");
+      expect(sweep.positions.some((position, index) => index > 0 && position < sweep.positions[index - 1])).toBe(true);
+      expect(sweep.size).toBe("250% 100%, auto");
       expect(await transcript.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
-      await expect(transcript.locator(".ui-text-shimmer")).toHaveCount(1);
-      await expect(transcript.locator('[data-slot="spinner"]')).toHaveCount(1);
+      await expect(transcript.locator('[data-slot="ai-shimmer"]')).toHaveCount(1);
+      await expect(transcript.locator('svg.animate-spin')).toHaveCount(1);
       await expect(transcript.getByText(title, { exact: true })).toHaveCSS("animation-name", "none");
       await page.screenshot({ path: info.outputPath("loading-animation.png") });
       await page.emulateMedia({ reducedMotion: "reduce" });
@@ -189,17 +189,72 @@ for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as 
       const scrollers = await drawer.evaluate((element) => [...element.querySelectorAll("*")].filter((node) => node.scrollHeight > node.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(node).overflowY)).length);
       expect(scrollers).toBe(1);
       await viewport.evaluate((element) => { element.scrollTop = 0; });
-      const process = transcript.getByRole("button", { name: "执行过程" }).first();
+      const process = transcript.getByRole("button", { name: "正在思考" });
       await process.click();
       await expect(process).toHaveAttribute("aria-expanded", "false");
       await emit({ ...base, stage: "render_svg", callId: "render", phase: "output", text: "后续预览内容。" });
       await expect(transcript.getByText("预览已在后台准备好。后续预览内容。")).toHaveCount(1);
       expect(await viewport.evaluate((element) => element.scrollTop)).toBe(0);
       await process.click();
-      await expect(transcript.locator('[data-slot="transcript-prose"]').first()).toHaveCSS("font-size", "16px");
-      await expect(transcript.locator('[data-slot="transcript-prose"]').first()).toHaveCSS("line-height", "28px");
+      await expect(transcript.locator('[data-slot="transcript-prose"]').first()).toHaveCSS("font-size", "14px");
+      await expect(transcript.locator('[data-slot="transcript-prose"]').first()).toHaveCSS("line-height", "24px");
       if (width === 1440) expect((await drawer.boundingBox())!.width).toBeGreaterThan(700);
       await page.screenshot({ path: info.outputPath("stage-reading.png") });
+    });
+
+    test("context task has one chain with nested reasoning and input image, followed by its final summary", async ({ page }, info) => {
+      await mockProjectApi(page);
+      const runId = "run-context-chain";
+      const createdAt = "2026-09-30T08:00:00.000Z";
+      const run = { runId, projectId, runKind: "feasibility", status: "completed", stage: "verify_diagram_visual", createdAt };
+      const snapshot = createEmptyFeasibilitySnapshot(runId, {
+        projectId, selectedArtifacts: ["context"], rules: [], requirementBaseline: null,
+        providerSettings: { providerConfigId: "test-provider", model: "test" }, inputs: feasibilityInputsSchema.parse({}),
+      });
+      snapshot.status = "completed";
+      const imageUrl = "https://images.example.test/context.png";
+      await page.route(imageUrl, (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="520" height="160"><rect width="520" height="160" rx="8" fill="#e5e7eb"/><g fill="#fff" stroke="#64748b"><rect x="20" y="55" width="90" height="50"/><rect x="180" y="45" width="160" height="70"/><rect x="410" y="55" width="90" height="50"/></g><path d="M110 80H180M340 80H410" stroke="#64748b"/><g text-anchor="middle" font-size="15" fill="#0f172a"><text x="65" y="85">学生</text><text x="260" y="85">图书馆座位预约系统</text><text x="455" y="85">管理员</text></g></svg>' }));
+      const events = [
+        { type: "stage_started", stage: "generate_context", tracksCompletion: true, eventId: "generate", createdAt },
+        { type: "run_activity", stage: "generate_context", runId, callId: "context", subtaskLabel: "系统环境图", phase: "output", format: "technical", text: '{"summary":"展示学生和管理员与图书馆座位预约系统的交互关系。"}', eventId: "description", createdAt },
+        { type: "stage_finished", stage: "generate_context", status: "completed", eventId: "generated", createdAt },
+        { type: "stage_started", stage: "render_context", tracksCompletion: true, eventId: "render", createdAt },
+        { type: "stage_finished", stage: "render_context", status: "completed", eventId: "rendered", createdAt },
+        { type: "stage_started", stage: "verify_diagram_visual", tracksCompletion: true, eventId: "review", createdAt },
+        { type: "run_activity", stage: "verify_diagram_visual", runId, callId: "visual", subtaskLabel: "系统环境图", phase: "started", format: "technical", inputImages: [{ url: imageUrl, caption: "系统环境图使用的图片 1" }], eventId: "image", createdAt },
+        { type: "run_activity", stage: "verify_diagram_visual", runId, callId: "visual", phase: "reasoning", format: "technical", text: "对照结构化模型核对学生、管理员与系统节点及其关系。", eventId: "reasoning", createdAt },
+        { type: "run_activity", stage: "verify_diagram_visual", runId, callId: "visual", phase: "output", format: "technical", text: '{"passed":true,"issues":[]}', eventId: "judgment", createdAt },
+        { type: "stage_finished", stage: "verify_diagram_visual", status: "completed", eventId: "reviewed", createdAt },
+        { type: "completed", snapshot, eventId: "complete", createdAt },
+      ];
+      await page.route(`**/api/projects/${projectId}/runs`, (route) => route.fulfill({ json: { projectId, runs: [run] } }));
+      await page.route(`**/api/projects/${projectId}/runs/${runId}*`, (route) => route.fulfill({ json: { projectId, run: { ...run, model: "deepseek-flash" }, events, snapshot } }));
+      await page.goto(`/projects/${projectId}`);
+      await page.getByRole("button", { name: "生成任务", exact: true }).click();
+      const transcript = page.getByTestId("generation-transcript");
+      const assistantHeader = transcript.locator('[data-slot="generation-assistant-header"]');
+      await expect(assistantHeader).toHaveText("可研分析助手deepseek-flash");
+      await expect(transcript.getByText(/任务状态：/)).toHaveCount(0);
+      await expect(transcript.getByText("可行性分析生成", { exact: true })).toHaveCount(0);
+      const chain = transcript.locator('[data-slot="chain-of-thought"]');
+      await expect(chain).toHaveCount(1);
+      await expect(chain.getByTestId("generation-task-step")).toHaveCount(3);
+      await expect(chain.locator("h3")).toHaveText(["生成系统环境图", "渲染系统环境图", "视觉检查"]);
+      const description = chain.locator('[data-slot="transcript-prose"]').first();
+      await expect(description).toHaveCSS("font-size", "14px");
+      const review = chain.getByTestId("generation-task-step").last();
+      const image = review.getByRole("img", { name: "系统环境图使用的图片 1" });
+      await expect.poll(() => image.evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBe(520);
+      const reasoning = review.getByRole("button", { name: "思考过程 · 系统环境图" });
+      await reasoning.click();
+      await expect(review.getByText("对照结构化模型核对学生、管理员与系统节点及其关系。")).toBeVisible();
+      await expect(transcript.getByRole("region", { name: "输出总结" })).toBeVisible();
+      await expect(chain.getByRole("region", { name: "输出总结" })).toHaveCount(0);
+      expect(await transcript.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      await page.screenshot({ path: info.outputPath("context-chain.png") });
+      await chain.getByRole("button", { name: "思考过程", exact: true }).click();
+      await expect(description).toBeHidden();
+      await expect(transcript.getByRole("region", { name: "输出总结" })).toBeVisible();
     });
 
     test("task transcript has no cards, restores replies and fits the drawer", async ({ page }, info) => {
@@ -234,7 +289,7 @@ for (const width of [1440, 390]) for (const colorScheme of ["light", "dark"] as 
       const transcript = page.getByTestId("generation-transcript");
       await expect(transcript.getByText("已识别学生与管理员，整理了查询座位、预约和签到等操作。", { exact: true })).toBeVisible();
       await expect(transcript.getByText("已生成 2 个图形预览。")).toBeVisible();
-      await expect(transcript.getByText("Agent", { exact: true })).toHaveCount(1);
+      await expect(transcript.getByText("需求建模助手", { exact: true })).toHaveCount(1);
       await expect(transcript.locator('[data-slot="card"], [data-slot="badge"]')).toHaveCount(0);
       expect(await transcript.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
       await page.screenshot({ path: info.outputPath("conversation.png") });

@@ -51,7 +51,7 @@ import { collectTextResult, logFailedStructuredOutput } from "./shared/structure
 import { stageProgressValue } from "./shared/pipeline-events.js";
 import { createRunError, throwRunError } from "./shared/errors.js";
 import { renderArtifactWithRepair } from "./render/render-artifact-with-repair.js";
-import { reviewRenderedArtifact } from "./render/review-rendered-artifact.js";
+import { DiagramReviewRenderError, reviewRenderedArtifact } from "./render/review-rendered-artifact.js";
 import { withConversationBranch } from "./shared/conversation-context.js";
 import type { PngRenderClient } from "../../adapters/render/png-render-client.js";
 
@@ -593,9 +593,22 @@ export async function runFeasibilityStagePipeline(
     }));
   };
 
+  const reviewCandidate = async (input: Parameters<typeof reviewRenderedArtifact>[0]) => {
+    updateStage("verify_diagram_visual", "正在核对模型结构与图面");
+    try { return await reviewRenderedArtifact(input); }
+    catch (error) {
+      throwIfRunCancelled(record);
+      if (error instanceof DiagramReviewRenderError) {
+        snapshot.visualReviews[input.model.modelId ?? input.model.diagramKind] = error.review;
+        throwRunError(createRunError("RUN_RENDER_FAILED", error.message));
+      }
+      throw error;
+    }
+  };
+
   if (snapshot.selectedArtifacts.includes("context")) {
     updateStage("generate_context", "正在使用所选模型生成系统上下文");
-    const contextModel = await generateFeasibilityJson({
+    let contextModel = await generateFeasibilityJson({
       record,
       stage: "generate_context",
       promptStage: "context",
@@ -607,45 +620,21 @@ export async function runFeasibilityStagePipeline(
         value: normalizeContextDiagram(value, validRequirementIds),
       }),
     });
+    updateStage("render_context", "正在核对并渲染系统环境图");
+    const checked = await reviewCandidate({ record, providerSettings, llmTransport, renderClient, pngRenderClient,
+      model: contextModel, mutable: true,
+      basis: { stage: "feasibility", baseline: snapshot.requirementBaseline, rules: snapshot.rules, traceability: traceabilityFromContext(contextModel) },
+      validateModel: (model) => { normalizeContextDiagram(model, validRequirementIds); },
+    });
+    throwIfRunCancelled(record);
+    contextModel = checked.model as typeof contextModel;
+    const artifact = checked.rendered.artifact;
+    // Preserve previous artifacts until the entire candidate tuple is accepted.
     snapshot.contextModel = contextModel;
     snapshot.contextTraceability = traceabilityFromContext(contextModel);
-
-    updateStage("render_context", "正在生成并渲染系统环境图");
-    const artifact = generatePlantUmlArtifacts([contextModel])[0];
-    if (!artifact) throw new Error("系统环境图未生成有效的 PlantUML");
-    snapshot.contextPlantUml = artifact;
-    emitEvent(record, artifactReadyRunEventSchema.parse({
-      type: "artifact_ready",
-      stage: "render_context",
-      artifactKind: "feasibilityContext",
-      modelId: artifact.modelId ?? "context",
-      subtaskId: "context",
-      subtaskLabel: "系统环境图",
-      subtaskStatus: "rendering",
-    }));
-    const renderResult = await renderArtifactWithRepair(
-      record,
-      providerSettings,
-      llmTransport,
-      renderClient,
-      contextModel,
-      artifact,
-    );
-    if (renderResult.status === "failed") {
-      throwRunError(createRunError("RUN_RENDER_FAILED", renderResult.errorMessage, {
-        details: {
-          diagramKind: artifact.diagramKind,
-          reason: renderResult.errorMessage,
-        },
-      }));
-    }
-    updateStage("verify_diagram_visual", "正在检查系统环境图的图面");
-    const checked = await reviewRenderedArtifact({ record, providerSettings, llmTransport, renderClient, pngRenderClient, model: contextModel, rendered: renderResult });
-    snapshot.visualReviews[artifact.modelId ?? "context"] = checked.review;
-    snapshot.contextPlantUml = checked.rendered.artifact as typeof artifact;
-    snapshot.contextSvg = checked.rendered.svgArtifact as NonNullable<
-      FeasibilityRunSnapshot["contextSvg"]
-    >;
+    snapshot.visualReviews[contextModel.modelId ?? "context"] = checked.review;
+    snapshot.contextPlantUml = checked.rendered.artifact as NonNullable<FeasibilityRunSnapshot["contextPlantUml"]>;
+    snapshot.contextSvg = checked.rendered.svgArtifact as NonNullable<FeasibilityRunSnapshot["contextSvg"]>;
     snapshot.contextFingerprint = snapshotInputFingerprint({
       rules: snapshot.rules,
       requirementBaseline: snapshot.requirementBaseline,
@@ -674,20 +663,18 @@ export async function runFeasibilityStagePipeline(
       parse: (value) => ({ value: normalizeFeasibilityBusinessFlow(value, validRequirementIds) }),
     });
     updateStage("render_business_flow", "正在渲染业务与系统流程图");
-    const artifact = generatePlantUmlArtifacts([result.model])[0];
-    if (!artifact) throw new Error("业务与系统流程图未生成有效的 PlantUML");
-    const rendered = await renderArtifactWithRepair(record, providerSettings, llmTransport, renderClient, result.model, artifact);
+    const checked = await reviewCandidate({ record, providerSettings, llmTransport, renderClient, pngRenderClient,
+      model: result.model, mutable: true,
+      basis: { stage: "feasibility", baseline: snapshot.requirementBaseline, rules: snapshot.rules, traceability: result.traceability },
+      validateModel: (model) => { normalizeFeasibilityBusinessFlow({ model, traceability: result.traceability }, validRequirementIds); },
+    });
     throwIfRunCancelled(record);
-    if (rendered.status === "failed") {
-      throwRunError(createRunError("RUN_RENDER_FAILED", rendered.errorMessage));
-    }
-    // Keep the previous workspace artifact until model, traceability and SVG all succeed.
-    updateStage("verify_diagram_visual", "正在检查业务与系统流程图的图面");
-    const checked = await reviewRenderedArtifact({ record, providerSettings, llmTransport, renderClient, pngRenderClient, model: result.model, rendered });
+    const artifact = checked.rendered.artifact;
+    result.model = checked.model as typeof result.model;
     snapshot.visualReviews[artifact.modelId ?? "business-flow"] = checked.review;
     snapshot.businessFlow = {
       ...result,
-      plantUml: checked.rendered.artifact as typeof artifact,
+      plantUml: checked.rendered.artifact as NonNullable<FeasibilityRunSnapshot["contextPlantUml"]>,
       svg: checked.rendered.svgArtifact as NonNullable<FeasibilityRunSnapshot["contextSvg"]>,
       fingerprint: snapshotInputFingerprint({ rules: snapshot.rules, requirementBaseline: snapshot.requirementBaseline }),
     };

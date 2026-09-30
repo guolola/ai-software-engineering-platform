@@ -1,13 +1,14 @@
 // Calls the render service for SVG output; pipelines handle repair decisions.
-import type { UmlDiagramKind } from "@uml-platform/contracts";
+import type { ModelRenderMapping, UmlDiagramKind } from "@uml-platform/contracts";
 
 export type AnyPlantUmlArtifact = {
   modelId?: string;
   diagramKind: UmlDiagramKind;
   source: string;
+  renderMapping?: ModelRenderMapping;
 };
 
-export type RenderClient = (artifact: AnyPlantUmlArtifact) => Promise<{
+export type RenderClient = (artifact: AnyPlantUmlArtifact, abortSignal?: AbortSignal) => Promise<{
   svg: string;
   renderMeta: {
     engine: string;
@@ -20,9 +21,11 @@ export type RenderClient = (artifact: AnyPlantUmlArtifact) => Promise<{
 export async function createRenderClient(
   baseUrl: string,
   artifact: AnyPlantUmlArtifact,
+  abortSignal?: AbortSignal,
 ): Promise<Awaited<ReturnType<RenderClient>>> {
   const response = await fetch(`${baseUrl}/render/svg`, {
     method: "POST",
+    signal: abortSignal,
     headers: {
       "Content-Type": "application/json",
     },

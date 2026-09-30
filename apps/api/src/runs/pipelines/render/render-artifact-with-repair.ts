@@ -1,25 +1,29 @@
 // Renders deterministic model source; compiler failures never authorize LLM graph rewrites.
-import { renderSvgResponseSchema, type DesignDiagramModelSpec, type DiagramModelSpec, type DesignSvgArtifact, type SvgArtifact, type ProviderSettings } from "@uml-platform/contracts";
+import { renderSvgResponseSchema, type ModelingStage, type DesignDiagramModelSpec, type DiagramModelSpec, type DesignSvgArtifact, type SvgArtifact, type ProviderSettings } from "@uml-platform/contracts";
 import type { LlmTransport } from "../../../llm.js";
 import type { AnyPlantUmlArtifact, RenderClient } from "../../../adapters/render/render-client.js";
 import type { RunRecord } from "../../records/run-record-store.js";
 import { generateDesignPlantUmlArtifacts, generatePlantUmlArtifacts } from "../../../plantuml.js";
 import { appendDesignTrace, appendRequirementTrace, designDiagramKindFromArtifact, requirementDiagramKindFromArtifact } from "../shared/trace-events.js";
+import { isRunCancelledError, throwIfRunCancelled } from "../../records/run-cancellation.js";
 
 export async function renderArtifactWithRepair(
   record: RunRecord, _providerSettings: ProviderSettings, _llmTransport: LlmTransport,
-  renderClient: RenderClient, model: DiagramModelSpec | DesignDiagramModelSpec, artifact: AnyPlantUmlArtifact,
+  renderClient: RenderClient, model: DiagramModelSpec | DesignDiagramModelSpec, artifact: AnyPlantUmlArtifact, stage?: ModelingStage, abortSignal?: AbortSignal,
 ): Promise<{ status: "success"; artifact: AnyPlantUmlArtifact; svgArtifact: SvgArtifact | DesignSvgArtifact } | { status: "failed"; artifact: AnyPlantUmlArtifact; errorMessage: string }> {
   try {
     // The model is authoritative, including on manual redraw and retry entry points.
-    const canonical = "designTrace" in record.snapshot
+    throwIfRunCancelled(record);
+    const canonical = stage === "design" || (!stage && "designTrace" in record.snapshot)
       ? generateDesignPlantUmlArtifacts([model as DesignDiagramModelSpec])[0]!
-      : generatePlantUmlArtifacts([model as DiagramModelSpec])[0]!;
+      : generatePlantUmlArtifacts([model as DiagramModelSpec], stage === "feasibility" || (!stage && "selectedArtifacts" in record.snapshot) ? "feasibility" : "requirements")[0]!;
     artifact = canonical;
-    const rendered = renderSvgResponseSchema.parse(await renderClient(canonical));
+    const rendered = renderSvgResponseSchema.parse(await renderClient(canonical, abortSignal));
     if (/Welcome to PlantUML!|Syntax Error\?|An error has occurred|Use 'allowmixing'/i.test(rendered.svg)) throw new Error("PlantUML returned a placeholder or error image");
     return { status: "success", artifact: canonical, svgArtifact: { modelId: canonical.modelId, diagramKind: canonical.diagramKind, svg: rendered.svg.replace(/\s(?:textLength|lengthAdjust)=(?:"[^"]*"|'[^']*')/g, ""), renderMeta: rendered.renderMeta } as SvgArtifact | DesignSvgArtifact };
   } catch (error) {
+    throwIfRunCancelled(record);
+    if (isRunCancelledError(error)) throw error;
     const errorMessage = error instanceof Error ? error.message : String(error);
     appendDesignTrace(record, { stage: "render_svg", attempt: 1, kind: "render_error", diagramKind: designDiagramKindFromArtifact(artifact), plantUmlSource: artifact.source, errorMessage });
     appendRequirementTrace(record, { stage: "render_svg", attempt: 1, kind: "render_error", diagramKind: requirementDiagramKindFromArtifact(artifact), plantUmlSource: artifact.source, errorMessage });

@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import confetti from "canvas-confetti";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppI18nProvider } from "../../../shared/i18n";
 import { floatingAlert } from "../../../shared/ui/floating-alert";
@@ -12,6 +13,8 @@ import { ProjectsIndexPage } from "../../user-platform/components/projects-index
 import { platformApi } from "../../user-platform/services/platform-api";
 import { useProjectOnboarding } from "../hooks/use-project-onboarding";
 import { OnboardingTourProvider } from "./onboarding-tour-provider";
+
+vi.mock("canvas-confetti", () => ({ default: vi.fn() }));
 
 vi.mock("onborda", async () => {
   const React = await import("react");
@@ -101,6 +104,7 @@ function renderProject(projectId = "project-first") {
 describe("first-use onboarding", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.mocked(confetti).mockClear();
     window.innerWidth = 1440;
     vi.spyOn(platformApi, "saveOnboardingOutcome").mockResolvedValue({
       emptyWorkspace: "completed", firstProject: null, firstProjectId: null,
@@ -121,10 +125,16 @@ describe("first-use onboarding", () => {
     await person.click(screen.getByRole("button", { name: "跳过引导" }));
     await waitFor(() => expect(platformApi.saveOnboardingOutcome).toHaveBeenCalledWith("empty-workspace", "skipped"));
     expect(screen.queryByRole("dialog", { name: "工作台引导" })).not.toBeInTheDocument();
+    expect(confetti).not.toHaveBeenCalled();
     await person.click(screen.getByRole("button", { name: "查看引导" }));
     await person.click(screen.getByRole("button", { name: "下一步" }));
     await person.click(screen.getByRole("button", { name: "完成引导" }));
     await waitFor(() => expect(platformApi.saveOnboardingOutcome).toHaveBeenCalledWith("empty-workspace", "completed"));
+    expect(confetti).toHaveBeenCalledExactlyOnceWith({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+    });
   });
 
   it("suppresses automatic guidance when account state cannot be read", async () => {
@@ -152,6 +162,7 @@ describe("first-use onboarding", () => {
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "工作台引导" })).not.toBeInTheDocument();
     await waitFor(() => expect(alert).toHaveBeenCalledWith(expect.stringContaining("未能保存")));
+    expect(confetti).not.toHaveBeenCalled();
   });
 
   it("does not start on a nonempty project list or after a recorded skip", async () => {
@@ -197,6 +208,7 @@ describe("first-use onboarding", () => {
     expect(screen.getByTestId("selection")).toHaveTextContent("test-home");
     expect(screen.getByTestId("tabs")).toHaveTextContent(originalTabs ?? "");
     await waitFor(() => expect(platformApi.saveOnboardingOutcome).toHaveBeenCalledWith("first-project", "skipped"));
+    expect(confetti).not.toHaveBeenCalled();
   });
 
   it("uses condensed mobile stages and completes the first owned project tour", async () => {
@@ -220,5 +232,10 @@ describe("first-use onboarding", () => {
     await person.click(screen.getByRole("button", { name: "完成引导" }));
     expect(screen.getByTestId("selection")).toHaveTextContent("system-requirements");
     await waitFor(() => expect(platformApi.saveOnboardingOutcome).toHaveBeenCalledWith("first-project", "completed"));
+    expect(confetti).toHaveBeenCalledExactlyOnceWith({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+    });
   });
 });

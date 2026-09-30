@@ -3,6 +3,7 @@ import {
   llmChunkRunEventSchema,
   stageProgressRunEventSchema,
   type RunStage,
+  type RunActivityEvent,
 } from "@uml-platform/contracts";
 import { emitEvent, type RunRecord } from "../../records/run-record-store.js";
 import { stageProgressValue } from "./pipeline-events.js";
@@ -25,6 +26,8 @@ export interface RunLlmChunkHandlerOptions {
   progress?: number;
   diagramKind?: string;
   modelId?: string;
+  operation?: RunActivityEvent["operation"];
+  round?: number;
   subtaskId?: string;
   subtaskLabel?: string;
   maxVisibleChunks?: number;
@@ -43,6 +46,8 @@ export function createRunLlmChunkHandlers({
   progress = stageProgressValue(stage),
   diagramKind,
   modelId,
+  operation,
+  round,
   subtaskId,
   subtaskLabel,
   maxVisibleChunks = Number.POSITIVE_INFINITY,
@@ -52,7 +57,7 @@ export function createRunLlmChunkHandlers({
   noVisibleChunkHeartbeatIntervalMs = NO_VISIBLE_CHUNK_HEARTBEAT_INTERVAL_MS,
   noVisibleChunkHeartbeatMessage = NO_VISIBLE_CHUNK_HEARTBEAT_MESSAGE,
 }: RunLlmChunkHandlerOptions): LlmChunkHandlers {
-  const activity = createCallActivity({ record, stage, subtaskId: subtaskId ?? modelId ?? diagramKind, subtaskLabel });
+  const activity = createCallActivity({ record, stage, subtaskId: subtaskId ?? modelId ?? diagramKind, subtaskLabel, modelId, operation, round });
   let emittedChunks = 0;
   let emittedChars = 0;
   let blankChunksSinceContent = 0;

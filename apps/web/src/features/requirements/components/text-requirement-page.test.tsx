@@ -2848,8 +2848,11 @@ describe("TextRequirementView", () => {
     render(withWorkspaceProviders(<><TextRequirementView view="models" /><SelectionProbe /></>, repository));
     await screen.findByRole("heading", { name: "需求模型" });
     await user.click(screen.getByRole("button", { name: "select analysis target" }));
+    expect(screen.queryByText(/1 个模型需要更新/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "仅更新过时模型" })).not.toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: /需要处理/ }));
     const guidance = screen.getByRole("dialog", { name: "需求模型暂时无法生成" });
+    expect(within(guidance).getByText(/1 个模型需要更新/)).toBeVisible();
     await user.click(within(guidance).getByRole("button", { name: "前往需求模型" }));
     expect(screen.getByTestId("workspace-selection")).toHaveTextContent("usecase");
   });

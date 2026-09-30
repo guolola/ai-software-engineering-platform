@@ -1,6 +1,6 @@
 // Emits deliberately paced demo output over the normal durable event stream.
 import { randomUUID } from "node:crypto";
-import type { RunActivityEvent, RunStage } from "@uml-platform/contracts";
+import type { RunActivityEvent, RunInputImage, RunStage } from "@uml-platform/contracts";
 import { emitEvent, type RunRecord } from "../records/run-record-store.js";
 import { throwIfRunCancelled } from "../records/run-cancellation.js";
 
@@ -9,7 +9,11 @@ const diagramNames: Record<string, string> = {
   prototype: "界面模型", analysis: "需求分析模型", architecture: "架构图", sequence: "顺序图", component: "组件图", table: "数据表模型",
 };
 
-interface DemoCall { title: string; subtaskId?: string; text: string }
+export interface DemoCall {
+  title: string; subtaskId?: string; text: string;
+  modelId?: string; operation?: RunActivityEvent["operation"]; round?: number;
+  reasoning?: string; summary?: string; inputImages?: RunInputImage[];
+}
 
 function demoCalls(record: RunRecord, stage: RunStage): DemoCall[] {
   const snapshot = record.snapshot;
@@ -69,24 +73,37 @@ function chunks(text: string, size: number) {
   return Array.from({ length: Math.ceil(characters.length / size) }, (_, i) => characters.slice(i * size, (i + 1) * size).join(""));
 }
 
-export async function emitOfflineDemoActivity(record: RunRecord, stage: RunStage) {
+export async function emitOfflineDemoCall(record: RunRecord, stage: RunStage, call: DemoCall) {
   throwIfRunCancelled(record);
   const beat = beatDuration();
-  // Independent calls start together and retain their own IDs, just like parallel provider calls.
-  await Promise.all(demoCalls(record, stage).map(async (call) => {
-    const callId = randomUUID();
-    const emit = (phase: RunActivityEvent["phase"], text?: string) => {
-      throwIfRunCancelled(record);
-      emitEvent(record, { type: "run_activity", eventId: randomUUID(), createdAt: new Date().toISOString(),
-        runId: record.snapshot.runId, stage, callId, subtaskId: call.subtaskId, subtaskLabel: call.title, format: "text", phase, text });
-    };
-    emit("started");
-    await pause(record, beat);
-    await pause(record, beat * 2);
-    for (const text of chunks(call.text, Math.max(18, Math.ceil(Array.from(call.text).length / 8)))) {
-      emit("output", text);
-      await pause(record, beat);
+  const callId = randomUUID();
+  const emit = (phase: RunActivityEvent["phase"], text?: string) => {
+    throwIfRunCancelled(record);
+    emitEvent(record, { type: "run_activity", eventId: randomUUID(), createdAt: new Date().toISOString(),
+      runId: record.snapshot.runId, stage, callId, subtaskId: call.subtaskId, subtaskLabel: call.title,
+      modelId: call.modelId, operation: call.operation, round: call.round, format: "text", phase, text,
+      ...(phase === "started" && call.inputImages?.length ? { inputImages: call.inputImages } : {}) });
+  };
+  emit("started");
+  await pause(record, beat);
+  // Only explicitly supplied fixture reasoning is shown, with its demo label retained.
+  if (call.reasoning) {
+    emit("thinking");
+    for (const text of chunks(call.reasoning, Math.max(18, Math.ceil(Array.from(call.reasoning).length / 3)))) {
+      emit("reasoning", text); await pause(record, beat);
     }
-    emit("completed");
-  }));
+  }
+  await pause(record, beat * 2);
+  for (const text of chunks(call.text, Math.max(18, Math.ceil(Array.from(call.text).length / 8)))) {
+    emit("output", text);
+    await pause(record, beat);
+  }
+  if (call.summary) emit("summary", call.summary);
+  emit("completed");
+  return callId;
+}
+
+export async function emitOfflineDemoActivity(record: RunRecord, stage: RunStage) {
+  // Independent calls start together and retain their own IDs, just like parallel provider calls.
+  await Promise.all(demoCalls(record, stage).map((call) => emitOfflineDemoCall(record, stage, call)));
 }
