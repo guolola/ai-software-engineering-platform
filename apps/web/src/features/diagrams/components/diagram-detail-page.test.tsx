@@ -1501,13 +1501,15 @@ describe("DiagramView", () => {
 
     expect(screen.getByText("元素清单")).toBeInTheDocument();
     const elementSearch = screen.getByLabelText("搜索元素");
-    const elementFilterGroup = screen.getByRole("group", { name: "按元素类型筛选" });
-    const addClassButton = screen.getByRole("button", { name: "添加类" });
+    const elementFilterGroup = screen.getByRole("combobox", { name: "按元素类型筛选" });
+    const addClassButton = screen.getByRole("button", { name: "添加", exact: true });
     expect(elementSearch).toBeInTheDocument();
     expect(elementSearch.compareDocumentPosition(elementFilterGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(elementFilterGroup.compareDocumentPosition(addClassButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole("button", { name: "全部类型 2" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "类 2" })).toBeInTheDocument();
+    expect(elementFilterGroup).toHaveTextContent("全部类型 2");
+    await userEvent.click(elementFilterGroup);
+    expect(await screen.findByRole("option", { name: "类 2" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("region", { name: "模型结构编辑" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("类 cls_event 名称")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "编辑类：Event" })).toBeInTheDocument();
@@ -1532,12 +1534,12 @@ describe("DiagramView", () => {
     });
     expect(screen.getByText("关系说明")).toBeInTheDocument();
     const relationSearch = screen.getByLabelText("搜索关系");
-    const relationFilterGroup = screen.getByRole("group", { name: "按关系类型筛选" });
+    const relationFilterGroup = screen.getByRole("combobox", { name: "按关系类型筛选" });
     const addRelationButton = screen.getByRole("button", { name: "添加关系" });
     expect(relationSearch).toBeInTheDocument();
     expect(relationSearch.compareDocumentPosition(relationFilterGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(relationFilterGroup.compareDocumentPosition(addRelationButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole("button", { name: "全部关系 1" })).toBeInTheDocument();
+    expect(relationFilterGroup).toHaveTextContent("全部关系 1");
     expect(screen.getAllByText("活动关联多个提醒记录。").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("关系 rel_event_reminder 起点")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "编辑关系：活动关联多个提醒记录。" })).toBeInTheDocument();
@@ -1681,14 +1683,16 @@ describe("DiagramView", () => {
 
     render(withWorkspaceProviders(<DiagramView type="class" />, repository));
 
-    await userEvent.click(await screen.findByRole("button", { name: "添加类" }));
+    await userEvent.click(await screen.findByRole("button", { name: "添加", exact: true }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "添加类" }));
     let dialog = await screen.findByRole("dialog", { name: /添加类/u });
     expect(dialog).toHaveClass("sm:max-w-2xl");
     expect(dialog).toHaveAttribute("data-form-layout", "4");
     await userEvent.click(within(dialog).getByRole("button", { name: "取消" }));
     expect(repository.renderStructuredModel).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole("button", { name: "添加类" }));
+    await userEvent.click(screen.getByRole("button", { name: "添加", exact: true }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "添加类" }));
     dialog = await screen.findByRole("dialog", { name: /添加类/u });
     const classNameInput = within(dialog).getByLabelText("类名称");
     await userEvent.clear(classNameInput);
@@ -1844,7 +1848,8 @@ describe("DiagramView", () => {
     expect(screen.queryByRole("tab", { name: /元素/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /关系/ })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "添加角色" }));
+    await userEvent.click(screen.getByRole("button", { name: "添加", exact: true }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "添加角色" }));
     let dialog = await screen.findByRole("dialog", { name: /添加角色/u });
     expect(dialog).toHaveClass("sm:max-w-2xl");
     expect(dialog).toHaveAttribute("data-form-layout", "4");

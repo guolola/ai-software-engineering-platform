@@ -466,7 +466,7 @@ describe("FeasibilityPage", () => {
     await userEvent.setup().keyboard("{Escape}");
     expect(screen.getByText("元素清单")).toBeInTheDocument();
     expect(screen.getByText("关系说明")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "添加人员" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "添加", exact: true })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "添加关系" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "上下文元素" })).not.toBeInTheDocument();
   });

@@ -1,10 +1,12 @@
 // Renders the model editor element and relationship list sections from prepared view data.
 import { SpotlightCard } from "../../../shared/ui/interactive-card";
 import { Input } from '../../../shared/ui/input';
-import { ArrowRight, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowRight, ChevronDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../shared/ui/button";
 import { Badge } from "../../../shared/ui/badge";
+import { SelectControl } from "../../../shared/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../../shared/ui/dropdown-menu";
 import { cn } from "../../../shared/ui/utils";
 import {
   type DiagramDetailItem,
@@ -66,15 +68,16 @@ export function ModelElementListSection({
   onSelectElement: (element: DiagramDetailItem) => void;
 }) {
   const { t } = useTranslation();
+  const creatableCollections = collections.filter((collection) => collection.allowCreate !== false);
   return (
     <section className="space-y-4">
       <div className="border-b border-border pb-3">
         <h3 className="text-lg font-semibold text-foreground">{t("diagramLists.elements.title")}</h3>
         <div
-          className="mt-3 flex items-center justify-between gap-3 overflow-x-auto pb-1"
+          className="mt-3 flex flex-wrap items-center justify-between gap-3 pb-1"
           aria-label={t("diagramLists.elements.toolbar")}
         >
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:min-w-max sm:flex-nowrap">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <label className="relative min-w-0 flex-1 sm:flex-none">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -86,56 +89,36 @@ export function ModelElementListSection({
               />
             </label>
             {detailGroups.length > 0 ? (
-              <div
-                className="flex items-center gap-2"
+              <SelectControl
                 aria-label={t("diagramLists.elements.filter")}
-                role="group"
-              >
-                <Button
-                  type="button"
-                  variant={elementKindFilter === "all" ? "default" : "outline"}
-                  size="sm"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => onElementKindFilterChange("all")}
-                >
-                  {t("diagramLists.elements.allTypes")}
-                  <span className="ml-1 font-mono text-[10px] opacity-75">
-                    {detailItemCount}
-                  </span>
-                </Button>
-                {detailGroups.map((group) => (
-                  <Button
-                    key={group.kind}
-                    type="button"
-                    variant={elementKindFilter === group.kind ? "default" : "outline"}
-                    size="sm"
-                    className="h-8 px-3 text-xs"
-                    onClick={() => onElementKindFilterChange(group.kind)}
-                  >
-                    {t(`diagrams.semantic.${group.kind}.label`)}
-                    <span className="ml-1 font-mono text-[10px] opacity-75">
-                      {group.items.length}
-                    </span>
-                  </Button>
-                ))}
-              </div>
+                value={elementKindFilter}
+                onValueChange={(value) => onElementKindFilterChange(value as "all" | SemanticElementKind)}
+                className="w-36 shrink-0"
+                options={[
+                  { value: "all", label: `${t("diagramLists.elements.allTypes")} ${detailItemCount}` },
+                  ...detailGroups.map((group) => ({ value: group.kind, label: `${t(`diagrams.semantic.${group.kind}.label`)} ${group.items.length}` })),
+                ]}
+              />
             ) : null}
           </div>
-          <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2 sm:min-w-max sm:flex-nowrap">
-            {onCreateElement && collections.filter((collection) => collection.allowCreate !== false).map((collection) => (
-              <Button
-                key={`add:${collection.key}`}
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8"
+          {onCreateElement && creatableCollections.length > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button variant="outline" size="sm" className="ml-auto h-9 shrink-0" />}
                 disabled={saving}
-                onClick={() => onCreateElement(collection)}
+                aria-label={t("common.add")}
               >
-                <Plus className="size-3.5" /> {t("diagramLists.elements.add", { kind: editorOwnerLabel(collection.label) })}
-              </Button>
-            ))}
-          </div>
+                <Plus className="size-3.5" /> {t("common.add")} <ChevronDown className="size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-40">
+                {creatableCollections.map((collection) => (
+                  <DropdownMenuItem key={collection.key} onClick={() => onCreateElement(collection)}>
+                    {t("diagramLists.elements.add", { kind: editorOwnerLabel(collection.label) })}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </div>
       </div>
       <div>
@@ -278,10 +261,10 @@ export function ModelRelationshipListSection({
       <div className="border-b border-border pb-3">
         <h3 className="text-lg font-semibold text-foreground">{t("diagramLists.relations.title")}</h3>
         <div
-          className="mt-3 flex items-center justify-between gap-3 overflow-x-auto pb-1"
+          className="mt-3 flex flex-wrap items-center justify-between gap-3 pb-1"
           aria-label={t("diagramLists.relations.toolbar")}
         >
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:min-w-max sm:flex-nowrap">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <label className="relative min-w-0 flex-1 sm:flex-none">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -293,46 +276,23 @@ export function ModelRelationshipListSection({
               />
             </label>
             {relationshipsCount > 0 ? (
-              <div
-                className="flex items-center gap-2"
+              <SelectControl
                 aria-label={t("diagramLists.relations.filter")}
-                role="group"
-              >
-                <Button
-                  type="button"
-                  variant={relationKindFilter === "all" ? "default" : "outline"}
-                  size="sm"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => onRelationKindFilterChange("all")}
-                >
-                  {t("diagramLists.relations.allTypes")}
-                  <span className="ml-1 font-mono text-[10px] opacity-75">
-                    {relationshipsCount}
-                  </span>
-                </Button>
-                {relationFilterOptions.map((option) => (
-                  <Button
-                    key={`relation-filter:${option.value}`}
-                    type="button"
-                    variant={relationKindFilter === option.value ? "default" : "outline"}
-                    size="sm"
-                    className="h-8 px-3 text-xs"
-                    onClick={() => onRelationKindFilterChange(option.value)}
-                  >
-                    {option.label}
-                    <span className="ml-1 font-mono text-[10px] opacity-75">
-                      {option.count}
-                    </span>
-                  </Button>
-                ))}
-              </div>
+                value={relationKindFilter}
+                onValueChange={onRelationKindFilterChange}
+                className="w-36 shrink-0"
+                options={[
+                  { value: "all", label: `${t("diagramLists.relations.allTypes")} ${relationshipsCount}` },
+                  ...relationFilterOptions.map((option) => ({ value: option.value, label: `${option.label} ${option.count}` })),
+                ]}
+              />
             ) : null}
           </div>
           {onCreateRelation && <Button
             type="button"
             size="sm"
             variant="outline"
-            className="ml-auto h-8"
+            className="ml-auto h-9 shrink-0"
             disabled={endpointOptionsCount === 0 || saving}
             onClick={onCreateRelation}
           >

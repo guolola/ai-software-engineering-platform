@@ -112,6 +112,16 @@ describe("TestModelPage", () => {
         ]),
       }),
     );
+    await user.click(screen.getByRole("button", { name: "我知道了" }));
+    const scenarioFilter = screen.getByRole("combobox", { name: "按测试场景筛选" });
+    await user.click(scenarioFilter);
+    await user.click(await screen.findByRole("option", { name: "异常流程" }));
+    expect(screen.queryByText("tc-uc_borrow-uc_borrow-main")).not.toBeInTheDocument();
+    expect(screen.getByText("暂无测试用例。")).toBeInTheDocument();
+    await user.click(scenarioFilter);
+    await user.click(await screen.findByRole("option", { name: "全部场景" }));
+    expect(screen.getByText("tc-uc_borrow-uc_borrow-main")).toBeInTheDocument();
+    expect(repository.updateTestGenerationResult).toHaveBeenCalledTimes(1);
   });
 
   it("shows the same save failure after every user retry", async () => {

@@ -21,10 +21,14 @@ function ContextEditor({
   section,
   onCommit,
   initialModel = contextModel,
+  readOnly = false,
+  saving = false,
 }: {
   section: "elements" | "relationships";
   onCommit: (draft: Record<string, unknown>) => Promise<void>;
   initialModel?: Record<string, unknown>;
+  readOnly?: boolean;
+  saving?: boolean;
 }) {
   const [draft, setDraft] = useState<Record<string, unknown>>(structuredClone(initialModel));
   return (
@@ -36,7 +40,8 @@ function ContextEditor({
         await onCommit(next);
       }}
       onSelectElement={() => undefined}
-      saving={false}
+      saving={saving}
+      readOnly={readOnly}
       visibleSection={section}
       sourceRuleOptions={[{ id: "r1", label: "客户可以发起订单" }]}
     />
@@ -51,9 +56,11 @@ describe("ModelEditPanel context mode", () => {
 
     expect(screen.queryByRole("button", { name: "添加中心系统" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "删除中心系统：订单系统" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "添加人员" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "添加人员" }));
+    expect(screen.queryByRole("button", { name: "添加人员" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "添加", exact: true }));
+    expect(screen.queryByRole("menuitem", { name: "添加中心系统" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "添加外部系统" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("menuitem", { name: "添加人员" }));
     const dialog = screen.getByRole("dialog", { name: "添加人员" });
     expect(dialog.querySelector('[data-slot="field-set"]')).toHaveClass(
       "rounded-xl",
@@ -75,6 +82,28 @@ describe("ModelEditPanel context mode", () => {
     expect(onCommit.mock.calls[0]?.[0]).toMatchObject({
       people: expect.arrayContaining([expect.objectContaining({ sourceRequirementIds: ["r1"] })]),
     });
+  });
+
+  it("filters elements through the shared type selector and restores all types", async () => {
+    const user = userEvent.setup();
+    render(<ContextEditor section="elements" onCommit={async () => undefined} />);
+    const filter = screen.getByRole("combobox", { name: "按元素类型筛选" });
+    expect(filter).toHaveTextContent("全部类型 3");
+    await user.click(filter);
+    expect(await screen.findByRole("option", { name: "角色 1" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("option", { name: "系统边界 1" }));
+    expect(screen.getByRole("button", { name: "定位元素：订单系统" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "定位元素：客户" })).not.toBeInTheDocument();
+    await user.click(filter);
+    await user.click(await screen.findByRole("option", { name: "全部类型 3" }));
+    expect(screen.getByRole("button", { name: "定位元素：客户" })).toBeInTheDocument();
+  });
+
+  it("hides creation in read-only mode and disables the menu while saving", () => {
+    const { rerender } = render(<ContextEditor section="elements" readOnly onCommit={async () => undefined} />);
+    expect(screen.queryByRole("button", { name: "添加", exact: true })).not.toBeInTheDocument();
+    rerender(<ContextEditor section="elements" saving onCommit={async () => undefined} />);
+    expect(screen.getByRole("button", { name: "添加", exact: true })).toBeDisabled();
   });
 
   it("uses the shared relation dialog for direction, endpoints, description, and sources", async () => {

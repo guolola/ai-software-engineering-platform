@@ -21,6 +21,7 @@ export const resources = {
         confirm: "确认",
         cancel: "取消",
         close: "关闭",
+        add: "添加",
       },
       feedback: {
         dismiss: "我知道了",
@@ -1579,6 +1580,7 @@ export const resources = {
         confirm: "Confirm",
         cancel: "Cancel",
         close: "Close",
+        add: "Add",
       },
       feedback: {
         dismiss: "Got it",
