@@ -10,15 +10,16 @@ export function isUnverifiableReviewText(text: string): boolean {
 }
 export function isExcludedDiagramReviewIssue(text: string): boolean {
   if (isUnverifiableReviewText(text)) return false;
-  const layout = /布局|位置|间距|交叉|绕线|绕行|遮挡|重叠|字体|字号|可读性|放在|放到|位于|置于|居中|偏移|拥挤|layout|position|alignment|spacing|crossing|routing|overlap|font[- ]?size|readability/i.test(text);
-  const structure = /缺少|缺失|遗漏|多出|未知|非法|端点|归属|主键|外键|条件|约束|方向.*(?:错|反|不符)|类型.*(?:错|不符)|标签.*(?:错|不一致|不符)|missing|extra|unknown|invalid|wrong|mismatch|constraint/i.test(text);
+  const layout = /布局|位置|间距|交叉|绕线|绕行|遮挡|重叠|字体|字号|可读性|放在|放到|位于|置于|居中|偏移|拥挤|layout|position|alignment|spacing|crossing|routing|overlap|font|readability/i.test(text);
+  // Merely naming an endpoint or business condition does not turn its spacing into a defect.
+  const structure = /缺少|缺失|遗漏|多出|未知|非法|(?:端点|归属|主键|外键|条件|约束|比较符|方向|类型|标签|符号).*(?:错误|有误|不一致|不符|相反|颠倒|不满足|违反)|missing|extra|unknown|invalid|mismatch|wrong (?:node|endpoint|owner|type|direction|label|symbol)|constraint (?:violation|error)/i.test(text);
   return layout && !structure;
 }
 export function classifyDiagramReviewIssue(text: string, layer?: "model" | "render" | "image", code = ""): DiagramReviewCategory {
   const value = `${code} ${text}`;
   if (isUnverifiableReviewText(value) || /未完成|超时|接口|非法.*(?:JSON|输出)|获取.*失败|PNG.*(?:失败|不可用)|timeout|invalid-json|provider-error/i.test(value)) return "check_execution";
-  if (/constraint|comparator|complementary-branch|主键|外键|比较符|分支条件|业务规则|业务约束|业务条件/i.test(value)) return "business_constraint";
-  if (/missing-svg|stale-label|render-mismatch|图形.*不一致|标签.*(?:错|不一致|不符)|连线.*(?:缺|方向|归属)|UML.*(?:错|不符)|wrong-(?:direction|symbol)/i.test(value)) return layer === "model" ? "model_structure" : "render_mismatch";
+  if (/constraint|comparator|complementary-branch|主键|外键|比较符|分支.*条件|业务规则|业务约束|业务条件/i.test(value)) return "business_constraint";
+  if (/missing-svg|stale-label|render-mismatch|图形.*不一致|标签.*(?:错|不一致|不符)|连线.*(?:缺|方向|归属)|方向.*(?:错|相反|不符|颠倒)|UML.*(?:错|不符)|wrong-(?:direction|symbol)/i.test(value)) return layer === "model" ? "model_structure" : "render_mismatch";
   if (/missing-node|extra-node|unknown-shape|wrong-(?:endpoint|type|owner)|explicit-owner|缺少|缺失|遗漏|多出|未知|非法引用|端点|关系类型|归属/i.test(value)) return layer === "image" || layer === "render" ? "render_mismatch" : "model_structure";
   return "other";
 }
