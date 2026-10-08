@@ -11,7 +11,7 @@ export const usageExampleIds = ["implement", "change", "feature", "verify"] as c
 export function ProjectUsageExamples({ onCopy }: { onCopy: (value: string) => Promise<void | boolean> }) {
   const { t, i18n } = useTranslation();
   return <section className="min-w-0" aria-label={t("mcp.guide")}>
-      <Accordion className="w-full" defaultValue={[usageExampleIds[0]]}>
+      <Accordion className="w-full">
         {usageExampleIds.map((id) => {
           const prompt = `${t("mcp.exampleProjectHelp")}\n\n${projectAgentPrompt(t("mcp.exampleProjectName"), i18n.resolvedLanguage ?? i18n.language)}\n\n${t(`mcp.examples.${id}.prompt`)}`;
           return <AccordionItem key={id} value={id}>

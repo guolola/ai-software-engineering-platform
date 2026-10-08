@@ -71,9 +71,14 @@ describe("MCP connections", () => {
     expect(screen.queryByRole("combobox", { name: "选择项目" })).not.toBeInTheDocument();
     expect(screen.queryByText("连接概况")).not.toBeInTheDocument();
     expect(example.closest('[data-slot="card"]')).toBeNull();
+    for (const trigger of screen.getAllByRole("button", { name: /如何/ })) expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "复制案例提示词" })).not.toBeInTheDocument();
+    await user.click(example);
     expect(example).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: "复制案例提示词" })).toBeEnabled();
-    expect(screen.getByText(/请通过 UML 平台 MCP 读取项目 某某自己项目/)).toHaveTextContent("本次任务：先总结");
+    const prompt = screen.getByRole("region", { name: "如何根据项目资料开始实现？" }).querySelector("pre");
+    expect(prompt).toHaveTextContent("请通过 UML 平台 MCP 读取项目 某某自己项目");
+    expect(prompt).toHaveTextContent("本次任务：先总结");
     await user.click(example);
     expect(screen.queryByRole("button", { name: "复制案例提示词" })).not.toBeInTheDocument();
     await user.click(example);
@@ -83,6 +88,8 @@ describe("MCP connections", () => {
     render(<McpConnectionsPanel onNavigate={vi.fn()} />);
     const guidance = await screen.findByText("在客户端发起连接，在打开的平台页面登录并选择项目。没有跳转时可切换个人令牌方式。");
     expect(guidance.closest('[data-slot="card"], [role="alert"]')).toBeNull();
+    expect(screen.getByText("传输协议：Streamable HTTP（流式 HTTP）。请在客户端使用本页 MCP 地址连接。")).toBeVisible();
+    expect(screen.getByLabelText("MCP 地址")).toHaveAccessibleDescription("传输协议：Streamable HTTP（流式 HTTP）。请在客户端使用本页 MCP 地址连接。");
     expect(screen.queryByText("客户端版本仍需实际验收，配置示例不代表已连接。")).not.toBeInTheDocument();
   });
   it("creates an account-wide token without project selection and closes the one-time display", async () => {
@@ -98,6 +105,7 @@ describe("MCP connections", () => {
       await screen.findByRole("option", { name: "个人令牌" }),
     );
     const create = screen.getByRole("button", { name: "创建 30 天个人令牌" });
+    expect(screen.getByText("传输协议：Streamable HTTP（流式 HTTP）。请在客户端使用本页 MCP 地址连接。")).toBeVisible();
     expect(create).toBeDisabled();
     fireEvent.change(screen.getByLabelText("连接名称"), {
       target: { value: "学生客户端" },

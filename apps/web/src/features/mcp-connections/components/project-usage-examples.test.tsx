@@ -5,7 +5,7 @@ import { expect, it, vi } from "vitest";
 import { AppI18nProvider } from "../../../shared/i18n/i18n-provider";
 import { ProjectUsageExamples } from "./project-usage-examples";
 
-it("opens the first example by default and copies the active scenario after keyboard navigation", async () => {
+it("starts with all examples collapsed and copies the active scenario after keyboard navigation", async () => {
   const user = userEvent.setup();
   const onCopy = vi.fn().mockResolvedValue(undefined);
   render(<AppI18nProvider><ProjectUsageExamples onCopy={onCopy} /></AppI18nProvider>);
@@ -13,6 +13,9 @@ it("opens the first example by default and copies the active scenario after keyb
   expect(screen.queryByText(/展开查看常用场景/)).not.toBeInTheDocument();
   const triggers = screen.getAllByRole("button", { name: /如何/ });
   expect(triggers).toHaveLength(4);
+  for (const trigger of triggers) expect(trigger).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByRole("button", { name: "复制案例提示词" })).not.toBeInTheDocument();
+  await user.click(triggers[0]);
   expect(triggers[0]).toHaveAttribute("aria-expanded", "true");
   const description = screen.getByText("适用于新项目或首次接手仓库，先确认技术要求，再按项目依据完成实现。");
   const copy = screen.getByRole("button", { name: "复制案例提示词" });
