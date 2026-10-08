@@ -1547,7 +1547,9 @@ describe("DiagramView", () => {
     expect(relationFilterGroup.compareDocumentPosition(addRelationButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(relationFilterGroup).toHaveTextContent(/^全部关系▼?$/);
     await userEvent.click(relationFilterGroup);
-    expect(screen.getAllByRole("option").every(option => !/\s\d+$/u.test(option.textContent ?? ""))).toBe(true);
+    // Base UI mounts the portal asynchronously; inspect options once they are accessible.
+    const relationOptions = await screen.findAllByRole("option");
+    expect(relationOptions.every(option => !/\s\d+$/u.test(option.textContent ?? ""))).toBe(true);
     await userEvent.keyboard("{Escape}");
     expect(screen.getAllByText("活动关联多个提醒记录。").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("关系 rel_event_reminder 起点")).not.toBeInTheDocument();
