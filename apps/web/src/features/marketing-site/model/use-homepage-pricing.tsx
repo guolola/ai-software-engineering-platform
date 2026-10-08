@@ -24,7 +24,7 @@ export function useHomepagePricing(): Plans {
       price: { monthly: sku ? sku.amountCents / 100 : null, yearly: sku?.creditAmount ?? null },
       period: en ? ' / purchase' : ' / 次购买',
       buttonText: en ? 'View account billing' : '查看账户权益',
-      features: [en ? 'Requirements and UML modeling' : '需求分析与 UML 建模', en ? 'Design and code prototypes' : '设计与代码原型', en ? 'Specification generation' : '工程说明书生成', en ? 'Tasks and artifact history' : '任务与产物历史', en ? 'See billing for full package details' : '完整套餐信息以计费页面为准'],
+      features: [en ? 'Requirements and UML modeling' : '需求分析与 UML 建模', en ? 'Design and agent sources' : '设计与 Agent 实现依据', en ? 'Specification generation' : '工程说明书生成', en ? 'Tasks and artifact history' : '任务与产物历史', en ? 'See billing for full package details' : '完整套餐信息以计费页面为准'],
       isPopular: index === 1,
     };
   });

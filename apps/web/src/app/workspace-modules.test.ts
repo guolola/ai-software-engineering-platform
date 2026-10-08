@@ -14,14 +14,14 @@ describe("workspaceModules", () => {
     );
   });
 
-  it("keeps testing after code in workspace module order", () => {
+  it("keeps testing after design without a code workspace", () => {
     expect(WORKSPACE_MODULES.map((module) => module.id)).toEqual([
       "system-requirements",
       "feasibility",
       "requirements",
       "diagrams",
       "design",
-      "code",
+      
       "testing",
       "documents",
     ]);
@@ -31,8 +31,7 @@ describe("workspaceModules", () => {
     expect(SHELL_ROUTE_MODULES.map((module) => module.route)).toEqual([
       "/workspace",
       "/exam",
-      "/tutorial",
     ]);
-    expect(findShellRouteModule("/tutorial").label).toBe("使用文档");
+    expect(findShellRouteModule("/exam").label).toBe("考试");
   });
 });

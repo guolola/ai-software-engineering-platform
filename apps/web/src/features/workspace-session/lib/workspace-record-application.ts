@@ -43,18 +43,18 @@ type WorkspaceRecordAppliers = {
   setHasFeasibilityImplementationArtifact: Setter<boolean>;
   setFeasibilityImplementationPlan: Setter<WorkspaceRecord["feasibilityImplementationPlan"]>;
   setManualModelEditStatus: Setter<WorkspaceRecord["manualModelEditStatus"]>;
-  setCodeSpec: Setter<WorkspaceRecord["codeSpec"]>;
-  setCodeBusinessLogic: Setter<WorkspaceRecord["codeBusinessLogic"]>;
-  setCodeFiles: Setter<WorkspaceRecord["codeFiles"]>;
-  setCodeEntryFile: Setter<WorkspaceRecord["codeEntryFile"]>;
-  setCodeDependencies: Setter<WorkspaceRecord["codeDependencies"]>;
-  setCodeUiMockup: Setter<WorkspaceRecord["codeUiMockup"]>;
-  setCodeAgentPlan: Setter<WorkspaceRecord["codeAgentPlan"]>;
-  setCodeSkills: Setter<WorkspaceRecord["codeSkills"]>;
-  setCodeSkillDiagnostics: Setter<WorkspaceRecord["codeSkillDiagnostics"]>;
-  setCodeSkillResourcePlan: Setter<WorkspaceRecord["codeSkillResourcePlan"]>;
-  setCodeSkillContext: Setter<WorkspaceRecord["codeSkillContext"]>;
-  setCodeDiagnostics: Setter<WorkspaceRecord["codeDiagnostics"]>;
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   setTestGenerationResult: Setter<WorkspaceRecord["testGenerationResult"]>;
   setGeneratedDiagrams: Setter<WorkspaceRecord["generatedDiagramTypes"]>;
   setGeneratedDesignDiagrams: Setter<WorkspaceRecord["generatedDesignDiagramTypes"]>;
@@ -119,18 +119,18 @@ export function applyWorkspaceRecordToSessionState(
   );
   appliers.setFeasibilityImplementationPlan(workspace.feasibilityImplementationPlan);
   appliers.setManualModelEditStatus(workspace.manualModelEditStatus ?? {});
-  appliers.setCodeSpec(workspace.codeSpec);
-  appliers.setCodeBusinessLogic(workspace.codeBusinessLogic);
-  appliers.setCodeFiles(workspace.codeFiles);
-  appliers.setCodeEntryFile(workspace.codeEntryFile);
-  appliers.setCodeDependencies(workspace.codeDependencies);
-  appliers.setCodeUiMockup(workspace.codeUiMockup);
-  appliers.setCodeAgentPlan(workspace.codeAgentPlan);
-  appliers.setCodeSkills(workspace.codeSkills);
-  appliers.setCodeSkillDiagnostics(workspace.codeSkillDiagnostics);
-  appliers.setCodeSkillResourcePlan(workspace.codeSkillResourcePlan);
-  appliers.setCodeSkillContext(workspace.codeSkillContext);
-  appliers.setCodeDiagnostics(workspace.codeDiagnostics);
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   appliers.setTestGenerationResult(workspace.testGenerationResult ?? null);
   appliers.setGeneratedDiagrams(workspace.generatedDiagramTypes);
   appliers.setGeneratedDesignDiagrams(workspace.generatedDesignDiagramTypes);

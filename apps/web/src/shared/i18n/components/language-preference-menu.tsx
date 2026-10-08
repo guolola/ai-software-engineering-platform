@@ -1,6 +1,6 @@
 // Renders the shared language preference menu used across public and authenticated shells.
 import { useState } from "react";
-import { Check, Languages } from "lucide-react";
+import { Check, ChevronDown, Languages } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../ui/button";
 import {
@@ -18,9 +18,10 @@ import { useAppI18n } from "../i18n-provider";
 
 type LanguagePreferenceMenuProps = {
   className?: string;
+  showLabel?: boolean;
 };
 
-export function LanguagePreferenceMenu({ className }: LanguagePreferenceMenuProps) {
+export function LanguagePreferenceMenu({ className, showLabel = false }: LanguagePreferenceMenuProps) {
   const { t } = useTranslation();
   const { locale, preference, setPreference } = useAppI18n();
   const [open, setOpen] = useState(false);
@@ -38,14 +39,14 @@ export function LanguagePreferenceMenu({ className }: LanguagePreferenceMenuProp
       <DropdownMenuTrigger
         render={<Button
             variant="ghost"
-            size="icon"
+            size={showLabel ? "sm" : "icon"}
             className={cn(className, (open || preference !== "system") && "text-primary")}
             title={t("language.title")}
             aria-label={t("language.title")}
           />}
         nativeButton={true}
       >
-        <Languages className="size-5" />
+        {showLabel ? <>{LOCALE_LABELS[locale]}<ChevronDown className="size-3.5" /></> : <Languages className="size-5" />}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44">
         {preferenceItems.map((item) => (

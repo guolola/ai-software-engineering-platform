@@ -21,17 +21,17 @@ export function createEmptyDiagnostics(): RunDiagnostics {
     stageStartedAt: {},
     stageMessages: {},
     events: [],
-    uiMockup: null,
-    uiReferenceSpec: null,
-    uiFidelityReport: null,
-    visualDirection: null,
-    skillResourceDiscoveryPlan: null,
-    skillResourcePreviews: null,
-    skillResourcePlan: null,
-    codeSkillContext: null,
+    
+    
+    
+    
+    
+    
+    
+    
     requirementTrace: [],
     designTrace: [],
-    codeTrace: [],
+    
   };
 }
 
@@ -43,25 +43,25 @@ export function formatStageForDiagnostics(stage: RunStage | null) {
     generate_design_sequence: "生成用例实现设计",
     generate_design_models: "生成设计模型",
     generate_tests: "生成测试用例",
-    analyze_code_business_logic: "分析业务逻辑",
-    analyze_code_product: "分析业务背景",
-    plan_code_ui: "规划界面方案",
-    generate_code_ui_mockup: "生成界面设计图",
-    analyze_code_ui_mockup: "解析界面设计图",
-    generate_code_ui_ir: "生成结构化 UI IR",
-    load_web_design_skill: "加载前端设计执行器",
-    select_code_skills: "选择前端设计执行器",
-    plan_code_files: "规划文件结构",
-    generate_code_spec: "生成代码规格",
-    generate_code_files: "生成代码文件",
-    plan_code: "制定实现步骤",
-    write_code_files: "写入原型文件",
-    audit_code_quality: "检查原型质量",
-    verify_code_ui_fidelity: "检查业务/界面覆盖",
-    verify_code_rendered_preview: "验证渲染预览",
-    verify_code_business_assertions: "验证业务断言",
-    verify_code_preview: "检查预览入口",
-    repair_code_files: "修复代码输出",
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     generate_document_text: "生成说明书正文",
     render_document_file: "写入说明书文件",
     generate_plantuml: "生成图源码",
@@ -83,25 +83,25 @@ export function sanitizeDiagnosticText(text: string) {
     ["generate_design_sequence", "生成用例实现设计"],
     ["generate_design_models", "生成设计模型"],
     ["generate_tests", "生成测试用例"],
-    ["analyze_code_business_logic", "分析业务逻辑"],
-    ["analyze_code_product", "分析业务背景"],
-    ["plan_code_ui", "规划界面方案"],
-    ["generate_code_ui_mockup", "生成界面设计图"],
-    ["analyze_code_ui_mockup", "解析界面设计图"],
-    ["generate_code_ui_ir", "生成结构化 UI IR"],
-    ["load_web_design_skill", "加载前端设计执行器"],
-    ["select_code_skills", "选择前端设计执行器"],
-    ["plan_code_files", "规划文件结构"],
-    ["generate_code_spec", "生成代码规格"],
-    ["generate_code_files", "生成代码文件"],
-    ["plan_code", "制定实现步骤"],
-    ["write_code_files", "写入原型文件"],
-    ["audit_code_quality", "检查原型质量"],
-    ["verify_code_ui_fidelity", "检查设计图还原度"],
-    ["verify_code_rendered_preview", "验证渲染预览"],
-    ["verify_code_business_assertions", "验证业务断言"],
-    ["verify_code_preview", "检查预览入口"],
-    ["repair_code_files", "修复代码输出"],
+    [ "分析业务逻辑"],
+    [ "分析业务背景"],
+    [ "规划界面方案"],
+    [ "生成界面设计图"],
+    [ "解析界面设计图"],
+    [ "生成结构化 UI IR"],
+    [ "加载前端设计执行器"],
+    [ "选择前端设计执行器"],
+    [ "规划文件结构"],
+    [ "生成代码规格"],
+    [ "生成代码文件"],
+    [ "制定实现步骤"],
+    [ "写入原型文件"],
+    [ "检查原型质量"],
+    [ "检查设计图还原度"],
+    [ "验证渲染预览"],
+    [ "验证业务断言"],
+    [ "检查预览入口"],
+    [ "修复代码输出"],
     ["generate_document_text", "生成说明书正文"],
     ["render_document_file", "写入说明书文件"],
     ["generate_plantuml", "生成图源码"],
@@ -109,11 +109,11 @@ export function sanitizeDiagnosticText(text: string) {
     ["verify_diagram_visual", "视觉检查"],
     ["PlantUML", "图源码"],
     ["SVG", "图像"],
-    ["codeFiles", "代码文件"],
-    ["codeSpec", "代码规格"],
-    ["uiMockup", "界面设计图"],
+    [ "代码文件"],
+    [ "代码规格"],
+    [ "界面设计图"],
     ["uiReferenceSpec", "界面设计图解析"],
-    ["businessLogic", "业务逻辑"],
+    [ "业务逻辑"],
     ["uiFidelityReport", "业务/界面覆盖检查"],
     ["designTokens", "设计 Token"],
     ["componentRegistry", "组件 Registry"],
@@ -137,7 +137,7 @@ export function appendDiagnosticStream(current: string, chunk: string) {
 
 export function isMeaningfulLlmChunkEvent(
   event: RunEvent,
-): event is RunEvent & { type: "llm_chunk"; stage: RunStage; chunk: string } {
+): boolean {
   return event.type === "llm_chunk" && event.chunk.trim().length > 0;
 }
 
@@ -183,13 +183,7 @@ export function summarizeEvent(event: RunEvent): DiagnosticEvent {
             ? "说明书文件已准备好"
             : `${formatStageForDiagnostics(event.stage)}的产物已准备好`,
       };
-    case "code_file_changed":
-      return {
-        id: `${suffix}:code_file_changed:${event.path}`,
-        at,
-        label: "文件已更新",
-        detail: sanitizeDiagnosticText(event.reason),
-      };
+    
     case "completed":
       if ("files" in event.snapshot) {
         return {
@@ -264,34 +258,20 @@ export function getProgressFromEvent(event: RunEvent) {
           return 45;
         case "generate_design_models":
           return 70;
-        case "analyze_code_business_logic":
-          return 18;
-        case "analyze_code_product":
-          return 18;
-        case "plan_code_ui":
-          return 34;
-        case "load_web_design_skill":
-          return 48;
-        case "generate_code_ui_mockup":
-          return 42;
-        case "plan_code_files":
-          return 50;
-        case "generate_code_spec":
-          return 45;
-        case "generate_code_files":
-          return 80;
-        case "plan_code":
-          return 58;
-        case "write_code_files":
-          return 74;
-        case "audit_code_quality":
-          return 88;
-        case "verify_code_business_assertions":
-          return 96;
-        case "verify_code_preview":
-          return 92;
-        case "repair_code_files":
-          return 96;
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         case "generate_document_text":
           return 55;
         case "render_document_file":
@@ -312,7 +292,7 @@ export function getProgressFromEvent(event: RunEvent) {
       return 100;
     case "llm_chunk":
     case "artifact_ready":
-    case "code_file_changed":
+    
     case "stage_finished":
       return null;
   }
@@ -331,7 +311,7 @@ export function deriveRunDiagnosticsFromEvent(
       ? diagnosticEvent.at
       : current.finishedAt,
     activeStage: "stage" in event ? event.stage : current.activeStage,
-    streamText: meaningfulChunk
+    streamText: meaningfulChunk && event.type === "llm_chunk"
       ? appendDiagnosticStream(current.streamText, event.chunk)
       : current.streamText,
     chunkCount: meaningfulChunk ? current.chunkCount + 1 : current.chunkCount,
@@ -360,77 +340,7 @@ export function deriveRunDiagnosticsFromEvent(
   } satisfies RunDiagnostics;
 }
 
-export function deriveCodeRunDiagnosticsFromEvent(
-  current: RunDiagnostics,
-  event: RunEvent,
-  diagnosticEvent: DiagnosticEvent,
-) {
-  const base = deriveRunDiagnosticsFromEvent(current, event, diagnosticEvent);
-  return {
-    ...base,
-    uiMockup:
-      event.type === "artifact_ready" && event.artifactKind === "uiMockup"
-        ? (event.uiMockup ?? current.uiMockup)
-        : current.uiMockup,
-    uiReferenceSpec:
-      event.type === "artifact_ready" &&
-      event.artifactKind === "uiReferenceSpec"
-        ? (event.uiReferenceSpec ?? current.uiReferenceSpec)
-        : event.type === "completed" && "uiReferenceSpec" in event.snapshot
-          ? (event.snapshot.uiReferenceSpec ?? current.uiReferenceSpec)
-          : current.uiReferenceSpec,
-    uiFidelityReport:
-      event.type === "artifact_ready" &&
-      event.artifactKind === "uiFidelityReport"
-        ? (event.uiFidelityReport ?? current.uiFidelityReport)
-        : event.type === "completed" && "uiFidelityReport" in event.snapshot
-          ? (event.snapshot.uiFidelityReport ?? current.uiFidelityReport)
-          : current.uiFidelityReport,
-    visualDirection:
-      event.type === "artifact_ready" &&
-      event.artifactKind === "visualDirection"
-        ? (event.visualDirection ?? current.visualDirection)
-        : event.type === "completed" && "visualDirection" in event.snapshot
-          ? (event.snapshot.visualDirection ?? current.visualDirection)
-          : current.visualDirection,
-    skillResourceDiscoveryPlan:
-      event.type === "artifact_ready" &&
-      event.artifactKind === "skillResourceDiscoveryPlan"
-        ? (event.skillResourceDiscoveryPlan ??
-          current.skillResourceDiscoveryPlan)
-        : event.type === "completed" &&
-            "skillResourceDiscoveryPlan" in event.snapshot
-          ? (event.snapshot.skillResourceDiscoveryPlan ??
-            current.skillResourceDiscoveryPlan)
-          : current.skillResourceDiscoveryPlan,
-    skillResourcePreviews:
-      event.type === "artifact_ready" &&
-      event.artifactKind === "skillResourcePreviews"
-        ? (event.skillResourcePreviews ?? current.skillResourcePreviews)
-        : event.type === "completed" && "skillResourcePreviews" in event.snapshot
-          ? (event.snapshot.skillResourcePreviews ??
-            current.skillResourcePreviews)
-          : current.skillResourcePreviews,
-    skillResourcePlan:
-      event.type === "artifact_ready" &&
-      event.artifactKind === "skillResourcePlan"
-        ? (event.skillResourcePlan ?? current.skillResourcePlan)
-        : event.type === "completed" && "skillResourcePlan" in event.snapshot
-          ? (event.snapshot.skillResourcePlan ?? current.skillResourcePlan)
-          : current.skillResourcePlan,
-    codeSkillContext:
-      event.type === "artifact_ready" &&
-      event.artifactKind === "codeSkillContext"
-        ? (event.codeSkillContext ?? current.codeSkillContext)
-        : event.type === "completed" && "codeSkillContext" in event.snapshot
-          ? (event.snapshot.codeSkillContext ?? current.codeSkillContext)
-          : current.codeSkillContext,
-    codeTrace:
-      event.type === "completed" && "codeTrace" in event.snapshot
-        ? (event.snapshot.codeTrace ?? [])
-        : current.codeTrace,
-  } satisfies RunDiagnostics;
-}
+
 
 export function addLocalFailureToRunDiagnostics(
   current: RunDiagnostics,

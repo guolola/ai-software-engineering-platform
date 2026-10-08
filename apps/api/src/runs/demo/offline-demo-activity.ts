@@ -34,16 +34,7 @@ function demoCalls(record: RunRecord, stage: RunStage): DemoCall[] {
     return [{ title: "整理需求规则",
       text: `已从演示数据读取 ${snapshot.rules?.length ?? 0} 条需求规则。\n本次选择 ${snapshot.selectedDiagrams.length} 类模型，后续过程将按步骤展开；多个模型会并行显示。` }];
   }
-  if ("files" in snapshot) {
-    const files = Object.keys(snapshot.files);
-    const entries: Partial<Record<RunStage, DemoCall>> = {
-      analyze_code_business_logic: { title: "整理业务逻辑", text: `已读取演示业务逻辑资料。\n原型入口为 ${snapshot.entryFile}，后续将准备代码规格与 ${files.length} 个文件。` },
-      generate_code_spec: { title: "整理代码规格", text: `演示代码规格已准备好。\n接下来会读取原型文件，保持入口文件与已有目录结构一致。` },
-      generate_code_files: { title: "准备原型文件", text: `本次原型包含 ${files.length} 个文件。\n${files.slice(0, 3).join("\n")}\n文件内容可在完成后展开查看。` },
-      verify_code_business_assertions: { title: "读取业务检查结果", text: snapshot.businessAssertionResults ? "已读取演示数据中保存的业务检查报告。\n原型文件和报告将随本次任务结果一起保留。" : "演示数据没有保存业务检查报告，当前仅提供原型文件。" },
-    };
-    if (entries[stage]) return [entries[stage]!];
-  }
+  
   if ("sections" in snapshot) {
     if (stage === "generate_document_text") return [{ title: "整理文档正文（演示）",
       text: snapshot.sections.slice(0, 2).map((section) => `${section.title}\n${section.body.join("\n").slice(0, 240)}`).join("\n\n") || "当前文档没有可展示的正文。" }];

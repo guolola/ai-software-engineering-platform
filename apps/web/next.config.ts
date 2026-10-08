@@ -9,7 +9,12 @@ const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: true },
   async rewrites() {
     const apiOrigin = process.env.UML_API_ORIGIN ?? 'http://127.0.0.1:4001';
-    return [{ source: '/api/:path*', destination: `${apiOrigin}/api/:path*` }];
+    return [
+      { source: '/api/:path*', destination: `${apiOrigin}/api/:path*` },
+      { source: '/.well-known/oauth-protected-resource/:path*', destination: `${apiOrigin}/.well-known/oauth-protected-resource/:path*` },
+      { source: '/.well-known/oauth-authorization-server/:path*', destination: `${apiOrigin}/.well-known/oauth-authorization-server/:path*` },
+      { source: '/.well-known/openid-configuration/:path*', destination: `${apiOrigin}/.well-known/openid-configuration/:path*` },
+    ];
   },
 };
 

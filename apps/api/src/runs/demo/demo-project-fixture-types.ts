@@ -1,6 +1,6 @@
 // Describes the frozen run artifacts used by the offline demo branch.
 import type {
-  CodeRunSnapshot,
+  
   DesignRunSnapshot,
   RunSnapshot,
 } from "@uml-platform/contracts";
@@ -17,5 +17,5 @@ export interface DemoProjectFixture {
   };
   requirementSnapshot: RunSnapshot;
   designSnapshot: DesignRunSnapshot;
-  codeSnapshot: CodeRunSnapshot;
+  
 }

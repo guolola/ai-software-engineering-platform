@@ -6,7 +6,7 @@ import {
   emitEvent,
   serializeRunRecordStore,
 } from "./run-record-store.js";
-import { createEmptyCodeSnapshot, createEmptySnapshot } from "./snapshots.js";
+import {  createEmptySnapshot } from "./snapshots.js";
 import { summarizeRunRecord } from "./run-record-summaries.js";
 
 test("run record store serializes metadata, snapshots, and events without listeners", () => {
@@ -230,63 +230,3 @@ test("run summaries use terminal metadata timestamps for completedAt", () => {
   assert.equal(summary.updatedAt, "2026-06-18T14:48:23.000Z");
 });
 
-test("run summaries expose code diagnostics for project history and task drawers", () => {
-  const snapshot = createEmptyCodeSnapshot("run-code-summary", {
-    designModels: [],
-  });
-  snapshot.status = "completed";
-  snapshot.currentStage = "verify_code_preview";
-  snapshot.files = {
-    "/src/App.tsx": "export default function App() { return null; }",
-  };
-  snapshot.diagnostics = [
-    {
-      stage: "verify_code_preview",
-      message: "检测到真实网络请求痕迹，已切换到本地 mock。",
-      at: "2026-06-21T00:00:00.000Z",
-    },
-  ];
-  snapshot.fileGenerationDiagnostics = [
-    {
-      stage: "operation_manifest",
-      status: "repaired",
-      path: "/src/App.tsx",
-      message: "入口文件缺失，已回退到 /src/App.tsx。",
-      at: "2026-06-21T00:00:01.000Z",
-    },
-  ];
-  snapshot.qualityDiagnostics = [
-    {
-      passed: false,
-      metrics: {
-        fileCount: 1,
-        pageFileCount: 1,
-        componentFileCount: 0,
-      },
-      issues: [
-        {
-          severity: "warning",
-          path: "/src/App.tsx",
-          message: "页面缺少空状态。",
-        },
-      ],
-    },
-  ];
-  const record = {
-    snapshot,
-    events: [],
-    listeners: new Set<() => void>(),
-    terminal: true,
-  };
-
-  const summary = summarizeRunRecord(record);
-
-  assert.equal(summary.runKind, "code");
-  assert.equal(summary.codeDiagnosticCount, 3);
-  assert.equal(summary.codeQualityIssueCount, 1);
-  assert.deepEqual(summary.codeDiagnosticSummary, [
-    "verify_code_preview：检测到真实网络请求痕迹，已切换到本地 mock。",
-    "operation_manifest：/src/App.tsx 入口文件缺失，已回退到 /src/App.tsx。",
-    "quality：/src/App.tsx 页面缺少空状态。",
-  ]);
-});

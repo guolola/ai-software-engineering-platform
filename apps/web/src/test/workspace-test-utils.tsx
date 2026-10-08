@@ -61,18 +61,18 @@ export function createWorkspaceRecord(
     designSvgArtifacts: {},
     designDiagramErrors: {},
     manualModelEditStatus: {},
-    codeSpec: null,
-    codeBusinessLogic: null,
-    codeFiles: {},
-    codeEntryFile: null,
-    codeDependencies: {},
-    codeUiMockup: null,
-    codeAgentPlan: [],
-    codeSkills: [],
-    codeSkillDiagnostics: [],
-    codeSkillResourcePlan: null,
-    codeSkillContext: null,
-    codeDiagnostics: [],
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     testGenerationResult: null,
     requirementInputFingerprint: null,
     diagramInputFingerprints: {},
@@ -167,6 +167,7 @@ export function createRunSnapshot(
     svgArtifacts: [],
     diagramErrors: {},
     requirementTrace: [],
+    visualReviews: {},
     currentStage: "render_svg",
     status: "completed",
     error: null,

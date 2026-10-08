@@ -107,10 +107,9 @@ export type WorkspaceSelection =
       relationshipId: string;
       label: string;
     }
-  | { kind: "workspace-placeholder"; workspaceId: WorkspacePlaceholderId; label: string };
+  ;
 
-export type WorkspacePlaceholderId =
-  | "code";
+
 
 export interface WorkspaceTab {
   id: string;
@@ -206,10 +205,7 @@ interface WorkspaceShellState {
     label: string,
     modelId?: string,
   ) => void;
-  openWorkspacePlaceholder: (
-    workspaceId: WorkspacePlaceholderId,
-    label: string,
-  ) => void;
+  
 }
 
 const WorkspaceShellContext = createContext<WorkspaceShellState | null>(null);
@@ -268,8 +264,7 @@ function tabIdForSelection(selection: WorkspaceSelection) {
       return "documents";
     case "document-editor":
       return `document:${selection.documentId}`;
-    case "workspace-placeholder":
-      return `workspace:${selection.workspaceId}`;
+    
   }
 }
 
@@ -314,8 +309,7 @@ function tabLabelForSelection(selection: WorkspaceSelection) {
       return "说明书";
     case "document-editor":
       return selection.label;
-    case "workspace-placeholder":
-      return selection.label;
+    
   }
 }
 
@@ -327,7 +321,7 @@ function createWorkspaceTab(selection: WorkspaceSelection): WorkspaceTab {
   };
 }
 
-export type WorkspaceStage = "system-requirements" | "feasibility" | "requirements" | "design" | "test" | "code" | "documents";
+export type WorkspaceStage = "system-requirements" | "feasibility" | "requirements" | "design" | "test" | "documents";
 
 export function stageForSelection(selection: WorkspaceSelection): WorkspaceStage {
   switch (selection.kind) {
@@ -365,8 +359,7 @@ export function stageForSelection(selection: WorkspaceSelection): WorkspaceStage
     case "documents-home":
     case "document-editor":
       return "documents";
-    case "workspace-placeholder":
-      return selection.workspaceId;
+    
   }
 }
 
@@ -637,16 +630,7 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
     [openWorkspaceTab],
   );
 
-  const openWorkspacePlaceholder = useCallback(
-    (workspaceId: WorkspacePlaceholderId, label: string) => {
-      openWorkspaceTab({
-        kind: "workspace-placeholder",
-        workspaceId,
-        label,
-      });
-    },
-    [openWorkspaceTab],
-  );
+  
 
   const value = useMemo(
     () => ({
@@ -687,7 +671,7 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       openDesignDiagramRelationship,
       openDiagramElement,
       openDiagramRelationship,
-      openWorkspacePlaceholder,
+      
     }),
     [
       activeTabId,
@@ -726,7 +710,7 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       openDesignDiagramRelationship,
       openDiagramElement,
       openDiagramRelationship,
-      openWorkspacePlaceholder,
+      
       selection,
     ],
   );
@@ -810,7 +794,6 @@ export function getSelectionKey(selection: WorkspaceSelection) {
       return `diagram-element:${selection.modelId ?? selection.diagram}:${selection.elementKind}:${selection.elementId}`;
     case "diagram-relationship":
       return `diagram-relationship:${selection.modelId ?? selection.diagram}:${selection.relationshipId}`;
-    case "workspace-placeholder":
-      return `workspace:${selection.workspaceId}`;
+    
   }
 }

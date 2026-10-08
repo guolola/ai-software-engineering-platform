@@ -25,7 +25,7 @@ import {
   type RunRecordStore,
 } from "../../runs/records/run-record-store.js";
 import {
-  createEmptyCodeSnapshot,
+  
   createEmptyDesignSnapshot,
   createEmptyDocumentSnapshot,
   createEmptySnapshot,
@@ -495,30 +495,7 @@ test("admin metrics expose cumulative overview and single-day generation breakdo
     completedAt: todayThree,
   });
 
-  const codeSnapshot = createEmptyCodeSnapshot("code-completed", {
-    designModels: [],
-  });
-  codeSnapshot.files = { "/src/App.tsx": "export default null", "/src/main.tsx": "main" };
-  putMetricRun(runs, {
-    runId: "code-completed",
-    snapshot: codeSnapshot,
-    status: "completed",
-    createdAt: todayOne,
-    completedAt: todayTwo,
-  });
-
-  const quickCodeSnapshot = createEmptyCodeSnapshot("code-quick", {
-    designModels: [],
-  });
-  quickCodeSnapshot.files = { "/src/Quick.tsx": "export default null" };
-  putMetricRun(runs, {
-    runId: "code-quick",
-    snapshot: quickCodeSnapshot,
-    status: "completed",
-    createdAt: todayFourThirty,
-    completedAt: todayFourThirtyFive,
-  });
-
+  
   const documentRequirement = createEmptyDocumentSnapshot("doc-requirements", {
     documentKind: "requirementsSpec",
     requirementText: "需求说明",
@@ -639,9 +616,9 @@ test("admin metrics expose cumulative overview and single-day generation breakdo
   const totalDocuments = totalByType.get("document_generation") as Record<string, unknown>;
   assert.equal(totalDocuments.generatedCount, 2);
   assert.equal(totalDocuments.modelCallCount, 1);
-  const totalCode = totalByType.get("code_generation") as Record<string, unknown>;
-  assert.equal(totalCode.generatedCount, 2);
-  assert.equal(totalCode.modelCallCount, 4);
+  
+  
+  
 
   const byType = new Map(
     body.generationBreakdown.map((row: { taskType: string }) => [row.taskType, row]),
@@ -663,13 +640,7 @@ test("admin metrics expose cumulative overview and single-day generation breakdo
   assert.equal(documents.artifactSummary, "需求规格说明书 1 · 软件设计说明书 1");
   assert.equal(documents.modelCallCount, 1);
 
-  const code = byType.get("code_generation") as Record<string, unknown>;
-  assert.equal(code.generatedCount, 2);
-  assert.equal(code.artifactSummary, "代码文件 3");
-  assert.equal(code.averageDuration, "32.5分钟");
-  assert.equal(code.modelCallCount, 4);
-
-  const yesterdayResponse = await app.inject({
+    const yesterdayResponse = await app.inject({
     method: "GET",
     url: `/api/admin/metrics?date=${shanghaiDateFromIso(yesterday)}`,
     headers: { Cookie: cookie },
@@ -2420,15 +2391,7 @@ test("admin run list classifies run kinds and returns readable summaries", async
       expectedTitle: "设计建模生成结果",
       createdAt: "2026-05-22T00:03:00.000Z",
     },
-    {
-      snapshot: createEmptyCodeSnapshot("run-code", {
-        designModels: [],
-        existingFiles: { "/src/App.tsx": "export default function App() { return null; }" },
-      }),
-      expectedType: "code_generation",
-      expectedTitle: "代码原型生成结果",
-      createdAt: "2026-05-22T00:02:00.000Z",
-    },
+    
     {
       snapshot: createEmptyDocumentSnapshot("run-doc", {
         documentKind: "requirementsSpec",

@@ -9,7 +9,7 @@ import {
   type RunActionResult,
 } from "@uml-platform/contracts";
 import {
-  createEmptyCodeSnapshot,
+  
   createEmptyDesignSnapshot,
   createEmptyDocumentSnapshot,
   createEmptyFeasibilitySnapshot,
@@ -56,17 +56,7 @@ function createQueuedSnapshotFromSource(
     });
   }
 
-  if ("files" in source) {
-    return createEmptyCodeSnapshot(newRunId, {
-      designModels: source.designModels,
-      designPlantUml: source.designPlantUml,
-      existingFiles: source.files,
-      // A failed-code retry must repair the diagnostic candidate in place.
-      // Clearing it would silently turn "retry" into a full regeneration.
-      generationMode: action === "retry" ? "continue" : source.generationMode,
-      requirementBaseline: source.requirementBaseline,
-    });
-  }
+  
 
   if ("designModelTraceability" in source) {
     const retryDiagrams = action === "retry"

@@ -173,7 +173,6 @@ describe("stage reading surface", () => {
   it.each([
     ["requirements", "需求建模助手", "Requirements Modeling Assistant"],
     ["design", "设计建模助手", "Design Modeling Assistant"],
-    ["code", "代码生成助手", "Code Generation Assistant"],
     ["document", "文档编写助手", "Documentation Assistant"],
     ["feasibility", "可研分析助手", "Feasibility Study Assistant"],
     ["unknown", "生成助手", "Generation Assistant"],

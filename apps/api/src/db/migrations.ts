@@ -1,5 +1,7 @@
 // Defines first-wave PostgreSQL migrations for identity, project, run, and document records.
 import type { Queryable } from "./transactions.js";
+import { mcpSchemaSql } from "../mcp/records/mcp-schema.js";
+import { retiredCodeDataSql } from "./retired-code-data.js";
 
 export const migrationTableName = "schema_migrations";
 
@@ -1283,6 +1285,8 @@ export const migrations = [
     id: "028_user_onboarding_state",
     sql: onboardingStateSql,
   },
+  { id: "029_mcp_authorization", sql: mcpSchemaSql },
+  { id: "030_retire_code_prototypes", sql: retiredCodeDataSql },
 ] as const;
 
 export async function runMigrations(

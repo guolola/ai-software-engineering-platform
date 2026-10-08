@@ -77,14 +77,18 @@ function errorResponse(input: {
 }
 
 export async function createConfiguredFastifyApp() {
-  const app = Fastify({ logger: true, trustProxy: true });
+  const app = Fastify({ logger: {
+    redact: ["req.headers.authorization", "req.headers.cookie", "res.headers.set-cookie"],
+    serializers: { req: (req) => ({ method: req.method, url: String(req.url ?? "").split("?")[0], hostname: req.hostname, remoteAddress: req.ip }) },
+  }, trustProxy: true });
   await app.register(cors, {
     origin: createCorsOriginChecker("API_CORS_ORIGINS", DEFAULT_LOCAL_CORS_ORIGINS),
     credentials: true,
-    exposedHeaders: ["Content-Disposition"],
+    exposedHeaders: ["Content-Disposition", "WWW-Authenticate", "MCP-Protocol-Version"],
   });
   await app.register(multipart);
   app.addHook("preSerialization", async (request, reply, payload) => {
+    if (request.routeOptions.config.mcpProtocol) return payload;
     if (reply.statusCode < 400 || typeof payload !== "object" || payload === null) {
       return payload;
     }

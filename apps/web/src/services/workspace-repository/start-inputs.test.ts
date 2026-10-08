@@ -1,14 +1,13 @@
 // Ensures every request builder requires valid real settings and only explicit demo context enables placeholders.
 import { afterEach, describe, expect, it } from "vitest";
 import type { GenerationExecutionMode, RequirementBaseline } from "@uml-platform/contracts";
-import { createProviderSettingsInput, createStartRunInput, createStartDesignRunInput, createStartCodeRunInput, createStartDocumentRunInput, createStartFeasibilityRunInput } from "./start-inputs";
+import { createProviderSettingsInput, createStartRunInput, createStartDesignRunInput,  createStartDocumentRunInput, createStartFeasibilityRunInput } from "./start-inputs";
 import { patchUserSettings } from "../../shared/lib/user-settings";
 
 afterEach(() => localStorage.clear());
 const builders = [
   (mode?: GenerationExecutionMode) => createStartRunInput("需求", [], [], [], [], [], mode),
   (mode?: GenerationExecutionMode) => createStartDesignRunInput({} as RequirementBaseline, [], [], [], [], [], [], [], [], mode),
-  (mode?: GenerationExecutionMode) => createStartCodeRunInput([], [], {}, "continue", mode),
   (mode?: GenerationExecutionMode) => createStartDocumentRunInput("feasibilityStudy", "需求", [], [], [], [], [], [], [], [], undefined, null, null, mode),
   (mode?: GenerationExecutionMode) => createStartFeasibilityRunInput(["context"], mode),
 ];

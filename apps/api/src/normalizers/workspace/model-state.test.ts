@@ -9,10 +9,10 @@ import { collectModelRefs } from "../traceability/traceability-normalizer.js";
 import { normalizeWorkspaceModelState } from "./model-state.js";
 import { generateDesignPlantUmlArtifacts, generatePlantUmlArtifacts } from "../../plantuml.js";
 import { buildDocumentContext } from "../../documents/context/document-context.js";
-import { summarizeDesignModelForCode } from "../../runs/pipelines/code/code-context.js";
-import { buildDesignToCodeMapping } from "../../runs/pipelines/code/design-to-code-mapping.js";
 
-test("navigation generation, edit, persistence, redraw, trace, documents and code share the same model", () => {
+
+
+test("navigation generation, edit, persistence, redraw, trace and documents share the same model", () => {
   const model = modelFixture("design", "navigation");
   if (model.diagramKind !== "navigation") throw new Error("fixture");
   const condition = "所有未保存字段均经过用户明确确认且拥有当前订单访问权限";
@@ -28,9 +28,6 @@ test("navigation generation, edit, persistence, redraw, trace, documents and cod
   assert.ok(collectModelRefs([saved]).refs.some((ref) => ref.elementId === "a"));
   const document = buildDocumentContext(startDocumentRunRequestSchema.parse({ documentKind: "softwareDesignSpec", requirementText: "支持订单访问。", designModels: [saved] }));
   assert.deepEqual(document.designModels[0], saved);
-  assert.ok(JSON.stringify(summarizeDesignModelForCode(saved)).includes(condition));
-  assert.ok(JSON.stringify(summarizeDesignModelForCode(saved)).includes("/orders/confirmed"));
-  assert.ok(buildDesignToCodeMapping([saved]).items.some((item) => item.elementId === "a" && item.diagramKind === "navigation"));
   if (saved.diagramKind === "navigation") saved.relationships[0]!.targetId = "absent";
   assert.throws(() => normalizeWorkspaceModelState({ designModels: { navigation: saved } }), /missing-endpoint/);
 });

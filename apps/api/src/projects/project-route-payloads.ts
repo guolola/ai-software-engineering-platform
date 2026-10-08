@@ -33,18 +33,18 @@ const stableProjectWorkspaceDefaults = {
   designSvgArtifacts: {},
   designDiagramErrors: {},
   manualModelEditStatus: {},
-  codeSpec: null,
-  codeBusinessLogic: null,
-  codeFiles: {},
-  codeEntryFile: null,
-  codeDependencies: {},
-  codeUiMockup: null,
-  codeAgentPlan: [],
-  codeSkills: [],
-  codeSkillDiagnostics: [],
-  codeSkillResourcePlan: null,
-  codeSkillContext: null,
-  codeDiagnostics: [],
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   requirementInputFingerprint: null,
   diagramInputFingerprints: {},
   designInputFingerprints: {},

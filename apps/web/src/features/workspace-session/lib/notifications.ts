@@ -17,7 +17,7 @@ export function notifyGenerationCompleted(kind: "requirements" | "design") {
 }
 
 export function notifyGenerationStarted(
-  _kind: "requirements" | "design" | "code" | "document",
+  _kind: "requirements" | "design" | "document",
   _documentKind?: DocumentKind,
 ) {
   // Progress is visible in the page state and generation-task drawer; avoid a second user-facing popup.

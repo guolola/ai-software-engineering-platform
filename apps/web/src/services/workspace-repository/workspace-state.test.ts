@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type {
   AtomicRequirement,
-  CodeRunSnapshot,
+  
   DesignDiagramModelSpec,
   DesignRunSnapshot,
   DiagramModelSpec,
@@ -139,60 +139,7 @@ function createDesignSnapshot(
   };
 }
 
-function createCodeSnapshot(
-  overrides: Partial<CodeRunSnapshot> = {},
-): CodeRunSnapshot {
-  return {
-    runId: "code-run-snapshot",
-    requirementText: "图书馆管理系统",
-    rules: [],
-    requirementBaseline: null,
-    coverageMatrix: null,
-    traceabilityMatrix: null,
-    designModels: [],
-    designPlantUml: [],
-    spec: null,
-    businessLogic: null,
-    loadedCodeSkill: null,
-    visualDirection: null,
-    skillResourceDiscoveryPlan: null,
-    skillResourcePreviews: null,
-    skillResourcePlan: null,
-    codeSkillContext: null,
-    appBlueprint: null,
-    uiBlueprint: null,
-    uiMockup: null,
-    uiReferenceSpec: null,
-    uiFidelityReport: null,
-    designTokens: null,
-    componentRegistry: null,
-    uiIr: null,
-    visualDiffReport: null,
-    businessAssertionResults: null,
-    repairLoopSummary: null,
-    selectedCodeSkills: [],
-    skillDiagnostics: [],
-    filePlan: null,
-    codeImplementationBrief: null,
-    codeFileOperationManifest: null,
-    fileGenerationDiagnostics: [],
-    codeTrace: [],
-    codeGenerationMode: "json_schema_operations",
-    qualityDiagnostics: [],
-    files: { "/src/App.tsx": "export default function App() { return null; }" },
-    entryFile: "/src/App.tsx",
-    dependencies: {},
-    agentPlan: [],
-    generationMode: "continue",
-    changedFileCount: 1,
-    diagnostics: [],
-    codeContextHash: null,
-    currentStage: "verify_code_preview",
-    status: "completed",
-    error: null,
-    ...overrides,
-  };
-}
+
 
 function tableDesignModel(): DesignDiagramModelSpec {
   return {
@@ -369,217 +316,13 @@ describe("applySnapshotToWorkspace", () => {
     expect(merged.generatedDesignDiagramTypes).toEqual([]);
   });
 
-  it("preserves existing code files when a regenerate code snapshot fails", () => {
-    const workspace = {
-      ...createEmptyWorkspace(),
-      codeFiles: {
-        "/src/App.tsx": "export default function App() { return <main>old</main>; }",
-      },
-      codeEntryFile: "/src/App.tsx",
-      codeDependencies: { react: "latest" },
-    };
+  
 
-    const merged = applySnapshotToWorkspace(
-      workspace,
-      createCodeSnapshot({
-        files: {},
-        entryFile: null,
-        dependencies: {},
-        generationMode: "regenerate",
-        changedFileCount: 0,
-        status: "failed",
-        currentStage: "write_code_files",
-        error: {
-          code: "RUN_INTERNAL_ERROR",
-          message: "代码重新生成失败",
-          category: "generation",
-          retryable: true,
-        },
-      }),
-    );
+  
 
-    expect(merged.codeFiles).toEqual(workspace.codeFiles);
-    expect(merged.codeEntryFile).toBe("/src/App.tsx");
-    expect(merged.codeDependencies).toEqual({ react: "latest" });
-  });
+  
 
-  it("clears stale rendered design artifacts when restoring code snapshots", () => {
-    const tableModel = tableDesignModel();
-    const workspace = {
-      ...createEmptyWorkspace(),
-      designModels: {
-        "class:old": {
-          diagramKind: "class",
-          modelId: "class:old",
-          title: "旧设计类图",
-          summary: "旧上下文。",
-          notes: [],
-          classes: [],
-          interfaces: [],
-          enums: [],
-          relationships: [],
-        } as DesignDiagramModelSpec,
-      },
-      designModelTraceability: [
-        {
-          requirementModelId: "old-requirement",
-          designModelId: "class:old",
-          rationale: "旧追踪。",
-        },
-      ],
-      designSvgArtifacts: {
-        "class:old": {
-          diagramKind: "class" as const,
-          modelId: "class:old",
-          svg: "<svg data-old=\"true\" />",
-          renderMeta: {
-            engine: "plantuml",
-            generatedAt: "2026-06-18T00:00:00.000Z",
-            sourceLength: 18,
-            durationMs: 1,
-          },
-        },
-      },
-      generatedDesignDiagramTypes: ["class" as const],
-      designInputFingerprints: { "class:old": "old-design-fingerprint" },
-      designDiagramErrors: {
-        "class:old": {
-          stage: "render_svg" as const,
-          error: {
-            code: "RUN_RENDER_FAILED" as const,
-            message: "旧设计图渲染失败",
-            category: "render" as const,
-            retryable: true,
-          },
-        },
-      },
-    };
-
-    const merged = applySnapshotToWorkspace(
-      workspace,
-      createCodeSnapshot({
-        designModels: [tableModel],
-        designPlantUml: [
-          {
-            diagramKind: "table",
-            modelId: "table",
-            source: "@startuml\nclass users\n@enduml",
-          },
-        ],
-      }),
-    );
-
-    expect(Object.keys(merged.designModels)).toEqual(["table"]);
-    expect(merged.designPlantUml).toEqual({
-      table: "@startuml\nclass users\n@enduml",
-    });
-    expect(merged.designModelTraceability).toEqual([]);
-    expect(merged.designSvgArtifacts).toEqual({});
-    expect(merged.designDiagramErrors).toEqual({});
-    expect(merged.generatedDesignDiagramTypes).toEqual([]);
-    expect(merged.designInputFingerprints).toEqual({});
-  });
-
-  it("preserves matching design traceability when restoring code snapshots", () => {
-    const tableModel = tableDesignModel();
-    const traceability = [
-      {
-        source: {
-          modelId: "table",
-          diagramKind: "table",
-          elementId: "users",
-          elementKind: "table",
-          label: "users",
-        },
-        targets: [
-          {
-            modelId: "usecase",
-            diagramKind: "usecase",
-            elementId: "uc-1",
-            elementKind: "usecase",
-            label: "查看座位",
-          },
-        ],
-        rationale: "数据库表支撑查看座位用例。",
-      },
-    ] as WorkspaceRecord["designModelTraceability"];
-    const workspace = {
-      ...createEmptyWorkspace(),
-      designModels: { table: tableModel },
-      designModelTraceability: traceability,
-      designPlantUml: { table: "@startuml\nclass old_users\n@enduml" },
-      designSvgArtifacts: {
-        table: {
-          diagramKind: "table" as const,
-          modelId: "table",
-          svg: "<svg data-table=\"true\" />",
-          renderMeta: {
-            engine: "plantuml",
-            generatedAt: "2026-06-18T00:00:00.000Z",
-            sourceLength: 18,
-            durationMs: 1,
-          },
-        },
-      },
-      generatedDesignDiagramTypes: ["table" as const],
-      designInputFingerprints: { table: "fresh-design-fingerprint" },
-    };
-
-    const merged = applySnapshotToWorkspace(
-      workspace,
-      createCodeSnapshot({
-        designModels: [tableModel],
-        designPlantUml: [
-          {
-            diagramKind: "table",
-            modelId: "table",
-            source: "@startuml\nclass users\n@enduml",
-          },
-        ],
-      }),
-    );
-
-    expect(merged.designModelTraceability).toEqual(traceability);
-    expect(merged.designSvgArtifacts).toEqual(workspace.designSvgArtifacts);
-    expect(merged.designInputFingerprints).toEqual({
-      table: "fresh-design-fingerprint",
-    });
-    expect(merged.designPlantUml).toEqual({
-      table: "@startuml\nclass users\n@enduml",
-    });
-    expect(merged.generatedDesignDiagramTypes).toEqual(["table"]);
-  });
-
-  it("preserves existing code files when a regenerate code snapshot is cancelled before files are written", () => {
-    const workspace = {
-      ...createEmptyWorkspace(),
-      codeFiles: {
-        "/src/main.tsx": "import App from './App';",
-        "/src/App.tsx": "export default function App() { return <main>old</main>; }",
-      },
-      codeEntryFile: "/src/main.tsx",
-      codeDependencies: { react: "latest", vite: "latest" },
-    };
-
-    const merged = applySnapshotToWorkspace(
-      workspace,
-      createCodeSnapshot({
-        files: {},
-        entryFile: null,
-        dependencies: {},
-        generationMode: "regenerate",
-        changedFileCount: 0,
-        status: "cancelled",
-        currentStage: "write_code_files",
-        error: null,
-      }),
-    );
-
-    expect(merged.codeFiles).toEqual(workspace.codeFiles);
-    expect(merged.codeEntryFile).toBe("/src/main.tsx");
-    expect(merged.codeDependencies).toEqual({ react: "latest", vite: "latest" });
-    expect(merged.codeDiagnostics).toEqual([]);
-  });
+  
 
   it("applies requirement baseline from model snapshots when requirement input matches", () => {
     const requirementText = "用户通过邮箱注册账号，联系方式在认领通过前隐藏。";

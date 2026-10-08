@@ -52,13 +52,7 @@ export interface StartDesignRunInput {
   providerSettings: ProviderSettingsInput;
 }
 
-export interface StartCodeRunInput {
-  designModels: DesignDiagramModelSpec[];
-  designPlantUml: DesignPlantUmlArtifact[];
-  existingFiles: Record<string, string>;
-  generationMode: "continue" | "regenerate";
-  providerSettings: ProviderSettingsInput;
-}
+
 
 export interface StartDocumentRunInput {
   documentKind: DocumentKind;
@@ -161,21 +155,7 @@ export function createStartDesignRunInput(
   };
 }
 
-export function createStartCodeRunInput(
-  designModels: DesignDiagramModelSpec[],
-  designPlantUml: DesignPlantUmlArtifact[] = [],
-  existingFiles: Record<string, string> = {},
-  generationMode: "continue" | "regenerate" = "continue",
-  executionMode: GenerationExecutionMode = "provider",
-): StartCodeRunInput {
-  return {
-    designModels,
-    designPlantUml,
-    existingFiles: generationMode === "regenerate" ? {} : existingFiles,
-    generationMode,
-    providerSettings: createProviderSettingsInput(executionMode),
-  };
-}
+
 
 export function createStartDocumentRunInput(
   documentKind: DocumentKind,

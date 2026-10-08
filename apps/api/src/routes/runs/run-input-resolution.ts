@@ -10,8 +10,8 @@ import {
   snapshotInputFingerprint,
   designRecordBelongsToDiagramKinds,
   designTraceabilityTouchesDiagramKinds,
-  startCodeRunCommandSchema,
-  startCodeRunRequestSchema,
+  
+  
   startDesignRunCommandSchema,
   startDesignRunRequestSchema,
   startDocumentRunCommandSchema,
@@ -20,8 +20,8 @@ import {
   startRunRequestSchema,
   type DesignDiagramKind,
   type DiagramKind,
-  type StartCodeRunCommand,
-  type StartCodeRunRequest,
+  
+  
   type StartDesignRunCommand,
   type StartDesignRunRequest,
   type StartDocumentRunCommand,
@@ -53,7 +53,6 @@ type InputResolution<T> =
 type ProjectGenerationPreflightKind =
   | "requirements"
   | "design"
-  | "code"
   | "requirementsSpec"
   | "softwareDesignSpec"
   | "feasibilityStudy";
@@ -670,7 +669,7 @@ function rejectProjectGenerationPreflight(input: {
     }
   }
 
-  if (input.kind === "code" || input.kind === "softwareDesignSpec") {
+  if (input.kind === "softwareDesignSpec") {
     const designModelEntries = Object.entries(recordValue(input.state.designModels));
     if (designModelEntries.length === 0) {
       return runInputResolutionError(
@@ -692,13 +691,7 @@ function rejectProjectGenerationPreflight(input: {
     }
   }
 
-  if (input.kind === "code") {
-    return rejectIncompleteDesignChain({
-      state: input.state,
-      includeAllWhenUngenerated: false,
-      requireTraceability: false,
-    });
-  }
+  
 
   if (input.kind === "softwareDesignSpec") {
     return rejectIncompleteDesignChain({
@@ -818,9 +811,7 @@ function designPlantUmlArtifactsFromWorkspace(state: Record<string, unknown>) {
   );
 }
 
-function codeFilesFromWorkspace(state: Record<string, unknown>) {
-  return stringRecordValue(state.codeFiles);
-}
+
 
 async function loadWorkspaceStateForCommand({
   commandProjectId,
@@ -1026,54 +1017,7 @@ function filterReplacingDesignContext(
   };
 }
 
-export async function resolveCodeRunInput(
-  body: unknown,
-  metadata: RunInputMetadata | undefined,
-  loadProjectWorkspace?: LoadProjectWorkspaceForRun,
-): Promise<
-  InputResolution<
-    StartCodeRunRequest & { requirementBaseline?: RequirementBaseline | null }
-  >
-> {
-  const legacy = startCodeRunRequestSchema.safeParse(body);
-  if (legacy.success) return { ok: true, input: legacy.data };
 
-  const command: StartCodeRunCommand = startCodeRunCommandSchema.parse(body);
-  const workspace = await loadWorkspaceStateForCommand({
-    commandProjectId: command.projectId,
-    metadata,
-    loadProjectWorkspace,
-  });
-  if (!workspace.ok) return workspace;
-  const preflight = rejectProjectGenerationPreflight({
-    kind: "code",
-    state: workspace.input.state,
-  });
-  if (preflight) return preflight;
-  const parsedBaseline = requirementBaselineSchema.safeParse(
-    workspace.input.state.requirementBaseline,
-  );
-  return {
-    ok: true,
-    input: {
-      ...startCodeRunRequestSchema.parse({
-        projectId: workspace.input.projectId,
-        designModels: presentRecordValues(workspace.input.state.designModels),
-        designPlantUml: designPlantUmlArtifactsFromWorkspace(workspace.input.state),
-        existingFiles:
-          command.generationMode === "regenerate"
-            ? {}
-            : codeFilesFromWorkspace(workspace.input.state),
-        generationMode: command.generationMode,
-        providerSettings: command.providerSettings,
-        imageProviderSettings: command.imageProviderSettings,
-      }),
-      // This is internal resolved context, not a new public request field. Code
-      // completion must always judge the project baseline loaded server-side.
-      requirementBaseline: parsedBaseline.success ? parsedBaseline.data : null,
-    },
-  };
-}
 
 export async function resolveDocumentRunInput(
   body: unknown,

@@ -2,7 +2,7 @@
 import { designDiagramKindSchema } from "@uml-platform/contracts";
 import type { ImageGenerationClient, LlmTransport } from "./llm.js";
 import type { LlmScheduler } from "./adapters/llm/llm-scheduler.js";
-import { getCodeSkillRuntimeStatus } from "./code-skills.js";
+
 import {
   DEFAULT_HOST,
   DEFAULT_PORT,
@@ -17,6 +17,7 @@ import {
   type RunAccessContext,
 } from "./server/register-routes.js";
 import { createApiPersistence } from "./server/persistence.js";
+import { registerMcpModule } from "./mcp/server/register-mcp-module.js";
 import { createApiExternalAdapters } from "./server/external-adapters.js";
 import type { AuthStore } from "./auth/in-memory-auth-store.js";
 import type { DocumentLibrary } from "./documents/library/document-library.js";
@@ -161,7 +162,7 @@ export async function createApiServer(options?: {
         process.env.ONLYOFFICE_DOCUMENT_SERVER_URL?.trim(),
       ),
     },
-    codeSkillStatus: getCodeSkillRuntimeStatus(),
+    
   });
   registerApiRoutes({
     app,
@@ -194,6 +195,7 @@ export async function createApiServer(options?: {
     disableBillingEntitlementGuard: options?.disableBillingEntitlementGuard,
   });
 
+  await registerMcpModule({ app, authStore, pool, production: runtimeNodeEnv === "production" });
   return app;
 }
 

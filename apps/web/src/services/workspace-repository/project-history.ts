@@ -10,7 +10,7 @@ import {
   type RunHistoryDiagramErrorSummary,
   type RunHistorySnapshot,
 } from "../../entities/run-history";
-import { formatCodeDiagnosticSummary } from "../../shared/lib/code-diagnostics";
+
 import { localizeRunFailure } from "../../shared/i18n/api-errors";
 
 export type ProjectRunDetailResponse = {
@@ -29,9 +29,9 @@ export type ProjectRunDetailResponse = {
     partialFailure?: boolean | null;
     missingArtifactCount?: number | null;
     missingArtifactSummary?: string[] | null;
-    codeDiagnosticCount?: number | null;
-    codeDiagnosticSummary?: string[] | null;
-    codeQualityIssueCount?: number | null;
+    
+    
+    
     sourceRunId?: string | null;
     sourceAction?: string | null;
     sourceRunStatus?: string | null;
@@ -75,9 +75,9 @@ export type ProjectRunsResponse = {
     partialFailure?: boolean | null;
     missingArtifactCount?: number | null;
     missingArtifactSummary?: string[] | null;
-    codeDiagnosticCount?: number | null;
-    codeDiagnosticSummary?: string[] | null;
-    codeQualityIssueCount?: number | null;
+    
+    
+    
     sourceRunId?: string | null;
     sourceAction?: string | null;
     sourceRunStatus?: string | null;
@@ -226,9 +226,9 @@ export function projectRunSummaryToHistoryItem(
     partialFailure: run.partialFailure ?? null,
     missingArtifactCount: run.missingArtifactCount ?? null,
     missingArtifactSummary: run.missingArtifactSummary ?? null,
-    codeDiagnosticCount: run.codeDiagnosticCount ?? null,
-    codeDiagnosticSummary: run.codeDiagnosticSummary ?? null,
-    codeQualityIssueCount: run.codeQualityIssueCount ?? null,
+    
+    
+    
     canRestore,
     snapshotAvailable: run.snapshotAvailable ?? Boolean(snapshot),
     documentDownloadAvailable,
@@ -252,12 +252,11 @@ function projectRunStageTitle(run: ProjectRunDetailResponse["run"]) {
   if (stage.includes("generate_tests")) return "生成测试用例";
   if (stage.includes("sequence")) return "生成用例实现设计";
   if (stage.includes("design")) return "生成设计模型";
-  if (stage.includes("code")) return "生成代码原型";
   if (stage.includes("document")) return "生成说明书";
   if (stage.includes("extract_rules")) return "抽取需求规则";
   if (stage.includes("generate_models")) return "生成需求模型";
   if (run.runKind === "design") return "设计模型生成";
-  if (run.runKind === "code") return "代码原型生成";
+  
   if (run.runKind === "document") return "说明书生成";
   if (run.runKind === "feasibility") return "可行性分析生成";
   return "需求模型生成";
@@ -266,7 +265,7 @@ function projectRunStageTitle(run: ProjectRunDetailResponse["run"]) {
 function projectRunKindLabel(run: ProjectRunDetailResponse["run"]) {
   if (!run) return "运行阶段";
   if (run.runKind === "design") return "设计阶段";
-  if (run.runKind === "code") return "代码原型";
+  
   if (run.runKind === "document") return "说明书";
   if (run.runKind === "feasibility") return "可行性分析";
   return "需求阶段";
@@ -283,12 +282,7 @@ function projectRunSummary(run: ProjectRunDetailResponse["run"]) {
     run?.diagramErrorSummary,
     { design: run?.runKind === "design" },
   );
-  const codeDiagnostics = run?.runKind === "code"
-    ? formatCodeDiagnosticSummary({
-        codeDiagnosticCount: run.codeDiagnosticCount,
-        codeDiagnosticSummary: run.codeDiagnosticSummary,
-      })
-    : null;
+  
   const parts = [
     run?.sourceRunId ? `${runActionLabel(run.sourceAction)}自 ${run.sourceRunId}` : null,
     run?.latestActionRunId
@@ -302,7 +296,7 @@ function projectRunSummary(run: ProjectRunDetailResponse["run"]) {
         ? "失败原因 任务遇到内部错误，请联系管理员。"
         : null,
     diagramErrors,
-    codeDiagnostics,
+    
     formatDocumentMissingArtifactSummary(
       run?.missingArtifactSummary,
       run?.missingArtifactCount,

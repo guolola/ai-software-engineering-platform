@@ -1,11 +1,11 @@
 // Creates initial snapshots for each run kind before pipelines start mutating them.
 import {
-  codeRunSnapshotSchema,
+  
   designRunSnapshotSchema,
   documentRunSnapshotSchema,
   feasibilityRunSnapshotSchema,
   runSnapshotSchema,
-  type CodeRunSnapshot,
+  
   type DesignDiagramKind,
   type DesignDiagramModelSpec,
   type DesignRunSnapshot,
@@ -139,74 +139,7 @@ export function createEmptyDesignSnapshot(
   });
 }
 
-export function createEmptyCodeSnapshot(
-  runId: string,
-  input: {
-    designModels: DesignDiagramModelSpec[];
-    designPlantUml?: Array<{ diagramKind: DesignDiagramKind; source: string }>;
-    existingFiles?: Record<string, string>;
-    generationMode?: "continue" | "regenerate";
-    requirementBaseline?: RequirementBaseline | null;
-    coverageMatrix?: CoverageMatrix | null;
-    traceabilityMatrix?: TraceabilityMatrix | null;
-  },
-): CodeRunSnapshot {
-  const generationMode = input.generationMode ?? "continue";
-  const requirementBaseline = input.requirementBaseline ?? null;
-  const existingFiles = Object.fromEntries(
-    Object.entries(input.existingFiles ?? {}).filter(
-      ([path]) => !normalizeSnapshotFilePath(path).startsWith("/src/docs/"),
-    ),
-  );
-  return codeRunSnapshotSchema.parse({
-    runId,
-    ...(requirementBaseline
-      ? {
-          requirementText: requirementBaseline.requirements
-            .map((requirement) => requirement.sourceFragment)
-            .join("\n"),
-          requirementBaseline,
-        }
-      : {}),
-    coverageMatrix: input.coverageMatrix ?? null,
-    traceabilityMatrix: input.traceabilityMatrix ?? null,
-    designModels: input.designModels,
-    designPlantUml: input.designPlantUml ?? [],
-    spec: null,
-    businessLogic: null,
-    loadedCodeSkill: null,
-    visualDirection: null,
-    skillResourceDiscoveryPlan: null,
-    skillResourcePreviews: null,
-    skillResourcePlan: null,
-    codeSkillContext: null,
-    appBlueprint: null,
-    uiBlueprint: null,
-    uiMockup: null,
-    uiReferenceSpec: null,
-    uiFidelityReport: null,
-    designTokens: null,
-    componentRegistry: null,
-    uiIr: null,
-    visualDiffReport: null,
-    businessAssertionResults: null,
-    repairLoopSummary: null,
-    selectedCodeSkills: [],
-    skillDiagnostics: [],
-    filePlan: null,
-    files: generationMode === "regenerate" ? {} : existingFiles,
-    entryFile: null,
-    dependencies: {},
-    agentPlan: [],
-    generationMode,
-    changedFileCount: 0,
-    diagnostics: [],
-    codeContextHash: null,
-    currentStage: null,
-    status: "queued",
-    error: null,
-  });
-}
+
 
 export function createEmptyDocumentSnapshot(
   runId: string,

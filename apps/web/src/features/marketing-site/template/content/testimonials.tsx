@@ -7,7 +7,7 @@ const productLogo = '/brand/uml-platform-logo.png'
 export const testimonials: TestimonialItem[] = [
   {
     name: 'Emily Watson',
-    username: '功能说明 / Workflow example',
+    username: '功能说明 / Workflow',
     avatar: productLogo,
     rating: 4.5,
     content: (
@@ -18,7 +18,7 @@ export const testimonials: TestimonialItem[] = [
   },
   {
     name: 'Alex Rivera',
-    username: '功能说明 / Workflow example',
+    username: '功能说明 / Workflow',
     avatar: productLogo,
     rating: 5,
     content: (
@@ -29,7 +29,7 @@ export const testimonials: TestimonialItem[] = [
   },
   {
     name: 'Marcus Johnson',
-    username: '功能说明 / Workflow example',
+    username: '功能说明 / Workflow',
     avatar: productLogo,
     rating: 4.5,
     content: (
@@ -40,7 +40,7 @@ export const testimonials: TestimonialItem[] = [
   },
   {
     name: 'Sarah Chen',
-    username: '功能说明 / Workflow example',
+    username: '功能说明 / Workflow',
     avatar: productLogo,
     rating: 5,
     content: (
@@ -51,7 +51,7 @@ export const testimonials: TestimonialItem[] = [
   },
   {
     name: 'Ncdai',
-    username: '功能说明 / Workflow example',
+    username: '功能说明 / Workflow',
     avatar: productLogo,
     rating: 4,
     content: (
@@ -62,7 +62,7 @@ export const testimonials: TestimonialItem[] = [
   },
   {
     name: 'Lisa Thompson',
-    username: '功能说明 / Workflow example',
+    username: '功能说明 / Workflow',
     avatar: productLogo,
     rating: 5,
     content: (

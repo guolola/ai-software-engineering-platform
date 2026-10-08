@@ -1,6 +1,6 @@
 // Owns run history data contracts, local persistence compaction, and snapshot summaries.
 import type {
-  CodeRunSnapshot,
+  
   DesignRunSnapshot,
   DocumentKind,
   DocumentRunSnapshot,
@@ -8,11 +8,12 @@ import type {
   RunError,
   RunSnapshot,
 } from "@uml-platform/contracts";
+import { stripRetiredCodeData } from "@uml-platform/contracts";
 import {
   DESIGN_DIAGRAM_META,
   DIAGRAM_META,
 } from "../diagram/model";
-import { formatCodeDiagnosticSummary } from "../../shared/lib/code-diagnostics";
+
 import { localizeRunFailure } from "../../shared/i18n/api-errors";
 
 export const RUN_HISTORY_STORAGE_KEY = "uml-platform.run-history.v1";
@@ -26,7 +27,6 @@ const DIAGNOSTIC_TEXT_PREVIEW_LIMIT = 1_000;
 export type RunHistorySnapshot =
   | RunSnapshot
   | DesignRunSnapshot
-  | CodeRunSnapshot
   | DocumentRunSnapshot;
 
 export interface RunHistoryItem {
@@ -61,9 +61,9 @@ export interface RunHistoryItem {
   partialFailure?: boolean | null;
   missingArtifactCount?: number | null;
   missingArtifactSummary?: string[] | null;
-  codeDiagnosticCount?: number | null;
-  codeDiagnosticSummary?: string[] | null;
-  codeQualityIssueCount?: number | null;
+  
+  
+  
   canRestore?: boolean | null;
   snapshotAvailable?: boolean | null;
   documentDownloadAvailable?: boolean | null;
@@ -83,11 +83,7 @@ export class RunHistoryStorageError extends Error {
   }
 }
 
-export function isCodeRunSnapshot(
-  snapshot: RunHistorySnapshot,
-): snapshot is CodeRunSnapshot {
-  return "files" in snapshot;
-}
+
 
 export function isDesignRunSnapshot(
   snapshot: RunHistorySnapshot,
@@ -120,7 +116,7 @@ export function createRunHistoryTitle(requirementText: string) {
 function safeParseHistory(value: string | null): RunHistoryItem[] {
   if (!value) return [];
   try {
-    const parsed = JSON.parse(value) as unknown;
+    const parsed = stripRetiredCodeData(JSON.parse(value)) as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((item): item is RunHistoryItem => {
       if (!item || typeof item !== "object") return false;
@@ -183,79 +179,12 @@ function compactTraceEntries<T extends Record<string, unknown>>(entries: T[]) {
   }));
 }
 
-function compactCodeSnapshot(snapshot: CodeRunSnapshot): CodeRunSnapshot {
-  return {
-    ...snapshot,
-    loadedCodeSkill: null,
-    uiMockup: snapshot.uiMockup
-      ? {
-          ...snapshot.uiMockup,
-          prompt:
-            truncateText(snapshot.uiMockup.prompt, DIAGNOSTIC_TEXT_PREVIEW_LIMIT) ??
-            snapshot.uiMockup.prompt,
-          imageDataUrl: null,
-        }
-      : null,
-    skillResourcePreviews: snapshot.skillResourcePreviews
-      ? {
-          ...snapshot.skillResourcePreviews,
-          previews: snapshot.skillResourcePreviews.previews.map((preview) => ({
-            ...preview,
-            sampleRows: [],
-            errorMessage: truncateText(
-              preview.errorMessage,
-              DIAGNOSTIC_TEXT_PREVIEW_LIMIT,
-            ),
-          })),
-        }
-      : null,
-    codeSkillContext: snapshot.codeSkillContext
-      ? {
-          ...snapshot.codeSkillContext,
-          designSystem: truncateText(
-            snapshot.codeSkillContext.designSystem,
-            SKILL_OUTPUT_PREVIEW_LIMIT,
-          ) ?? "",
-          stackGuidelines: truncateText(
-            snapshot.codeSkillContext.stackGuidelines,
-            SKILL_OUTPUT_PREVIEW_LIMIT,
-          ) ?? "",
-          domainGuidelines: truncateText(
-            snapshot.codeSkillContext.domainGuidelines,
-            SKILL_OUTPUT_PREVIEW_LIMIT,
-          ) ?? "",
-          actionResults: snapshot.codeSkillContext.actionResults.map((result) => ({
-            ...result,
-            stdout: truncateText(result.stdout, SKILL_OUTPUT_PREVIEW_LIMIT) ?? "",
-            stderr:
-              truncateText(result.stderr, DIAGNOSTIC_TEXT_PREVIEW_LIMIT) ?? "",
-            errorMessage: truncateText(
-              result.errorMessage,
-              DIAGNOSTIC_TEXT_PREVIEW_LIMIT,
-            ),
-          })),
-        }
-      : null,
-    codeImplementationBrief: null,
-    codeFileOperationManifest: null,
-    fileGenerationDiagnostics: snapshot.fileGenerationDiagnostics.map((diagnostic) => ({
-      ...diagnostic,
-      message: truncateText(diagnostic.message, DIAGNOSTIC_TEXT_PREVIEW_LIMIT) ?? "",
-    })),
-    codeTrace: compactTraceEntries(snapshot.codeTrace) as CodeRunSnapshot["codeTrace"],
-    diagnostics: snapshot.diagnostics.map((diagnostic) => ({
-      ...diagnostic,
-      message: truncateText(diagnostic.message, DIAGNOSTIC_TEXT_PREVIEW_LIMIT) ?? "",
-    })),
-  };
-}
+
 
 export function compactRunHistorySnapshot(
   snapshot: RunHistorySnapshot,
 ): RunHistorySnapshot {
-  if (isCodeRunSnapshot(snapshot)) {
-    return compactCodeSnapshot(snapshot);
-  }
+  
   if (isDesignRunSnapshot(snapshot)) {
     return {
       ...snapshot,
@@ -347,7 +276,7 @@ export function clearRunHistoryItems() {
 
 export function getRunHistorySnapshotLabel(snapshot: RunHistorySnapshot) {
   if (isDocumentRunSnapshot(snapshot)) return "说明书";
-  if (isCodeRunSnapshot(snapshot)) return "代码原型";
+  
   if (isDesignRunSnapshot(snapshot)) return "设计阶段";
   return "需求阶段";
 }
@@ -438,19 +367,7 @@ export function getRunHistorySnapshotSummary(snapshot: RunHistorySnapshot) {
     ].filter(Boolean).join(" · ");
   }
 
-  if (isCodeRunSnapshot(snapshot)) {
-    if (snapshot.status === "failed" && snapshot.generationMode === "regenerate") {
-      return "代码重新生成失败，已保留上一版代码";
-    }
-    return [
-      `代码文件 ${Object.keys(snapshot.files).length} 个`,
-      formatCodeDiagnosticSummary({
-        diagnostics: snapshot.diagnostics,
-        fileGenerationDiagnostics: snapshot.fileGenerationDiagnostics,
-        qualityDiagnostics: snapshot.qualityDiagnostics,
-      }),
-    ].filter(Boolean).join(" · ");
-  }
+  
 
   if (isDesignRunSnapshot(snapshot)) {
     const labels = snapshot.selectedDiagrams

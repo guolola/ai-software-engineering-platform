@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type {
   AtomicRequirement,
-  CodeRunSnapshot,
+  
   DesignDiagramModelSpec,
   DesignRunSnapshot,
   DesignSvgArtifact,
@@ -135,60 +135,7 @@ function tableDesignModel(): DesignDiagramModelSpec {
   };
 }
 
-function codeSnapshot(
-  overrides: Partial<CodeRunSnapshot> = {},
-): CodeRunSnapshot {
-  return {
-    runId: "code-run-snapshot",
-    requirementText: "图书馆管理系统",
-    rules: [],
-    requirementBaseline: null,
-    coverageMatrix: null,
-    traceabilityMatrix: null,
-    designModels: [],
-    designPlantUml: [],
-    spec: null,
-    businessLogic: null,
-    loadedCodeSkill: null,
-    visualDirection: null,
-    skillResourceDiscoveryPlan: null,
-    skillResourcePreviews: null,
-    skillResourcePlan: null,
-    codeSkillContext: null,
-    appBlueprint: null,
-    uiBlueprint: null,
-    uiMockup: null,
-    uiReferenceSpec: null,
-    uiFidelityReport: null,
-    designTokens: null,
-    componentRegistry: null,
-    uiIr: null,
-    visualDiffReport: null,
-    businessAssertionResults: null,
-    repairLoopSummary: null,
-    selectedCodeSkills: [],
-    skillDiagnostics: [],
-    filePlan: null,
-    codeImplementationBrief: null,
-    codeFileOperationManifest: null,
-    fileGenerationDiagnostics: [],
-    codeTrace: [],
-    codeGenerationMode: "json_schema_operations",
-    qualityDiagnostics: [],
-    files: { "/src/App.tsx": "export default function App() { return null; }" },
-    entryFile: "/src/App.tsx",
-    dependencies: {},
-    agentPlan: [],
-    generationMode: "continue",
-    changedFileCount: 1,
-    diagnostics: [],
-    codeContextHash: null,
-    currentStage: "verify_code_preview",
-    status: "completed",
-    error: null,
-    ...overrides,
-  };
-}
+
 
 function requirementRule(
   id: string,
@@ -293,67 +240,9 @@ function designSnapshot(
   };
 }
 
-test("restore preserves existing code files when a regenerate code snapshot fails", () => {
-  const currentState = {
-    codeFiles: {
-      "/src/App.tsx": "export default function App() { return <main>old</main>; }",
-    },
-    codeEntryFile: "/src/App.tsx",
-    codeDependencies: { react: "latest" },
-  };
 
-  const restored = restoreRunSnapshotToWorkspaceState({
-    currentState,
-    snapshot: codeSnapshot({
-      files: {},
-      entryFile: null,
-      dependencies: {},
-      generationMode: "regenerate",
-      changedFileCount: 0,
-      status: "failed",
-      currentStage: "write_code_files",
-      error: {
-        code: "RUN_INTERNAL_ERROR",
-        message: "代码重新生成失败",
-        category: "generation",
-        retryable: true,
-      },
-    }),
-  });
 
-  assert.deepEqual(restored.codeFiles, currentState.codeFiles);
-  assert.equal(restored.codeEntryFile, "/src/App.tsx");
-  assert.deepEqual(restored.codeDependencies, { react: "latest" });
-});
 
-test("restore preserves existing code files when a regenerate code snapshot is cancelled before files are written", () => {
-  const currentState = {
-    codeFiles: {
-      "/src/main.tsx": "import App from './App';",
-      "/src/App.tsx": "export default function App() { return <main>old</main>; }",
-    },
-    codeEntryFile: "/src/main.tsx",
-    codeDependencies: { react: "latest", vite: "latest" },
-  };
-
-  const restored = restoreRunSnapshotToWorkspaceState({
-    currentState,
-    snapshot: codeSnapshot({
-      files: {},
-      entryFile: null,
-      dependencies: {},
-      generationMode: "regenerate",
-      changedFileCount: 0,
-      status: "cancelled",
-      currentStage: "write_code_files",
-      error: null,
-    }),
-  });
-
-  assert.deepEqual(restored.codeFiles, currentState.codeFiles);
-  assert.equal(restored.codeEntryFile, "/src/main.tsx");
-  assert.deepEqual(restored.codeDependencies, { react: "latest", vite: "latest" });
-});
 
 test("restore stores snapshot input fingerprints for requirement diagrams after current input changed", () => {
   const rulesV1 = [requirementRule("r1", "用户可以查看座位。")];
@@ -961,132 +850,9 @@ test("restore applies successful design artifacts from failed partial snapshots"
   assert.ok((restored.designDiagramErrors as Record<string, unknown>).component);
 });
 
-test("restore clears stale rendered design artifacts when applying code snapshots", () => {
-  const tableModel = tableDesignModel();
-  const restored = restoreRunSnapshotToWorkspaceState({
-    currentState: {
-      designModels: {
-        "class:old": {
-          diagramKind: "class",
-          modelId: "class:old",
-          title: "旧设计类图",
-          summary: "旧上下文。",
-          notes: [],
-          classes: [],
-          interfaces: [],
-          enums: [],
-          relationships: [],
-        },
-      },
-      designModelTraceability: [
-        {
-          requirementModelId: "old-requirement",
-          designModelId: "class:old",
-          rationale: "旧追踪。",
-        },
-      ],
-      designSvgArtifacts: {
-        "class:old": designSvgArtifact("class", "class:old"),
-      },
-      generatedDesignDiagramTypes: ["class"],
-      designInputFingerprints: { "class:old": "old-design-fingerprint" },
-      designDiagramErrors: {
-        "class:old": {
-          stage: "render_svg",
-          error: {
-            code: "RUN_RENDER_FAILED",
-            message: "旧设计图渲染失败",
-            category: "render",
-            retryable: true,
-          },
-        },
-      },
-    },
-    snapshot: codeSnapshot({
-      designModels: [tableModel],
-      designPlantUml: [
-        {
-          diagramKind: "table",
-          modelId: "table",
-          source: "@startuml\nclass users\n@enduml",
-        },
-      ],
-    }),
-    mode: "merge",
-  });
 
-  assert.deepEqual(Object.keys(restored.designModels as Record<string, unknown>), [
-    "table",
-  ]);
-  assert.deepEqual(restored.designPlantUml, {
-    table: "@startuml\nclass users\n@enduml",
-  });
-  assert.deepEqual(restored.designModelTraceability, []);
-  assert.deepEqual(restored.designSvgArtifacts, {});
-  assert.deepEqual(restored.designDiagramErrors, {});
-  assert.deepEqual(restored.generatedDesignDiagramTypes, []);
-  assert.deepEqual(restored.designInputFingerprints, {});
-});
 
-test("restore preserves matching design traceability when applying code snapshots", () => {
-  const tableModel = tableDesignModel();
-  const traceability = [
-    {
-      source: {
-        modelId: "table",
-        diagramKind: "table",
-        elementId: "users",
-        elementKind: "table",
-        label: "users",
-      },
-      targets: [
-        {
-          modelId: "usecase",
-          diagramKind: "usecase",
-          elementId: "uc-1",
-          elementKind: "usecase",
-          label: "查看座位",
-        },
-      ],
-      rationale: "数据库表支撑查看座位用例。",
-    },
-  ];
-  const restored = restoreRunSnapshotToWorkspaceState({
-    currentState: {
-      designModels: { table: tableModel },
-      designModelTraceability: traceability,
-      designPlantUml: { table: "@startuml\nclass old_users\n@enduml" },
-      designSvgArtifacts: {
-        table: designSvgArtifact("table", "table"),
-      },
-      generatedDesignDiagramTypes: ["table"],
-      designInputFingerprints: { table: "fresh-design-fingerprint" },
-    },
-    snapshot: codeSnapshot({
-      designModels: [tableModel],
-      designPlantUml: [
-        {
-          diagramKind: "table",
-          modelId: "table",
-          source: "@startuml\nclass users\n@enduml",
-        },
-      ],
-    }),
-    mode: "merge",
-  });
 
-  assert.deepEqual(restored.designModelTraceability, traceability);
-  assert.deepEqual(restored.designSvgArtifacts, {
-    table: designSvgArtifact("table", "table"),
-  });
-  assert.deepEqual(restored.designInputFingerprints, {
-    table: "fresh-design-fingerprint",
-  });
-  assert.deepEqual(restored.designPlantUml, {
-    table: "@startuml\nclass users\n@enduml",
-  });
-  assert.deepEqual(restored.generatedDesignDiagramTypes, ["table"]);
-});
 
 test("restore fills missing requirement text without replacing existing rules", () => {
   const existingRule = {

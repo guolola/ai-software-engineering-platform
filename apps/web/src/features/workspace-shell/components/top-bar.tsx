@@ -88,18 +88,18 @@ const RUN_STATUS_LABEL = {
   interrupted: "interrupted",
 } as const;
 
-type RunKind = "requirements" | "design" | "code" | "document" | "feasibility";
+type RunKind = "requirements" | "design" | "document" | "feasibility";
 
 const STAGE_LABELS: Record<RunStage, string> = {
   generate_business_flow: "generate_business_flow", render_business_flow: "render_business_flow",
   extract_rules: "extract_rules", generate_models: "generate_models", generate_design_sequence: "generate_design_sequence",
-  generate_design_models: "generate_design_models", generate_tests: "generate_tests", analyze_code_business_logic: "analyze_code_business_logic",
-  analyze_code_product: "analyze_code_product", plan_code_ui: "plan_code_ui", generate_code_ui_mockup: "generate_code_ui_mockup",
-  analyze_code_ui_mockup: "analyze_code_ui_mockup", generate_code_ui_ir: "generate_code_ui_ir", load_web_design_skill: "load_web_design_skill",
-  select_code_skills: "select_code_skills", plan_code_files: "plan_code_files", generate_code_spec: "generate_code_spec",
-  generate_code_files: "generate_code_files", plan_code: "plan_code", write_code_files: "write_code_files",
-  audit_code_quality: "audit_code_quality", verify_code_ui_fidelity: "verify_code_ui_fidelity", verify_code_rendered_preview: "verify_code_rendered_preview",
-  verify_code_business_assertions: "verify_code_business_assertions", verify_code_preview: "verify_code_preview", repair_code_files: "repair_code_files",
+  generate_design_models: "generate_design_models", generate_tests: "generate_tests", 
+    
+    
+    
+    
+    
+    
   generate_document_text: "generate_document_text", render_document_file: "render_document_file", generate_plantuml: "generate_plantuml",
   render_svg: "render_svg", generate_context: "generate_context", render_context: "render_context", generate_implementation: "generate_implementation",
   verify_diagram_visual: "verify_diagram_visual",
@@ -120,17 +120,7 @@ const STAGES_BY_KIND: Record<RunKind, RunStage[]> = {
     "render_svg",
     "verify_diagram_visual",
   ],
-  code: [
-    "analyze_code_business_logic",
-    "plan_code_ui",
-    "generate_code_files",
-    "audit_code_quality",
-    "verify_code_ui_fidelity",
-    "verify_code_rendered_preview",
-    "verify_code_business_assertions",
-    "verify_code_preview",
-    "repair_code_files",
-  ],
+  
   document: ["generate_document_text", "render_document_file"],
   feasibility: [
     "generate_context",
@@ -210,7 +200,6 @@ function normalizeRunStatus(status: string): keyof typeof RUN_STATUS_LABEL {
 function normalizeRunKind(kind: PlatformRunSummary["runKind"]): RunKind | null {
   return kind === "requirements" ||
     kind === "design" ||
-    kind === "code" ||
     kind === "document" ||
     kind === "feasibility"
     ? kind

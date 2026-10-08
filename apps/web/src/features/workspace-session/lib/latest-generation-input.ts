@@ -4,8 +4,8 @@ import type { RequirementRule } from "../../../entities/requirement-rule/model";
 import type { WorkspaceRecord } from "../../../entities/workspace/model";
 
 interface LatestGenerationInput {
-  codeEditVersion: number;
-  codeFiles: Record<string, string>;
+  
+  
   designModelTraceability: WorkspaceRecord["designModelTraceability"];
   designModels: WorkspaceRecord["designModels"];
   models: WorkspaceRecord["models"];
@@ -17,8 +17,8 @@ interface LatestGenerationInput {
 export function useLatestGenerationInputRef(input: LatestGenerationInput) {
   const latestInputRef = useRef(input);
   const {
-    codeEditVersion,
-    codeFiles,
+    
+    
     designModelTraceability,
     designModels,
     models,
@@ -29,8 +29,8 @@ export function useLatestGenerationInputRef(input: LatestGenerationInput) {
 
   useEffect(() => {
     latestInputRef.current = {
-      codeEditVersion,
-      codeFiles,
+      
+      
       designModelTraceability,
       designModels,
       models,
@@ -39,8 +39,8 @@ export function useLatestGenerationInputRef(input: LatestGenerationInput) {
       rules,
     };
   }, [
-    codeEditVersion,
-    codeFiles,
+    
+    
     designModelTraceability,
     designModels,
     models,

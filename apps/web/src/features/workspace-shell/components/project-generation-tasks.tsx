@@ -125,8 +125,8 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
     {restored.disconnected && <p role="status" className="text-sm text-muted-foreground">连接中断，正在恢复。已收到的内容会保留。</p>}
     {restored.unavailable && <p role="status" className="text-xs text-destructive">无法读取任务过程，任务可能已移除或你没有访问权限。</p>}
     {!restored.loading && runId && !events.some((event) => event.type === "run_activity") && <p className="text-xs text-muted-foreground">此任务未保存完整回复，当前仅展示可用的执行记录。</p>}
-    {diagnostics?.uiMockup?.imageUrl && <a className="text-sm underline underline-offset-4" href={diagnostics.uiMockup.imageUrl} target="_blank" rel="noreferrer">查看界面设计图</a>}
-    {diagnostics?.uiFidelityReport && <p>{readableTaskText(diagnostics.uiFidelityReport.summary)}</p>}
+    
+    
     <div className="flex flex-wrap items-center gap-3">
       {active && scopedProjectId && runId && <Button size="sm" variant="ghost" disabled={actionBusy} onClick={() => void perform(async () => {
         if (!active) return;
@@ -139,17 +139,13 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
         const nextId = response.runId ?? response.run?.runId;
         if (nextId) { setActionRun({ ...response.run, runId: nextId, sourceRunId: runId, runKind: kind, status: response.status ?? response.run?.status ?? "queued" }); requestOpenGenerationTask({ runId: nextId }); }
       })}>重试任务</Button>}
-      {completed && <Button size="sm" variant="link" className="h-auto p-0" onClick={() => setPreviewRunId(previewRunId === runId ? null : runId ?? null)}>{previewRunId === runId ? "收起结果" : kind === "code" ? "查看代码文件" : kind === "document" ? "查看文档正文" : "查看生成结果"}</Button>}
-      {completed && kind === "code" && shell && session.currentRunDiagnostics.runId === runId && <Button size="sm" variant="link" className="h-auto p-0" onClick={() => { shell.openWorkspaceTab({ kind: "workspace-placeholder", workspaceId: "code", label: "代码" }); onViewResult?.(); }}>打开代码原型</Button>}
+      {completed && <Button size="sm" variant="link" className="h-auto p-0" onClick={() => setPreviewRunId(previewRunId === runId ? null : runId ?? null)}>{previewRunId === runId ? "收起结果" : kind === "document" ? "查看文档正文" : "查看生成结果"}</Button>}
+      
       {completed && "documentKind" in completed && (completed.documentId || completed.byteLength > 0) && selectedRemote?.documentDownloadAvailable !== false && repository.downloadDocumentRun && runId && <Button size="sm" variant="link" className="h-auto p-0" disabled={actionBusy} onClick={() => void perform(async () => {
         const result = await repository.downloadDocumentRun!(runId, completed.fileName ?? undefined);
         downloadBlobFile(result.fileName, result.blob);
       })}>下载文档</Button>}
     </div>
-    {completed && previewRunId === runId && <div className="min-w-0 space-y-4" aria-label="生成结果">
-      {"svgArtifacts" in completed && completed.svgArtifacts.map((artifact, index) => <figure key={index} className="min-w-0"><img alt={`生成的 UML 图 ${index + 1}`} className="max-h-96 max-w-full object-contain" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(artifact.svg)}`} /></figure>)}
-      {"files" in completed && Object.entries(completed.files).map(([path, content]) => <details key={path}><summary className="cursor-pointer break-all text-sm">{path}</summary><pre className="whitespace-pre-wrap break-all text-xs">{content}</pre></details>)}
-      {"sections" in completed && completed.sections.map((section, index) => <section key={index} className="space-y-2"><h4 className="font-medium">{section.title}</h4>{section.body.map((paragraph, item) => <p key={item} className="whitespace-pre-wrap break-words">{paragraph}</p>)}</section>)}
-    </div>}
+    
   </GenerationTranscript>;
 }

@@ -5,16 +5,16 @@ import { catalog, findPromptForMessage } from "./catalog.js";
 import { PromptRuntimeStore, applyPublishedInstructions, withPinnedPrompts } from "./store.js";
 import type { LlmTransport } from "../llm.js";
 
-test("catalog exposes active categories and keeps shared instructions and skill read-only", async () => {
+test("catalog exposes active categories and keeps shared instructions read-only", async () => {
   const store = new PromptRuntimeStore(null);
   const items = await store.list();
-  for (const category of ["需求建模", "可行性分析", "设计建模", "代码原型", "文档与渲染"]) {
+  for (const category of ["需求建模", "可行性分析", "设计建模", "文档与渲染"]) {
     assert.ok(items.some((item) => item.path[0] === category));
   }
   assert.ok(items.some((item) => item.id === "feasibility.business-flow"));
-  assert.equal(items.find((item) => item.id === "skill.ui-ux-pro-max")?.editable, false);
+  assert.equal(items.some((item) => item.id.startsWith("code.") || item.id === "skill.ui-ux-pro-max"), false);
   assert.equal(items.find((item) => item.id === "shared.json")?.editable, false);
-  assert.ok(catalog.length > 25);
+  assert.ok(catalog.length > 10);
   await assert.rejects(() => store.createDraft("shared.json", "修改", "admin"), { statusCode: 403 });
 });
 

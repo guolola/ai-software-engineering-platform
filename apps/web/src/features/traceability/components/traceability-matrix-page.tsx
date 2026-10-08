@@ -77,7 +77,6 @@ function historyRunKind(item: ReturnType<typeof useWorkspaceSession>["historyIte
   if (item.runKind) return item.runKind;
   if (!item.snapshot) return null;
   if ("documentKind" in item.snapshot) return "document";
-  if ("files" in item.snapshot) return "code";
   if ("requirementModels" in item.snapshot) return "design";
   return "requirements";
 }

@@ -153,7 +153,8 @@ test("case project creation seeds every marketing case workspace", async () => {
 
     assert.equal(response.statusCode, 201);
     const body = response.json();
-    assert.equal(body.project.name, `${title} 示例项目`);
+    assert.equal(body.project.name, title);
+    assert.doesNotMatch(body.project.description, /示例|样例/u);
     assert.equal(body.project.visibility, "private");
     assert.equal(body.currentUserRole, "owner");
     assert.equal((await authStore.getProject(body.project.id))?.backgroundKey, backgroundKey);

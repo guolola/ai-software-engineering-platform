@@ -4,7 +4,6 @@ import type { RunRecord } from "./run-record-store.js";
 export type AdminRunTaskType =
   | "requirements_to_uml"
   | "design_modeling"
-  | "code_generation"
   | "document_generation"
   | "feasibility_analysis"
   | "unknown";
@@ -39,7 +38,6 @@ export const GENERATION_TASKS: Array<{ taskType: GenerationTaskType; label: stri
   { taskType: "design_modeling", label: "设计建模" },
   { taskType: "document_generation", label: "说明书生成" },
   { taskType: "feasibility_analysis", label: "可行性分析" },
-  { taskType: "code_generation", label: "代码生成" },
 ];
 
 const GENERATION_TASK_TYPE_SET = new Set<AdminRunTaskType>(
@@ -138,7 +136,7 @@ export function readProviderConfigId(snapshot: RunRecord["snapshot"]) {
 export function taskTypeForSnapshot(snapshot: RunRecord["snapshot"]): AdminRunTaskType {
   if ("selectedArtifacts" in snapshot) return "feasibility_analysis";
   if ("documentKind" in snapshot) return "document_generation";
-  if ("files" in snapshot) return "code_generation";
+  
   if ("designModelTraceability" in snapshot) return "design_modeling";
   if ("models" in snapshot || "plantUml" in snapshot || "svgArtifacts" in snapshot) {
     return "requirements_to_uml";
@@ -184,29 +182,7 @@ export function buildRunArtifactSummary(snapshot: RunRecord["snapshot"]): AdminR
     };
   }
 
-  if (taskType === "code_generation") {
-    const files = asRecord(source.files);
-    const dependencies = asRecord(source.dependencies);
-    return {
-      title: "代码原型生成结果",
-      description: typeof source.entryFile === "string" ? `入口文件：${source.entryFile}` : "后台未返回入口文件",
-      metrics: [
-        { label: "生成文件", value: Object.keys(files).length },
-        { label: "依赖", value: Object.keys(dependencies).length },
-        { label: "质量诊断", value: arrayLength(source.qualityDiagnostics) },
-        { label: "变更文件", value: typeof source.changedFileCount === "number" ? source.changedFileCount : Object.keys(files).length },
-      ],
-      artifacts: [
-        { label: "代码文件", count: Object.keys(files).length, detail: Object.keys(files).slice(0, 4).join("、") || undefined },
-        { label: "业务逻辑", count: source.businessLogic ? 1 : 0 },
-        { label: "UI 蓝图", count: source.uiBlueprint || source.uiIr ? 1 : 0 },
-      ],
-      notes: [
-        source.codeGenerationMode ? `生成模式：${source.codeGenerationMode}` : "后台未返回生成模式",
-        source.repairLoopSummary ? "包含修复循环摘要" : "未返回修复循环摘要",
-      ],
-    };
-  }
+  
 
   if (taskType === "design_modeling") {
     return {

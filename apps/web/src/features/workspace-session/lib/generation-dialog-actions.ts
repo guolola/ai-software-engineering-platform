@@ -192,25 +192,7 @@ export function designRunCompletionDialog(input: {
   };
 }
 
-export function codeRunCompletionDialog(snapshot: {
-  changedFileCount?: number;
-  generationMode?: "continue" | "regenerate";
-  runId?: string | null;
-}): GenerationResultDialogState {
-  return {
-    title: i18n.t("generation.dialog.titles.codeCompleted"),
-    tone: "success",
-    message:
-      snapshot.generationMode === "continue" && snapshot.changedFileCount === 0
-        ? i18n.t("generation.dialog.codeNoChanges")
-        : snapshot.generationMode === "regenerate"
-          ? i18n.t("generation.dialog.codeRegenerated")
-          : i18n.t("generation.dialog.codeCompleted"),
-    runId: snapshot.runId ?? null,
-    stageLabel: i18n.t("generation.dialog.labels.codePrototype"),
-    targetLabel: i18n.t("generation.dialog.labels.currentCodePrototype"),
-  };
-}
+
 
 export function documentRunCompletionDialog(input: {
   documentTitle: string;

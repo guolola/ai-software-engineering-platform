@@ -117,7 +117,7 @@ test("public home, dashboard, projects, and MFA fit the mobile viewport", async 
   });
 
   await page.goto("/");
-  await expect(page.getByText("示例项目概览", { exact: true })).toBeVisible();
+  await expect(page.getByText("项目概览", { exact: true })).toBeVisible();
   await checkViewportMatrix(page, "home");
   await page.screenshot({ path: info.outputPath("home-360.png"), fullPage: true });
 
@@ -176,13 +176,8 @@ test("public home, dashboard, projects, and MFA fit the mobile viewport", async 
   }
 });
 
-test("workspace stages, details, code preview, tests, and account dialog fit the responsive viewport matrix", async ({ page }, info) => {
+test("workspace stages, details, tests, and account dialog fit the responsive viewport matrix", async ({ page }, info) => {
   await mockProjectApi(page, {
-    codeFiles: {
-      "/src/App.tsx": "export default function App() { return <main>Mobile preview</main>; }",
-      "/src/main.tsx": "import { createRoot } from 'react-dom/client'; import App from './App'; createRoot(document.getElementById('root')!).render(<App/>);",
-    },
-    codeEntryFile: "/src/main.tsx",
     testCases: [{
       id: "TC-1",
       title: "预约座位成功",

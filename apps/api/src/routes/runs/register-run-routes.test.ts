@@ -9,7 +9,7 @@ import type {
   DesignModelTraceabilityEntry,
   DesignRunSnapshot,
   DesignSvgArtifact,
-  CodeRunSnapshot,
+  
   ProjectPermission,
   ProviderSettings,
   RequirementModelTraceabilityEntry,
@@ -34,7 +34,7 @@ import type { PngRenderClient } from "../../adapters/render/png-render-client.js
 import { createRunRecordStore, emitEvent } from "../../runs/records/run-record-store.js";
 import type { RunRecord } from "../../runs/records/run-record-store.js";
 import {
-  createEmptyCodeSnapshot,
+  
   createEmptyDesignSnapshot,
   createEmptyDocumentSnapshot,
   createEmptySnapshot,
@@ -298,9 +298,7 @@ function createProjectWorkspaceState(svg = "<svg><text>sequence</text></svg>") {
         workspaceRequirementTraceability,
       ),
     },
-    codeFiles: {
-      "/src/App.tsx": "export default function App() { return <main>活动日历</main>; }",
-    },
+    
   };
 }
 
@@ -447,9 +445,9 @@ async function createRunRouteTestContext(options?: {
     defaultSseAllowOrigin: "http://localhost:5173",
     runStagePipeline: options?.runStagePipeline ?? completeQueuedRun,
     runDesignStagePipeline: options?.runDesignStagePipeline ?? completeQueuedRun,
-    runCodeStagePipeline: completeQueuedRun,
+    
     runDocumentStagePipeline: options?.runDocumentStagePipeline ?? (async () => undefined),
-    addCodeDiagnostic: () => undefined,
+    
     runAccessGuard: options?.runAccessGuard,
     providerConfigs: defaultProviderConfigs,
     resolveProjectName: options?.resolveProjectName,
@@ -1192,9 +1190,9 @@ test("project run starts can resolve managed provider config secrets", async () 
     defaultSseAllowOrigin: "http://localhost:5173",
     runStagePipeline: completeQueuedRun,
     runDesignStagePipeline: completeQueuedRun,
-    runCodeStagePipeline: completeQueuedRun,
+    
     runDocumentStagePipeline: async () => undefined,
-    addCodeDiagnostic: () => undefined,
+    
     runAccessGuard: createTestRunAccessGuard({
       "user-a": { start_runs: ["project-a"], view_runs: ["project-a"] },
     }),
@@ -1524,9 +1522,9 @@ test("project run rejects missing personal provider settings instead of using pr
     defaultSseAllowOrigin: "http://localhost:5173",
     runStagePipeline: completeQueuedRun,
     runDesignStagePipeline: completeQueuedRun,
-    runCodeStagePipeline: completeQueuedRun,
+    
     runDocumentStagePipeline: async () => undefined,
-    addCodeDiagnostic: () => undefined,
+    
     runAccessGuard: createTestRunAccessGuard({
       "user-a": { start_runs: ["project-a"], view_runs: ["project-a"] },
     }),
@@ -1718,9 +1716,9 @@ test("project run starts return 429 and do not call the pipeline when provider q
       pipelineCalls += 1;
     },
     runDesignStagePipeline: async () => undefined,
-    runCodeStagePipeline: async () => undefined,
+    
     runDocumentStagePipeline: async () => undefined,
-    addCodeDiagnostic: () => undefined,
+    
     runAccessGuard: createTestRunAccessGuard({
       "user-a": { start_runs: ["project-a"], view_runs: ["project-a"] },
     }),
@@ -1927,6 +1925,16 @@ test("project run history lists only runs for an authorized project member", asy
   await app.close();
 });
 
+test("retired code generation routes return normal 404 responses", async () => {
+  const app = await createRunRouteTestApp();
+  for (const [method, url] of [["POST", "/api/code-runs"], ["GET", "/api/code-runs/old-run"], ["GET", "/api/code-runs/old-run/events"]] as const) {
+    const response = await app.inject({ method, url, ...(method === "POST" ? { payload: {} } : {}) });
+    assert.equal(response.statusCode, 404);
+    assert.equal(response.json().error, "Not Found");
+  }
+  await app.close();
+});
+
 test("project run history exposes run kind for each snapshot type", async () => {
   const { app, runs } = await createRunRouteTestContext({
     runAccessGuard: createTestRunAccessGuard({
@@ -1972,19 +1980,7 @@ test("project run history exposes run kind for each snapshot type", async () => 
       terminal: true,
       metadata,
     },
-    {
-      snapshot: {
-        ...createEmptyCodeSnapshot("run-code", {
-          designModels: [],
-        }),
-        currentStage: "generate_code_files",
-        status: "completed",
-      },
-      events: [],
-      listeners: new Set(),
-      terminal: true,
-      metadata,
-    },
+    
     {
       snapshot: {
         ...createEmptyDocumentSnapshot("run-document", {
@@ -2021,7 +2017,7 @@ test("project run history exposes run kind for each snapshot type", async () => 
   );
   assert.deepEqual(runKinds, {
     "run-document": "document",
-    "run-code": "code",
+    
     "run-design": "design",
     "run-requirements": "requirements",
   });
@@ -2992,13 +2988,7 @@ test("project start commands reject pending requirement review candidates before
         selectedDiagrams: ["sequence"],
       },
     },
-    {
-      url: "/api/code-runs",
-      payload: {
-        projectId: "project-a",
-        generationMode: "continue",
-      },
-    },
+    
     {
       url: "/api/document-runs",
       payload: {
@@ -3062,36 +3052,8 @@ test("project-scoped generation commands reject incomplete workspace state befor
       },
       code: "REQUIREMENT_TRACEABILITY_MISSING",
     },
-    {
-      label: "code without design models",
-      state: {
-        ...createProjectWorkspaceState(),
-        designModels: {},
-        designPlantUml: {},
-        designSvgArtifacts: {},
-        generatedDesignDiagramTypes: [],
-      },
-      url: "/api/code-runs",
-      payload: {
-        projectId: "project-a",
-        generationMode: "continue",
-      },
-      code: "DESIGN_MODELS_MISSING",
-    },
-    {
-      label: "code with generated design missing metadata",
-      state: {
-        ...createProjectWorkspaceState(),
-        designInputFingerprints: {},
-        designPlantUml: {},
-      },
-      url: "/api/code-runs",
-      payload: {
-        projectId: "project-a",
-        generationMode: "continue",
-      },
-      code: "DESIGN_MODELS_INVALID",
-    },
+    
+    
     {
       label: "requirements spec without requirement PlantUML",
       state: {
@@ -3430,81 +3392,7 @@ test("project requirements analysis command records implicit usecase dependency 
   await app.close();
 });
 
-test("project code and document start commands build run inputs from workspace", async () => {
-  let capturedDocumentInput:
-    | Parameters<
-        NonNullable<
-          Parameters<typeof registerRunRoutes>[0]["runDocumentStagePipeline"]
-        >
-      >[1]
-    | undefined;
-  const { app, runs } = await createRunRouteTestContext({
-    completeRuns: false,
-    runAccessGuard: createTestRunAccessGuard({
-      "user-a": {
-        start_runs: ["project-a"],
-        manage_documents: ["project-a"],
-      },
-    }),
-    loadProjectWorkspace: async () => ({ state: createProjectWorkspaceState() }),
-    runDocumentStagePipeline: async (_record, input) => {
-      capturedDocumentInput = input;
-    },
-  });
 
-  const codeResponse = await app.inject({
-    method: "POST",
-    url: "/api/code-runs",
-    headers: {
-      "x-test-user-id": "user-a",
-    },
-    payload: {
-      projectId: "project-a",
-      generationMode: "continue",
-    },
-  });
-
-  assert.equal(codeResponse.statusCode, 202, codeResponse.body);
-  const codeRecord = runs.get(codeResponse.json().runId);
-  assert.ok(codeRecord);
-  const codeSnapshot = codeRecord.snapshot as CodeRunSnapshot;
-  assert.equal(codeSnapshot.requirementText?.includes("活动"), true);
-  assert.equal("rules" in codeSnapshot, false);
-  assert.equal(codeSnapshot.requirementBaseline?.runId, "workspace-baseline");
-  assert.equal(codeSnapshot.designModels[0]?.modelId, "design-sequence-view");
-  assert.equal(codeSnapshot.designPlantUml[0]?.modelId, "design-sequence-view");
-  assert.equal(
-    codeSnapshot.files["/src/App.tsx"]?.includes("活动日历"),
-    true,
-  );
-
-  const documentResponse = await app.inject({
-    method: "POST",
-    url: "/api/document-runs",
-    headers: {
-      "x-test-user-id": "user-a",
-    },
-    payload: {
-      projectId: "project-a",
-      documentKind: "softwareDesignSpec",
-      useAiText: false,
-    },
-  });
-
-  assert.equal(documentResponse.statusCode, 202, documentResponse.body);
-  assert.ok(capturedDocumentInput);
-  assert.equal(capturedDocumentInput.projectId, "project-a");
-  assert.equal(capturedDocumentInput.documentKind, "softwareDesignSpec");
-  assert.equal(capturedDocumentInput.useAiText, false);
-  assert.equal(capturedDocumentInput.requirementModels[0]?.diagramKind, "usecase");
-  assert.equal(capturedDocumentInput.requirementPlantUml[0]?.diagramKind, "usecase");
-  assert.equal(capturedDocumentInput.requirementSvgArtifacts[0]?.svg.includes("usecase"), true);
-  assert.equal(capturedDocumentInput.designModels[0]?.modelId, "design-sequence-view");
-  assert.equal(capturedDocumentInput.designPlantUml[0]?.modelId, "design-sequence-view");
-  assert.equal(capturedDocumentInput.designSvgArtifacts[0]?.modelId, "design-sequence-view");
-
-  await app.close();
-});
 
 test("project software design document command rejects incomplete design chain metadata", async () => {
   let documentPipelineCalled = false;
@@ -3664,43 +3552,6 @@ test("offline demo project start commands complete fixed artifacts without provi
       true,
     );
 
-    const codeResponse = await app.inject({
-      method: "POST",
-      url: "/api/code-runs",
-      headers: {
-        "x-test-user-id": "user-a",
-      },
-      payload: {
-        projectId: demoProjectId,
-        generationMode: "regenerate",
-      },
-    });
-    assert.equal(codeResponse.statusCode, 202, codeResponse.body);
-    const codeRunId = codeResponse.json().runId;
-    await waitForRunStatus(runs, codeRunId, "completed");
-    const codeSnapshot = runs.get(codeRunId)?.snapshot as CodeRunSnapshot;
-    assert.equal(codeSnapshot.status, "completed");
-    assert.equal(Boolean(codeSnapshot.files["/src/components/ui/dialog.tsx"]), true);
-    assert.match(
-      codeSnapshot.files["/src/components/ui/dialog.tsx"] ?? "",
-      /DialogContent/,
-    );
-    const loginPageSource = codeSnapshot.files["/src/pages/LoginPage.tsx"] ?? "";
-    assert.match(loginPageSource, /useState\('student1'\)/);
-    assert.match(loginPageSource, /useState\('123456'\)/);
-    assert.equal(loginPageSource.includes("setTimeout"), false);
-    assert.match(loginPageSource, /const success = onLogin/);
-    assert.match(loginPageSource, /const handleLogin = \(\) =>/);
-    assert.match(loginPageSource, /onClick=\{handleLogin\}/);
-    assert.equal(loginPageSource.includes("import { Button }"), false);
-    const workspaceShellSource =
-      codeSnapshot.files["/src/components/WorkspaceShell.tsx"] ?? "";
-    assert.match(workspaceShellSource, /请输入用户名和密码/);
-    assert.equal(
-      workspaceShellSource.includes("setErrorWithRetry('网络异常，请重试'"),
-      false,
-    );
-
     const documentResponse = await app.inject({
       method: "POST",
       url: "/api/document-runs",
@@ -3812,36 +3663,7 @@ test("offline demo project name patterns do not affect unmatched projects", asyn
   }
 });
 
-test("project start commands reject missing workspace generation context before queuing", async () => {
-  const app = await createRunRouteTestApp({
-    runAccessGuard: createTestRunAccessGuard({
-      "user-a": {
-        start_runs: ["project-a"],
-      },
-    }),
-    loadProjectWorkspace: async () => ({
-      state: {
-        requirementText: "用户可以查看公开活动日历。",
-      },
-    }),
-  });
 
-  const response = await app.inject({
-    method: "POST",
-    url: "/api/code-runs",
-    headers: {
-      "x-test-user-id": "user-a",
-    },
-    payload: {
-      projectId: "project-a",
-    },
-  });
-
-  assert.equal(response.statusCode, 409);
-  assert.equal(response.json().error.code, "REQUIREMENT_MODELS_MISSING");
-
-  await app.close();
-});
 
 test("project run history supports detail and status filters for authorized members", async () => {
   const { app, runs } = await createRunRouteTestContext({
@@ -4198,64 +4020,7 @@ test("removed run evidence and review routes return 404", async () => {
   await app.close();
 });
 
-test("blocked requirement baseline no longer blocks design or code starts but still blocks documents", async () => {
-  const blockedBaseline = createBlockedRequirementBaseline();
-  const blockedWorkspaceState = {
-    ...createProjectWorkspaceState(),
-    requirementBaseline: blockedBaseline,
-  };
-  const { app, runs } = await createRunRouteTestContext({
-    completeRuns: false,
-    runAccessGuard: createTestRunAccessGuard({
-      "reviewer-a": {
-        start_runs: ["project-a"],
-        manage_documents: ["project-a"],
-      },
-    }),
-    loadProjectWorkspace: async () => ({ state: blockedWorkspaceState }),
-  });
 
-  const designResponse = await app.inject({
-    method: "POST",
-    url: "/api/design-runs",
-    headers: { "x-test-user-id": "reviewer-a" },
-    payload: {
-      projectId: "project-a",
-      selectedDiagrams: ["sequence"],
-    },
-  });
-
-  assert.equal(designResponse.statusCode, 202);
-
-  const codeResponse = await app.inject({
-    method: "POST",
-    url: "/api/code-runs",
-    headers: { "x-test-user-id": "reviewer-a" },
-    payload: {
-      projectId: "project-a",
-      generationMode: "continue",
-    },
-  });
-
-  assert.equal(codeResponse.statusCode, 202);
-
-  const documentResponse = await app.inject({
-    method: "POST",
-    url: "/api/document-runs",
-    headers: { "x-test-user-id": "reviewer-a" },
-    payload: {
-      projectId: "project-a",
-      documentKind: "softwareDesignSpec",
-      useAiText: false,
-    },
-  });
-
-  assert.equal(documentResponse.statusCode, 409);
-  assert.equal(documentResponse.json().error.code, "REQUIREMENT_BASELINE_BLOCKED");
-  assert.equal(runs.size, 2);
-
-  await app.close();
-});
 
 test("guest project run starts return 429 after the visitor daily generation limit", async () => {
   let pipelineCalls = 0;

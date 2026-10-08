@@ -1,8 +1,8 @@
 // Builds run-level CoverageMatrix and TraceabilityMatrix artifacts from generated outputs.
 import type {
   AtomicRequirement,
-  CodeBusinessAssertionResult,
-  CodeRunSnapshot,
+  
+  
   CoverageMatrix,
   CoverageMatrixRow,
   DesignDiagramModelSpec,
@@ -39,12 +39,7 @@ type DesignStageInput = RequirementStageInput & {
   designModelTraceability: DesignModelTraceabilityEntry[];
 };
 
-type CodeStageInput = {
-  runId: string;
-  baseline: RequirementBaseline;
-  files: CodeRunSnapshot["files"];
-  businessAssertionResults?: CodeBusinessAssertionResult | null;
-};
+
 
 type MutableTraceState = {
   links: TraceabilityLink[];
@@ -494,21 +489,9 @@ function shouldCheckDesignSourceSemantics(
   return !isStructuralModelRef(ref, designModels);
 }
 
-function isInfrastructureCodeArtifact(path: string) {
-  return (
-    path === "/package.json" ||
-    path === "/index.html" ||
-    path === "/src/main.tsx" ||
-    path === "/src/styles.css" ||
-    path.startsWith("/src/docs/") ||
-    path.endsWith(".css") ||
-    path.endsWith(".json")
-  );
-}
 
-function isCodeTraceManifest(path: string) {
-  return path === "/BUSINESS_CONTEXT.md";
-}
+
+
 
 function codeMatchesRequirement(path: string, content: string, requirement: AtomicRequirement) {
   const text = `${path}\n${content}`.toLowerCase();
@@ -521,7 +504,7 @@ function coverageStatusForRequirement(
   requirement: AtomicRequirement,
   modelElements: string[],
   designElements: string[],
-  codeArtifacts: string[],
+  
 ): CoverageMatrixRow["status"] {
   if (requirement.status === "conflict") return "conflict";
   if (requirement.status === "pending-review" || requirement.status === "ambiguous") {
@@ -531,12 +514,11 @@ function coverageStatusForRequirement(
   if (
     requirement.type === "non-functional" &&
     modelElements.length === 0 &&
-    designElements.length === 0 &&
-    codeArtifacts.length === 0
+    designElements.length === 0
   ) {
     return "not-modelable";
   }
-  return modelElements.length > 0 || designElements.length > 0 || codeArtifacts.length > 0
+  return modelElements.length > 0 || designElements.length > 0
     ? "covered"
     : "pending-review";
 }
@@ -548,7 +530,7 @@ function buildCoverageRows(
     {
       modelElements: Set<string>;
       designElements: Set<string>;
-      codeArtifacts: Set<string>;
+      
       tests: Set<string>;
       reviewItems: Set<string>;
     }
@@ -558,18 +540,18 @@ function buildCoverageRows(
     const traced = tracedArtifacts.get(requirement.id) ?? {
       modelElements: new Set<string>(),
       designElements: new Set<string>(),
-      codeArtifacts: new Set<string>(),
+      
       tests: new Set<string>(),
       reviewItems: new Set<string>(),
     };
     const modelElements = Array.from(traced.modelElements);
     const designElements = Array.from(traced.designElements);
-    const codeArtifacts = Array.from(traced.codeArtifacts);
+    
     const status = coverageStatusForRequirement(
       requirement,
       modelElements,
       designElements,
-      codeArtifacts,
+      
     );
     return {
       requirementId: requirement.id,
@@ -582,7 +564,7 @@ function buildCoverageRows(
           : "Requirement needs review or an alternative evidence path before completion.",
       modelElements,
       designElements,
-      codeArtifacts,
+      
       tests: Array.from(traced.tests),
       reviewItems:
         status === "not-modelable"
@@ -598,19 +580,19 @@ function addTracedArtifact(
     {
       modelElements: Set<string>;
       designElements: Set<string>;
-      codeArtifacts: Set<string>;
+      
       tests: Set<string>;
       reviewItems: Set<string>;
     }
   >,
   requirementId: string,
-  kind: "modelElements" | "designElements" | "codeArtifacts" | "tests" | "reviewItems",
+  kind: "modelElements" | "designElements" |  "tests" | "reviewItems",
   artifact: string,
 ) {
   const current = tracedArtifacts.get(requirementId) ?? {
     modelElements: new Set<string>(),
     designElements: new Set<string>(),
-    codeArtifacts: new Set<string>(),
+    
     tests: new Set<string>(),
     reviewItems: new Set<string>(),
   };
@@ -631,7 +613,7 @@ export function buildRequirementStageTrustedChain({
     {
       modelElements: Set<string>;
       designElements: Set<string>;
-      codeArtifacts: Set<string>;
+      
       tests: Set<string>;
       reviewItems: Set<string>;
     }
@@ -861,147 +843,7 @@ export function buildDesignStageTrustedChain(input: DesignStageInput): TrustedCh
   };
 }
 
-export function buildCodeStageTrustedChain({
-  runId,
-  baseline,
-  files,
-  businessAssertionResults,
-}: CodeStageInput): TrustedChainArtifacts {
-  const state: MutableTraceState = { links: [], diagnostics: [] };
-  const tracedArtifacts = new Map<
-    string,
-    {
-      modelElements: Set<string>;
-      designElements: Set<string>;
-      codeArtifacts: Set<string>;
-      tests: Set<string>;
-      reviewItems: Set<string>;
-    }
-  >();
-  const accepted = acceptedRequirements(baseline);
-  const bundleMatchedRequirements = accepted.filter((requirement) =>
-    Object.entries(files).some(
-      ([path, content]) =>
-        isCodeTraceManifest(path) && codeMatchesRequirement(path, content, requirement),
-    ),
-  );
-  for (const [path, content] of Object.entries(files)) {
-    if (isInfrastructureCodeArtifact(path)) continue;
-    const directMatched = accepted.filter((requirement) =>
-      codeMatchesRequirement(path, content, requirement),
-    );
-    const matched =
-      directMatched.length > 0 ? directMatched : bundleMatchedRequirements;
-    if (matched.length === 0) {
-      addDiagnostic(state, {
-        severity: "error",
-        code: "orphan-artifact",
-        message: `Code artifact ${path} has no requirement trace.`,
-        artifactType: "code",
-        artifactId: path,
-        blocksCompletion: true,
-      });
-      continue;
-    }
-    for (const requirement of matched) {
-      addTracedArtifact(tracedArtifacts, requirement.id, "codeArtifacts", path);
-      addBidirectionalLink(
-        state,
-        "requirement",
-        requirement.id,
-        "code",
-        path,
-        "implements",
-        directMatched.includes(requirement)
-          ? Math.min(0.8, requirement.confidence)
-          : Math.min(0.55, requirement.confidence),
-        directMatched.includes(requirement)
-          ? `Code artifact contains business terms for ${requirement.id}.`
-          : `Code artifact is part of a generated bundle whose business context maps to ${requirement.id}.`,
-      );
-    }
-  }
 
-  const assertionRequirementIds = new Set<string>();
-  for (const assertion of businessAssertionResults?.assertions ?? []) {
-    assertionRequirementIds.add(assertion.requirementId);
-    const requirement = accepted.find((candidate) => candidate.id === assertion.requirementId);
-    if (!requirement) {
-      addDiagnostic(state, {
-        severity: "error",
-        code: "fake-trace",
-        message: `Business assertion ${assertion.id} references no accepted baseline requirement.`,
-        artifactType: "test",
-        artifactId: assertion.id,
-        requirementId: assertion.requirementId,
-        blocksCompletion: true,
-      });
-      continue;
-    }
-    if (assertion.status === "passed") {
-      addTracedArtifact(tracedArtifacts, assertion.requirementId, "tests", `test:${assertion.id}`);
-      addBidirectionalLink(
-        state,
-        "requirement",
-        assertion.requirementId,
-        "test",
-        assertion.id,
-        "verifies",
-        assertion.verificationMethod === "static-code-scan" ? 0.7 : 0.9,
-        `Business assertion ${assertion.id} verifies ${assertion.requirementId}.`,
-      );
-      for (const codeArtifact of assertion.evidenceArtifacts) {
-        addBidirectionalLink(
-          state,
-          "test",
-          assertion.id,
-          "code",
-          codeArtifact,
-          "verifies",
-          0.7,
-          `Business assertion ${assertion.id} was verified against ${codeArtifact}.`,
-        );
-      }
-      continue;
-    }
-    addDiagnostic(state, {
-      severity: assertion.severity === "critical" ? "critical" : "error",
-      code: "business-assertion-gap",
-      message: `Business assertion ${assertion.id} failed for ${assertion.requirementId}: ${assertion.message}`,
-      artifactType: "test",
-      artifactId: assertion.id,
-      requirementId: assertion.requirementId,
-      blocksCompletion: true,
-    });
-  }
-
-  for (const requirement of accepted) {
-    if (assertionRequirementIds.has(requirement.id)) continue;
-    addDiagnostic(state, {
-      severity: requirement.criticality === "critical" ? "critical" : "error",
-      code: "business-assertion-gap",
-      message: `${requirement.id} has no requirement-linked business assertion result.`,
-      artifactType: "requirement",
-      artifactId: requirement.id,
-      requirementId: requirement.id,
-      blocksCompletion: true,
-    });
-  }
-
-  const coverageMatrix = coverageMatrixSchema.parse({
-    runId,
-    rows: buildCoverageRows(baseline, tracedArtifacts),
-  });
-  addCoverageDiagnostics(state, coverageMatrix);
-  return {
-    coverageMatrix,
-    traceabilityMatrix: traceabilityMatrixSchema.parse({
-      runId,
-      links: state.links,
-      diagnostics: state.diagnostics,
-    }),
-  };
-}
 
 export function assertTrustedChainAllowsCompletion(_artifacts: TrustedChainArtifacts) {
   // Trusted-chain gaps are now audit hints in the interactive workflow. Pipeline
@@ -1044,7 +886,7 @@ function coverageRowsToTraceMap(rows: CoverageMatrix["rows"]) {
     {
       modelElements: Set<string>;
       designElements: Set<string>;
-      codeArtifacts: Set<string>;
+      
       tests: Set<string>;
       reviewItems: Set<string>;
     }
@@ -1053,7 +895,7 @@ function coverageRowsToTraceMap(rows: CoverageMatrix["rows"]) {
     tracedArtifacts.set(row.requirementId, {
       modelElements: new Set(row.modelElements),
       designElements: new Set(row.designElements),
-      codeArtifacts: new Set(row.codeArtifacts),
+      
       tests: new Set(row.tests),
       reviewItems: new Set(row.reviewItems),
     });

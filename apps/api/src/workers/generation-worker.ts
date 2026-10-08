@@ -14,9 +14,9 @@ import {
 } from "../runs/pipelines/run-record-pipeline-starter.js";
 import { runStagePipeline } from "../runs/pipelines/requirements-pipeline.js";
 import { runDesignStagePipeline } from "../runs/pipelines/design-pipeline.js";
-import { runCodeStagePipeline } from "../runs/pipelines/code-pipeline.js";
+
 import { runDocumentStagePipeline } from "../runs/pipelines/document-pipeline.js";
-import { addCodeDiagnostic } from "../runs/pipelines/code/code-run-diagnostics.js";
+
 import { snapshotProviderSettings } from "../runs/providers/run-provider-gates.js";
 import {
   attachProjectWorkspaceSync,
@@ -155,15 +155,15 @@ async function start() {
           documentLibrary: persistence.documentLibrary,
           runStagePipeline,
           runDesignStagePipeline,
-          runCodeStagePipeline,
+          
           runDocumentStagePipeline,
-          addCodeDiagnostic,
+          
           documentInput: job.documentInput,
           billingEntitlements: provider.billingRequired ? billingService : undefined,
           analyticsStore: persistence.analyticsStore,
         });
       } catch (error) {
-        handleRunPipelineError(record, error, addCodeDiagnostic);
+        handleRunPipelineError(record, error);
         throw error;
       } finally {
         activeRecords.delete(job.runId);

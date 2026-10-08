@@ -101,7 +101,7 @@ function FloatingAlertCard({ alert, onDismiss }: { alert: FloatingAlertEntry; on
   return (
     <Alert
       className={cn(
-        'w-full text-foreground shadow-xl backdrop-blur-xl *:[svg]:row-span-1 *:[svg]:translate-y-0',
+        'w-full min-w-0 items-center text-foreground shadow-xl backdrop-blur-xl [overflow-wrap:anywhere] *:[svg]:row-span-1 *:[svg]:translate-y-0',
         alert.tone === 'success' && 'border-success/45 bg-success/10 *:[svg]:text-success',
         alert.tone === 'info' && 'border-info/45 bg-info/10 *:[svg]:text-info',
         alert.tone === 'warning' && 'border-warning/45 bg-warning/10 *:[svg]:text-warning',
@@ -119,7 +119,7 @@ function FloatingAlertCard({ alert, onDismiss }: { alert: FloatingAlertEntry; on
       <Icon aria-hidden='true' />
       <AlertTitle>{alert.title}</AlertTitle>
       {alert.description ? <AlertDescription className='col-start-2'>{alert.description}</AlertDescription> : null}
-      <AlertAction>
+      <AlertAction className={cn(!alert.description && 'top-1/2 -translate-y-1/2')}>
         <Button type='button' variant='ghost' size='icon-xs' aria-label='关闭提示' onClick={onDismiss}>
           <X />
         </Button>
@@ -157,13 +157,14 @@ export function FloatingAlertProvider({ children }: { children: React.ReactNode 
     ? null
     : document.querySelector<HTMLElement>('[data-slot="dialog-content"][data-open], [data-slot="drawer-content"]')
   const viewport = (
-    <div className='font-sans pointer-events-none fixed inset-x-4 top-4 z-[100] mx-auto flex max-w-xl flex-col gap-2 sm:top-20' aria-live='polite' aria-atomic='false'>
+    <div className='font-sans pointer-events-none fixed inset-x-4 top-4 z-[100] mx-auto flex max-w-xl flex-col items-center gap-2 sm:top-20' aria-live='polite' aria-atomic='false'>
       <AnimatePresence initial={false} mode='popLayout'>
         {alerts.map(alert => (
           <motion.div
             key={alert.id}
             data-slot='floating-alert-item'
-            className='pointer-events-auto'
+            // Each alert follows its own content width; long messages stay within the viewport.
+            className='pointer-events-auto w-fit min-w-0 max-w-full'
             layout={!reduceMotion}
             initial={reduceMotion ? false : { opacity: 0, y: -8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}

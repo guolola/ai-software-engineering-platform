@@ -4,17 +4,18 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --watch --import tsx src/index.ts",
     "bootstrap:admin": "tsx src/bootstrap/admin-bootstrap-cli.ts",
     "workspace:fingerprints": "node scripts/normalize-workspace-fingerprints.mjs",
     "workspace:cleanup-design-records": "node scripts/cleanup-stale-design-records.mjs",
-    "build": "tsc -p tsconfig.json && npm run copy:code-skills",
-    "copy:code-skills": "node scripts/copy-code-skills.mjs",
+    "build": "tsc -p tsconfig.json",
     "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "10.1.0",
     "@fastify/multipart": "^10.0.0",
+    "@modelcontextprotocol/node": "2.1.1",
+    "@modelcontextprotocol/server": "2.3.1",
     "@types/nodemailer": "^6.4.17",
     "@uml-platform/contracts": "0.0.1",
     "@uml-platform/prompts": "0.0.1",
@@ -24,11 +25,16 @@
     "ioredis": "^5.11.1",
     "ip2region": "^2.3.0",
     "nodemailer": "^6.9.16",
+    "oidc-provider": "9.12.2",
     "openai": "^6.44.0",
     "pg": "^8.21.0",
-    "zod": "3.24.4"
+    "zod": "3.24.4",
+    "zod-to-json-schema": "3.24.6"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@modelcontextprotocol/client": "2.3.1",
+    "@types/oidc-provider": "9.12.1",
     "@types/pg": "^8.20.0"
   }
 }

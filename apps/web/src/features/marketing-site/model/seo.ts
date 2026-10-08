@@ -74,6 +74,7 @@ function upsertMeta(selector: string, attributes: Record<string, string>) {
   let element = document.head.querySelector<HTMLMetaElement>(selector);
   if (!element) {
     element = document.createElement("meta");
+    element.dataset.seoRuntime = "true";
     document.head.appendChild(element);
   }
   Object.entries(attributes).forEach(([name, value]) => element!.setAttribute(name, value));
@@ -104,8 +105,13 @@ export function applyRouteMetadata(
           ? "Software Engineering Practice Platform"
           : "软件工程实践平台";
     upsertMeta('meta[name="robots"]', { name: "robots", content: "noindex, nofollow" });
-    canonical?.remove();
-    document.head.querySelector('meta[name="description"]')?.remove();
+    // Next.js owns its server-rendered head nodes. Retire their values in place so
+    // React can still remove those nodes safely during navigation or hot reload.
+    if (canonical?.dataset.seoRuntime === "true") canonical.remove();
+    else canonical?.removeAttribute("href");
+    const description = document.head.querySelector<HTMLMetaElement>('meta[name="description"]');
+    if (description?.dataset.seoRuntime === "true") description.remove();
+    else description?.setAttribute("content", "");
     document.head.querySelectorAll('[data-seo-social="true"]').forEach((element) => element.remove());
     removeManagedStructuredData();
     return;
@@ -123,7 +129,10 @@ export function applyRouteMetadata(
   const canonicalElement = canonical ?? document.createElement("link");
   canonicalElement.setAttribute("rel", "canonical");
   canonicalElement.setAttribute("href", absoluteCanonical);
-  if (!canonical) document.head.appendChild(canonicalElement);
+  if (!canonical) {
+    canonicalElement.dataset.seoRuntime = "true";
+    document.head.appendChild(canonicalElement);
+  }
 
   document.head.querySelectorAll('[data-seo-social="true"]').forEach((element) => element.remove());
   const socialTags: Array<Record<string, string>> = [

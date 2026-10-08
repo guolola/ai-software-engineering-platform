@@ -58,15 +58,7 @@ export const WORKSPACE_MODULES: WorkspaceModuleDefinition[] = [
     prerequisiteStepIds: ["diagrams"],
     emptyState: "先生成需求模型后进入设计阶段",
   },
-  {
-    id: "code",
-    label: "代码",
-    route: "/workspace",
-    tabId: "workspace:code",
-    artifactTypes: ["codeFile", "codeSpec", "uiMockup"],
-    prerequisiteStepIds: ["design"],
-    emptyState: "先生成设计模型后生成前端原型",
-  },
+  
   {
     id: "testing",
     label: "测试",
@@ -97,11 +89,6 @@ export const SHELL_ROUTE_MODULES = [
     label: "考试",
     route: "/exam" as const,
     description: "考试模块正在建设中，后续会承载课程测评、题目生成和评分流程。",
-  },
-  {
-    label: "使用文档",
-    route: "/tutorial" as const,
-    description: "查看项目内使用手册、操作路径、截图说明和常见问题。",
   },
 ];
 

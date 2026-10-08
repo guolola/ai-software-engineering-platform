@@ -1,0 +1,809 @@
+// Exercises actual SDK HTTP exchanges, browser consent, and revocation using isolated platform accounts.
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import {
+  Client,
+  StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
+import test from "node:test";
+import { createConfiguredFastifyApp } from "../../server/fastify-app.js";
+import { createInMemoryAuthStore } from "../../auth/in-memory-auth-store.js";
+import { loadMcpConfig } from "../../mcp/auth/mcp-config.js";
+import { registerMcpModule } from "../../mcp/server/register-mcp-module.js";
+import { createMcpToolService } from "../../mcp/tools/tool-service.js";
+import {
+  mcpContextInputSchema,
+  mcpArtifactInputSchema,
+  mcpListProjectsInputSchema,
+} from "@uml-platform/contracts";
+
+async function setup(
+  webOrigin?: string,
+  publicOrigin = "http://localhost:4001",
+  cimdOrigins = "",
+) {
+  const authStore = createInMemoryAuthStore();
+  const app = await createConfiguredFastifyApp();
+  app.log.level = "silent";
+  const config = loadMcpConfig({
+    MCP_ENABLED: "true",
+    MCP_PUBLIC_ORIGIN: publicOrigin,
+    MCP_CIMD_ORIGINS: cimdOrigins,
+    ...(webOrigin ? { MCP_WEB_ORIGIN: webOrigin } : {}),
+    MCP_OAUTH_CLIENTS: JSON.stringify([
+      {
+        client_id: "test-client",
+        client_name: "Coding agent",
+        redirect_uris: ["http://127.0.0.1:8765/callback"],
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+      },
+    ]),
+  })!;
+  const module = (await registerMcpModule({
+    app,
+    authStore,
+    pool: null,
+    production: false,
+    config,
+  }))!;
+  const alice = await authStore.createUser({
+    email: "alice@example.test",
+    displayName: "Alice",
+    passwordHash: "not-a-password",
+  });
+  const bob = await authStore.createUser({
+    email: "bob@example.test",
+    displayName: "Bob",
+    passwordHash: "not-a-password",
+  });
+  const a = await authStore.createProject({
+    ownerUserId: alice.id,
+    name: "图书管理系统",
+    description: "A",
+    visibility: "private",
+  });
+  const b = await authStore.createProject({
+    ownerUserId: bob.id,
+    name: "图书管理系统",
+    description: "B",
+    visibility: "private",
+  });
+  const session = await authStore.createSession({
+    userId: alice.id,
+    ipAddress: "127.0.0.1",
+    userAgent: "test",
+  });
+  const pat = await module.access.createToken(
+    alice.id,
+    "test",
+    [a.project.id],
+    30,
+  );
+  const headers = {
+    host: new URL(publicOrigin).host,
+    authorization: `Bearer ${pat.token}`,
+    accept: "application/json, text/event-stream",
+    "mcp-protocol-version": "2025-11-25",
+  };
+  const browserHeaders = {
+    host: new URL(publicOrigin).host,
+    cookie: `uml_session=${session.id}`,
+  };
+  function parse(response: { body: string }) {
+    return response.body.startsWith("event:")
+      ? JSON.parse(
+          response.body
+            .split("\n")
+            .find((line) => line.startsWith("data: "))!
+            .slice(6),
+        )
+      : JSON.parse(response.body);
+  }
+  async function rpc(method: string, params: unknown = {}) {
+    return app.inject({
+      method: "POST",
+      url: "/api/mcp",
+      headers,
+      payload: { jsonrpc: "2.0", id: 1, method, params },
+    });
+  }
+  return {
+    app,
+    authStore,
+    ...module,
+    config,
+    alice,
+    bob,
+    a: a.project,
+    b: b.project,
+    ownerMember: a.ownerMember,
+    pat,
+    headers,
+    browserHeaders,
+    parse,
+    rpc,
+  };
+}
+test("local demo proxy exposes enabled connections, tools and OAuth on the same Web origin", async (t) => {
+  const s = await setup("http://localhost:3000", "http://localhost:3000");
+  t.after(() => s.app.close());
+  const proxyHeaders = {
+    host: "localhost:4101",
+    "x-forwarded-host": "localhost:3000",
+  };
+  const management = await s.app.inject({
+    url: "/api/mcp/connections",
+    headers: {
+      ...s.browserHeaders,
+      ...proxyHeaders,
+      origin: "http://localhost:3000",
+    },
+  });
+  assert.equal(management.statusCode, 200);
+  assert.equal(management.json().enabled, true);
+  assert.equal(management.json().serverUrl, "http://localhost:3000/api/mcp");
+  const discovery = await s.app.inject({
+    url: "/.well-known/oauth-protected-resource/api/mcp",
+    headers: proxyHeaders,
+  });
+  assert.equal(discovery.json().resource, management.json().serverUrl);
+  const tools = await s.app.inject({
+    method: "POST",
+    url: "/api/mcp",
+    headers: { ...s.headers, ...proxyHeaders },
+    payload: { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} },
+  });
+  assert.equal(s.parse(tools).result.tools.length, 4);
+  const authorization = await s.app.inject({
+    url: `/api/mcp/oauth/auth?${new URLSearchParams({
+      client_id: "test-client",
+      response_type: "code",
+      scope: "mcp:read",
+      resource: s.config.resource,
+      redirect_uri: "http://127.0.0.1:8765/callback",
+      code_challenge: "a".repeat(43),
+      code_challenge_method: "S256",
+    })}`,
+    headers: proxyHeaders,
+  });
+  assert.equal(authorization.statusCode, 303);
+  assert.match(
+    authorization.headers.location!,
+    /^http:\/\/localhost:3000\/account\/connections\?interaction=/,
+  );
+});
+test("discovery and failures preserve protocol JSON instead of the platform error envelope", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  const denied = await s.app.inject({
+    method: "POST",
+    url: "/api/mcp",
+    headers: { host: "localhost:4001" },
+    payload: {},
+  });
+  assert.equal(denied.statusCode, 401);
+  assert.equal(denied.json().error, "invalid_token");
+  assert.match(denied.headers["www-authenticate"]!, /resource_metadata/);
+  const resource = await s.app.inject({
+    url: "/.well-known/oauth-protected-resource/api/mcp",
+    headers: { host: "localhost:4001" },
+  });
+  assert.equal(resource.json().resource, s.config.resource);
+  const oauth = await s.app.inject({
+    url: "/.well-known/oauth-authorization-server/api/mcp/oauth",
+    headers: { host: "localhost:4001" },
+  });
+  assert.equal(oauth.statusCode, 200);
+  assert.equal(oauth.json().issuer, s.config.issuer);
+  assert.equal(oauth.json().token_endpoint, `${s.config.issuer}/token`);
+  assert.notEqual(oauth.json().client_id_metadata_document_supported, true);
+  assert.equal(oauth.json().registration_endpoint, `${s.config.issuer}/reg`);
+  const initialize = s.parse(
+    await s.rpc("initialize", {
+      protocolVersion: "2025-11-25",
+      capabilities: {},
+      clientInfo: { name: "test", version: "1" },
+    }),
+  );
+  assert.equal(initialize.result.serverInfo.name, "uml-platform");
+  const tools = s.parse(await s.rpc("tools/list"));
+  assert.deepEqual(
+    tools.result.tools.map((tool: { name: string }) => tool.name).sort(),
+    [
+      "check_context_updates",
+      "get_artifact",
+      "get_implementation_context",
+      "list_projects",
+    ],
+  );
+  const invalid = s.parse(
+    await s.rpc("tools/call", { name: "get_artifact", arguments: {} }),
+  );
+  assert.ok(invalid.error || invalid.result.isError);
+  const foreignOrigin = await s.app.inject({
+    method: "POST",
+    url: "/api/mcp",
+    headers: { ...s.headers, origin: "https://attacker.test" },
+    payload: {},
+  });
+  assert.equal(foreignOrigin.statusCode, 403);
+});
+test("two users cannot exchange project IDs, tokens, artifact IDs or cursors; live revocation is immediate", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  const listed = s.parse(
+    await s.rpc("tools/call", { name: "list_projects", arguments: {} }),
+  ).result.structuredContent;
+  assert.deepEqual(
+    listed.data.items.map((p: { id: string }) => p.id),
+    [s.a.id],
+  );
+  const foreign = s.parse(
+    await s.rpc("tools/call", {
+      name: "get_implementation_context",
+      arguments: { projectId: s.b.id },
+    }),
+  ).result;
+  assert.equal(foreign.isError, true);
+  assert.equal(foreign.structuredContent.data.code, "access_denied");
+  const principal = await s.access.authenticate(s.headers.authorization);
+  const service = createMcpToolService(s.access, principal);
+  s.authStore.saveProjectWorkspace({
+    projectId: s.a.id,
+    baseVersion: 0,
+    updatedByUserId: s.alice.id,
+    state: {
+      requirementText: "借阅",
+      rules: [
+        {
+          id: "R1",
+          text: "归还",
+          category: "业务规则",
+          relatedDiagrams: ["usecase"],
+        },
+      ],
+    },
+  });
+  const first = await service.get_implementation_context(
+    mcpContextInputSchema.parse({ projectId: s.a.id, limit: 1 }),
+  );
+  assert.ok(first.data.nextCursor);
+  const bobPat = await s.access.createToken(s.bob.id, "bob", [s.b.id], 30);
+  const bob = createMcpToolService(
+    s.access,
+    await s.access.authenticate(`Bearer ${bobPat.token}`),
+  );
+  const cursor = await bob.get_implementation_context(
+    mcpContextInputSchema.parse({
+      projectId: s.b.id,
+      cursor: first.data.nextCursor,
+    }),
+  );
+  assert.equal(cursor.status, "refresh_required");
+  await s.store.revokeGrant(s.pat.connection.id);
+  assert.equal((await s.rpc("tools/list")).statusCode, 401);
+  await assert.rejects(() =>
+    service.get_implementation_context(
+      mcpContextInputSchema.parse({ projectId: s.a.id }),
+    ),
+  );
+});
+test("large model chunks reassemble exactly and concurrent source changes require refresh", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  const text = "业务需求🙂".repeat(8000);
+  s.authStore.saveProjectWorkspace({
+    projectId: s.a.id,
+    baseVersion: 0,
+    updatedByUserId: s.alice.id,
+    state: { requirementText: text },
+  });
+  const service = createMcpToolService(
+    s.access,
+    await s.access.authenticate(s.headers.authorization),
+  );
+  const context = await service.get_implementation_context(
+    mcpContextInputSchema.parse({ projectId: s.a.id }),
+  );
+  const version = (context.data.manifest as { contentHash: string }[])[0]
+    .contentHash;
+  const input = mcpArtifactInputSchema.parse({
+    projectId: s.a.id,
+    scope: {},
+    expectedContextVersion: context.data.contextVersion,
+    artifactId: "requirements:source",
+    expectedVersion: version,
+    length: 997,
+  });
+  let buffer = "";
+  let offset = 0;
+  for (;;) {
+    const part = await service.get_artifact({ ...input, offset });
+    buffer += part.data.chunk;
+    if (part.data.nextOffset === null) break;
+    offset = part.data.nextOffset as number;
+  }
+  assert.equal(JSON.parse(buffer).text, text);
+  s.authStore.saveProjectWorkspace({
+    projectId: s.a.id,
+    baseVersion: 1,
+    updatedByUserId: s.alice.id,
+    state: { requirementText: "新内容" },
+  });
+  assert.equal((await service.get_artifact(input)).status, "refresh_required");
+});
+test("scoped browser token creation needs CSRF; stored records never contain plaintext tokens", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  const listing = (
+    await s.app.inject({
+      url: "/api/mcp/connections",
+      headers: s.browserHeaders,
+    })
+  ).json();
+  const request = {
+    method: "POST" as const,
+    url: "/api/mcp/connections/tokens",
+    headers: s.browserHeaders,
+    payload: { name: "agent", projectIds: [s.a.id] },
+  };
+  assert.equal((await s.app.inject(request)).statusCode, 403);
+  const created = await s.app.inject({
+    ...request,
+    headers: { ...s.browserHeaders, "x-mcp-csrf": listing.csrf },
+  });
+  assert.equal(created.statusCode, 201);
+  const response = created.json();
+  assert.ok(response.token.startsWith("uml_mcp_"));
+  assert.doesNotMatch(
+    JSON.stringify(await s.store.listConnections(s.alice.id)),
+    new RegExp(response.token),
+  );
+  const expired = await s.access.createToken(
+    s.alice.id,
+    "expired",
+    [s.a.id],
+    -1,
+  );
+  await assert.rejects(() => s.access.authenticate(`Bearer ${expired.token}`));
+  s.authStore.updateProject(s.a.id, { status: "deleted" });
+  const removed = s.parse(
+    await s.rpc("tools/call", {
+      name: "get_implementation_context",
+      arguments: { projectId: s.a.id },
+    }),
+  ).result;
+  assert.equal(removed.structuredContent.data.code, "access_denied");
+});
+
+test("account-wide personal tokens follow live project access, including projects created later", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  const listing = (await s.app.inject({ url: "/api/mcp/connections", headers: s.browserHeaders })).json();
+  const created = await s.app.inject({
+    method: "POST",
+    url: "/api/mcp/connections/tokens",
+    headers: { ...s.browserHeaders, "x-mcp-csrf": listing.csrf },
+    payload: { name: "all-my-projects" },
+  });
+  assert.equal(created.statusCode, 201, created.body);
+  assert.equal(created.json().connection.projectScope, "account");
+  const principal = await s.access.authenticate(`Bearer ${created.json().token}`);
+  const service = createMcpToolService(s.access, principal);
+  const later = await s.authStore.createProject({ ownerUserId: s.alice.id, name: "Later project", description: "", visibility: "private" });
+  const projects = await service.list_projects(mcpListProjectsInputSchema.parse({}));
+  assert.deepEqual(new Set((projects.data.items as { id: string }[]).map((project) => project.id)), new Set([s.a.id, later.project.id]));
+  const scoped = createMcpToolService(s.access, await s.access.authenticate(s.headers.authorization));
+  assert.deepEqual(((await scoped.list_projects(mcpListProjectsInputSchema.parse({}))).data.items as { id: string }[]).map((project) => project.id), [s.a.id]);
+  assert.equal((await service.get_implementation_context(mcpContextInputSchema.parse({ projectId: later.project.id }))).status, "ok");
+  await assert.rejects(() => service.get_implementation_context(mcpContextInputSchema.parse({ projectId: s.b.id })), { code: "access_denied" });
+  s.authStore.deleteMember(s.ownerMember.id);
+  await assert.rejects(() => service.get_implementation_context(mcpContextInputSchema.parse({ projectId: s.a.id })), { code: "access_denied" });
+  const refreshed = await service.list_projects(mcpListProjectsInputSchema.parse({}));
+  assert.deepEqual((refreshed.data.items as { id: string }[]).map((project) => project.id), [later.project.id]);
+  await s.store.revokeGrant(principal.id);
+  await assert.rejects(() => service.list_projects(mcpListProjectsInputSchema.parse({})), { code: "invalid_token" });
+});
+
+test("accounts with no projects can create personal tokens before creating their first project", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  const user = await s.authStore.createUser({ email: "new@example.test", displayName: "New user", passwordHash: "not-a-password" });
+  const token = await s.access.createToken(user.id, "new-account", undefined, 30);
+  const service = createMcpToolService(s.access, await s.access.authenticate(`Bearer ${token.token}`));
+  assert.deepEqual((await service.list_projects(mcpListProjectsInputSchema.parse({}))).data.items, []);
+  const project = await s.authStore.createProject({ ownerUserId: user.id, name: "First project", description: "", visibility: "private" });
+  assert.equal((await service.get_implementation_context(mcpContextInputSchema.parse({ projectId: project.project.id }))).status, "ok");
+  s.authStore.updateUser(user.id, { status: "disabled" });
+  await assert.rejects(() => service.list_projects(mcpListProjectsInputSchema.parse({})), { code: "invalid_token" });
+});
+test("OAuth PKCE login, project consent, refresh and revocation round-trip", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  const jar = new Map<string, string>();
+  jar.set("uml_session", s.browserHeaders.cookie.slice("uml_session=".length));
+  const send = async (
+    url: string,
+    method: "GET" | "POST" = "GET",
+    payload?: string | object,
+    headers: Record<string, string> = {},
+  ) => {
+    const res = await s.app.inject({
+      url,
+      method,
+      headers: {
+        host: "localhost:4001",
+        cookie: [...jar].map(([k, v]) => `${k}=${v}`).join("; "),
+        ...headers,
+      },
+      ...(payload === undefined ? {} : { payload }),
+    });
+    for (const cookie of res.cookies) jar.set(cookie.name, cookie.value);
+    return res;
+  };
+  const verifier = "a".repeat(64);
+  const params = new URLSearchParams({
+    client_id: "test-client",
+    redirect_uri: "http://127.0.0.1:8765/callback",
+    response_type: "code",
+    scope: "mcp:read offline_access",
+    resource: s.config.resource,
+    code_challenge_method: "S256",
+    code_challenge: createHash("sha256").update(verifier).digest("base64url"),
+    state: "local-state",
+  });
+  const auth = await send(`/api/mcp/oauth/auth?${params}`);
+  assert.equal(auth.statusCode, 303, auth.body);
+  const uid = new URL(auth.headers.location!).searchParams.get("interaction")!;
+  const details = await send(`/api/mcp/interactions/${uid}`);
+  assert.equal(details.statusCode, 200, details.body);
+  const info = (await send("/api/mcp/connections")).json();
+  const consent = await send(
+    `/api/mcp/interactions/${uid}`,
+    "POST",
+    { projectIds: [s.a.id], csrf: info.csrf },
+    { "x-mcp-csrf": info.csrf },
+  );
+  assert.equal(consent.statusCode, 200, consent.body);
+  const resume = new URL(consent.json().redirect);
+  const callback = await send(`${resume.pathname}${resume.search}`);
+  assert.equal(callback.statusCode, 303, callback.body);
+  const redirect = new URL(callback.headers.location!);
+  const repeated = redirect.searchParams.get("interaction");
+  assert.equal(
+    redirect.searchParams.get("state"),
+    "local-state",
+    repeated
+      ? JSON.stringify(
+          (await s.store.findEntity("Interaction", "id", repeated))?.prompt,
+        )
+      : redirect.toString(),
+  );
+  assert.ok(redirect.searchParams.get("code"), redirect.toString());
+  const exchange = await send(
+    "/api/mcp/oauth/token",
+    "POST",
+    new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: "test-client",
+      code: redirect.searchParams.get("code")!,
+      redirect_uri: "http://127.0.0.1:8765/callback",
+      code_verifier: verifier,
+      resource: s.config.resource,
+    }).toString(),
+    { "content-type": "application/x-www-form-urlencoded" },
+  );
+  assert.equal(exchange.statusCode, 200, exchange.body);
+  const tokens = exchange.json();
+  const principal = await s.access.authenticate(
+    `Bearer ${tokens.access_token}`,
+  );
+  assert.deepEqual(principal.projectIds, [s.a.id]);
+  assert.ok(tokens.refresh_token);
+  const refreshed = await send(
+    "/api/mcp/oauth/token",
+    "POST",
+    new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: "test-client",
+      refresh_token: tokens.refresh_token,
+      resource: s.config.resource,
+    }).toString(),
+    { "content-type": "application/x-www-form-urlencoded" },
+  );
+  assert.equal(refreshed.statusCode, 200, refreshed.body);
+  await s.store.revokeGrant(principal.id);
+  await assert.rejects(() =>
+    s.access.authenticate(`Bearer ${refreshed.json().access_token}`),
+  );
+  const revoked = await send(
+    "/api/mcp/oauth/token",
+    "POST",
+    new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: "test-client",
+      refresh_token: refreshed.json().refresh_token,
+    }).toString(),
+    { "content-type": "application/x-www-form-urlencoded" },
+  );
+  assert.equal(revoked.statusCode, 400);
+  assert.equal(revoked.json().error, "invalid_grant");
+});
+test("official SDK v2 client completes discovery and all four tools over HTTP", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  s.authStore.saveProjectWorkspace({
+    projectId: s.a.id,
+    baseVersion: 0,
+    updatedByUserId: s.alice.id,
+    state: {
+      requirementText:
+        "使用 Spring Boot + Vue + MySQL 构建图书管理系统，每人最多借5本。",
+    },
+  });
+  const client = new Client({ name: "platform-acceptance", version: "1" });
+  const transport = new StreamableHTTPClientTransport(
+    new URL(s.config.resource),
+    {
+      requestInit: { headers: { authorization: s.headers.authorization } },
+      fetch: async (url, options) => {
+        const request = new Request(url, options);
+        const headers = Object.fromEntries(request.headers);
+        headers.host = "localhost:4001";
+        const response = await s.app.inject({
+          method: request.method as "POST" | "GET" | "DELETE",
+          url: new URL(request.url).pathname,
+          headers,
+          ...(request.method === "POST"
+            ? { payload: await request.text() }
+            : {}),
+        });
+        return new Response(
+          [204, 205, 304].includes(response.statusCode) ? null : response.body,
+          {
+            status: response.statusCode,
+            headers: Object.fromEntries(
+              Object.entries(response.headers).map(([key, value]) => [
+                key,
+                String(value),
+              ]),
+            ),
+          },
+        );
+      },
+    },
+  );
+  t.after(() => client.close());
+  await client.connect(transport);
+  assert.equal((await client.listTools()).tools.length, 4);
+  const projects = await client.callTool({
+    name: "list_projects",
+    arguments: {},
+  });
+  assert.ok(projects.structuredContent);
+  const context = (
+    await client.callTool({
+      name: "get_implementation_context",
+      arguments: { projectId: s.a.id },
+    })
+  ).structuredContent as {
+    data: {
+      scope: unknown;
+      contextVersion: string;
+      manifest: { artifactId: string; contentHash: string }[];
+    };
+  };
+  const artifact = await client.callTool({
+    name: "get_artifact",
+    arguments: {
+      projectId: s.a.id,
+      scope: context.data.scope,
+      expectedContextVersion: context.data.contextVersion,
+      artifactId: context.data.manifest[0].artifactId,
+      expectedVersion: context.data.manifest[0].contentHash,
+    },
+  });
+  assert.match(JSON.stringify(artifact.structuredContent), /Spring Boot/);
+  s.authStore.saveProjectWorkspace({
+    projectId: s.a.id,
+    baseVersion: 1,
+    updatedByUserId: s.alice.id,
+    state: {
+      requirementText:
+        "使用 Spring Boot + Vue + MySQL 构建图书管理系统，每人最多借8本。",
+    },
+  });
+  const updates = (
+    await client.callTool({
+      name: "check_context_updates",
+      arguments: {
+        projectId: s.a.id,
+        scope: context.data.scope,
+        manifest: context.data.manifest,
+      },
+    })
+  ).structuredContent as { data: { changes: { change: string }[] } };
+  assert.equal(updates.data.changes[0].change, "modified");
+});
+test("CIMD is advertised only after trusted metadata origins are configured", async (t) => {
+  const s = await setup(undefined, "http://localhost:4001", "https://trusted-client.example");
+  t.after(() => s.app.close());
+  const metadata = await s.app.inject({
+    url: "/.well-known/oauth-authorization-server/api/mcp/oauth",
+    headers: { host: "localhost:4001" },
+  });
+  assert.equal(metadata.json().client_id_metadata_document_supported, true);
+  assert.equal(metadata.json().registration_endpoint, `${s.config.issuer}/reg`);
+  const untrusted = await s.app.inject({
+    url: `/api/mcp/oauth/auth?${new URLSearchParams({
+      client_id: "https://127.0.0.1/client.json",
+      response_type: "code",
+      redirect_uri: "http://127.0.0.1:8765/callback",
+      scope: "mcp:read",
+      code_challenge: "a".repeat(43),
+      code_challenge_method: "S256",
+    })}`,
+    headers: { host: "localhost:4001" },
+  });
+  assert.ok(untrusted.statusCode >= 400 || untrusted.headers.location?.includes("error="), untrusted.body);
+});
+
+test("DCR validates redirects; missing PKCE, unknown resource and untrusted CIMD cannot authorize", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  const registered = await s.app.inject({
+    method: "POST",
+    url: "/api/mcp/oauth/reg",
+    headers: { host: "localhost:4001" },
+    payload: {
+      client_name: "Dynamic agent",
+      redirect_uris: ["http://127.0.0.1:8765/callback"],
+      token_endpoint_auth_method: "none",
+    },
+  });
+  assert.equal(registered.statusCode, 201, registered.body);
+  // Default OAuth discovery uses DCR, and the platform supplies the resource when the client omits it.
+  const authorize = await s.app.inject({
+    url: `/api/mcp/oauth/auth?${new URLSearchParams({
+      client_id: registered.json().client_id,
+      response_type: "code",
+      redirect_uri: "http://127.0.0.1:8765/callback",
+      scope: "mcp:read",
+      code_challenge: "a".repeat(43),
+      code_challenge_method: "S256",
+    })}`,
+    headers: { host: "localhost:4001" },
+  });
+  assert.equal(authorize.statusCode, 303, authorize.body);
+  assert.match(authorize.headers.location!, /\/account\/connections\?interaction=/);
+  const invalid = await s.app.inject({
+    method: "POST",
+    url: "/api/mcp/oauth/reg",
+    headers: { host: "localhost:4001" },
+    payload: { redirect_uris: ["http://attacker.test/callback"] },
+  });
+  assert.equal(invalid.statusCode, 400);
+  const base = {
+    client_id: "test-client",
+    response_type: "code",
+    redirect_uri: "http://127.0.0.1:8765/callback",
+    scope: "mcp:read",
+    resource: s.config.resource,
+  };
+  for (const params of [
+    base,
+    { ...base, client_id: "https://127.0.0.1/client.json" },
+    {
+      ...base,
+      resource: "https://other-resource.test/",
+      code_challenge: "a".repeat(43),
+      code_challenge_method: "S256",
+    },
+  ]) {
+    const response = await s.app.inject({
+      url: `/api/mcp/oauth/auth?${new URLSearchParams(params)}`,
+      headers: { host: "localhost:4001" },
+    });
+    assert.ok(
+      response.statusCode >= 400 ||
+        Boolean(response.headers.location?.includes("error=")),
+      response.body,
+    );
+  }
+});
+test("member removal, disabled accounts and concurrent principals are checked at read time", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  const bobToken = await s.access.createToken(s.bob.id, "bob", [s.b.id], 30);
+  const bob = createMcpToolService(
+    s.access,
+    await s.access.authenticate(`Bearer ${bobToken.token}`),
+  );
+  const alice = createMcpToolService(
+    s.access,
+    await s.access.authenticate(s.headers.authorization),
+  );
+  const [a, b] = await Promise.all([
+    alice.get_implementation_context(
+      mcpContextInputSchema.parse({ projectId: s.a.id }),
+    ),
+    bob.get_implementation_context(
+      mcpContextInputSchema.parse({ projectId: s.b.id }),
+    ),
+  ]);
+  assert.equal((a.data.project as { id: string }).id, s.a.id);
+  assert.equal((b.data.project as { id: string }).id, s.b.id);
+  s.authStore.deleteMember(s.ownerMember.id);
+  await assert.rejects(() =>
+    alice.get_implementation_context(
+      mcpContextInputSchema.parse({ projectId: s.a.id }),
+    ),
+  );
+  s.authStore.updateUser(s.bob.id, { status: "disabled" });
+  await assert.rejects(() => s.access.authenticate(`Bearer ${bobToken.token}`));
+});
+test("invalid JSON stays a JSON-RPC parse error and feature-off prevents external access", async (t) => {
+  const s = await setup("http://localhost:4003");
+  t.after(() => s.app.close());
+  const malformed = await s.app.inject({
+    method: "POST",
+    url: "/api/mcp",
+    headers: { ...s.headers, "content-type": "application/json" },
+    payload: "{",
+  });
+  assert.equal(malformed.statusCode, 400);
+  assert.equal(malformed.json().error.code, -32700);
+  const forwarded = await s.app.inject({
+    url: "/.well-known/oauth-protected-resource/api/mcp",
+    headers: { host: "127.0.0.1:4001", "x-forwarded-host": "localhost:4001" },
+  });
+  assert.equal(forwarded.statusCode, 200);
+  const browserProxy = await s.app.inject({
+    url: "/api/mcp/connections",
+    headers: {
+      ...s.browserHeaders,
+      host: "127.0.0.1:4001",
+      "x-forwarded-host": "localhost:4003",
+      origin: "http://localhost:4003",
+    },
+  });
+  assert.equal(browserProxy.statusCode, 200);
+  const invalidHost = await s.app.inject({
+    url: "/api/mcp/connections",
+    headers: {
+      ...s.browserHeaders,
+      host: "127.0.0.1:4001",
+      "x-forwarded-host": "attacker.test",
+    },
+  });
+  assert.equal(invalidHost.statusCode, 403);
+  const disabled = await createConfiguredFastifyApp();
+  disabled.log.level = "silent";
+  t.after(() => disabled.close());
+  await registerMcpModule({
+    app: disabled,
+    authStore: s.authStore,
+    pool: null,
+    production: false,
+    config: null,
+  });
+  assert.equal(
+    (await disabled.inject({ url: "/api/mcp/connections" })).json().enabled,
+    false,
+  );
+  assert.equal(
+    (await disabled.inject({ method: "POST", url: "/api/mcp", payload: {} }))
+      .statusCode,
+    404,
+  );
+  assert.equal(
+    (
+      await disabled.inject({
+        url: "/.well-known/oauth-protected-resource/api/mcp",
+      })
+    ).statusCode,
+    404,
+  );
+});

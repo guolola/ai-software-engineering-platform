@@ -257,13 +257,13 @@ describe("business stage presentation queue", () => {
     expect(projectGenerationTranscript(events).steps[0].calls).toHaveLength(2);
   });
 
-  it("retains check, repair, recheck as three stable steps", () => {
+  it("retains modeling, source generation and rendering as three stable steps", () => {
     const events: RunEvent[] = [];
-    for (const stage of ["audit_code_quality", "repair_code_files", "audit_code_quality"] as const) {
+    for (const stage of ["generate_models", "generate_plantuml", "render_svg"] as const) {
       events.push({ type: "stage_started", stage, tracksCompletion: true }, { type: "stage_finished", stage, status: "completed" });
     }
     const steps = projectGenerationTranscript(events).visibleSteps;
-    expect(steps.map((step) => step.stage)).toEqual(["audit_code_quality", "repair_code_files", "audit_code_quality"]);
+    expect(steps.map((step) => step.stage)).toEqual(["generate_models", "generate_plantuml", "render_svg"]);
     expect(new Set(steps.map((step) => step.id)).size).toBe(3);
   });
 

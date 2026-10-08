@@ -4,7 +4,8 @@ import { patchUserSettings } from "../../../shared/lib/user-settings";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DesignRunSnapshot } from "@uml-platform/contracts";
+import { designDiagramKindSchema, runSnapshotSchema, type DesignRunSnapshot } from "@uml-platform/contracts";
+import { librarySeatDemoFixture } from "../../../../../api/src/runs/demo/fixtures/library-seat-demo-fixture";
 import type { WorkspaceRepository } from "../../../services/workspace-repository";
 import {
   createRequirementBaseline,
@@ -92,6 +93,41 @@ function storeManagedUserSettings() {
 }
 
 describe("DesignModelPage", () => {
+  it("allows all seven design targets from the PostgreSQL offline demo requirement snapshot", async () => {
+    const snapshot = runSnapshotSchema.parse(librarySeatDemoFixture.requirementSnapshot);
+    const repository = createMockWorkspaceRepository({
+      requirementText: snapshot.requirementText,
+      requirementBaseline: snapshot.requirementBaseline,
+      rules: snapshot.rules,
+      rulesVersion: 1,
+      rulesBasedOnTextVersion: 0,
+      models: Object.fromEntries(snapshot.models.map((model) => [model.modelId ?? model.diagramKind, model])),
+      generatedDiagramTypes: [...new Set(snapshot.models.map((model) => model.diagramKind))],
+      diagramVersions: Object.fromEntries(snapshot.models.map((model) => [model.diagramKind, 1])),
+      requirementModelTraceability: snapshot.requirementModelTraceability,
+    });
+    const startDesignRun = vi.fn(async (_input: StartDesignRunInput) => ({ runId: "demo-design-run" }));
+    repository.startDesignRun = startDesignRun;
+    repository.subscribeToDesignRun = vi.fn(async () => {});
+    const user = userEvent.setup();
+    render(withWorkspaceProviders(<DesignModelPage />, repository));
+
+    await screen.findByRole("heading", { name: "目标模型" });
+    for (const label of ["总体架构图", "用例实现设计", "设计类图", "页面导航模型", "数据库设计", "组件（构件）关系", "部署设计"]) {
+      const checkbox = screen.getByRole("checkbox", { name: label });
+      await waitFor(() => expect(checkbox).not.toHaveAttribute("aria-disabled", "true"));
+      await user.click(screen.getByRole("button", { name: `选择${label}` }));
+      expect(checkbox).toBeChecked();
+    }
+    expect(screen.getByText("7/7")).toBeInTheDocument();
+    expect(screen.queryByText(/需求模型之间的追踪关系不完整/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /生成设计模型/ }));
+    const confirmation = await screen.findByRole("dialog", { name: "确认生成设计模型" });
+    await user.click(within(confirmation).getByRole("button", { name: "确认生成" }));
+    await waitFor(() => expect(startDesignRun).toHaveBeenCalledTimes(1));
+    expect(new Set(startDesignRun.mock.calls[0][0].requestedDiagrams)).toEqual(new Set(designDiagramKindSchema.options));
+  });
+
   it("shows real model eligibility independently of design prerequisites", async () => {
     localStorage.clear();
     const repository = createMockWorkspaceRepository({ requirementText: "生成设计", rules: [createRule()], models: { usecase: useCaseModel }, selectedDesignDiagramTypes: ["sequence"] });

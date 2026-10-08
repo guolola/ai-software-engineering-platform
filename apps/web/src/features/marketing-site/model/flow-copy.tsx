@@ -12,7 +12,7 @@ const copy: Record<string, Record<string, string>> = {
   },
   "It&apos;s built to simplify your sales process and keep everything easy to manage.": {
     "zh-CN": "连接需求、模型、代码与文档，让每个阶段都有据可查。",
-    "en": "Connect requirements, models, code and documents in one traceable workflow."
+    "en": "Connect requirements, models, tests and documents in one traceable workflow."
   },
   "Start building now": {
     "zh-CN": "开始创建项目",
@@ -27,7 +27,7 @@ const copy: Record<string, Record<string, string>> = {
     "en": "From requirements to delivery"
   },
   "Join Flow and get a complete overview of your users, sales, and performance - all from one powerful dashboard.": {
-    "zh-CN": "在同一个项目中组织需求分析、UML 建模、代码原型与说明书。",
+    "zh-CN": "在同一个项目中组织需求分析、UML 建模、Coding Agent与说明书。",
     "en": "Organize requirements, UML models, code prototypes and specifications in one project."
   },
   "Get started": {
@@ -59,12 +59,12 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Organize artifacts, inspect progress and trace changes from analysis to delivery."
   },
   "User are improved by": {
-    "zh-CN": "示例任务完成进度",
-    "en": "Example task progress"
+    "zh-CN": "任务完成进度",
+    "en": "Task progress"
   },
   "than last month and product reached to 2,432 new users": {
-    "zh-CN": "示意数据；实际进度以项目任务为准",
-    "en": "Illustrative data; actual progress appears in project tasks"
+    "zh-CN": "实际进度以项目任务为准",
+    "en": "Actual progress appears in project tasks"
   },
   "Product reach": {
     "zh-CN": "产物概览",
@@ -72,7 +72,7 @@ const copy: Record<string, Record<string, string>> = {
   },
   "See how many people discover and engage with your product visitors, views and conversion signals at a glance.": {
     "zh-CN": "集中查看需求、模型、代码与文档，了解各阶段的产物及生成状态。",
-    "en": "Review requirements, models, code and documents with their generation status."
+    "en": "Review requirements, models, tests and documents with their generation status."
   },
   "Athlete": {
     "zh-CN": "需求",
@@ -99,15 +99,15 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Organize members and access within each project."
   },
   "Riley Smith": {
-    "zh-CN": "需求分析示例",
-    "en": "Requirements example"
+    "zh-CN": "需求分析",
+    "en": "Requirements analysis"
   },
   "$2,000": {
     "zh-CN": "需求阶段",
     "en": "Requirements"
   },
   "Taylor Morgan": {
-    "zh-CN": "模型生成示例",
+    "zh-CN": "模型生成",
     "en": "Model generation"
   },
   "$2,200": {
@@ -115,32 +115,32 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Models"
   },
   "Alex Thomas": {
-    "zh-CN": "设计推导示例",
-    "en": "Design example"
+    "zh-CN": "设计推导",
+    "en": "Design derivation"
   },
   "$1,500": {
     "zh-CN": "设计模型",
     "en": "Design model"
   },
   "Jamie Parker": {
-    "zh-CN": "代码原型示例",
-    "en": "Code example"
+    "zh-CN": "Coding Agent",
+    "en": "Code prototype"
   },
   "$800": {
-    "zh-CN": "原型预览",
+    "zh-CN": "实现与验证",
     "en": "Prototype preview"
   },
   "Casey Reynolds": {
-    "zh-CN": "文档生成示例",
-    "en": "Document example"
+    "zh-CN": "文档生成",
+    "en": "Document generation"
   },
   "$750": {
     "zh-CN": "说明书",
     "en": "Specification"
   },
   "Jordan Lee": {
-    "zh-CN": "测试追踪示例",
-    "en": "Test tracing example"
+    "zh-CN": "测试追踪",
+    "en": "Test tracing"
   },
   "$3,250": {
     "zh-CN": "跟踪矩阵",
@@ -155,8 +155,8 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Inspect generation tasks, stage status and historical artifacts."
   },
   "Set monthly sales goal": {
-    "zh-CN": "示例项目阶段目标",
-    "en": "Example project milestone"
+    "zh-CN": "项目阶段目标",
+    "en": "Project milestone"
   },
   "Goals & Targets": {
     "zh-CN": "阶段目标与前置条件",
@@ -191,8 +191,8 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Requirements"
   },
   "$120k": {
-    "zh-CN": "示例",
-    "en": "Example"
+    "zh-CN": "需求模型",
+    "en": "Requirements model"
   },
   "+12.6%": {
     "zh-CN": "进行中",
@@ -203,8 +203,8 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Design"
   },
   "$20k": {
-    "zh-CN": "示例",
-    "en": "Example"
+    "zh-CN": "设计模型",
+    "en": "Design model"
   },
   "-4.2%": {
     "zh-CN": "待更新",
@@ -219,8 +219,8 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Connect upstream requirements to downstream designs through traceability matrices."
   },
   "Details": {
-    "zh-CN": "示例说明",
-    "en": "Illustration"
+    "zh-CN": "详细说明",
+    "en": "Details"
   },
   "Trusted by 5,000+ growing businesses": {
     "zh-CN": "面向软件工程教学与实践",
@@ -250,13 +250,13 @@ const copy: Record<string, Record<string, string>> = {
     "zh-CN": "更清晰",
     "en": "clearer"
   },
-  "Example rating: 4.5 out of 5": {
-    "zh-CN": "示例评分：满分 5 分中的 4.5 分",
-    "en": "Example rating: 4.5 out of 5"
+  "Rating: 4.5 out of 5": {
+    "zh-CN": "评分：满分 5 分中的 4.5 分",
+    "en": "Rating: 4.5 out of 5"
   },
-  "Interface example · Requirements, models and delivery": {
-    "zh-CN": "界面示例 · 需求 · 建模 · 交付",
-    "en": "Interface example · Requirements · Models · Delivery"
+  "Requirements, models and delivery": {
+    "zh-CN": "需求 · 建模 · 交付",
+    "en": "Requirements · Models · Delivery"
   },
   "Requirements analysis": {
     "zh-CN": "需求分析",
@@ -284,7 +284,7 @@ const copy: Record<string, Record<string, string>> = {
   },
   "Track every key metric in one clean dashboard - no code, no setup, just real-time insights that help you grow smarter.": {
     "zh-CN": "从需求分析、UML 建模到代码和说明书，在一个项目中完成可追踪的实践流程。",
-    "en": "Work from requirements and UML models to code and specifications in one traceable project."
+    "en": "Work from requirements and UML models to agent implementation and specifications in one traceable project."
   },
   "Welcome to dashboard": {
     "zh-CN": "项目工作区",
@@ -347,8 +347,8 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Practice with real engineering tasks"
   },
   "Real stories from users who simplified their sales process and grew their revenue with Flow.": {
-    "zh-CN": "以下为平台能力与流程示例，不是客户评价或效果承诺。",
-    "en": "These are capability and workflow examples, not customer testimonials or performance claims."
+    "zh-CN": "了解平台能力与实践流程，连接需求、模型与交付产物。",
+    "en": "Explore platform capabilities and workflows connecting requirements, models and deliverables."
   },
   "4.5": {
     "zh-CN": "5",
@@ -464,7 +464,7 @@ const copy: Record<string, Record<string, string>> = {
   },
   "Move deals effortlessly through stages with our intuitive pipeline system designed for clarity and control. This system ensures that you always have a clear view of your progress.": {
     "zh-CN": "按需求、设计、代码与文档推进项目，查看生成状态和需要补充的前置条件。",
-    "en": "Move through requirements, design, code and documents with progress and prerequisites visible."
+    "en": "Move through requirements, design, tests and documents with progress and prerequisites visible."
   },
   "Instant Performance Insights": {
     "zh-CN": "追踪变更与历史",
@@ -479,8 +479,8 @@ const copy: Record<string, Record<string, string>> = {
     "en": "What is this platform?"
   },
   "Flow is a SaaS platform that helps you monitor and manage your product performance - including users, purchases, and engagement - from a single dashboard.": {
-    "zh-CN": "这是面向软件工程教学与实践的项目工作区，支持需求分析、UML 建模、代码原型与说明书生成。",
-    "en": "A project workspace for software engineering education and practice, including requirements, UML, code prototypes and specifications."
+    "zh-CN": "这是面向软件工程教学与实践的项目工作区，支持需求分析、UML 建模、Coding Agent与说明书生成。",
+    "en": "A project workspace for software engineering education and practice, including requirements, UML, agent connections and specifications."
   },
   "How does Flow help my business?": {
     "zh-CN": "如何开始一个项目？",
@@ -547,8 +547,8 @@ const copy: Record<string, Record<string, string>> = {
     "en": "UML modeling"
   },
   "Up to 1K tracked users": {
-    "zh-CN": "代码原型",
-    "en": "Code prototypes"
+    "zh-CN": "Coding Agent",
+    "en": "Coding Agent"
   },
   "Basic revenue insights": {
     "zh-CN": "任务记录",
@@ -675,16 +675,16 @@ const copy: Record<string, Record<string, string>> = {
     "en": " retaining upstream and downstream links"
   },
   "Sarah Chen": {
-    "zh-CN": "代码原型",
-    "en": "Code prototypes"
+    "zh-CN": "Coding Agent",
+    "en": "Coding Agent"
   },
   "From onboarding to daily usage, everything feels well thought out. The components are": {
-    "zh-CN": "查看生成文件、编辑代码并运行",
-    "en": "Review generated files, edit code and run"
+    "zh-CN": "通过 MCP 读取项目依据，交给外部 Agent",
+    "en": "Read project sources through MCP and let an external agent"
   },
   "polished, consistent, and production-ready": {
-    "zh-CN": "原型预览",
-    "en": "prototype previews"
+    "zh-CN": "实现与验证",
+    "en": "implement and verify"
   },
   ". Shipping new features is noticeably faster.": {
     "zh-CN": "，检查界面与业务实现。",
@@ -735,7 +735,7 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Design"
   },
   "Fedex": {
-    "zh-CN": "代码原型",
+    "zh-CN": "Coding Agent",
     "en": "Code"
   },
   "Hubspot": {
@@ -776,7 +776,7 @@ const copy: Record<string, Record<string, string>> = {
   },
   "Track revenue growth, conversions & profitability.": {
     "zh-CN": "查看需求、设计与代码关联。",
-    "en": "Inspect requirement, design and code relationships."
+    "en": "Inspect requirement and design relationships."
   },
   "Productivity & Optimization": {
     "zh-CN": "实践与交付",
@@ -827,12 +827,12 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Your email address"
   },
   "Total visitors": {
-    "zh-CN": "示例项目概览",
-    "en": "Example project overview"
+    "zh-CN": "项目概览",
+    "en": "Project overview"
   },
   "Total sales": {
-    "zh-CN": "示例产物跟踪",
-    "en": "Example artifact tracking"
+    "zh-CN": "产物跟踪",
+    "en": "Artifact tracking"
   },
   "23.02K": {
     "zh-CN": "需求 → 模型",
@@ -855,32 +855,32 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Testing"
   },
   "Headset 22R": {
-    "zh-CN": "文档任务示例",
-    "en": "Example document task"
+    "zh-CN": "文档任务",
+    "en": "Document task"
   },
   "Dell Vision 7": {
-    "zh-CN": "可行性任务示例",
-    "en": "Example feasibility task"
+    "zh-CN": "可行性任务",
+    "en": "Feasibility task"
   },
   "Playstation 5": {
-    "zh-CN": "测试任务示例",
-    "en": "Example test task"
+    "zh-CN": "测试任务",
+    "en": "Test task"
   },
   "Online Store": {
-    "zh-CN": "需求阶段示例",
-    "en": "Example requirements"
+    "zh-CN": "需求阶段",
+    "en": "Requirements stage"
   },
   "Offline Store": {
-    "zh-CN": "设计阶段示例",
-    "en": "Example design"
+    "zh-CN": "设计阶段",
+    "en": "Design stage"
   },
   "Credits": {
     "zh-CN": " 次权益",
     "en": " credits"
   },
-  "功能说明 / Workflow example": {
+  "功能说明 / Workflow": {
     "zh-CN": "功能说明 · 非客户评价",
-    "en": "Workflow example · not a review"
+    "en": "Workflow · not a review"
   },
   "$2,350": {
     "zh-CN": "代码阶段",

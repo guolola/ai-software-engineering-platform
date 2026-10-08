@@ -116,13 +116,13 @@ describe("workspace-session diagnostics helpers", () => {
     expect(
       getProgressFromEvent({
         type: "stage_started",
-        stage: "write_code_files",
+        stage: "generate_models",
       }),
-    ).toBe(74);
+    ).toBe(65);
     expect(
       getProgressFromEvent({
         type: "stage_progress",
-        stage: "write_code_files",
+        stage: "generate_models",
         progress: 81,
       }),
     ).toBe(81);

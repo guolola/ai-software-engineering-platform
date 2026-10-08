@@ -497,10 +497,7 @@ export function deriveSidebarDiagramState(input: SidebarDiagramStateInput) {
       undefined,
       activeStatusForProjectRunKind(input.projectRuns, "design"),
     ),
-    codeRootStatus: mergeProjectedStatus(
-      undefined,
-      activeStatusForProjectRunKind(input.projectRuns, "code"),
-    ),
+    
     documentRootStatus: mergeProjectedStatus(
       undefined,
       activeStatusForProjectRunKind(input.projectRuns, "document"),

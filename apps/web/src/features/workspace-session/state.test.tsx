@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AtomicRequirement,
-  CodeRunSnapshot,
+  
   DesignDiagramModelSpec,
   DesignRunSnapshot,
   DiagramModelSpec,
@@ -127,60 +127,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function createCodeRunSnapshot(
-  overrides: Partial<CodeRunSnapshot> = {},
-): CodeRunSnapshot {
-  return {
-    runId: "code-run-test",
-    requirementText: "生成图书馆预约系统",
-    rules: [],
-    requirementBaseline: null,
-    coverageMatrix: null,
-    traceabilityMatrix: null,
-    designModels: [],
-    designPlantUml: [],
-    spec: null,
-    businessLogic: null,
-    loadedCodeSkill: null,
-    visualDirection: null,
-    skillResourceDiscoveryPlan: null,
-    skillResourcePreviews: null,
-    skillResourcePlan: null,
-    codeSkillContext: null,
-    appBlueprint: null,
-    uiBlueprint: null,
-    uiMockup: null,
-    uiReferenceSpec: null,
-    uiFidelityReport: null,
-    designTokens: null,
-    componentRegistry: null,
-    uiIr: null,
-    visualDiffReport: null,
-    businessAssertionResults: null,
-    repairLoopSummary: null,
-    selectedCodeSkills: [],
-    skillDiagnostics: [],
-    filePlan: null,
-    codeImplementationBrief: null,
-    codeFileOperationManifest: null,
-    fileGenerationDiagnostics: [],
-    codeTrace: [],
-    codeGenerationMode: "json_schema_operations",
-    qualityDiagnostics: [],
-    files: { "/src/App.tsx": "export default function App() { return null; }" },
-    entryFile: "/src/App.tsx",
-    dependencies: {},
-    agentPlan: [],
-    generationMode: "continue",
-    changedFileCount: 1,
-    diagnostics: [],
-    codeContextHash: null,
-    currentStage: "verify_code_preview",
-    status: "completed",
-    error: null,
-    ...overrides,
-  };
-}
+
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -3045,176 +2992,9 @@ describe("WorkspaceSessionProvider", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps previous code files visible when regenerate code fails with an empty snapshot", async () => {
-    const oldFiles = {
-      "/src/App.tsx": "export default function App() { return <main>old</main>; }",
-    };
-    const failedCodeSnapshot = createCodeRunSnapshot({
-      runId: "code-run-failed-regenerate",
-      files: {},
-      entryFile: null,
-      dependencies: {},
-      generationMode: "regenerate",
-      changedFileCount: 0,
-      currentStage: "write_code_files",
-      status: "failed",
-      error: {
-        code: "RUN_INTERNAL_ERROR",
-        message: "代码重新生成失败",
-        category: "generation",
-        retryable: true,
-      },
-    });
-    const saveRunHistory = vi.fn();
-    const repository: WorkspaceRepository = {
-      loadWorkspace: vi.fn(async () =>
-        createWorkspaceRecord({
-          requirementText: "生成图书馆预约系统",
-          rules: [createRule({ id: "r1", text: "用户可以预约座位。" })],
-          models: {
-            usecase: {
-              diagramKind: "usecase",
-              title: "用例模型",
-              summary: "座位预约用例。",
-              notes: [],
-              actors: [],
-              useCases: [],
-              systemBoundaries: [],
-              relationships: [],
-            },
-          },
-          designModels: {
-            class: {
-              diagramKind: "class",
-              modelId: "class",
-              title: "设计类图",
-              summary: "座位预约设计。",
-              notes: [],
-              classes: [],
-              interfaces: [],
-              enums: [],
-              relationships: [],
-            },
-          },
-          codeFiles: oldFiles,
-          codeEntryFile: "/src/App.tsx",
-          codeDependencies: { react: "latest" },
-        }),
-      ),
-      updateRequirementText: vi.fn(async () => {}),
-      startRun: vi.fn(async () => ({ runId: "unused-requirement-run" })),
-      subscribeToRun: vi.fn(async () => {}),
-      getRunSnapshot: vi.fn(async () => createRunSnapshot()),
-      startCodeRun: vi.fn(async () => ({ runId: "code-run-failed-regenerate" })),
-      subscribeToCodeRun: vi.fn(async () => {
-        throw new Error("代码重新生成失败");
-      }),
-      getCodeRunSnapshot: vi.fn(async () => failedCodeSnapshot),
-      renderPlantUml: vi.fn(),
-      testProviderSettings: vi.fn(),
-      saveRunHistory,
-      listRunHistory: vi.fn(async () => []),
-      restoreRunHistory: vi.fn(async () => null),
-      deleteRunHistory: vi.fn(async () => []),
-      clearRunHistory: vi.fn(async () => {}),
-    };
-    const { result } = renderHook(() => useWorkspaceSession(), {
-      wrapper: ({ children }) => withWorkspaceProviders(children, repository),
-    });
+  
 
-    await waitFor(() => {
-      expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
-      expect(result.current.workspaceInitialized).toBe(true);
-    });
-
-    await act(async () => {
-      await result.current.generateCodePrototype("regenerate");
-    });
-
-    expect(result.current.codeFiles).toEqual(oldFiles);
-    expect(result.current.codeEntryFile).toBe("/src/App.tsx");
-    expect(saveRunHistory).toHaveBeenCalledWith(
-      expect.objectContaining({
-        runId: "code-run-failed-regenerate",
-        status: "failed",
-        generationMode: "regenerate",
-        files: {},
-      }),
-      expect.any(Object),
-    );
-    expect(
-      await screen.findByRole("dialog", { name: "任务遇到内部错误" }),
-      ).toBeInTheDocument();
-  });
-
-  it("blocks code generation when design artifacts still have errors", async () => {
-    const classDesignModel: DesignDiagramModelSpec = {
-      diagramKind: "class",
-      modelId: "class",
-      title: "设计类图",
-      summary: "订单设计类。",
-      notes: [],
-      classes: [],
-      interfaces: [],
-      enums: [],
-      relationships: [],
-    };
-    const startCodeRun = vi.fn(async () => ({ runId: "code-should-not-start" }));
-    const repository: WorkspaceRepository = {
-      loadWorkspace: vi.fn(async () =>
-        createWorkspaceRecord({
-          requirementText: "订单系统需求",
-          rules: [createRule()],
-          designModels: { class: classDesignModel },
-          designDiagramErrors: {
-            component: {
-              stage: "render_svg",
-              error: {
-                code: "RUN_RENDER_FAILED",
-                message: "组件图渲染失败",
-                category: "render",
-                retryable: true,
-              },
-            },
-          },
-        }),
-      ),
-      updateRequirementText: vi.fn(async () => {}),
-      startRun: vi.fn(),
-      subscribeToRun: vi.fn(),
-      getRunSnapshot: vi.fn(),
-      startCodeRun,
-      subscribeToCodeRun: vi.fn(),
-      getCodeRunSnapshot: vi.fn(),
-      renderPlantUml: vi.fn(),
-      testProviderSettings: vi.fn(),
-      saveRunHistory: vi.fn(),
-      listRunHistory: vi.fn(async () => []),
-      restoreRunHistory: vi.fn(async () => null),
-      deleteRunHistory: vi.fn(async () => []),
-      clearRunHistory: vi.fn(async () => {}),
-    };
-
-    const { result } = renderHook(() => useWorkspaceSession(), {
-      wrapper: ({ children }) => withWorkspaceProviders(children, repository),
-    });
-
-    await waitFor(() => {
-      expect(repository.loadWorkspace).toHaveBeenCalledTimes(1);
-      expect(result.current.workspaceInitialized).toBe(true);
-    });
-
-    await act(async () => {
-      await result.current.generateCodePrototype();
-    });
-
-    expect(startCodeRun).not.toHaveBeenCalled();
-    expect(result.current.runStatus).toBe("failed");
-    expect(result.current.errorMessage).toContain("设计模型依赖无效");
-    expect(
-      await screen.findByRole("dialog", { name: "暂时无法开始生成" }),
-    ).toBeInTheDocument();
-  });
+  
 
   it("labels completed requirement snapshots with diagram errors as partially generated", async () => {
     const activityRule = createRule({

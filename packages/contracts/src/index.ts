@@ -17,7 +17,6 @@ export type {
 } from "./admin-rbac.js";
 export * from "./auth-account.js";
 export * from "./api-errors.js";
-export * from "./code-generation.js";
 export * from "./billing.js";
 export * from "./documents.js";
 export * from "./fingerprints.js";
@@ -34,3 +33,5 @@ export * from "./visual-review.js";
 export * from "./system-notices.js";
 
 export * from "./model-json-schema.js";
+export * from "./mcp/index.js";
+export * from "./legacy-code-retirement.js";

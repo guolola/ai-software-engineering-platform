@@ -1,14 +1,13 @@
 // Coordinates active generation runs so stale async events cannot update session state.
 import { useCallback, useMemo, useRef } from "react";
 
-type RunScope = "requirements" | "design" | "code" | "document" | "workspace";
+type RunScope = "requirements" | "design" | "document" | "workspace";
 
 export function useRunController() {
   const nextRunRequestIdRef = useRef(0);
   const activeRunRequestIdRef = useRef<Record<RunScope, number>>({
     requirements: 0,
     design: 0,
-    code: 0,
     document: 0,
     workspace: 0,
   });

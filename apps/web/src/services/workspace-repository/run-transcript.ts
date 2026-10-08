@@ -4,7 +4,7 @@ import { requestJson } from "../api-client";
 import { streamProjectRunEvents } from "./run-subscriptions";
 
 const endpoints: Record<string, string> = {
-  requirements: "runs", design: "design-runs", code: "code-runs",
+  requirements: "runs", design: "design-runs",
   document: "document-runs", feasibility: "feasibility-runs",
 };
 

@@ -1,5 +1,6 @@
 // Provides the initial bilingual resource bundle for shared navigation, metadata, and core UI states.
 import type { Resource } from "i18next";
+import { mcpEn, mcpZh } from "./mcp-resources";
 import { feasibilityResourcesEn, feasibilityResourcesZh } from "./feasibility-resources";
 import { onboardingEn, onboardingZh } from "./onboarding-resources";
 
@@ -7,6 +8,7 @@ export const resources = {
   "zh-CN": {
     translation: {
       ...onboardingZh,
+      mcp: mcpZh,
       generationModel: {
         providerRequired: "未选择模型供应商",
         modelRequired: "请先选择用于生成的模型。",
@@ -96,7 +98,7 @@ export const resources = {
           membersFooterText: "团队成员正在推进各项目里程碑。",
           areaTab: "按月",
           designRuns: "设计运行",
-          codeRuns: "代码运行",
+          
           monthlyRuns: "运行总数",
           runsLabel: "运行",
           areaFooterStrong: "持续增长",
@@ -164,7 +166,7 @@ export const resources = {
           emailOrUsername: "邮箱或用户名", email: "邮箱", emailAddress: "邮箱地址", password: "密码", newPassword: "新密码", forgotPassword: "忘记密码？",
           passwordPlaceholder: "至少 8 个字符", showPassword: "显示密码", hidePassword: "隐藏密码", strength: "密码强度：{{value}}", strengthStrong: "强", strengthMedium: "中", strengthWeak: "弱",
           useRecoveryCode: "使用恢复码", useAuthenticator: "使用认证器", remember: "记住我", mfaCode: "MFA 验证码", mfaPlaceholder: "6 位验证码", mfaPrompt: "请输入认证器中的 6 位验证码完成登录。",
-          mfaExpiry: "本次挑战过期时间：{{time}}。", username: "用户名", usernameHint: "3-32 位小写字母、数字或下划线，可用于登录。",
+          mfaExpiry: "请在 {{time}} 前完成验证。", username: "用户名", usernameHint: "3-32 位小写字母、数字或下划线，可用于登录。",
           usernameTitle: "用户名需为 3-32 位小写字母、数字或下划线", displayName: "昵称", displayNamePlaceholder: "王老师", invitation: "邀请码", optional: "（选填）",
           invitationPlaceholder: "如有邀请码，请在此输入", terms: "我已阅读并同意服务条款", verifySent: "验证邮件已发送到 {{email}}。请点击邮件中的验证链接，或复制短期 token 到下方完成验证。",
           verifyInstruction: "请点击邮件中的验证链接，或复制短期 token 到下方完成验证。", yourEmail: "你的邮箱", emailToken: "邮件验证码 / 短期 token",
@@ -181,7 +183,7 @@ export const resources = {
       },
       account: {
         close: "关闭", settings: "设置", preferences: "用户偏好设置", profile: "个人资料", security: "安全设置",
-        sessions: "登录会话", globalSettings: "全局设置", logout: "退出登录", loading: "正在加载账号信息...",
+        sessions: "登录会话", globalSettings: "全局设置", externalConnections: "外部工具连接", logout: "退出登录", loading: "正在加载账号信息...",
         loadFailed: "账号信息加载失败。", profileTitle: "个人资料信息", profileDescription: "管理你的头像、昵称和账号基础信息。",
         avatarAria: "头像图片", changeAvatar: "更换头像", avatarHint: "支持 PNG、JPG、WebP，最大 2MB。", avatarSelected: "已选择：{{name}}",
         avatarTypeError: "请选择 PNG、JPG 或 WebP 图片。", avatarSizeError: "头像图片不能超过 2MB。",
@@ -260,13 +262,13 @@ export const resources = {
         runningOldAdvice: "新结果生成期间旧产物仍可查看；需要确认当前证据时先查看旧版。", runningAdvice: "保持在当前链路视图或打开生成任务查看实时日志。", currentAdvice: "当前节点可作为下游生成输入。",
         filters: { all: "全部链路", stale: "需更新", error: "错误", impact: "影响路径" }, reset: "重置视图", summaryCurrent: "最新 {{count}}", summaryStale: "需更新 {{count}}", summaryError: "错误 {{count}}", summaryInterrupted: "服务中断 {{count}}",
         statuses: { not_generated: "未生成", current: "最新", stale: "需更新", error: "错误", running: "生成中", interrupted: "服务中断" },
-        kinds: { rule: "需求规则", requirement_model: "需求模型", design_model: "设计模型", document: "说明书", code: "代码原型" }, more: "{{label}} 更多操作",
-        stages: { requirement_rules: "需求规则", requirement_models: "需求模型", design_models: "设计模型", code_docs: "产物" },
+        kinds: { rule: "需求规则", requirement_model: "需求模型", design_model: "设计模型", document: "说明书",  }, more: "{{label}} 更多操作",
+        stages: { requirement_rules: "需求规则", requirement_models: "需求模型", design_models: "设计模型", documents: "产物" },
         actions: { generate: "生成", view: "查看", update: "更新", retry: "重试", progress: "查看进度" },
         products: {
           requirementsSpec: { label: "需求说明书", description: "汇总需求规则与需求模型的说明书。" },
           softwareDesignSpec: { label: "设计说明书", description: "汇总设计模型、代码规格与接口约束。" },
-          code: { label: "代码原型", description: "由设计模型生成可运行的前端原型。" },
+          
           emptyRules: { label: "需求规则", description: "从需求文本抽取可追踪的规则。" },
         },
         reasons: {
@@ -292,7 +294,7 @@ export const resources = {
           repairRules: "批量修复需求规则失败，请稍后重试。",
           startRequirements: "需求模型生成未能启动，请稍后重试。",
           startDesign: "设计模型生成未能启动，请稍后重试。",
-          startCode: "代码生成未能启动，请稍后重试。",
+          
           startDocument: "说明书生成未能启动，请稍后重试。",
           renderDiagram: "图形绘制失败，请检查模型后重试。",
           redrawModel: "模型重绘失败，请稍后重试。",
@@ -429,7 +431,7 @@ export const resources = {
       generation: {
         resultStale: "结果基于生成开始时的内容，期间修改不会自动合并到本次结果",
         confirmationFlow: { label: "模型生成范围", updated: "更新", added: "新增" },
-        dialog: { thisRequirement: "这条需求", thisRule: "这条规则", thisRun: "本次运行", smartRepair: "智能修复", technicalHidden: "未能提供可安全展示的错误详情，请携带请求或任务编号联系管理员。", problem: "任务遇到内部错误，请携带请求或任务编号联系管理员。", completedWithFailures: "生成已完成，但有 {{count}} 个模型生成失败，可在当前页面查看错误并重试。", completed: "生成完成。", qualityHints: "另有 {{count}} 项质量提示，可在当前页面查看。", result: "生成结果", failure: "操作失败", success: "操作成功", listSeparator: "、", groups: { rules: "需求规则补齐", requirements: "需求模型补齐 / 更新", new: "新生成", regenerated: "重新生成", designDependencies: "设计依赖补齐", kept: "保留不变" }, noModels: "本次没有需要生成的模型。", confirmGeneration: "确认生成", titles: { cancelled: "任务已取消", failed: "生成失败", requirementsPartial: "需求模型部分生成", rulesCompleted: "需求规则已生成", requirementsCompleted: "需求模型已生成", designPartial: "设计模型部分生成", designCompleted: "设计模型已生成", codeCompleted: "代码原型已生成", documentMissing: "说明书已生成但缺图", documentCompleted: "说明书已生成" }, repairFailedCount: "生成完成，但有 {{count}} 条需求规则修复失败，请重试后确认。", repairPendingCount: "生成完成，已生成 {{count}} 条修复候选，请确认后继续生成模型。", labels: { rules: "需求规则", requirementModels: "需求模型", currentText: "当前需求文本", selectedRequirementModels: "已选需求模型", designModels: "设计模型", selectedDesignModels: "已选设计图", codePrototype: "代码原型", currentCodePrototype: "当前代码原型", document: "说明书" }, codeNoChanges: "本次未产生文件变更。", codeRegenerated: "代码重新生成完成。", codeCompleted: "代码生成完成。", documentMissing: "{{title}}已生成，但有 {{count}} 项图源缺失，请复核后交付。", documentCompleted: "{{title}}已生成。" },
+        dialog: { thisRequirement: "这条需求", thisRule: "这条规则", thisRun: "本次运行", smartRepair: "智能修复", technicalHidden: "未能提供可安全展示的错误详情，请携带请求或任务编号联系管理员。", problem: "任务遇到内部错误，请携带请求或任务编号联系管理员。", completedWithFailures: "生成已完成，但有 {{count}} 个模型生成失败，可在当前页面查看错误并重试。", completed: "生成完成。", qualityHints: "另有 {{count}} 项质量提示，可在当前页面查看。", result: "生成结果", failure: "操作失败", success: "操作成功", listSeparator: "、", groups: { rules: "需求规则补齐", requirements: "需求模型补齐 / 更新", new: "新生成", regenerated: "重新生成", designDependencies: "设计依赖补齐", kept: "保留不变" }, noModels: "本次没有需要生成的模型。", confirmGeneration: "确认生成", titles: { cancelled: "任务已取消", failed: "生成失败", requirementsPartial: "需求模型部分生成", rulesCompleted: "需求规则已生成", requirementsCompleted: "需求模型已生成", designPartial: "设计模型部分生成", designCompleted: "设计模型已生成",  documentMissing: "说明书已生成但缺图", documentCompleted: "说明书已生成" }, repairFailedCount: "生成完成，但有 {{count}} 条需求规则修复失败，请重试后确认。", repairPendingCount: "生成完成，已生成 {{count}} 条修复候选，请确认后继续生成模型。", labels: { rules: "需求规则", requirementModels: "需求模型", currentText: "当前需求文本", selectedRequirementModels: "已选需求模型", designModels: "设计模型", selectedDesignModels: "已选设计图",   document: "说明书" },    documentMissing: "{{title}}已生成，但有 {{count}} 项图源缺失，请复核后交付。", documentCompleted: "{{title}}已生成。" },
         status: {
           idle: "暂无任务", queued: "排队中", running: "运行中", completed: "已完成",
           failed: "失败", cancelled: "已取消", interrupted: "服务中断，可重试", interruptedDetail: "服务中断，可从运行历史重试或重新运行", unknown: "未知状态",
@@ -440,38 +442,38 @@ export const resources = {
           requirementModels: "生成需求模型", tests: "生成测试用例", designModels: "生成设计模型",
           designPlantUml: "生成设计 PlantUML", requirementPlantUml: "生成需求 PlantUML", plantUml: "生成 PlantUML",
           designSvg: "渲染设计图表", requirementSvg: "渲染需求图表", svg: "渲染图表",
-          code: "生成代码原型", verifyCode: "验证代码预览", requirementsDocument: "生成需求规格说明书",
+            requirementsDocument: "生成需求规格说明书",
           feasibilityDocument: "生成可行性研究报告", designDocument: "生成软件设计说明书", documentText: "生成说明书正文",
           requirementsFile: "生成需求规格说明书文件", feasibilityFile: "生成可行性研究报告文件",
           designFile: "生成软件设计说明书文件", documentFile: "生成说明书文件",
         },
         stageLabels: {
           extract_rules: "抽取需求规则", generate_models: "生成需求模型", generate_design_sequence: "生成用例实现设计",
-          generate_design_models: "生成设计模型", generate_tests: "生成测试用例", analyze_code_business_logic: "分析业务逻辑",
-          analyze_code_product: "分析业务背景", plan_code_ui: "规划界面方案", generate_code_ui_mockup: "生成界面设计图",
-          analyze_code_ui_mockup: "解析界面设计图", generate_code_ui_ir: "生成结构化 UI IR", load_web_design_skill: "加载前端设计执行器",
-          select_code_skills: "选择前端设计执行器", plan_code_files: "规划文件结构", generate_code_spec: "生成代码规格",
-          generate_code_files: "生成代码文件", plan_code: "制定实现步骤", write_code_files: "写入原型文件",
-          audit_code_quality: "检查原型质量", verify_code_ui_fidelity: "检查业务/界面覆盖", verify_code_rendered_preview: "验证渲染预览",
-          verify_code_business_assertions: "验证业务断言", verify_code_preview: "检查预览入口", repair_code_files: "修复代码输出",
+          generate_design_models: "生成设计模型", generate_tests: "生成测试用例", 
+            
+            
+            
+            
+            
+            
           generate_document_text: "生成说明书正文", render_document_file: "写入说明书文件", generate_plantuml: "生成图源码",
           render_svg: "渲染图像", generate_context: "生成系统环境图", render_context: "渲染系统环境图",
           generate_implementation: "生成实现方案",
           generate_business_flow: "生成业务与系统流程图", render_business_flow: "渲染业务与系统流程图",
         },
         taskKinds: {
-          requirements: "需求模型生成", design: "设计模型生成", code: "代码生成", document: "说明书生成",
+          requirements: "需求模型生成", design: "设计模型生成",  document: "说明书生成",
           feasibility: "可行性分析生成", unknown: "项目生成任务",
         },
         assistants: {
-          requirements: "需求建模助手", design: "设计建模助手", code: "代码生成助手", document: "文档编写助手",
+          requirements: "需求建模助手", design: "设计建模助手",  document: "文档编写助手",
           feasibility: "可研分析助手", unknown: "生成助手",
         },
         thoughtProcess: { active: "正在思考", finished: "思考过程" },
         drawer: {
           serverRuns: "服务端运行中", taskList: "任务列表", clearCompleted: "清理已完成",
           status: "状态", progress: "进度", message: "消息", noActiveTask: "暂无进行中的任务",
-          runId: "运行 ID", relation: "运行关系", codeDiagnostics: "代码诊断", startedAt: "开始时间",
+          runId: "运行 ID", relation: "运行关系",  startedAt: "开始时间",
           finishedAt: "结束时间", duration: "耗时", model: "模型", started: "开始 {{time}}", finished: "结束 {{time}}",
           durationInline: "耗时 {{duration}}", modelInline: "模型 {{model}}", notRecorded: "未记录", inProgress: "进行中",
           seconds: "{{count}} 秒", minutes: "{{count}} 分钟", minuteSeconds: "{{minutes}} 分 {{seconds}} 秒",
@@ -485,9 +487,9 @@ export const resources = {
           retryOne: "重试此模型", retrySameKind: "重试全部同类模型", retrySameKindTitle: "当前重试按模型类型执行，会重试同类模型而不是单个实例",
           stageChain: "链路阶段", noStages: "暂无任务阶段。", assistantName: "生成助手", assistantIdle: "有生成任务时，我会在这里按阶段汇报推理与执行输出。", executionDetails: "执行详情", technicalFlow: "技术执行流",
           waitingOutput: "等待模型输出...", copiedTrace: "已复制追踪内容", copyFailed: "复制失败",
-          uiMockup: "界面设计图", openUiMockup: "查看界面设计图大图", uiMockupAlt: "界面设计图", uiMockupMissing: "设计图暂未生成",
+           openUiMockup: "查看界面设计图大图", uiMockupAlt: "界面设计图", uiMockupMissing: "设计图暂未生成",
           imageModel: "图片模型：{{model}}", fidelityCheck: "设计图还原检查", fidelityPassed: "基本贴合", fidelityFailed: "需要修复",
-          technicalDetails: "技术详情 · 原始追踪与解析日志", designTrace: "设计调试追踪", codeTrace: "代码调试追踪",
+          technicalDetails: "技术详情 · 原始追踪与解析日志", designTrace: "设计调试追踪", 
           requirementTrace: "需求调试追踪", copyTrace: "复制追踪内容", traceGlobal: "全局", traceAttempt: "第 {{count}} 次", noTechnicalDetails: "无详细内容",
           traceKinds: { llm_output: "模型原始返回", parse_error: "解析错误", parsed_model: "解析后的模型", parsed_data: "解析后的数据", validation_error: "校验错误", plantuml_source: "PlantUML 源码", render_error: "渲染错误", repair_output: "修复原始返回", repaired_data: "修复后数据", repaired_plantuml: "修复后 PlantUML", file_content: "文件内容结果" },
           queueReasons: { global: "服务器忙", provider: "供应商繁忙", project: "项目并发已满", user: "用户并发已满", run: "本次任务并发已满" },
@@ -568,7 +570,7 @@ export const resources = {
           implementation: "实现方案",
           requirementPipeline: "需求模型链路",
           designPipeline: "设计模型链路",
-          codePrototype: "代码原型",
+          
           documentPipeline: "说明书",
           queued: "排队中",
           generating: "生成中",
@@ -599,14 +601,14 @@ export const resources = {
           closeSameStage: "关闭同阶段标签",
           requirementsHome: "回到需求模型首页",
           designHome: "回到设计模型首页",
-          codeHome: "回到代码页",
-          code: "代码",
+          
+          
           labels: {
             systemRequirements: "系统需求",
             feasibility: "可行性分析",
             requirements: "需求模型",
             design: "设计模型",
-            code: "代码",
+            
             tests: "测试",
             documents: "说明书",
             contextDiagram: "系统环境图",
@@ -1045,7 +1047,7 @@ export const resources = {
           restore: "恢复快照", download: "重新下载", delete: "删除记录", refresh: "刷新历史",
           total: "总计", running: "运行中", failed: "失败", latest: "最近", none: "暂无",
           all: "全部", requirements: "需求分析", feasibility: "可行性分析", models: "模型生成",
-          code: "代码构建", documents: "说明书", statusFilter: "筛选状态", modelFilter: "筛选模型",
+           documents: "说明书", statusFilter: "筛选状态", modelFilter: "筛选模型",
           allStatuses: "全部状态", allModels: "全部模型", allCategories: "全部分类", model: "模型 {{model}}", operator: "操作者 {{operator}}",
           filterLabels: { status: "状态", category: "分类" },
           stage: "阶段：{{stage}}", updated: "更新时间：{{time}}", noTime: "暂无时间",
@@ -1419,83 +1421,7 @@ export const resources = {
           requirementElement: "需求元素：{{groupLabel}} / {{elementLabel}}",
         },
       },
-      code: {
-        title: "前端原型代码",
-        description: "依据设计模型生成、编辑并预览前端原型。",
-        fileCount: "{{count}} 个文件",
-        modelModes: { strict_json: "严格 JSON", json_object: "JSON 模式", compatible: "兼容模式" },
-        compatibleWarning: "该模型将使用普通输出，并通过校验与修复重试保证结构。",
-        designModelCount: "设计模型 {{count}}",
-        generatingCode: "正在生成代码",
-        guidanceTitle: "代码原型暂时无法生成",
-        missingPrerequisites: "请先输入需求并生成设计模型，代码页会根据设计阶段模型生成 React 原型。",
-        missingRequirementPrerequisite: "请先在系统需求页输入并保存需求，再生成设计模型。",
-        missingDesignPrerequisite: "请先生成设计模型，代码页会根据设计阶段模型生成 React 原型。",
-        actions: {
-          start: "启动生成",
-          continue: "继续生成",
-          continueShort: "继续",
-          generateShort: "生成",
-          regenerate: "重新生成",
-          redoShort: "重做",
-          runPreview: "运行预览",
-          diagnostics: "诊断（{{count}}）",
-        },
-        views: { label: "代码与预览", code: "代码", preview: "预览" },
-        panes: {
-          files: "文件",
-          editor: "编辑",
-          preview: "预览",
-        },
-        preview: {
-          openWindow: "在新窗口打开",
-          fullscreen: "全屏预览",
-          exitFullscreen: "退出全屏",
-          refresh: "刷新预览",
-          address: "预览地址",
-          compiling: "预览正在编译",
-          notReady: "预览还没有准备好",
-          popupBlocked: "新窗口被浏览器拦截，请允许弹窗后重试",
-        },
-        status: {
-          previewReadyPolishing: {
-            title: "预览已就绪，仍在完善输出",
-            message: "可先查看和编辑当前原型，后台仍在补齐质量检查发现的问题。",
-          },
-          generating: {
-            title: "正在生成前端原型",
-            message: "生成完成前，预览会在代码文件写入后自动刷新。",
-          },
-          pending: {
-            title: "有未运行的修改",
-            message: "当前编辑内容尚未构建到预览，点击“运行预览”后再查看最新效果。",
-          },
-          building: {
-            title: "正在构建预览",
-            message: "正在把当前编辑内容构建到预览视图。",
-          },
-          error: {
-            title: "预览构建失败",
-            message: "请根据预览区域的错误修复代码，然后再次运行预览。",
-          },
-          requirementMissing: {
-            title: "需求源头已删除",
-            message: "当前代码为旧产物，仍可查看预览；请重新输入需求并重跑后再继续生成或重新生成。",
-          },
-          diagnostics: {
-            title: "代码生成存在诊断",
-            message: "{{summary}}。当前预览仍可查看，建议复核后继续生成或重新生成。",
-          },
-          updated: {
-            title: "预览已更新",
-            message: "当前预览已经使用最新生成结果完成构建，可以查看、继续生成或重新生成。",
-          },
-          ready: {
-            title: "设计模型已就绪",
-            message: "点击“启动生成”后，代码区和预览区会随着文件生成自动更新。",
-          },
-        },
-      },
+      
       docs: {
         badge: "项目内使用文档",
         title: "软件工程实践平台使用手册",
@@ -1566,6 +1492,7 @@ export const resources = {
   en: {
     translation: {
       ...onboardingEn,
+      mcp: mcpEn,
       generationModel: {
         providerRequired: "No model provider selected",
         modelRequired: "Select a model for generation first.",
@@ -1655,7 +1582,7 @@ export const resources = {
           membersFooterText: "Your team is advancing project milestones.",
           areaTab: "Monthly",
           designRuns: "Design runs",
-          codeRuns: "Code runs",
+          
           monthlyRuns: "Total runs",
           runsLabel: "Runs",
           areaFooterStrong: "Steady growth",
@@ -1723,7 +1650,7 @@ export const resources = {
           emailOrUsername: "Email or username", email: "Email", emailAddress: "Email address", password: "Password", newPassword: "New password", forgotPassword: "Forgot password?",
           passwordPlaceholder: "At least 8 characters", showPassword: "Show password", hidePassword: "Hide password", strength: "Password strength: {{value}}", strengthStrong: "Strong", strengthMedium: "Medium", strengthWeak: "Weak",
           useRecoveryCode: "Use a recovery code", useAuthenticator: "Use authenticator", remember: "Remember me", mfaCode: "MFA code", mfaPlaceholder: "6-digit code", mfaPrompt: "Enter the 6-digit code from your authenticator app to finish signing in.",
-          mfaExpiry: "This challenge expires at {{time}}.", username: "Username", usernameHint: "3–32 lowercase letters, numbers, or underscores; it can be used to sign in.",
+          mfaExpiry: "Complete verification before {{time}}.", username: "Username", usernameHint: "3–32 lowercase letters, numbers, or underscores; it can be used to sign in.",
           usernameTitle: "Username must be 3–32 lowercase letters, numbers, or underscores", displayName: "Display name", displayNamePlaceholder: "Alex", invitation: "Invitation code", optional: "(optional)",
           invitationPlaceholder: "Enter an invitation code if you have one", terms: "I have read and agree to the terms of service", verifySent: "A verification email was sent to {{email}}. Open its link or paste the short-lived token below.",
           verifyInstruction: "Open the verification link in the email, or paste the short-lived token below.", yourEmail: "your email", emailToken: "Email verification / short-lived token",
@@ -1740,7 +1667,7 @@ export const resources = {
       },
       account: {
         close: "Close", settings: "Settings", preferences: "User preferences", profile: "Profile", security: "Security",
-        sessions: "Sessions", globalSettings: "Global settings", logout: "Log out", loading: "Loading account information...",
+        sessions: "Sessions", globalSettings: "Global settings", externalConnections: "External tools", logout: "Log out", loading: "Loading account information...",
         loadFailed: "Failed to load account information.", profileTitle: "Profile information", profileDescription: "Manage your avatar, display name, and basic account information.",
         avatarAria: "Profile picture", changeAvatar: "Change picture", avatarHint: "PNG, JPG, or WebP up to 2 MB.", avatarSelected: "Selected: {{name}}",
         avatarTypeError: "Choose a PNG, JPG, or WebP image.", avatarSizeError: "The profile picture must be no larger than 2 MB.",
@@ -1819,13 +1746,13 @@ export const resources = {
         runningOldAdvice: "The previous artifact remains available while the new result is generated; open it when you need to verify current evidence.", runningAdvice: "Stay in this graph or open Generation tasks for live execution details.", currentAdvice: "This node can be used as input for downstream generation.",
         filters: { all: "All chains", stale: "Needs update", error: "Errors", impact: "Impact path" }, reset: "Reset view", summaryCurrent: "Current {{count}}", summaryStale: "Needs update {{count}}", summaryError: "Errors {{count}}", summaryInterrupted: "Interrupted {{count}}",
         statuses: { not_generated: "Not generated", current: "Current", stale: "Needs update", error: "Error", running: "Generating", interrupted: "Interrupted" },
-        kinds: { rule: "Requirement rules", requirement_model: "Requirement models", design_model: "Design models", document: "Documents", code: "Code prototype" }, more: "More actions for {{label}}",
-        stages: { requirement_rules: "Requirement rules", requirement_models: "Requirement models", design_models: "Design models", code_docs: "Artifacts" },
+        kinds: { rule: "Requirement rules", requirement_model: "Requirement models", design_model: "Design models", document: "Documents",  }, more: "More actions for {{label}}",
+        stages: { requirement_rules: "Requirement rules", requirement_models: "Requirement models", design_models: "Design models", documents: "Artifacts" },
         actions: { generate: "Generate", view: "View", update: "Update", retry: "Retry", progress: "View progress" },
         products: {
           requirementsSpec: { label: "Requirements specification", description: "Summarizes requirement rules and requirement models." },
           softwareDesignSpec: { label: "Software design specification", description: "Summarizes design models, code specifications, and interface constraints." },
-          code: { label: "Code prototype", description: "A runnable frontend prototype generated from design models." },
+          
           emptyRules: { label: "Requirement rules", description: "Extracts traceable rules from requirement text." },
         },
         reasons: {
@@ -1851,7 +1778,7 @@ export const resources = {
           repairRules: "The requirement rules could not be repaired in bulk. Try again later.",
           startRequirements: "Requirement-model generation could not start. Try again later.",
           startDesign: "Design-model generation could not start. Try again later.",
-          startCode: "Code generation could not start. Try again later.",
+          
           startDocument: "Document generation could not start. Try again later.",
           renderDiagram: "The diagram could not be rendered. Check the model and try again.",
           redrawModel: "The model could not be redrawn. Try again later.",
@@ -1886,7 +1813,7 @@ export const resources = {
           AUTH_INVALID_CREDENTIALS: "The email, username, or password is incorrect.",
           AUTH_EMAIL_VERIFICATION_REQUIRED: "Verify your email before signing in.",
           AUTH_ACCOUNT_INACTIVE: "This account is not active or has been disabled.",
-          AUTH_MFA_CHALLENGE_INVALID: "The MFA challenge expired. Sign in again.",
+          AUTH_MFA_CHALLENGE_INVALID: "This verification has expired. Sign in again.",
           AUTH_MFA_CODE_INVALID: "The MFA code is incorrect.",
           AUTH_ADMIN_ROLE_REQUIRED: "This account does not have administrator access.",
           AUTH_ADMIN_MFA_REQUIRED: "Enable MFA before opening the admin console.",
@@ -1988,7 +1915,7 @@ export const resources = {
       generation: {
         resultStale: "This result uses the content from when generation started; later edits are not merged automatically.",
         confirmationFlow: { label: "Model generation scope", updated: "Updated", added: "New" },
-        dialog: { thisRequirement: "this requirement", thisRule: "this rule", thisRun: "this run", smartRepair: "smart repair", technicalHidden: "No error details are safe to display. Contact an administrator with the request or task ID.", problem: "The task encountered an internal error. Contact an administrator with the request or task ID.", completedWithFailures: "Generation completed, but {{count}} models failed. Review and retry them on this page.", completed: "Generation completed.", qualityHints: "There are also {{count}} quality hints to review on this page.", result: "Generation result", failure: "Operation failed", success: "Operation succeeded", listSeparator: ", ", groups: { rules: "Requirement-rule dependencies", requirements: "Requirement-model dependencies / updates", new: "New", regenerated: "Regenerated", designDependencies: "Design dependencies", kept: "Kept unchanged" }, noModels: "No models need to be generated this time.", confirmGeneration: "Confirm generation", titles: { cancelled: "Task cancelled", failed: "Generation failed", requirementsPartial: "Requirement models partially generated", rulesCompleted: "Requirement rules generated", requirementsCompleted: "Requirement models generated", designPartial: "Design models partially generated", designCompleted: "Design models generated", codeCompleted: "Code prototype generated", documentMissing: "Document generated with missing diagrams", documentCompleted: "Document generated" }, repairFailedCount: "Generation completed, but {{count}} requirement-rule repairs failed. Retry and confirm them.", repairPendingCount: "Generation completed with {{count}} repair candidates. Confirm them before generating models.", labels: { rules: "Requirement rules", requirementModels: "Requirement models", currentText: "Current requirement text", selectedRequirementModels: "Selected requirement models", designModels: "Design models", selectedDesignModels: "Selected design diagrams", codePrototype: "Code prototype", currentCodePrototype: "Current code prototype", document: "Document" }, codeNoChanges: "No files changed in this run.", codeRegenerated: "Code regeneration completed.", codeCompleted: "Code generation completed.", documentMissing: "{{title}} was generated, but {{count}} diagram sources are missing. Review them before delivery.", documentCompleted: "{{title}} was generated." },
+        dialog: { thisRequirement: "this requirement", thisRule: "this rule", thisRun: "this run", smartRepair: "smart repair", technicalHidden: "No error details are safe to display. Contact an administrator with the request or task ID.", problem: "The task encountered an internal error. Contact an administrator with the request or task ID.", completedWithFailures: "Generation completed, but {{count}} models failed. Review and retry them on this page.", completed: "Generation completed.", qualityHints: "There are also {{count}} quality hints to review on this page.", result: "Generation result", failure: "Operation failed", success: "Operation succeeded", listSeparator: ", ", groups: { rules: "Requirement-rule dependencies", requirements: "Requirement-model dependencies / updates", new: "New", regenerated: "Regenerated", designDependencies: "Design dependencies", kept: "Kept unchanged" }, noModels: "No models need to be generated this time.", confirmGeneration: "Confirm generation", titles: { cancelled: "Task cancelled", failed: "Generation failed", requirementsPartial: "Requirement models partially generated", rulesCompleted: "Requirement rules generated", requirementsCompleted: "Requirement models generated", designPartial: "Design models partially generated", designCompleted: "Design models generated",  documentMissing: "Document generated with missing diagrams", documentCompleted: "Document generated" }, repairFailedCount: "Generation completed, but {{count}} requirement-rule repairs failed. Retry and confirm them.", repairPendingCount: "Generation completed with {{count}} repair candidates. Confirm them before generating models.", labels: { rules: "Requirement rules", requirementModels: "Requirement models", currentText: "Current requirement text", selectedRequirementModels: "Selected requirement models", designModels: "Design models", selectedDesignModels: "Selected design diagrams",   document: "Document" },    documentMissing: "{{title}} was generated, but {{count}} diagram sources are missing. Review them before delivery.", documentCompleted: "{{title}} was generated." },
         status: {
           idle: "No tasks", queued: "Queued", running: "Running", completed: "Completed",
           failed: "Failed", cancelled: "Cancelled", interrupted: "Service interrupted; retry available", interruptedDetail: "Service interrupted. Retry or rerun it from Run history.", unknown: "Unknown status",
@@ -1999,38 +1926,38 @@ export const resources = {
           requirementModels: "Generating requirement models", tests: "Generating test cases", designModels: "Generating design models",
           designPlantUml: "Generating design PlantUML", requirementPlantUml: "Generating requirement PlantUML", plantUml: "Generating PlantUML",
           designSvg: "Rendering design diagrams", requirementSvg: "Rendering requirement diagrams", svg: "Rendering diagrams",
-          code: "Generating code prototype", verifyCode: "Verifying code preview", requirementsDocument: "Generating requirements specification",
+            requirementsDocument: "Generating requirements specification",
           feasibilityDocument: "Generating feasibility report", designDocument: "Generating software design specification", documentText: "Generating document content",
           requirementsFile: "Creating requirements specification file", feasibilityFile: "Creating feasibility report file",
           designFile: "Creating software design specification file", documentFile: "Creating document file",
         },
         stageLabels: {
           extract_rules: "Extracting requirement rules", generate_models: "Generating requirement models", generate_design_sequence: "Generating use-case implementation design",
-          generate_design_models: "Generating design models", generate_tests: "Generating test cases", analyze_code_business_logic: "Analyzing business logic",
-          analyze_code_product: "Analyzing product context", plan_code_ui: "Planning UI", generate_code_ui_mockup: "Generating UI mockup",
-          analyze_code_ui_mockup: "Analyzing UI mockup", generate_code_ui_ir: "Generating structured UI IR", load_web_design_skill: "Loading frontend design executor",
-          select_code_skills: "Selecting frontend design executor", plan_code_files: "Planning file structure", generate_code_spec: "Generating code specification",
-          generate_code_files: "Generating code files", plan_code: "Planning implementation", write_code_files: "Writing prototype files",
-          audit_code_quality: "Auditing prototype quality", verify_code_ui_fidelity: "Checking business and UI coverage", verify_code_rendered_preview: "Verifying rendered preview",
-          verify_code_business_assertions: "Verifying business assertions", verify_code_preview: "Checking preview entry", repair_code_files: "Repairing code output",
+          generate_design_models: "Generating design models", generate_tests: "Generating test cases", 
+            
+            
+            
+            
+            
+            
           generate_document_text: "Generating document content", render_document_file: "Writing document file", generate_plantuml: "Generating diagram source",
           render_svg: "Rendering diagram", generate_context: "Generating System Environment Diagram", render_context: "Rendering System Environment Diagram",
           generate_implementation: "Generating Technical Proposed Solution",
           generate_business_flow: "Generating business and system flow", render_business_flow: "Rendering business and system flow",
         },
         taskKinds: {
-          requirements: "Requirement model generation", design: "Design model generation", code: "Code generation", document: "Document generation",
+          requirements: "Requirement model generation", design: "Design model generation",  document: "Document generation",
           feasibility: "Feasibility analysis generation", unknown: "Project generation task",
         },
         assistants: {
-          requirements: "Requirements Modeling Assistant", design: "Design Modeling Assistant", code: "Code Generation Assistant", document: "Documentation Assistant",
+          requirements: "Requirements Modeling Assistant", design: "Design Modeling Assistant",  document: "Documentation Assistant",
           feasibility: "Feasibility Study Assistant", unknown: "Generation Assistant",
         },
         thoughtProcess: { active: "Thinking", finished: "Thought process" },
         drawer: {
           serverRuns: "Server runs", taskList: "Tasks", clearCompleted: "Clear completed",
           status: "Status", progress: "Progress", message: "Message", noActiveTask: "No active task",
-          runId: "Run ID", relation: "Run relationship", codeDiagnostics: "Code diagnostics", startedAt: "Started",
+          runId: "Run ID", relation: "Run relationship",  startedAt: "Started",
           finishedAt: "Finished", duration: "Duration", model: "Model", started: "Started {{time}}", finished: "Finished {{time}}",
           durationInline: "Duration {{duration}}", modelInline: "Model {{model}}", notRecorded: "Not recorded", inProgress: "In progress",
           seconds: "{{count}} sec", minutes: "{{count}} min", minuteSeconds: "{{minutes}} min {{seconds}} sec",
@@ -2044,9 +1971,9 @@ export const resources = {
           retryOne: "Retry this model", retrySameKind: "Retry all models of this type", retrySameKindTitle: "Retry currently works by model type and will retry every model of this type",
           stageChain: "Pipeline stages", noStages: "No task stages.", assistantName: "Generation assistant", assistantIdle: "When a generation run starts, I report reasoning and execution output here stage by stage.", executionDetails: "Execution details", technicalFlow: "Technical execution stream",
           waitingOutput: "Waiting for model output...", copiedTrace: "Trace copied", copyFailed: "Copy failed",
-          uiMockup: "UI mockup", openUiMockup: "Open full-size UI mockup", uiMockupAlt: "UI mockup", uiMockupMissing: "No UI mockup was generated",
+           openUiMockup: "Open full-size UI mockup", uiMockupAlt: "UI mockup", uiMockupMissing: "No UI mockup was generated",
           imageModel: "Image model: {{model}}", fidelityCheck: "UI fidelity check", fidelityPassed: "Acceptable match", fidelityFailed: "Repair needed",
-          technicalDetails: "Technical details · raw traces and parser logs", designTrace: "Design debug traces", codeTrace: "Code debug traces",
+          technicalDetails: "Technical details · raw traces and parser logs", designTrace: "Design debug traces", 
           requirementTrace: "Requirement debug traces", copyTrace: "Copy trace", traceGlobal: "Global", traceAttempt: "Attempt {{count}}", noTechnicalDetails: "No technical details",
           traceKinds: { llm_output: "Raw model response", parse_error: "Parse error", parsed_model: "Parsed model", parsed_data: "Parsed data", validation_error: "Validation error", plantuml_source: "PlantUML source", render_error: "Render error", repair_output: "Raw repair response", repaired_data: "Repaired data", repaired_plantuml: "Repaired PlantUML", file_content: "File content result" },
           queueReasons: { global: "Server busy", provider: "Provider busy", project: "Project concurrency limit reached", user: "User concurrency limit reached", run: "Run concurrency limit reached" },
@@ -2130,7 +2057,7 @@ export const resources = {
           implementation: "Technical Proposed Solution",
           requirementPipeline: "Requirement model pipeline",
           designPipeline: "Design model pipeline",
-          codePrototype: "Code prototype",
+          
           documentPipeline: "Documents",
           queued: "Queued",
           generating: "Generating",
@@ -2161,14 +2088,14 @@ export const resources = {
           closeSameStage: "Close tabs from same stage",
           requirementsHome: "Back to requirement models",
           designHome: "Back to design models",
-          codeHome: "Back to code",
-          code: "Code",
+          
+          
           labels: {
             systemRequirements: "System requirements",
             feasibility: "Feasibility analysis",
             requirements: "Requirement models",
             design: "Design models",
-            code: "Code",
+            
             tests: "Tests",
             documents: "Documents",
             contextDiagram: "System Environment Diagram",
@@ -2607,7 +2534,7 @@ export const resources = {
           restore: "Restore snapshot", download: "Download again", delete: "Delete record", refresh: "Refresh history",
           total: "Total", running: "Running", failed: "Failed", latest: "Latest", none: "None",
           all: "All", requirements: "Requirements", feasibility: "Feasibility", models: "Model generation",
-          code: "Code build", documents: "Documents", statusFilter: "Filter by status", modelFilter: "Filter by model",
+           documents: "Documents", statusFilter: "Filter by status", modelFilter: "Filter by model",
           allStatuses: "All statuses", allModels: "All models", allCategories: "All categories", model: "Model {{model}}", operator: "Operator {{operator}}",
           filterLabels: { status: "Status", category: "Category" },
           stage: "Stage: {{stage}}", updated: "Updated: {{time}}", noTime: "No timestamp",
@@ -2981,83 +2908,7 @@ export const resources = {
           requirementElement: "Requirement element: {{groupLabel}} / {{elementLabel}}",
         },
       },
-      code: {
-        title: "Frontend prototype code",
-        description: "Generate, edit, and preview a frontend prototype from design models.",
-        fileCount: "{{count}} files",
-        modelModes: { strict_json: "Strict JSON", json_object: "JSON mode", compatible: "Compatible mode" },
-        compatibleWarning: "This model uses regular output with validation and repair retries to preserve structure.",
-        designModelCount: "{{count}} design models",
-        generatingCode: "Generating code",
-        guidanceTitle: "The code prototype cannot be generated yet",
-        missingPrerequisites: "Enter requirements and generate design models first. The code page generates a React prototype from design-stage models.",
-        missingRequirementPrerequisite: "Enter and save requirements first, then generate the design models.",
-        missingDesignPrerequisite: "Generate design models first. The code page creates the React prototype from those models.",
-        actions: {
-          start: "Start generation",
-          continue: "Continue generation",
-          continueShort: "Continue",
-          generateShort: "Generate",
-          regenerate: "Regenerate",
-          redoShort: "Redo",
-          runPreview: "Run preview",
-          diagnostics: "Diagnostics ({{count}})",
-        },
-        views: { label: "Code and preview", code: "Code", preview: "Preview" },
-        panes: {
-          files: "Files",
-          editor: "Editor",
-          preview: "Preview",
-        },
-        preview: {
-          openWindow: "Open in new window",
-          fullscreen: "Fullscreen preview",
-          exitFullscreen: "Exit fullscreen",
-          refresh: "Refresh preview",
-          address: "Preview address",
-          compiling: "Compiling preview",
-          notReady: "The preview is not ready yet",
-          popupBlocked: "The browser blocked the new window. Allow pop-ups and try again.",
-        },
-        status: {
-          previewReadyPolishing: {
-            title: "Preview is ready; output is still being refined",
-            message: "You can view and edit the current prototype while quality issues are being fixed in the background.",
-          },
-          generating: {
-            title: "Generating frontend prototype",
-            message: "Before generation completes, the preview refreshes automatically after code files are written.",
-          },
-          pending: {
-            title: "Unrun changes",
-            message: "The current edits have not been built into the preview. Click Run preview to see the latest result.",
-          },
-          building: {
-            title: "Building preview",
-            message: "Building the current edits into the preview.",
-          },
-          error: {
-            title: "Preview build failed",
-            message: "Fix the code using the preview error, then run the preview again.",
-          },
-          requirementMissing: {
-            title: "Requirement source was removed",
-            message: "This code is an older artifact and can still be previewed. Re-enter requirements and rerun before continuing or regenerating.",
-          },
-          diagnostics: {
-            title: "Code generation has diagnostics",
-            message: "{{summary}}. The preview is still available; review it before continuing or regenerating.",
-          },
-          updated: {
-            title: "Preview updated",
-            message: "The preview has been built from the latest generated result and is ready to view, continue, or regenerate.",
-          },
-          ready: {
-            title: "Design models are ready",
-            message: "After you click Start generation, the code and preview panes update as files are generated.",
-          },
-        },
-      },
+      
       docs: {
         badge: "In-product docs",
         title: "Software Engineering Practice Platform Guide",

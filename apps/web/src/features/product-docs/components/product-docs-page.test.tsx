@@ -6,9 +6,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProductDocsPage as ProductDocsPageView } from "./product-docs-page";
 import { SidebarProvider } from "../../../shared/ui/sidebar";
+import { ThemeProvider } from "../../../shared/ui/theme-provider";
+import { AppI18nProvider } from "../../../shared/i18n/i18n-provider";
 
 function ProductDocsPage(props: Parameters<typeof ProductDocsPageView>[0]) {
-  return <SidebarProvider><ProductDocsPageView {...props} /></SidebarProvider>;
+  return <AppI18nProvider><ThemeProvider><SidebarProvider><ProductDocsPageView {...props} /></SidebarProvider></ThemeProvider></AppI18nProvider>;
 }
 
 afterEach(() => {
@@ -25,13 +27,44 @@ import {
 const PUBLIC_DIRECTORY = resolve(process.cwd(), "public");
 
 describe("ProductDocsPage", () => {
-  it("uses page scrolling and pins both desktop navigation columns", () => {
+  it("places the single search input in the header and supports the search shortcut", async () => {
+    const user = userEvent.setup();
+    render(<ProductDocsPage />);
+    const header = screen.getByTestId("docs-header");
+    const input = within(header).getByRole("textbox", { name: "搜索使用文档" });
+    expect(screen.getAllByRole("textbox", { name: "搜索使用文档" })).toHaveLength(1);
+    expect(within(header).getByRole("button", { name: "切换界面语言" })).toHaveTextContent("中文");
+    expect(within(header).getByRole("button", { name: "切换到深色" })).toBeInTheDocument();
+    await user.keyboard("{Control>}k{/Control}");
+    expect(input).toHaveFocus();
+    await user.type(input, "AI 修复");
+    expect(screen.getByRole("button", { name: "文档目录" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("搜索结果")).toBeInTheDocument();
+  });
+
+  it("keeps the maintenance notice and quick-start action within the article column", async () => {
+    const user = userEvent.setup();
+    render(<ProductDocsPage />);
+    const column = screen.getByTestId("docs-article-column");
+    expect(within(column).getByTestId("docs-footer")).toBeInTheDocument();
+    expect(column).toHaveClass("max-w-[800px]");
+    await user.click(screen.getByRole("button", { name: "项目首页与项目创建" }));
+    await user.click(within(column).getByRole("button", { name: "回到快速开始" }));
+    expect(within(column).getByRole("heading", { name: "快速开始" })).toHaveFocus();
+  });
+
+  it("uses shared scroll areas for the page and pinned navigation columns", () => {
     render(<ProductDocsPage />);
 
     expect(screen.getByTestId("product-docs-page")).not.toHaveClass("overflow-y-auto");
-    expect(document.getElementById("product-docs-directory")).toHaveClass("@[720px]/docs:sticky", "@[720px]/docs:overflow-y-auto");
-    expect(screen.getByRole("complementary", { name: "本页大纲" })).toHaveClass("@[1040px]/docs:sticky", "@[1040px]/docs:overflow-y-auto");
-    expect(screen.getByRole("heading", { name: "快速开始" })).toHaveClass("@[720px]/docs:scroll-mt-24");
+    expect(screen.getByTestId("product-docs-page")).toHaveClass("h-dvh", "overflow-hidden");
+    expect(document.getElementById("product-docs-directory")).toHaveClass("@[720px]/docs:sticky");
+    expect(screen.getByRole("complementary", { name: "本页大纲" })).toHaveClass("@[1040px]/docs:sticky");
+    for (const id of ["docs-content-scroll-area", "docs-directory-scroll-area", "docs-outline-scroll-area"]) {
+      expect(screen.getByTestId(id)).toHaveAttribute("data-slot", "scroll-area");
+      expect(screen.getByTestId(id).querySelector('[data-slot="scroll-area-viewport"]')).toBeInTheDocument();
+    }
+    expect(screen.getByRole("heading", { name: "快速开始" })).toHaveClass("scroll-mt-6");
   });
 
   it("shows the project-local quick start article by default", () => {
@@ -42,7 +75,7 @@ describe("ProductDocsPage", () => {
       screen.queryByRole("heading", { name: "普通用户完整操作路径" }),
     ).not.toBeInTheDocument();
     expect(screen.getByLabelText("搜索使用文档")).toBeInTheDocument();
-    const quickStartVideo = screen.getByLabelText("快速开始项目演示视频");
+    const quickStartVideo = screen.getByLabelText("快速开始项目操作视频");
     expect(quickStartVideo).toBeInTheDocument();
     expect(quickStartVideo.querySelector("source")).toHaveAttribute(
       "src",
@@ -190,18 +223,24 @@ describe("ProductDocsPage", () => {
       name: "适用场景",
       level: 2,
     });
-    const scrollIntoView = vi.fn();
-    Object.defineProperty(targetHeading, "scrollIntoView", {
+    const viewport = screen.getByTestId("docs-content-scroll-area").querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')!;
+    const scrollTo = vi.fn();
+    Object.defineProperty(viewport, "scrollTo", {
       configurable: true,
-      value: scrollIntoView,
+      value: scrollTo,
     });
+    vi.spyOn(viewport, "getBoundingClientRect").mockReturnValue({ top: 64 } as DOMRect);
+    vi.spyOn(targetHeading, "getBoundingClientRect").mockReturnValue({ top: 900 } as DOMRect);
+    const scrollIntoView = vi.spyOn(targetHeading, "scrollIntoView");
 
     await user.click(screen.getByRole("link", { name: "适用场景" }));
 
-    expect(scrollIntoView).toHaveBeenCalledWith({
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 812,
       behavior: "smooth",
-      block: "start",
     });
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe(`#${encodeURIComponent("适用场景")}`);
   });
 
   it("renders markdown images for the selected article", async () => {
@@ -211,12 +250,12 @@ describe("ProductDocsPage", () => {
 
     const sidebar = screen.getByRole("complementary", { name: "使用文档目录" });
     await user.click(
-      within(sidebar).getByRole("button", { name: /代码原型生成与预览/u }),
+      within(sidebar).getByRole("button", { name: /需求输入、规则确认与 AI 修复/u }),
     );
 
-    expect(screen.getAllByAltText("代码文件树和预览截图")[0]).toHaveAttribute(
+    expect(screen.getAllByAltText("需求规则确认与 AI 修复局部截图")[0]).toHaveAttribute(
       "src",
-      "/help/images/docs-code-preview.png",
+      "/help/images/docs-requirement-ai-repair.png",
     );
 
   });
@@ -235,7 +274,7 @@ describe("ProductDocsPage", () => {
     render(<ProductDocsPage />);
     const article = screen.getByRole("article");
     const title = within(article).getByRole("heading", { level: 1 });
-    const video = screen.getByLabelText("快速开始项目演示视频");
+    const video = screen.getByLabelText("快速开始项目操作视频");
     expect(title.compareDocumentPosition(video) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(article).not.toHaveAttribute("data-slot", "card");
     const sidebar = screen.getByRole("complementary", { name: "使用文档目录" });
@@ -251,7 +290,8 @@ describe("ProductDocsPage", () => {
     await user.click(screen.getByRole("button", { name: "项目首页与项目创建" }));
     expect(screen.getByRole("heading", { name: "项目首页与项目创建" })).toHaveFocus();
     expect(window.location.hash).toBe("");
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(screen.getByTestId("docs-content-scroll-area").querySelector('[data-slot="scroll-area-viewport"]')?.scrollTop).toBe(0);
   });
 
   it("opens the mobile directory and collapses it after selecting an article", async () => {
@@ -270,9 +310,9 @@ describe("ProductDocsPage", () => {
     expect(screen.getByRole("heading", { name: "项目首页与项目创建" })).toHaveFocus();
   });
 
-  it("keeps every manifest article attached to a local docs screenshot", () => {
+  it("keeps manifest screenshots attached to non-empty local assets", () => {
     for (const article of PRODUCT_DOC_ARTICLES) {
-      expect(article.screenshot, article.id).toBeDefined();
+      if (!article.screenshot) continue;
       expect(article.screenshot?.src, article.id).toMatch(
         /^\/help\/images\/docs-[a-z0-9-]+\.png$/u,
       );
@@ -317,7 +357,7 @@ describe("ProductDocsPage", () => {
     const quickStart = PRODUCT_DOC_ARTICLES.find((article) => article.id === "quick-start");
 
     expect(quickStart?.video).toMatchObject({
-      title: "快速开始项目演示视频",
+      title: "快速开始项目操作视频",
       src: "https://tuolola.oss-cn-chengdu.aliyuncs.com/video/%E9%A1%B9%E7%9B%AE%E6%BC%94%E7%A4%BA.mp4",
     });
   });

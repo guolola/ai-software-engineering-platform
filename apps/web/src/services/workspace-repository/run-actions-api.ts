@@ -17,7 +17,7 @@ import { projectHeaders, requireProjectScope, withProjectHeaders } from "./proje
 import { runPayloadWithoutUnmanagedProviderSettings } from "./run-payload";
 import type {
   ProviderSettingsInput,
-  StartCodeRunInput,
+  
   StartDesignRunInput,
   StartDocumentRunInput,
   StartRunInput,
@@ -116,24 +116,7 @@ export async function startDesignRunRequest(
   );
 }
 
-export async function startCodeRunRequest(
-  input: StartCodeRunInput,
-  projectId: string | null,
-) {
-  const scopedProjectId = requireProjectScope(projectId);
-  return postJson<{ runId: string }>(
-    "/api/code-runs",
-    runPayloadWithoutUnmanagedProviderSettings({
-      projectId: scopedProjectId,
-      generationMode: input.generationMode,
-      providerSettings: input.providerSettings,
-    }),
-    {
-      errorKey: "errors.operations.startCode",
-      headers: projectHeaders(scopedProjectId),
-    },
-  );
-}
+
 
 export async function startDocumentRunRequest(
   input: StartDocumentRunInput,

@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "../../../shared/ui/badge";
 import { VideoPlayer } from "../../../shared/ui/video-player";
 import { cn } from "../../../shared/ui/utils";
+import { ScrollArea } from "../../../shared/ui/scroll-area";
 import { i18n as appI18n } from "../../../shared/i18n";
 import {
   isAppRouteHref,
@@ -41,7 +42,7 @@ export function DocsArticleView({
     <article className="min-w-0 w-full max-w-[800px]">
       <header className="mb-8">
         <h1 id={headings.find((heading) => heading.level === 1)?.id ?? article.id}
-          tabIndex={-1} className="scroll-mt-36 break-words text-3xl font-semibold tracking-tight outline-none @[720px]/docs:scroll-mt-24 @[720px]/docs:text-4xl">
+          tabIndex={-1} className="scroll-mt-6 break-words text-3xl font-semibold tracking-tight outline-none @[720px]/docs:text-4xl">
           {headings.find((heading) => heading.level === 1)?.title ?? article.title}
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -110,7 +111,7 @@ function createMarkdownComponents({
       return (
         <h2
           id={headingId(2, children)}
-          className="mt-6 scroll-mt-36 @[720px]/docs:scroll-mt-24 break-words text-xl font-semibold first:mt-0"
+          className="mt-6 scroll-mt-6 break-words text-xl font-semibold first:mt-0"
           {...props}
         >
           {children}
@@ -121,7 +122,7 @@ function createMarkdownComponents({
       return (
         <h3
           id={headingId(3, children)}
-          className="mt-4 scroll-mt-36 @[720px]/docs:scroll-mt-24 break-words text-base font-semibold"
+          className="mt-4 scroll-mt-6 break-words text-base font-semibold"
           {...props}
         >
           {children}
@@ -195,21 +196,23 @@ function createMarkdownComponents({
     },
     pre({ children, node: _node, ...props }) {
       return (
-        <pre
-          className="bg-muted text-foreground mt-4 max-w-full overflow-x-auto rounded-lg p-4 text-sm leading-6"
-          {...props}
-        >
-          {children}
-        </pre>
+        <ScrollArea className="mt-4 max-w-full rounded-lg bg-muted" showHorizontalScrollbar contentClassName="!block">
+          <pre
+            className="w-max min-w-full p-4 text-sm leading-6 text-foreground"
+            {...props}
+          >
+            {children}
+          </pre>
+        </ScrollArea>
       );
     },
     table({ children, node: _node, ...props }) {
       return (
-        <div className="mt-5 max-w-full overflow-hidden rounded-lg border border-border">
+        <ScrollArea className="mt-5 max-w-full rounded-lg border border-border [&_[data-slot=table-container]]:overflow-visible" showHorizontalScrollbar contentClassName="!block">
           <Table className="min-w-[620px] border-collapse text-left text-sm"   {...props}>
             {children}
           </Table>
-        </div>
+        </ScrollArea>
       );
     },
     thead({ children, node: _node, ...props }) {

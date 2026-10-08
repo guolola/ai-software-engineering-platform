@@ -1,6 +1,6 @@
 // Owns run snapshot reads and SSE fallback behavior for workspace repository runs.
 import type {
-  CodeRunSnapshot,
+  
   DesignRunSnapshot,
   DocumentRunSnapshot,
   FeasibilityRunSnapshot,
@@ -24,7 +24,6 @@ type RunSubscriptionInput = {
 type RestorableRunSnapshot =
   | RunSnapshot
   | DesignRunSnapshot
-  | CodeRunSnapshot
   | DocumentRunSnapshot
   | FeasibilityRunSnapshot;
 
@@ -176,25 +175,7 @@ export async function readDesignRunSnapshot(
   });
 }
 
-export async function readCodeRunSnapshot(
-  runId: string,
-  projectId: string | null = null,
-) {
-  try {
-    return await requestJson<CodeRunSnapshot>(`/api/code-runs/${runId}`, {
-      errorKey: "errors.operations.loadRun",
-      headers: projectHeaders(projectId),
-    });
-  } catch (error) {
-    if (error instanceof ApiClientError && error.status === 404) {
-      throw new ApiClientError(
-        "代码生成任务已丢失，可能是本地 API 服务重启，请重新生成",
-        404,
-      );
-    }
-    throw error;
-  }
-}
+
 
 export async function readDocumentRunSnapshot(
   runId: string,
@@ -367,23 +348,7 @@ async function waitForDesignRunSnapshot(
   });
 }
 
-async function waitForCodeRunSnapshot(
-  runId: string,
-  onEvent: (event: RunEvent) => void,
-  projectId: string | null = null,
-) {
-  await waitForTerminalSnapshot({
-    runId,
-    projectId,
-    onEvent,
-    readSnapshot: readCodeRunSnapshot,
-    fallbackFailureMessage: "代码生成失败",
-    fallbackCancelledStage: "write_code_files",
-    fallbackProgressStage: "write_code_files",
-    progressMessage: "SSE 已断开，正在通过快照轮询等待代码生成任务",
-    progressForSnapshot: (snapshot) => (snapshot.currentStage ? 70 : 10),
-  });
-}
+
 
 async function waitForDocumentRunSnapshot(
   runId: string,
@@ -501,40 +466,7 @@ export async function subscribeToDesignRunEvents({
   await subscription.closed;
 }
 
-export async function subscribeToCodeRunEvents({
-  runId,
-  projectId,
-  onEvent,
-}: RunSubscriptionInput) {
-  if (projectId) {
-    const scopedProjectId = requireProjectScope(projectId);
-    try {
-      await streamProjectRunEvents(
-        `/api/code-runs/${runId}/events`,
-        scopedProjectId,
-        onEvent,
-      );
-      return;
-    } catch (error) {
-      if (
-        error instanceof ApiClientError &&
-        (error.status === 401 || error.status === 403)
-      ) {
-        throw error;
-      }
-      if (error instanceof StreamedRunFailedError) {
-        throw error;
-      }
-      await waitForCodeRunSnapshot(runId, onEvent, scopedProjectId);
-      return;
-    }
-  }
-  const subscription = subscribeToRunEvents(`/api/code-runs/${runId}/events`, {
-    onEvent,
-    onError: () => waitForCodeRunSnapshot(runId, onEvent, projectId),
-  });
-  await subscription.closed;
-}
+
 
 export async function subscribeToDocumentRunEvents({
   runId,

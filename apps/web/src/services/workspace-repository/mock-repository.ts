@@ -2,7 +2,7 @@
 import {
   designRecordBelongsToDiagramKinds,
   designTraceabilityTouchesDiagramKinds,
-  type CodeRunSnapshot,
+  
   type DesignRunSnapshot,
   type DesignSvgArtifact,
   type DocumentLibraryItem,
@@ -26,7 +26,7 @@ import {
 } from "../../entities/run-history";
 import { documentFileName } from "./document-api";
 import type {
-  StartCodeRunInput,
+  
   StartDesignRunInput,
   StartDocumentRunInput,
   StartRunInput,
@@ -111,16 +111,12 @@ export function createMockWorkspaceRepository(
       ...defaultWorkspace.manualModelEditStatus,
       ...seed.manualModelEditStatus,
     },
-    codeFiles: { ...defaultWorkspace.codeFiles, ...seed.codeFiles },
-    codeDependencies: {
-      ...defaultWorkspace.codeDependencies,
-      ...seed.codeDependencies,
-    },
-    codeUiMockup: seed.codeUiMockup ?? null,
+    
+    
+    
   };
   const snapshots = new Map<string, RunSnapshot>();
   const designSnapshots = new Map<string, DesignRunSnapshot>();
-  const codeSnapshots = new Map<string, CodeRunSnapshot>();
   const documentSnapshots = new Map<string, DocumentRunSnapshot>();
   const documentBuffers = new Map<string, Blob>();
   const documents = new Map<string, DocumentLibraryItem>();
@@ -150,18 +146,18 @@ export function createMockWorkspaceRepository(
         designSvgArtifacts: { ...workspace.designSvgArtifacts },
         designDiagramErrors: { ...workspace.designDiagramErrors },
         manualModelEditStatus: { ...workspace.manualModelEditStatus },
-        codeSpec: workspace.codeSpec,
-        codeBusinessLogic: workspace.codeBusinessLogic,
-        codeFiles: { ...workspace.codeFiles },
-        codeEntryFile: workspace.codeEntryFile,
-        codeDependencies: { ...workspace.codeDependencies },
-        codeUiMockup: workspace.codeUiMockup,
-        codeAgentPlan: [...workspace.codeAgentPlan],
-        codeSkills: [...workspace.codeSkills],
-        codeSkillDiagnostics: [...workspace.codeSkillDiagnostics],
-        codeSkillResourcePlan: workspace.codeSkillResourcePlan,
-        codeSkillContext: workspace.codeSkillContext,
-        codeDiagnostics: [...workspace.codeDiagnostics],
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         requirementReviewCandidates: {
           ...workspace.requirementReviewCandidates,
         },
@@ -274,14 +270,7 @@ export function createMockWorkspaceRepository(
       };
     },
 
-    async updateCodeDiagnostics(diagnostics) {
-      workspace = {
-        ...workspace,
-        codeDiagnostics: structuredClone(
-          diagnostics,
-        ) as WorkspaceRecord["codeDiagnostics"],
-      };
-    },
+    
 
     async updateTestGenerationResult(result) {
       workspace = {
@@ -316,6 +305,7 @@ export function createMockWorkspaceRepository(
         runId,
         requirementText: input.requirementText,
         selectedDiagrams: input.selectedDiagrams,
+        analysisTargetUseCaseIds: input.analysisTargetUseCaseIds ?? [],
         rules:
           input.rules.length > 0
             ? input.rules
@@ -333,6 +323,10 @@ export function createMockWorkspaceRepository(
         svgArtifacts: Object.values(workspace.svgArtifacts),
         diagramErrors: workspace.diagramErrors,
         requirementTrace: [],
+        requirementBaseline: workspace.requirementBaseline,
+        coverageMatrix: null,
+        traceabilityMatrix: null,
+        visualReviews: workspace.visualReviews,
         currentStage: "render_svg",
         status: "completed",
         error: null,
@@ -408,6 +402,9 @@ export function createMockWorkspaceRepository(
           .map(([, artifact]) => artifact),
         diagramErrors: workspace.designDiagramErrors,
         designTrace: [],
+        coverageMatrix: null,
+        traceabilityMatrix: null,
+        visualReviews: workspace.visualReviews,
         currentStage: "render_svg",
         status: "completed",
         error: null,
@@ -416,62 +413,7 @@ export function createMockWorkspaceRepository(
       return { runId };
     },
 
-    async startCodeRun(input: StartCodeRunInput) {
-      const runId = `code-run-${Math.random().toString(36).slice(2, 10)}`;
-      const mergedFiles =
-        input.generationMode === "regenerate"
-          ? {
-              "/src/App.tsx":
-                workspace.codeFiles["/src/App.tsx"] ??
-                "export default function App() { return <main>重新生成的原型</main>; }",
-            }
-          : {
-              ...workspace.codeFiles,
-              ...input.existingFiles,
-      };
-      const snapshot: CodeRunSnapshot = {
-        runId,
-        designModels: input.designModels,
-        designPlantUml: input.designPlantUml,
-        spec: workspace.codeSpec,
-        loadedCodeSkill: null,
-        skillResourcePlan: null,
-        codeSkillContext: null,
-        appBlueprint: workspace.codeSpec?.appBlueprint ?? null,
-        businessLogic: workspace.codeBusinessLogic,
-        uiBlueprint: workspace.codeSpec?.uiBlueprint ?? null,
-        uiMockup: null,
-        uiReferenceSpec: null,
-        uiFidelityReport: null,
-        designTokens: null,
-        componentRegistry: null,
-        uiIr: null,
-        visualDiffReport: null,
-        repairLoopSummary: null,
-        selectedCodeSkills: [],
-        skillDiagnostics: [],
-        filePlan: workspace.codeSpec?.filePlan ?? null,
-        codeImplementationBrief: null,
-        codeFileOperationManifest: null,
-        fileGenerationDiagnostics: [],
-        codeTrace: [],
-        codeGenerationMode: "json_schema_operations",
-        qualityDiagnostics: [],
-        files: mergedFiles,
-        entryFile: workspace.codeEntryFile,
-        dependencies: workspace.codeDependencies,
-        agentPlan: ["写入骨架", "生成核心界面", "检查预览入口"],
-        generationMode: input.generationMode,
-        changedFileCount: 0,
-        diagnostics: [],
-        codeContextHash: "mock",
-        currentStage: "write_code_files",
-        status: "completed",
-        error: null,
-      };
-      codeSnapshots.set(runId, snapshot);
-      return { runId };
-    },
+    
 
     async startDocumentRun(input: StartDocumentRunInput) {
       const runId = `document-run-${Math.random().toString(36).slice(2, 10)}`;
@@ -481,6 +423,11 @@ export function createMockWorkspaceRepository(
         runId,
         documentKind: input.documentKind,
         requirementText: input.requirementText,
+        requirementBaseline: workspace.requirementBaseline,
+        coverageMatrix: null,
+        traceabilityMatrix: null,
+        feasibilityImplementationPlan: workspace.feasibilityImplementationPlan,
+        feasibilityInputs: workspace.feasibilityInputs,
         documentId,
         sections: [
           { level: 1, title: "1 引言", body: ["Mock 说明书正文。"] },
@@ -503,6 +450,7 @@ export function createMockWorkspaceRepository(
       const now = new Date().toISOString();
       documents.set(documentId, {
         id: documentId,
+        status: "active",
         workspaceId: "mock-workspace",
         documentKind: input.documentKind,
         title:
@@ -544,30 +492,7 @@ export function createMockWorkspaceRepository(
       onEvent({ type: "completed", snapshot });
     },
 
-    async subscribeToCodeRun(runId, onEvent) {
-      const snapshot = codeSnapshots.get(runId);
-      if (!snapshot) {
-        throw new Error("Mock code run not found");
-      }
-      onEvent({ type: "queued" });
-      onEvent({
-        type: "stage_started",
-        stage: "plan_code",
-      });
-      onEvent({
-        type: "stage_started",
-        stage: "write_code_files",
-      });
-      onEvent({
-        type: "code_file_changed",
-        path: "/src/App.tsx",
-        content:
-          snapshot.files["/src/App.tsx"] ??
-          "export default function App() { return null; }",
-        reason: "Mock 生成器写入入口组件",
-      });
-      onEvent({ type: "completed", snapshot });
-    },
+    
 
     async subscribeToDocumentRun(runId, onEvent) {
       const snapshot = documentSnapshots.get(runId);
@@ -622,27 +547,7 @@ export function createMockWorkspaceRepository(
       return snapshot;
     },
 
-    async getCodeRunSnapshot(runId) {
-      const snapshot = codeSnapshots.get(runId);
-      if (!snapshot) {
-        throw new Error("Mock code run not found");
-      }
-      workspace = {
-        ...workspace,
-        codeSpec: snapshot.spec,
-        codeFiles: { ...snapshot.files },
-        codeEntryFile: snapshot.entryFile,
-        codeDependencies: { ...snapshot.dependencies },
-        codeUiMockup: snapshot.uiMockup,
-        codeAgentPlan: [...snapshot.agentPlan],
-        codeSkills: [...snapshot.selectedCodeSkills],
-        codeSkillDiagnostics: [...snapshot.skillDiagnostics],
-        codeSkillResourcePlan: snapshot.skillResourcePlan,
-        codeSkillContext: snapshot.codeSkillContext,
-        codeDiagnostics: [...snapshot.diagnostics],
-      };
-      return snapshot;
-    },
+    
 
     async getDocumentRunSnapshot(runId) {
       const snapshot = documentSnapshots.get(runId);

@@ -30,9 +30,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function phaseSummaryFromEvent(event: RunEvent, fallback: string | null) {
-  if (event.type === "code_file_changed") {
-    return "已写入可预览文件，预览会自动刷新。";
-  }
+  
   if (event.type === "stage_progress" && event.message) {
     return event.message;
   }
@@ -79,7 +77,7 @@ export function createGenerationTask(input: {
     message: input.message,
     messageCode: "RUN_QUEUED",
     errorMessage: null,
-    previewReady: false,
+    
     phaseSummary: input.message,
     technicalDetailsCollapsed: true,
     diagnostics: {
@@ -723,13 +721,11 @@ function taskMessageFromEvent(
   messages: {
     queued: string;
     completed: string;
-    fileChanged?: (path: string) => string;
+    
   },
   subtasks: GenerationSubtask[],
 ) {
-  if (event.type === "code_file_changed" && messages.fileChanged) {
-    return messages.fileChanged(event.path);
-  }
+  
   if (event.type === "stage_progress") {
     return event.message ?? task.message;
   }
@@ -778,7 +774,7 @@ export function updateDiagnosticsFromEvent(
         : current.finishedAt,
     activeStage: "stage" in event ? event.stage : current.activeStage,
     streamText:
-      isMeaningfulLlmChunkEvent(event)
+      event.type === "llm_chunk" && isMeaningfulLlmChunkEvent(event)
         ? appendDiagnosticStream(current.streamText, event.chunk)
         : current.streamText,
     chunkCount:
@@ -791,52 +787,14 @@ export function updateDiagnosticsFromEvent(
       event.type === "stage_progress" && event.message
         ? { ...current.stageMessages, [event.stage]: event.message }
         : current.stageMessages,
-    uiMockup:
-      event.type === "artifact_ready" && event.artifactKind === "uiMockup"
-        ? event.uiMockup ?? current.uiMockup
-        : current.uiMockup,
-    uiReferenceSpec:
-      event.type === "artifact_ready" && event.artifactKind === "uiReferenceSpec"
-        ? event.uiReferenceSpec ?? current.uiReferenceSpec
-        : event.type === "completed" && "uiReferenceSpec" in event.snapshot
-          ? event.snapshot.uiReferenceSpec ?? current.uiReferenceSpec
-          : current.uiReferenceSpec,
-    uiFidelityReport:
-      event.type === "artifact_ready" && event.artifactKind === "uiFidelityReport"
-        ? event.uiFidelityReport ?? current.uiFidelityReport
-        : event.type === "completed" && "uiFidelityReport" in event.snapshot
-          ? event.snapshot.uiFidelityReport ?? current.uiFidelityReport
-          : current.uiFidelityReport,
-    visualDirection:
-      event.type === "artifact_ready" && event.artifactKind === "visualDirection"
-        ? event.visualDirection ?? current.visualDirection
-        : event.type === "completed" && "visualDirection" in event.snapshot
-          ? event.snapshot.visualDirection ?? current.visualDirection
-          : current.visualDirection,
-    skillResourceDiscoveryPlan:
-      event.type === "artifact_ready" && event.artifactKind === "skillResourceDiscoveryPlan"
-        ? event.skillResourceDiscoveryPlan ?? current.skillResourceDiscoveryPlan
-        : event.type === "completed" && "skillResourceDiscoveryPlan" in event.snapshot
-          ? event.snapshot.skillResourceDiscoveryPlan ?? current.skillResourceDiscoveryPlan
-          : current.skillResourceDiscoveryPlan,
-    skillResourcePreviews:
-      event.type === "artifact_ready" && event.artifactKind === "skillResourcePreviews"
-        ? event.skillResourcePreviews ?? current.skillResourcePreviews
-        : event.type === "completed" && "skillResourcePreviews" in event.snapshot
-          ? event.snapshot.skillResourcePreviews ?? current.skillResourcePreviews
-          : current.skillResourcePreviews,
-    skillResourcePlan:
-      event.type === "artifact_ready" && event.artifactKind === "skillResourcePlan"
-        ? event.skillResourcePlan ?? current.skillResourcePlan
-        : event.type === "completed" && "skillResourcePlan" in event.snapshot
-          ? event.snapshot.skillResourcePlan ?? current.skillResourcePlan
-          : current.skillResourcePlan,
-    codeSkillContext:
-      event.type === "artifact_ready" && event.artifactKind === "codeSkillContext"
-        ? event.codeSkillContext ?? current.codeSkillContext
-        : event.type === "completed" && "codeSkillContext" in event.snapshot
-          ? event.snapshot.codeSkillContext ?? current.codeSkillContext
-          : current.codeSkillContext,
+    
+    
+    
+    
+    
+    
+    
+    
     requirementTrace:
       event.type === "completed" && "requirementTrace" in event.snapshot
         ? event.snapshot.requirementTrace ?? []
@@ -845,10 +803,7 @@ export function updateDiagnosticsFromEvent(
       event.type === "completed" && "designTrace" in event.snapshot
         ? event.snapshot.designTrace ?? []
         : current.designTrace,
-    codeTrace:
-      event.type === "completed" && "codeTrace" in event.snapshot
-        ? event.snapshot.codeTrace ?? []
-        : current.codeTrace,
+    
     events: shouldDisplayEvent
       ? [...current.events, diagnosticEvent].slice(-80)
       : current.events,
@@ -861,7 +816,7 @@ export function updateTaskFromEvent(
   messages: {
     queued: string;
     completed: string;
-    fileChanged?: (path: string) => string;
+    
   },
 ): GenerationTask {
   const progress = getProgressFromEvent(event);
@@ -883,8 +838,7 @@ export function updateTaskFromEvent(
     title: titleWithSubtaskSummary(task, subtasks),
     status: nextStatus,
     progress: repairContinues ? 85 : progress ?? task.progress,
-    previewReady:
-      task.previewReady || (task.kind === "code" && event.type === "code_file_changed"),
+    
     phaseSummary: repairContinues
       ? "正在修复需求规则"
       : taskPhaseSummaryFromEvent(event, subtasks, task.phaseSummary),

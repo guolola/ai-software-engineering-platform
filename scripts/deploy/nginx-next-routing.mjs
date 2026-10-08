@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { accessSync, constants, existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { ensureMcpDiscovery } from './nginx-mcp-routing.mjs';
 
 const oldRoot = '/current/apps/web/dist';
 const nextRoot = '/current/apps/web/.next/standalone/apps/web/public';
@@ -68,14 +69,14 @@ export function migrateNextRouting(config, deployPath) {
       .filter((server) => server.includes('server_name jianglisoftware.com;'))
       .filter((server) => server.includes('proxy_pass http://127.0.0.1:4001;'))
       .filter((server) => server.includes('proxy_pass http://127.0.0.1:4003;'));
-    if (directNextServers.length === 1) return config;
+    if (directNextServers.length === 1) return config.replace(directNextServers[0], ensureMcpDiscovery(directNextServers[0]));
     throw new Error('Unknown site root or API proxy; refusing to change Nginx routing.');
   }
   const { serverStart, close: serverClose } = findServerBlock(config, activeWebRoot);
   const beforeServer = config.slice(0, serverStart);
   const afterServer = config.slice(serverClose + 1);
   let result = config.slice(serverStart, serverClose + 1);
-  if (result.includes(newWebRoot) && result.includes('proxy_pass http://127.0.0.1:4003;')) return config;
+  if (result.includes(newWebRoot) && result.includes('proxy_pass http://127.0.0.1:4003;')) return `${beforeServer}${ensureMcpDiscovery(result)}${afterServer}`;
   if (!result.includes(`root ${oldWebRoot};`) || !result.includes('location /api/ {')) {
     throw new Error('Unknown site root or API proxy; refusing to change Nginx routing.');
   }
@@ -114,7 +115,7 @@ export function migrateNextRouting(config, deployPath) {
     .replace(/\s*index index\.html;/, '')
     .replace(/\s*error_page 404 \/404\.html;/, '');
   const migratedServer = rootLocationMatches.length === 0 ? insertRootLocation(result, newWebRoot) : result;
-  return `${beforeServer}${migratedServer}${afterServer}`;
+  return `${beforeServer}${ensureMcpDiscovery(migratedServer)}${afterServer}`;
 }
 
 function nginx(...args) {

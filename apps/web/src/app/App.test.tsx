@@ -741,7 +741,7 @@ describe("App shell routes", () => {
             JSON.stringify({
               project: {
                 id: `case-project-${caseId}`,
-                name: `${caseTitleById[caseId] ?? "案例"} 示例项目`,
+                name: caseTitleById[caseId] ?? "项目",
                 description: "案例生成项目",
                 visibility: "private",
                 status: "active",
@@ -776,7 +776,7 @@ describe("App shell routes", () => {
             JSON.stringify({
               project: {
                 id: projectId,
-                name: "案例示例项目",
+                name: "案例项目",
                 description: "案例生成项目",
                 visibility: "private",
                 status: "active",
@@ -1468,6 +1468,45 @@ describe("App shell routes", () => {
     );
   });
 
+  it("shows OAuth consent independently of the workbench and keeps connection management in its shell", async () => {
+    const fetchMock = vi.mocked(fetch);
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const pathname = new URL(String(input), "http://127.0.0.1:4101").pathname;
+      if (pathname === "/api/mcp/connections") return Response.json({ enabled: true, serverUrl: "http://localhost:3000/api/mcp", csrf: "consent-csrf", projects: [{ id: "library-id", name: "图书管理系统" }], connections: [] });
+      if (pathname === "/api/mcp/interactions/consent-id") return Response.json({ clientName: "Codex", clientId: "client-id" });
+      return defaultFetch(input, init);
+    });
+    window.history.pushState({}, "", "/account/connections?interaction=consent-id");
+    const { container } = render(withWorkspaceProviders(<Shell />, createRepository()));
+
+    expect(await screen.findByRole("heading", { name: "授权给 Codex" })).toBeVisible();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+    expect(container.querySelector('[data-slot="sidebar"]')).toBeNull();
+    expect(screen.queryByRole("heading", { name: "编程助手" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("使用的软件")).not.toBeInTheDocument();
+    expect(screen.queryByText("如何根据项目资料开始实现？")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "授权读取所选项目" })).toBeDisabled();
+
+    act(() => {
+      window.history.pushState({}, "", "/projects/connections");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(await screen.findByLabelText("使用的软件")).toBeVisible();
+    expect(screen.getByRole("banner")).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="sidebar"]')).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: "授权给 Codex" })).not.toBeInTheDocument();
+  });
+
+  it("preserves the OAuth interaction through the standalone consent login guard", async () => {
+    authSessionMode = "unauthenticated";
+    window.history.pushState({}, "", "/account/connections?interaction=consent-id");
+    render(withWorkspaceProviders(<Shell />, createRepository()));
+    await screen.findByLabelText("邮箱或用户名");
+    expect(window.location.pathname).toBe("/login");
+    expect(new URLSearchParams(window.location.search).get("redirect")).toBe("/account/connections?interaction=consent-id");
+  });
+
   it("shows the account billing route and keeps payment return available", async () => {
     authSessionMode = "authenticated";
     projectApiMode = "authenticated";
@@ -1501,7 +1540,7 @@ describe("App shell routes", () => {
   });
 
   it("redirects unauthenticated top-level feature pages to login", async () => {
-    for (const path of ["/exam", "/tutorial"] as const) {
+    for (const path of ["/exam"] as const) {
       authSessionMode = "unauthenticated";
       window.history.pushState({}, "", path);
       const view = render(withWorkspaceProviders(<Shell />, createRepository()));
@@ -1510,7 +1549,7 @@ describe("App shell routes", () => {
         expect(window.location.pathname).toBe("/login");
       });
       expect(window.location.search).toBe(`?redirect=${encodeURIComponent(path)}&reason=login-required`);
-      expect(screen.queryByRole("heading", { name: path === "/exam" ? "考试" : "使用文档" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "考试" })).not.toBeInTheDocument();
       expect(screen.queryByText("项目导航")).not.toBeInTheDocument();
 
       view.unmount();
@@ -1553,6 +1592,25 @@ describe("App shell routes", () => {
     expect(await screen.findByRole("button", { name: "账号" })).toBeInTheDocument();
   });
 
+  it.each(["unauthenticated", "offline"] as const)("opens public documentation when the session is %s", async (sessionMode) => {
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const user = userEvent.setup();
+    authSessionMode = sessionMode;
+    window.history.pushState({}, "", "/tutorial");
+    render(withWorkspaceProviders(<Shell />, createRepository()));
+
+    expect(screen.getByRole("heading", { name: "快速开始" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/tutorial");
+    expect(screen.queryByTestId("auth-check-placeholder")).not.toBeInTheDocument();
+    expect(document.querySelector('[data-slot="sidebar-container"]')).not.toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes("/api/auth/me"))).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "项目首页与项目创建" }));
+    expect(screen.getByRole("heading", { name: "项目首页与项目创建" })).toHaveFocus();
+    await user.click(screen.getByRole("link", { name: "主页" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+  });
+
   it("renders the product documentation page for signed-in users", async () => {
     authSessionMode = "authenticated";
     window.history.pushState({}, "", "/tutorial");
@@ -1566,11 +1624,11 @@ describe("App shell routes", () => {
     expect(
       screen.queryByRole("heading", { name: "普通用户完整操作路径" }),
     ).not.toBeInTheDocument();
-    expect(document.querySelector('[data-slot="sidebar-container"]')).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Toggle Sidebar" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "主页" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "使用文档" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("button", { name: "账号" })).toBeInTheDocument();
+    expect(document.querySelector('[data-slot="sidebar-container"]')).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Toggle Sidebar" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "主页" })).toHaveAttribute("href", "/");
+    expect(screen.queryByRole("link", { name: "使用文档" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "账号" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "文档目录" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "快速开始" })).toBeInTheDocument();
     expect(screen.getByLabelText("搜索使用文档")).toBeInTheDocument();
@@ -1583,7 +1641,7 @@ describe("App shell routes", () => {
     expect(screen.getAllByRole("button", { name: /项目首页与项目创建/u }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: /模型详情页、元素列表与追踪矩阵/u }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: /说明书生成、样式、版本与下载/u }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: /代码原型生成与预览/u }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /Coding Agent 接入与授权/u }).length).toBeGreaterThan(0);
     expect(screen.queryByText("项目导航")).not.toBeInTheDocument();
     expect(document.querySelector('[data-slot="sidebar-inset"] > footer')).not.toBeInTheDocument();
   });
@@ -2056,7 +2114,6 @@ describe("App shell routes", () => {
   it.each([
     { path: "/exam", readyTestId: null },
     { path: "/dashboard", readyTestId: "dashboard-shell" },
-    { path: "/tutorial", readyTestId: "product-docs-page" },
     { path: "/account/billing", readyTestId: "account-billing-dashboard" },
   ])("blocks $path content without an intermediate loading page while verifying the session", async ({ path, readyTestId }) => {
     vi.useFakeTimers();

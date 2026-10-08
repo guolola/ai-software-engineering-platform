@@ -6,10 +6,12 @@ import {
   designTraceabilityTouchesDiagramKinds,
   normalizeSnapshotFingerprint,
   snapshotInputFingerprint,
+  isLegacyCodeSnapshot,
+  stripRetiredCodeData,
 } from "@uml-platform/contracts";
 import type {
   AtomicRequirement,
-  CodeRunSnapshot,
+  
   DesignDiagramKind,
   DesignDiagramModelSpec,
   DesignPlantUmlArtifact,
@@ -29,8 +31,7 @@ import type {
 
 export type RestorableRunSnapshot =
   | RunSnapshot
-  | DesignRunSnapshot
-  | CodeRunSnapshot;
+  | DesignRunSnapshot;
 
 type AnyRunSnapshot = RestorableRunSnapshot | DocumentRunSnapshot | FeasibilityRunSnapshot;
 type WorkspaceState = Record<string, unknown>;
@@ -49,7 +50,7 @@ const REVIEWABLE_REQUIREMENT_FIELDS = [
 export function isRestorableRunSnapshot(
   snapshot: AnyRunSnapshot,
 ): snapshot is RestorableRunSnapshot {
-  return !("documentKind" in snapshot) && !("selectedArtifacts" in snapshot);
+  return !isLegacyCodeSnapshot(snapshot) && !("documentKind" in snapshot) && !("selectedArtifacts" in snapshot);
 }
 
 function reviewCandidateStillNeeded(
@@ -187,11 +188,7 @@ function reconcileAcceptedReviewCandidates(
   };
 }
 
-function shouldPreserveCodeWorkspaceOnSnapshot(snapshot: CodeRunSnapshot) {
-  if (snapshot.generationMode !== "regenerate") return false;
-  if (snapshot.status === "cancelled") return true;
-  return snapshot.status === "failed" && Object.keys(snapshot.files).length === 0;
-}
+
 
 function pruneRequirementReviewCandidatesForBaseline(
   candidates: unknown,
@@ -249,25 +246,23 @@ function applySnapshotToWorkspaceState(
   snapshot: RestorableRunSnapshot,
   options: { replaceRequirementInput?: boolean } = {},
 ) {
-  const next: WorkspaceState = { ...state };
+  const next: WorkspaceState = stripRetiredCodeData({ ...state });
   const currentRequirementText = stringValue(next.requirementText);
   const currentRules = arrayValue(next.rules);
   const currentHasRequirements =
     currentRequirementText.trim().length > 0 || currentRules.length > 0;
 
-  const isCodeSnapshot = isCodeRunSnapshot(snapshot);
+  
   const isDesignSnapshot = isDesignRunSnapshot(snapshot);
-  const isRequirementSnapshot = !isCodeSnapshot && !isDesignSnapshot;
-  if (!isCodeSnapshot) {
+  const isRequirementSnapshot = !isDesignSnapshot;
+  {
     const kind = isDesignSnapshot ? "design" : "requirements";
     next.visualReviews = {
       ...recordValue(next.visualReviews),
       ...Object.fromEntries(Object.entries(snapshot.visualReviews ?? {}).map(([id, review]) => [`${kind}:${id}`, review])),
     };
   }
-  const snapshotRequirementFingerprint = isCodeSnapshot
-    ? ""
-    : snapshotInputFingerprint({
+  const snapshotRequirementFingerprint = snapshotInputFingerprint({
         requirementText: snapshot.requirementText,
         rules: snapshot.rules,
       });
@@ -325,74 +320,7 @@ function applySnapshotToWorkspaceState(
     applyRequirementBaselineToWorkspaceState(next, snapshot.requirementBaseline);
   }
 
-  if (isCodeSnapshot) {
-    const incomingDesignModels = Object.fromEntries(
-      snapshot.designModels.map((model) => [getDesignModelId(model), model]),
-    );
-    const incomingDesignModelIds = new Set(Object.keys(incomingDesignModels));
-    const deletedDesignModelIds = Object.keys(recordValue(next.designModels)).filter(
-      (modelId) => !incomingDesignModelIds.has(modelId),
-    );
-
-    next.designModels = incomingDesignModels;
-    next.designModelTraceability = mergeDesignTraceability(
-      arrayValue(
-        next.designModelTraceability,
-      ) as DesignRunSnapshot["designModelTraceability"],
-      [],
-      [],
-      deletedDesignModelIds,
-    );
-    next.designPlantUml = Object.fromEntries(
-      [
-        ...Object.entries(
-          keepDesignRecordsForModelIds(
-            recordValue(next.designPlantUml),
-            incomingDesignModelIds,
-          ),
-        ),
-        ...snapshot.designPlantUml.map((artifact) => [
-          getDesignArtifactId(artifact),
-          artifact.source,
-        ] as const),
-      ],
-    );
-    next.designSvgArtifacts = keepDesignRecordsForModelIds(
-      recordValue(next.designSvgArtifacts),
-      incomingDesignModelIds,
-    );
-    next.designDiagramErrors = keepDesignRecordsForModelIds(
-      recordValue(next.designDiagramErrors),
-      incomingDesignModelIds,
-    );
-    next.designInputFingerprints = keepDesignRecordsForModelIds(
-      recordValue(next.designInputFingerprints),
-      incomingDesignModelIds,
-    );
-    next.generatedDesignDiagramTypes = completeGeneratedDesignDiagrams(
-      next,
-      uniqueStrings(
-        snapshot.designModels.map((model) => model.diagramKind),
-      ) as DesignDiagramKind[],
-    );
-    next.selectedDiagramTypes = [];
-    next.selectedDesignDiagramTypes = [];
-    next.codeSpec = snapshot.spec;
-    next.codeBusinessLogic = snapshot.businessLogic;
-    if (!shouldPreserveCodeWorkspaceOnSnapshot(snapshot)) {
-      next.codeFiles = { ...snapshot.files };
-      next.codeEntryFile = snapshot.entryFile;
-      next.codeDependencies = { ...snapshot.dependencies };
-    }
-    next.codeUiMockup = snapshot.uiMockup;
-    next.codeAgentPlan = [...snapshot.agentPlan];
-    next.codeSkills = [...snapshot.selectedCodeSkills];
-    next.codeSkillDiagnostics = [...snapshot.skillDiagnostics];
-    next.codeSkillResourcePlan = snapshot.skillResourcePlan;
-    next.codeSkillContext = snapshot.codeSkillContext;
-    next.codeDiagnostics = [...snapshot.diagnostics];
-    return finalizeSnapshotWorkspaceState(next);
-  }
+  
 
   if (isDesignRunSnapshot(snapshot)) {
     const designRecords = mapDesignSnapshotToRecords(snapshot);
@@ -670,11 +598,7 @@ function applySnapshotToWorkspaceState(
   return finalizeSnapshotWorkspaceState(next);
 }
 
-function isCodeRunSnapshot(
-  snapshot: RestorableRunSnapshot,
-): snapshot is CodeRunSnapshot {
-  return "files" in snapshot;
-}
+
 
 function isDesignRunSnapshot(
   snapshot: RestorableRunSnapshot,

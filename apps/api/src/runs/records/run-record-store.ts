@@ -1,7 +1,7 @@
 // Defines the in-memory run record boundary shared by routes, pipelines, and SSE.
 import { randomUUID } from "node:crypto";
 import type {
-  CodeRunSnapshot,
+  
   DesignRunSnapshot,
   DocumentRunSnapshot,
   FeasibilityRunSnapshot,
@@ -10,7 +10,7 @@ import type {
 } from "@uml-platform/contracts";
 
 export interface RunRecord {
-  snapshot: RunSnapshot | DesignRunSnapshot | CodeRunSnapshot | DocumentRunSnapshot | FeasibilityRunSnapshot;
+  snapshot: RunSnapshot | DesignRunSnapshot | DocumentRunSnapshot | FeasibilityRunSnapshot;
   events: RunEvent[];
   eventCreatedAt?: string[];
   listeners: Set<(event: RunEvent) => void>;

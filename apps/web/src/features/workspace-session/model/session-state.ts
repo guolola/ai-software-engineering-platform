@@ -1,18 +1,18 @@
 // Defines the public workspace session context shape and local run diagnostics types.
 
 import type {
-  CodeBusinessLogic,
-  CodeGenerationSpec,
-  CodeRunSnapshot,
-  CodeSkillContext,
-  CodeSkillResourceDiscoveryPlan,
-  CodeSkillResourcePreviewResult,
-  CodeSkillResourcePlan,
-  CodeTraceEntry,
-  CodeVisualDirection,
-  CodeUiFidelityReport,
-  CodeUiMockup,
-  CodeUiReferenceSpec,
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   DesignTraceEntry,
   BillingEntitlementErrorResponse,
   RequirementTraceEntry,
@@ -43,7 +43,7 @@ export interface DiagnosticEvent {
 export interface RunDiagnostics {
   /** Durable conversation records, independent of the capped diagnostic log. */
   transcript?: RunEvent[];
-  runKind: "requirements" | "design" | "code" | "document" | "feasibility" | null;
+  runKind: "requirements" | "design" | "document" | "feasibility" | null;
   runId: string | null;
   providerModel: string | null;
   startedAt: string | null;
@@ -54,23 +54,22 @@ export interface RunDiagnostics {
   stageStartedAt: Partial<Record<RunStage, string>>;
   stageMessages: Partial<Record<string, string>>;
   events: DiagnosticEvent[];
-  uiMockup: CodeUiMockup | null;
-  uiReferenceSpec: CodeUiReferenceSpec | null;
-  uiFidelityReport: CodeUiFidelityReport | null;
-  visualDirection: CodeVisualDirection | null;
-  skillResourceDiscoveryPlan: CodeSkillResourceDiscoveryPlan | null;
-  skillResourcePreviews: CodeSkillResourcePreviewResult | null;
-  skillResourcePlan: CodeSkillResourcePlan | null;
-  codeSkillContext: CodeSkillContext | null;
+  
+  
+  
+  
+  
+  
+  
+  
   requirementTrace: RequirementTraceEntry[];
   designTrace: DesignTraceEntry[];
-  codeTrace: CodeTraceEntry[];
+  
 }
 
 export type GenerationTaskKind =
   | "requirements"
   | "design"
-  | "code"
   | "document"
   | "feasibility";
 
@@ -110,7 +109,7 @@ export interface GenerationTask {
   messageCode?: string | null;
   messageParams?: Record<string, string | number | boolean | null>;
   errorMessage: string | null;
-  previewReady: boolean;
+  
   phaseSummary: string | null;
   technicalDetailsCollapsed: boolean;
   diagnostics: RunDiagnostics;
@@ -192,26 +191,26 @@ export interface WorkspaceSessionState {
   hasFeasibilityImplementationArtifact: boolean;
   feasibilityImplementationPlan: WorkspaceRecord["feasibilityImplementationPlan"];
   syncFeasibilityArtifacts: (workspace: WorkspaceRecord) => void;
-  codeSpec: CodeGenerationSpec | null;
-  codeBusinessLogic: CodeBusinessLogic | null;
-  codeFiles: Record<string, string>;
-  codeEntryFile: string | null;
-  codeDependencies: Record<string, string>;
-  codeUiMockup: CodeUiMockup | null;
-  codeAgentPlan: string[];
-  codeSkills: CodeRunSnapshot["selectedCodeSkills"];
-  codeSkillDiagnostics: CodeRunSnapshot["skillDiagnostics"];
-  codeSkillResourcePlan: CodeRunSnapshot["skillResourcePlan"];
-  codeSkillContext: CodeRunSnapshot["codeSkillContext"];
-  codeDiagnostics: CodeRunSnapshot["diagnostics"];
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   testGenerationResult: WorkspaceRecord["testGenerationResult"];
   updateTestGenerationResult: (
     result: WorkspaceRecord["testGenerationResult"],
   ) => Promise<void>;
-  codeEditVersion: number;
-  updateCodeFile: (path: string, value: string) => void;
-  recordCodePreviewDiagnostic: (message: string) => void;
-  clearCodePreviewDiagnostics: () => void;
+  
+  
+  
+  
   canUpdateWorkspace: boolean;
   canStartRuns: boolean;
   generationExecutionMode: import("@uml-platform/contracts").GenerationExecutionMode;
@@ -279,7 +278,7 @@ export interface WorkspaceSessionState {
   ) => Promise<void>;
   generateDiagrams: (only?: DiagramType[]) => Promise<void>;
   generateDesignDiagrams: (only?: DesignDiagramType[]) => Promise<void>;
-  generateCodePrototype: (mode?: "continue" | "regenerate") => Promise<void>;
+  
   generateRequirementsSpec: (
     documentStyle?: DocumentStyleSettings,
   ) => Promise<DocumentRunSnapshot | null>;

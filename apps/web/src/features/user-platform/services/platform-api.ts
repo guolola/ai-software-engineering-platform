@@ -103,7 +103,7 @@ export interface PlatformRunSummary {
   projectId?: string;
   status: string;
   stage?: string | null;
-  runKind?: "requirements" | "design" | "code" | "document" | string | null;
+  runKind?: "requirements" | "design" | "document" | string | null;
   documentKind?: DocumentKind | null;
   selectedDiagrams?: DiagramKind[] | DesignDiagramKind[] | null;
   requestedDiagrams?: DesignDiagramKind[] | null;
@@ -122,9 +122,9 @@ export interface PlatformRunSummary {
   updatedAt?: string | null;
   errorMessage?: string | null;
   error?: RunError | null;
-  codeDiagnosticCount?: number | null;
-  codeDiagnosticSummary?: string[] | null;
-  codeQualityIssueCount?: number | null;
+  
+  
+  
   terminal?: boolean | null;
   snapshotAvailable?: boolean | null;
   canRestore?: boolean | null;

@@ -2,7 +2,7 @@
 import type { Step } from "onborda";
 
 export type TourId = "empty-workspace" | "first-project-desktop" | "first-project-mobile";
-export type TourStage = "system" | "feasibility" | "requirements" | "design" | "code" | "tests" | "documents";
+export type TourStage = "system" | "feasibility" | "requirements" | "design" | "tests" | "documents";
 
 export type TourItem = {
   key: string;
@@ -22,7 +22,7 @@ export const TOUR_ITEMS: Record<TourId, readonly TourItem[]> = {
     { key: "desktop.requirements", selector: '[data-onboarding-nav="requirements"]', side: "right", stage: "requirements" },
     { key: "desktop.diagrams", selector: "#requirement-target-models", side: "top", stage: "requirements" },
     { key: "desktop.design", selector: '[data-onboarding-nav="design"]', side: "right", stage: "design" },
-    { key: "desktop.code", selector: '[data-onboarding-nav="workspace:code"]', side: "right", stage: "code" },
+    
     { key: "desktop.tests", selector: '[data-onboarding-nav="test"]', side: "right", stage: "tests" },
     { key: "desktop.documents", selector: '[data-onboarding-nav="documents"]', side: "right", stage: "documents" },
     { key: "desktop.tasks", selector: "#onboarding-tasks-action", side: "bottom" },

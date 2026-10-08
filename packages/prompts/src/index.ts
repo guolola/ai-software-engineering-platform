@@ -3,26 +3,7 @@ export {
   buildGenerateDocumentContentPrompt,
   buildRepairDocumentContentPrompt,
 } from "./document-prompts.js";
-export {
-  buildAnalyzeCodeBusinessLogicPrompt,
-  buildAnalyzeCodeUiMockupPrompt,
-  buildGenerateCodeAgentPlanPrompt,
-  buildGenerateCodeAppBlueprintPrompt,
-  buildGenerateCodeComponentRegistryPrompt,
-  buildGenerateCodeDesignTokensPrompt,
-  buildGenerateCodeFileOperationsPrompt,
-  buildGenerateCodeFilePlanPrompt,
-  buildGenerateCodeFilesPrompt,
-  buildGenerateCodeSkillResourceDiscoveryPrompt,
-  buildGenerateCodeSkillResourcePlanPrompt,
-  buildGenerateCodeSpecPrompt,
-  buildGenerateCodeUiBlueprintPrompt,
-  buildGenerateCodeUiIrPrompt,
-  buildGenerateCodeUiMockupPrompt,
-  buildGenerateCodeVisualDirectionPrompt,
-  buildRepairCodeFileOperationsPrompt,
-  buildVerifyCodeUiFidelityPrompt,
-} from "./code-prompts.js";
+
 export {
   JSON_ONLY_SYSTEM_PROMPT,
   buildExtractRulesPrompt,

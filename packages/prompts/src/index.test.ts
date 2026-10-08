@@ -3,18 +3,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { RequirementBaseline, RequirementRule } from "@uml-platform/contracts";
 import {
-  buildAnalyzeCodeBusinessLogicPrompt,
-  buildGenerateCodeAppBlueprintPrompt,
-  buildGenerateCodeAgentPlanPrompt,
-  buildGenerateCodeFilePlanPrompt,
-  buildGenerateCodeFileOperationsPrompt,
-  buildGenerateCodeSkillResourceDiscoveryPrompt,
-  buildGenerateCodeSkillResourcePlanPrompt,
-  buildGenerateCodeVisualDirectionPrompt,
-  buildGenerateCodeUiIrPrompt,
-  buildGenerateCodeSpecPrompt,
-  buildGenerateCodeUiBlueprintPrompt,
-  buildGenerateCodeUiMockupPrompt,
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   buildExtractRulesPrompt,
   buildGenerateDesignTraceabilityPrompt,
   buildGenerateDesignSequencePrompt,
@@ -23,12 +23,12 @@ import {
   buildGenerateDesignModelsPrompt,
   buildGenerateModelsPrompt,
   buildGenerateRequirementAnalysisPrompt,
-  buildRepairCodeFileOperationsPrompt,
+  
   buildRepairDesignModelsPrompt,
   buildRepairDesignTraceabilityPrompt,
   buildRepairModelsPrompt,
   buildRepairRequirementTraceabilityPrompt,
-  buildVerifyCodeUiFidelityPrompt,
+  
 } from "./index.js";
 
 const sampleRules: RequirementRule[] = [
@@ -498,22 +498,7 @@ test("code generation prompts use business background theme and modular files", 
         relationships: [],
       },
     ],
-    designToCodeMapping: {
-      generatedAt: "2026-06-26T00:00:00.000Z",
-      items: [
-        {
-          designModelId: "architecture",
-          diagramKind: "architecture",
-          elementId: "cmp-events",
-          elementKind: "architecture-component",
-          label: "活动工作台",
-          targetType: "component",
-          targetPath: "/src/components/EventsWorkspace.tsx",
-          rationale: "总体架构图组件决定模块边界。",
-        },
-      ],
-      diagnostics: [],
-    },
+    
   };
 
   const specPrompt = buildGenerateCodeSpecPrompt([]);
@@ -521,46 +506,8 @@ test("code generation prompts use business background theme and modular files", 
     "/src/App.tsx": "",
   });
   const appBlueprintPrompt = buildGenerateCodeAppBlueprintPrompt([]);
-  const appBlueprint = {
-    appName: "校园活动平台",
-    domain: "校园活动",
-    targetUsers: ["学生"],
-    coreWorkflow: "浏览活动并报名",
-    pages: [
-      {
-        id: "overview",
-        name: "活动总览",
-        route: "/",
-        purpose: "查看活动",
-        sourceDiagramIds: [],
-      },
-      {
-        id: "detail",
-        name: "活动详情",
-        route: "/detail",
-        purpose: "查看详情",
-        sourceDiagramIds: [],
-      },
-    ],
-    successCriteria: ["能完成活动浏览和报名"],
-  };
-  const uiBlueprint = {
-    theme: {
-      name: "校园活动",
-      primaryColor: "#2563eb",
-      backgroundColor: "#f8fafc",
-      surfaceColor: "#ffffff",
-      textColor: "#0f172a",
-      accentColor: "#f97316",
-      density: "comfortable" as const,
-      tone: "清爽",
-    },
-    visualLanguage: "校园服务风格",
-    navigationModel: "页面切换",
-    layoutPrinciples: ["信息清晰"],
-    componentGuidelines: ["状态明确"],
-    stateGuidelines: ["保留空状态"],
-  };
+  
+  
   const uiBlueprintPrompt = buildGenerateCodeUiBlueprintPrompt(
     codeContext,
     appBlueprint,
@@ -616,28 +563,7 @@ test("code generation prompts use business background theme and modular files", 
     frontendOperations: ["筛选活动", "提交报名", "查看提醒"],
     plantUmlTraceability: ["class:Activity", "sequence:signup"],
   };
-  const businessLogicPrompt = buildAnalyzeCodeBusinessLogicPrompt(
-    [],
-    [],
-    codeContext.designToCodeMapping,
-    {
-      generatedAt: "2026-06-26T00:00:00.000Z",
-      passed: true,
-      strictMode: false,
-      models: [
-        {
-          designModelId: "architecture",
-          diagramKind: "architecture",
-          mappedElementCount: 1,
-          targetPaths: ["/src/components/EventsWorkspace.tsx"],
-          status: "covered",
-          missingElements: [],
-          message: "已覆盖",
-        },
-      ],
-      diagnostics: [],
-    },
-  );
+  
   const filePlanPrompt = buildGenerateCodeFilePlanPrompt(
     codeContext,
     appBlueprint,
@@ -663,111 +589,24 @@ test("code generation prompts use business background theme and modular files", 
     appBlueprint,
     uiBlueprint,
   );
-  const visualDirection = {
-    productType: "public activity calendar",
-    targetAudience: "guests and registered users",
-    toneKeywords: ["friendly", "professional"],
-    styleKeywords: ["light SaaS", "soft cards"],
-    colorMood: "light blue green",
-    typographyMood: "clean readable sans-serif",
-    layoutMood: "responsive calendar workspace",
-    componentTexture: "soft shadows and subtle borders",
-    interactionMood: "clear feedback and accessible forms",
-    avoidStyles: ["pure black default background"],
-    promptBrief: "Friendly public activity calendar with light blue green palette and polished SaaS cards.",
-  };
-  const skillResourceDiscoveryPlan = {
-    skillName: "ui-ux-pro-max",
-    alias: "@web-design",
-    requests: [
-      {
-        path: "data/styles.csv",
-        reason: "理解视觉风格。",
-        expectedUse: "选择卡片和浅色主题规则。",
-      },
-      {
-        path: "data/stacks/react.csv",
-        reason: "理解 React 实现规则。",
-        expectedUse: "保证原型可运行。",
-      },
-    ],
-    diagnostics: [],
-  };
-  const skillResourcePreviews = {
-    skillName: "ui-ux-pro-max",
-    alias: "@web-design",
-    previews: [
-      {
-        path: "data/styles.csv",
-        rowCount: 120,
-        headers: ["No", "Category", "Style", "Description"],
-        sampleRows: [
-          {
-            No: "1",
-            Category: "Cards",
-            Style: "soft SaaS",
-            Description: "Light cards with subtle borders",
-          },
-        ],
-        matchedHints: ["calendar"],
-        status: "completed" as const,
-      },
-    ],
-    diagnostics: [],
-  };
+  
+  
+  
   const operationsPrompt = buildGenerateCodeFileOperationsPrompt(
     codeContext,
     {},
     {
       businessLogic,
-      designToCodeMapping: codeContext.designToCodeMapping,
-      uiBlueprint,
-      visualDirection,
-      skillResourceDiscoveryPlan,
-      skillResourcePreviews,
-      selectedCodeSkills: [
-        {
-          alias: "@web-design",
-          name: "ui-ux-pro-max",
-          description: "ui-ux-pro-max",
-          source: "project",
-          location: "apps/api/src/code-skills/ui-ux-pro-max/SKILL.md",
-          appliesTo: ["implementation", "repair"],
-          priority: 100,
-          reason: "固定启用",
-        },
-      ],
+      
+      
+      
+      
+      
+      
       codeSkillInstructions:
         '<code_skill alias="@web-design" name="ui-ux-pro-max">生成完整可运行代码。</code_skill>',
-      skillResourcePlan: {
-        skillName: "ui-ux-pro-max",
-        alias: "@web-design",
-        query: "校园活动 React responsive",
-        requests: [
-          {
-            resourceType: "stack",
-            name: "react-stack",
-            query: "React responsive prototype",
-            csvPath: "",
-            stack: "react",
-            domain: "",
-            actionName: "",
-            maxResults: 6,
-            reason: "获取 React stack 规则。",
-          },
-        ],
-        diagnostics: [],
-      },
-      codeSkillContext: {
-        skillName: "ui-ux-pro-max",
-        alias: "@web-design",
-        query: "校园活动 React",
-        designSystem: "## Design System",
-        stackGuidelines: "{\"stack\":\"react\"}",
-        domainGuidelines: "{\"domain\":\"ux\"}",
-        actionResults: [],
-        diagnostics: [],
-      },
+      
+      
     },
   );
   const repairOperationsPrompt = buildRepairCodeFileOperationsPrompt(
@@ -780,22 +619,11 @@ test("code generation prompts use business background theme and modular files", 
     "缺少主题切换",
     {
       businessLogic,
-      designToCodeMapping: codeContext.designToCodeMapping,
-      visualDirection,
-      skillResourceDiscoveryPlan,
-      skillResourcePreviews,
-      selectedCodeSkills: [
-        {
-          alias: "@web-design",
-          name: "ui-ux-pro-max",
-          description: "ui-ux-pro-max",
-          source: "project",
-          location: "apps/api/src/code-skills/ui-ux-pro-max/SKILL.md",
-          appliesTo: ["implementation", "repair"],
-          priority: 100,
-          reason: "固定启用",
-        },
-      ],
+      
+      
+      
+      
+      
       codeSkillInstructions:
         '<code_skill alias="@web-design" name="ui-ux-pro-max">生成完整可运行代码。</code_skill>',
     },
@@ -807,30 +635,7 @@ test("code generation prompts use business background theme and modular files", 
     null,
     null,
   );
-  const skillResourcePlanPrompt = buildGenerateCodeSkillResourcePlanPrompt(
-    businessLogic,
-    {
-      alias: "@web-design",
-      aliases: ["@web-design"],
-      name: "ui-ux-pro-max",
-      description: "UI/UX design intelligence",
-      source: "project",
-      location: "apps/api/src/code-skills/ui-ux-pro-max/SKILL.md",
-      baseDir: "apps/api/src/code-skills/ui-ux-pro-max",
-      fileManifest: [
-        {
-          path: "apps/api/src/code-skills/ui-ux-pro-max/data/stacks/react.csv",
-          relativePath: "data/stacks/react.csv",
-          kind: "data",
-          size: 120,
-        },
-      ],
-      content: "Use search.py and CSV resources for UI/UX guidance.",
-      loadedAt: new Date().toISOString(),
-    },
-    visualDirection,
-    skillResourcePreviews,
-  );
+  
   const visualDirectionPrompt = buildGenerateCodeVisualDirectionPrompt(
     businessLogic,
     {
@@ -897,17 +702,17 @@ test("code generation prompts use business background theme and modular files", 
 
   assert.match(specPrompt, /theme 必须描述业务领域主题/);
   assert.match(specPrompt, /不是软件工程实践平台主题/);
-  assert.match(businessLogicPrompt, /businessLogic/);
-  assert.match(businessLogicPrompt, /PlantUML/);
-  assert.match(businessLogicPrompt, /不是 skill/);
-  assert.match(businessLogicPrompt, /设计模型定义页面、实体、流程和模块结构/);
-  assert.match(businessLogicPrompt, /不得从已确认需求基线推导与设计结构无关的新页面/);
-  assert.match(businessLogicPrompt, /服务端已确认需求基线/);
-  assert.match(businessLogicPrompt, /designToCodeMapping/);
-  assert.match(businessLogicPrompt, /必须全部是字符串数组/);
-  assert.match(businessLogicPrompt, /不要输出对象数组/);
-  assert.match(businessLogicPrompt, /coreWorkflow 必须是一个字符串/);
-  assert.match(businessLogicPrompt, /status:待审核\|已通过/);
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   assert.match(planPrompt, /App、components、domain\/types、data\/mock-data/);
   assert.match(appBlueprintPrompt, /2 到 6 个页面/);
   assert.match(uiBlueprintPrompt, /避免空壳营销页/);
@@ -969,22 +774,22 @@ test("code generation prompts use business background theme and modular files", 
   assert.match(operationsPrompt, /不要把权限边界、服务边界、过滤条件、函数名、规则溯源等说明性文本直接显示/);
   assert.match(operationsPrompt, /\/BUSINESS_CONTEXT\.md/);
   assert.match(operationsPrompt, /不要放到 \/src\/docs\/\*/);
-  assert.match(skillResourcePlanPrompt, /自主声明/);
-  assert.match(skillResourcePlanPrompt, /Skill 资源预览结果/);
-  assert.match(skillResourcePlanPrompt, /headers\/sampleRows/);
-  assert.match(skillResourcePlanPrompt, /data\/styles\.csv/);
-  assert.match(skillResourcePlanPrompt, /data\/products\.csv/);
-  assert.match(skillResourcePlanPrompt, /data\/colors\.csv/);
-  assert.match(skillResourcePlanPrompt, /data\/typography\.csv/);
-  assert.match(skillResourcePlanPrompt, /data\/\*\*\/\.csv|data\/\*\*\/\*\.csv/);
-  assert.match(skillResourcePlanPrompt, /不要声明所有 CSV/);
-  assert.match(skillResourcePlanPrompt, /Web React 原型/);
-  assert.match(skillResourcePlanPrompt, /data\/app-interface\.csv/);
-  assert.match(skillResourcePlanPrompt, /React Native 的 haptics/);
-  assert.match(skillResourcePlanPrompt, /React 原型必须声明 stack=react/);
-  assert.match(skillResourcePlanPrompt, /stack=react、stack=shadcn、stack=html-tailwind/);
-  assert.match(skillResourcePlanPrompt, /Tailwind utility、CSS variables、Radix UI 和 shadcn 风格本地组件/);
-  assert.match(skillResourcePlanPrompt, /dark-mode 资源，只能用于可选深色主题/);
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   assert.match(visualDirectionPrompt, /promptBrief/);
   assert.match(visualDirectionPrompt, /优秀官网 demo/);
   assert.match(visualDirectionPrompt, /Web React/);

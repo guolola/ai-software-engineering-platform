@@ -1,10 +1,11 @@
-// Composes the in-app documentation center from modular docs data, search, and article panels.
+// Composes the public documentation page with independent navigation and shared scroll areas.
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, BookOpenCheck, Menu, ChevronDown } from "lucide-react";
 import { cn } from "../../../shared/ui/utils";
 import { Button } from "../../../shared/ui/button";
 import { PageContainer } from "../../../shared/template/layout/page";
+import { ScrollArea } from "../../../shared/ui/scroll-area";
 import { i18n as appI18n } from "../../../shared/i18n";
 import { getProductDocArticles, getProductDocCategories } from "../model/docs-content";
 import {
@@ -14,6 +15,8 @@ import {
 import { DocsArticleView } from "./docs-article-view";
 import { DocsOnThisPage } from "./docs-on-this-page";
 import { DocsSidebar } from "./docs-sidebar";
+import { DocsHeader } from "./docs-header";
+import { scrollDocsHeading } from "../lib/docs-scroll";
 
 type ProductDocsPageProps = {
   onNavigate?: (route: string) => void;
@@ -28,6 +31,8 @@ export function ProductDocsPage({ onNavigate }: ProductDocsPageProps) {
   const [selection, setSelection] = useState({ id: articles[0]?.id ?? "", revision: 0 });
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const pageRef = useRef<HTMLElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const directoryToolbarRef = useRef<HTMLDivElement>(null);
   const selectArticle = (id: string) => {
     setSelection((current) => ({ id, revision: current.revision + 1 }));
     setDirectoryOpen(false);
@@ -39,7 +44,9 @@ export function ProductDocsPage({ onNavigate }: ProductDocsPageProps) {
     // Wait for the new article and collapsed mobile directory to commit together.
     const title = pageRef.current?.querySelector<HTMLElement>("article h1");
     title?.focus({ preventScroll: true });
-    title?.scrollIntoView({ block: "start" });
+    if (title && viewportRef.current) {
+      scrollDocsHeading(viewportRef.current, title, directoryToolbarRef.current?.offsetHeight ?? 0, "instant");
+    }
   }, [selection]);
   const [searchQuery, setSearchQuery] = useState("");
   const selectedArticle =
@@ -55,58 +62,72 @@ export function ProductDocsPage({ onNavigate }: ProductDocsPageProps) {
   );
 
   return (
-    <main ref={pageRef} data-testid="product-docs-page" className="@container/docs min-w-0 w-full bg-background text-foreground">
-      <div className="sticky top-20 z-40 border-b border-border bg-background px-4 py-2 @[720px]/docs:hidden">
-        <Button
-          variant="ghost"
-          className="w-full justify-start"
-          aria-expanded={directoryOpen}
-          aria-controls="product-docs-directory"
-          onClick={() => setDirectoryOpen((open) => !open)}
-        >
-          <Menu className="size-4" />
-          {t("docs.directory")}
-          <ChevronDown className="ml-auto size-4" />
-        </Button>
-      </div>
-      <PageContainer className="h-auto flex-none py-8 @[720px]/docs:py-10">
-        <div className="grid w-full grid-cols-1 items-start gap-8 @[720px]/docs:grid-cols-[256px_minmax(0,1fr)] @[1040px]/docs:grid-cols-[256px_minmax(0,800px)_200px]">
-          <div id="product-docs-directory" className={cn("min-w-0 @[720px]/docs:sticky @[720px]/docs:top-24 @[720px]/docs:max-h-[calc(100dvh-7rem)] @[720px]/docs:self-start @[720px]/docs:overflow-y-auto @[720px]/docs:block", !directoryOpen && "hidden")}>
-            <DocsSidebar
-              articles={articles}
-              categories={categories}
-              searchQuery={searchQuery}
-              searchResults={searchResults}
-              selectedArticleId={selectedArticle.id}
-              onSearchQueryChange={setSearchQuery}
-              onSelectArticle={selectArticle}
-            />
-          </div>
-
-          <DocsArticleView
-            article={selectedArticle}
-            headings={headings}
-            onNavigate={onNavigate}
-          />
-
-          <DocsOnThisPage headings={headings} />
-        </div>
-
-        <footer data-testid="docs-footer" className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
-          <span className="inline-flex items-center gap-2">
-            <BookOpenCheck className="size-4 text-primary" />
-            {t("docs.maintainedNotice")}
-          </span>
-          <Button variant="ghost"
-            type="button"
-            className="inline-flex items-center gap-1 hover:underline"
-            onClick={() => selectArticle(articles[0]?.id ?? selectedArticle.id)}
+    <main ref={pageRef} data-testid="product-docs-page" className="@container/docs flex h-dvh min-h-0 min-w-0 w-full flex-col overflow-hidden bg-background text-foreground">
+      <DocsHeader searchQuery={searchQuery} onSearchQueryChange={(query) => {
+        setSearchQuery(query);
+        // Mobile search exposes its results in the collapsible directory immediately.
+        setDirectoryOpen(Boolean(query.trim()));
+      }} />
+      <ScrollArea data-testid="docs-content-scroll-area" viewportRef={viewportRef} className="min-h-0 flex-1" contentClassName="!block">
+        <div ref={directoryToolbarRef} className="sticky top-0 z-40 border-b border-border bg-background px-4 py-2 @[720px]/docs:hidden">
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            aria-expanded={directoryOpen}
+            aria-controls="product-docs-directory"
+            onClick={() => setDirectoryOpen((open) => !open)}
           >
-            {t("docs.backToQuickStart")}
-            <ArrowRight className="size-4" />
+            <Menu className="size-4" />
+            {t("docs.directory")}
+            <ChevronDown className="ml-auto size-4" />
           </Button>
-        </footer>
-      </PageContainer>
+        </div>
+        <PageContainer className="h-auto flex-none py-8 @[720px]/docs:py-10">
+          <div className="grid w-full grid-cols-1 items-start gap-8 @[720px]/docs:grid-cols-[256px_minmax(0,1fr)] @[1040px]/docs:grid-cols-[256px_minmax(0,800px)_200px]">
+            <div id="product-docs-directory" className={cn("min-w-0 @[720px]/docs:sticky @[720px]/docs:top-8 @[720px]/docs:self-start @[720px]/docs:block", !directoryOpen && "hidden")}>
+              <ScrollArea data-testid="docs-directory-scroll-area" className="h-[min(60dvh,32rem)] @[720px]/docs:h-[calc(100dvh-8rem)]" contentClassName="!block">
+                <DocsSidebar
+                  articles={articles}
+                  categories={categories}
+                  searchQuery={searchQuery}
+                  searchResults={searchResults}
+                  selectedArticleId={selectedArticle.id}
+                  onSelectArticle={selectArticle}
+                />
+              </ScrollArea>
+            </div>
+
+            <div data-testid="docs-article-column" className="min-w-0 w-full max-w-[800px]">
+              <DocsArticleView
+                article={selectedArticle}
+                headings={headings}
+                onNavigate={onNavigate}
+              />
+              <footer data-testid="docs-footer" className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground">
+                <span className="inline-flex items-center gap-2">
+                  <BookOpenCheck className="size-4 text-primary" />
+                  {t("docs.maintainedNotice")}
+                </span>
+                <Button variant="ghost"
+                  type="button"
+                  className="inline-flex items-center gap-1 hover:underline"
+                  onClick={() => selectArticle(articles[0]?.id ?? selectedArticle.id)}
+                >
+                  {t("docs.backToQuickStart")}
+                  <ArrowRight className="size-4" />
+                </Button>
+              </footer>
+            </div>
+
+            <DocsOnThisPage headings={headings} onSelectHeading={(id) => {
+              const heading = document.getElementById(id);
+              if (heading && viewportRef.current && pageRef.current?.contains(heading)) {
+                scrollDocsHeading(viewportRef.current, heading, directoryToolbarRef.current?.offsetHeight ?? 0);
+              }
+            }} />
+          </div>
+        </PageContainer>
+      </ScrollArea>
     </main>
   );
 }

@@ -89,11 +89,7 @@ export const LINEAGE_KIND_STYLES: Record<
     iconBox: "border-border bg-muted/60",
     iconColor: "text-warning",
   },
-  code: {
-    icon: FileCode2,
-    iconBox: "border-border bg-muted/60",
-    iconColor: "text-teal-600 dark:text-teal-300",
-  },
+  
 };
 
 type LineageNodeCardProps = {

@@ -6,14 +6,7 @@ import {
 
 describe("workflow manifest", () => {
   it("exposes prerequisite reasons that the UI can show inline", () => {
-    expect(
-      getWorkflowDisabledReason("code", {
-        hasRequirementText: true,
-        hasRequirementModels: true,
-        hasDesignModels: false,
-        hasCodeFiles: false,
-      }),
-    ).toBe("请先生成设计模型");
+    
   });
 
   it("keeps workflow step ids unique", () => {

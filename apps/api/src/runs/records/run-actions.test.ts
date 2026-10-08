@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type {
-  CodeRunSnapshot,
+  
   DesignRunSnapshot,
   FeasibilityRunSnapshot,
   RunSnapshot,
@@ -11,7 +11,7 @@ import { buildRequirementBaseline } from "../baselines/requirement-baseline.js";
 import { createQueuedRunFromSource } from "./run-actions.js";
 import type { RunRecord, RunRecordStore } from "./run-record-store.js";
 import {
-  createEmptyCodeSnapshot,
+  
   createEmptyDesignSnapshot,
   createEmptyFeasibilitySnapshot,
   createEmptySnapshot,
@@ -110,36 +110,7 @@ test("createQueuedRunFromSource preserves design requested diagram scope", () =>
   assert.deepEqual(rerunSnapshot.requestedDiagrams, ["sequence"]);
 });
 
-test("createQueuedRunFromSource preserves the code requirement baseline", () => {
-  const runs: RunRecordStore = new Map();
-  const requirementBaseline = buildRequirementBaseline({
-    runId: "baseline-code-run",
-    requirementText: "用户可以查看图书。",
-    rules: [rule],
-  });
-  const sourceSnapshot = createEmptyCodeSnapshot("source-code-run", {
-    designModels: [],
-    existingFiles: { "/src/App.tsx": "export default function App(){}" },
-    requirementBaseline,
-  });
-  sourceSnapshot.status = "failed";
 
-  createQueuedRunFromSource({
-    runs,
-    source: createSourceRecord(sourceSnapshot),
-    action: "retry",
-    sourceRunId: sourceSnapshot.runId,
-    runId: "retry-code-run",
-  });
-
-  const retrySnapshot = runs.get("retry-code-run")?.snapshot as CodeRunSnapshot;
-  assert.equal(retrySnapshot.requirementBaseline?.runId, "baseline-code-run");
-  assert.equal(retrySnapshot.generationMode, "continue");
-  assert.equal(
-    retrySnapshot.files["/src/App.tsx"],
-    "export default function App(){}",
-  );
-});
 
 test("retry narrows a failed requirement batch to retryable diagram errors", () => {
   const runs: RunRecordStore = new Map();

@@ -1,14 +1,14 @@
 // Verifies run subscriptions recover from broken SSE streams by polling terminal snapshots.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
-  CodeRunSnapshot,
+  
   DesignRunSnapshot,
   DocumentRunSnapshot,
   RunEvent,
   RunSnapshot,
 } from "@uml-platform/contracts";
 import {
-  subscribeToCodeRunEvents,
+  
   subscribeToDesignRunEvents,
   subscribeToDocumentRunEvents,
   subscribeToRequirementRunEvents,
@@ -92,56 +92,7 @@ function designSnapshot(
   };
 }
 
-function codeSnapshot(
-  overrides: Partial<CodeRunSnapshot> = {},
-): CodeRunSnapshot {
-  return {
-    runId: "run-code-1",
-    requirementText: "生成订单系统代码",
-    rules: [],
-    designModels: [],
-    designPlantUml: [],
-    spec: null,
-    businessLogic: null,
-    loadedCodeSkill: null,
-    visualDirection: null,
-    skillResourceDiscoveryPlan: null,
-    skillResourcePreviews: null,
-    skillResourcePlan: null,
-    codeSkillContext: null,
-    appBlueprint: null,
-    uiBlueprint: null,
-    uiMockup: null,
-    uiReferenceSpec: null,
-    uiFidelityReport: null,
-    designTokens: null,
-    componentRegistry: null,
-    uiIr: null,
-    visualDiffReport: null,
-    repairLoopSummary: null,
-    selectedCodeSkills: [],
-    skillDiagnostics: [],
-    filePlan: null,
-    codeImplementationBrief: null,
-    codeFileOperationManifest: null,
-    fileGenerationDiagnostics: [],
-    codeTrace: [],
-    codeGenerationMode: "json_schema_operations",
-    qualityDiagnostics: [],
-    files: { "/src/App.tsx": "export default function App() { return null; }" },
-    entryFile: "/src/App.tsx",
-    dependencies: {},
-    agentPlan: [],
-    generationMode: "regenerate",
-    changedFileCount: 1,
-    diagnostics: [],
-    codeContextHash: null,
-    currentStage: "write_code_files",
-    status: "completed",
-    error: null,
-    ...overrides,
-  };
-}
+
 
 function documentSnapshot(
   overrides: Partial<DocumentRunSnapshot> = {},
@@ -347,14 +298,7 @@ describe("run subscriptions", () => {
         status: "completed",
       }),
     },
-    {
-      label: "code",
-      runId: "run-code-1",
-      eventPath: "/api/code-runs/run-code-1/events",
-      snapshotPath: "/api/code-runs/run-code-1",
-      subscribe: subscribeToCodeRunEvents,
-      snapshot: codeSnapshot(),
-    },
+    
     {
       label: "document",
       runId: "run-doc-1",

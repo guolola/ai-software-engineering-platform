@@ -13,7 +13,7 @@ export type {
   ShellRoutePath,
 } from "../shared/lib/app-route-types";
 
-const SHELL_PATHS = new Set<ShellRoutePath>(["/workspace", "/exam", "/tutorial"]);
+const SHELL_PATHS = new Set<ShellRoutePath>(["/workspace", "/exam"]);
 const MARKETING_PATHS = new Set<MarketingRoutePath>(["/"]);
 const AUTH_PATHS = new Set<AuthRoutePath>([
   "/login",
@@ -24,6 +24,9 @@ const AUTH_PATHS = new Set<AuthRoutePath>([
 ]);
 
 export function matchAppRoute(pathname: string): AppRoute {
+  // Public documentation is independent of the authenticated workspace routes.
+  if (pathname === "/tutorial") return { kind: "product-docs", path: "/tutorial" };
+  if (pathname === "/projects/connections" || pathname === "/account/connections") return { kind: "mcp-connections", path: pathname };
   if (MARKETING_PATHS.has(pathname as MarketingRoutePath)) {
     return { kind: "marketing-home", path: pathname as MarketingRoutePath };
   }

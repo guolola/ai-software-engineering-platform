@@ -35,14 +35,14 @@ test("parallel calls and retries do not close a stage; the pipeline closes it on
 test("advancing closes the prior pass and preserves partial failure and review outcomes", () => {
   const run = record();
   const lifecycle = createStageLifecycle(run);
-  for (const [stage, status] of [["audit_code_quality", "failed"], ["repair_code_files", "completed"], ["audit_code_quality", "pending_review"]] as const) {
+  for (const [stage, status] of [["generate_models", "failed"], ["generate_plantuml", "completed"], ["render_svg", "pending_review"]] as const) {
     lifecycle.advance(stage);
     emitEvent(run, { type: "stage_started", stage, tracksCompletion: true });
     emitEvent(run, { type: "stage_progress", stage, progress: 80, subtaskId: "audit", subtaskStatus: status });
   }
   emitEvent(run, { type: "completed", snapshot: run.snapshot });
   assert.deepEqual(run.events.filter((event) => event.type === "stage_finished").map((event) => [event.stage, event.status]), [
-    ["audit_code_quality", "failed"], ["repair_code_files", "completed"], ["audit_code_quality", "pending_review"],
+    ["generate_models", "failed"], ["generate_plantuml", "completed"], ["render_svg", "pending_review"],
   ]);
 });
 

@@ -12,7 +12,6 @@ const STAGE_SELECTION_KIND = {
   feasibility: "feasibility-home",
   requirements: "requirements-text",
   design: "design-home",
-  code: "workspace-placeholder",
   tests: "test-home",
   documents: "documents-home",
 } as const;
@@ -65,7 +64,7 @@ export function useProjectOnboarding(projectId: string) {
           case "feasibility": workspace.openFeasibilityHome(); break;
           case "requirements": workspace.openRequirementsText(); break;
           case "design": workspace.openDesignHome(); break;
-          case "code": workspace.openWorkspacePlaceholder("code", t("workspace.tabs.labels.code")); break;
+          
           case "tests": workspace.openTestHome(); break;
           case "documents": workspace.openDocumentsHome(); break;
         }

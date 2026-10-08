@@ -8,7 +8,7 @@ import type {
 import { snapshotInputFingerprint, feasibilityInputsSchema } from "@uml-platform/contracts";
 import { createBusinessFlowArtifact } from "../../test-fixtures/feasibility/business-flow.js";
 import { createInMemoryAuthStore } from "../../auth/in-memory-auth-store.js";
-import { createEmptyCodeSnapshot, createEmptyDesignSnapshot, createEmptyDocumentSnapshot, createEmptyFeasibilitySnapshot, createEmptySnapshot } from "../../runs/records/snapshots.js";
+import {  createEmptyDesignSnapshot, createEmptyDocumentSnapshot, createEmptyFeasibilitySnapshot, createEmptySnapshot } from "../../runs/records/snapshots.js";
 import { emitEvent, type RunRecord } from "../../runs/records/run-record-store.js";
 import { buildRequirementBaseline } from "../../runs/baselines/requirement-baseline.js";
 import {
@@ -445,119 +445,5 @@ test("terminal design snapshots do not pollute requirement fingerprints during a
   );
 });
 
-test("terminal code snapshots auto-sync generated files while document snapshots are skipped", async () => {
-  const { authStore, project, user, syncProjectWorkspace } =
-    await createWorkspaceSyncFixture();
-  const codeSnapshot = createEmptyCodeSnapshot("run-code-sync", {
-    designModels: [designClassModel],
-  });
-  codeSnapshot.files = {
-    "/src/App.tsx": "export default function App() { return null; }",
-  };
-  codeSnapshot.status = "completed";
-  attachAndComplete(
-    {
-      snapshot: codeSnapshot,
-      events: [],
-      listeners: new Set(),
-      terminal: false,
-      metadata: {
-        projectId: project.id,
-        userId: user.id,
-        createdAt: "2026-06-20T00:00:00.000Z",
-      },
-    },
-    syncProjectWorkspace,
-  );
 
-  await waitForWorkspace(
-    async () => (await authStore.getProjectWorkspace(project.id)).state,
-    (candidate) =>
-      Boolean((candidate.codeFiles as Record<string, string> | undefined)?.["/src/App.tsx"]),
-  );
 
-  const beforeDocument = await authStore.getProjectWorkspace(project.id);
-  const documentSnapshot = createEmptyDocumentSnapshot("run-document-sync", {
-    documentKind: "requirementsSpec",
-    requirementText: rule.text,
-  });
-  documentSnapshot.status = "completed";
-  attachAndComplete(
-    {
-      snapshot: documentSnapshot,
-      events: [],
-      listeners: new Set(),
-      terminal: false,
-      metadata: {
-        projectId: project.id,
-        userId: user.id,
-        createdAt: "2026-06-20T00:00:00.000Z",
-      },
-    },
-    syncProjectWorkspace,
-  );
-
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  const afterDocument = await authStore.getProjectWorkspace(project.id);
-  assert.equal(afterDocument.version, beforeDocument.version);
-});
-
-test("cancelled regenerate code snapshots do not clear existing project code files", async () => {
-  const { authStore, project, user, syncProjectWorkspace } =
-    await createWorkspaceSyncFixture();
-  const oldCodeFiles = {
-    "/src/main.tsx": "import App from './App';",
-    "/src/App.tsx": "export default function App() { return <main>old</main>; }",
-  };
-  const seeded = await authStore.saveProjectWorkspace({
-    projectId: project.id,
-    baseVersion: 0,
-    state: {
-      codeFiles: oldCodeFiles,
-      codeEntryFile: "/src/main.tsx",
-      codeDependencies: { react: "latest", vite: "latest" },
-    },
-    updatedByUserId: user.id,
-  });
-  assert.equal(seeded.ok, true);
-
-  const snapshot = createEmptyCodeSnapshot("run-code-cancelled-sync", {
-    designModels: [designClassModel],
-    existingFiles: oldCodeFiles,
-    generationMode: "regenerate",
-  });
-  snapshot.status = "cancelled";
-  snapshot.currentStage = "write_code_files";
-  const record: RunRecord = {
-    snapshot,
-    events: [],
-    listeners: new Set(),
-    terminal: false,
-    metadata: {
-      projectId: project.id,
-      userId: user.id,
-      createdAt: "2026-06-20T00:00:00.000Z",
-    },
-  };
-
-  attachProjectWorkspaceSync(record, syncProjectWorkspace);
-  emitEvent(record, {
-    type: "cancelled",
-    stage: "write_code_files",
-    message: "用户取消代码重新生成。",
-  });
-
-  const state = await waitForWorkspace(
-    async () => (await authStore.getProjectWorkspace(project.id)).state,
-    (candidate) =>
-      Boolean(
-        (candidate.designModels as Record<string, unknown> | undefined)?.[
-          "class:design"
-        ],
-      ),
-  );
-
-  assert.deepEqual(state.codeFiles, oldCodeFiles);
-  assert.equal(state.codeEntryFile, "/src/main.tsx");
-  assert.deepEqual(state.codeDependencies, { react: "latest", vite: "latest" });
-});

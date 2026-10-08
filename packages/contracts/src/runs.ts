@@ -26,36 +26,7 @@ import {
   traceabilityMatrixSchema,
   umlDiagramKindSchema,
 } from "./requirements.js";
-import {
-  codeAppBlueprintSchema,
-  codeBusinessAssertionResultSchema,
-  codeBusinessLogicSchema,
-  codeComponentRegistrySchema,
-  codeDesignTokensSchema,
-  designModelCoverageReportSchema,
-  designToCodeMappingSchema,
-  codeFileGenerationDiagnosticSchema,
-  codeFilePlanSchema,
-  codeFileOperationManifestResultSchema,
-  codeGenerationSpecSchema,
-  codeImplementationBriefSchema,
-  codeQualityDiagnosticSchema,
-  codeRepairLoopSummarySchema,
-  codeSkillContextSchema,
-  codeSkillDiagnosticsSchema,
-  codeSkillResourceDiscoveryPlanSchema,
-  codeSkillResourcePlanSchema,
-  codeSkillResourcePreviewResultSchema,
-  codeSkillSelectionSchema,
-  codeUiBlueprintSchema,
-  codeUiFidelityReportSchema,
-  codeUiIrSchema,
-  codeUiMockupSchema,
-  codeUiReferenceSpecSchema,
-  codeVisualDiffReportSchema,
-  codeVisualDirectionSchema,
-  loadedCodeSkillSchema,
-} from "./code-generation.js";
+
 import {
   imageProviderSettingsSchema,
   providerSettingsSchema,
@@ -210,28 +181,11 @@ export const startDesignRunCommandSchema = z
   .strict();
 export type StartDesignRunCommand = z.infer<typeof startDesignRunCommandSchema>;
 
-export const startCodeRunRequestSchema = z
-  .object({
-    projectId: z.string().min(1).optional(),
-    designModels: z.array(designDiagramModelSpecSchema).min(1),
-    designPlantUml: z.array(designPlantUmlArtifactSchema).default([]),
-    existingFiles: z.record(z.string().min(1), z.string()).default({}),
-    generationMode: z.enum(["continue", "regenerate"]).default("continue"),
-    providerSettings: providerSettingsSchema.optional(),
-    imageProviderSettings: imageProviderSettingsSchema.optional(),
-  })
-  .strict();
-export type StartCodeRunRequest = z.infer<typeof startCodeRunRequestSchema>;
 
-export const startCodeRunCommandSchema = z
-  .object({
-    projectId: z.string().min(1).optional(),
-    generationMode: z.enum(["continue", "regenerate"]).default("continue"),
-    providerSettings: providerSettingsSchema.optional(),
-    imageProviderSettings: imageProviderSettingsSchema.optional(),
-  })
-  .strict();
-export type StartCodeRunCommand = z.infer<typeof startCodeRunCommandSchema>;
+
+
+
+
 
 export const startDocumentRunRequestSchema = z.object({
   projectId: z.string().min(1).optional(),
@@ -276,25 +230,21 @@ export const runStageSchema = z.enum([
   "generate_design_sequence",
   "generate_design_models",
   "generate_tests",
-  "analyze_code_business_logic",
-  "analyze_code_product",
-  "plan_code_ui",
-  "generate_code_ui_mockup",
-  "analyze_code_ui_mockup",
-  "generate_code_ui_ir",
-  "load_web_design_skill",
-  "select_code_skills",
-  "plan_code_files",
-  "generate_code_spec",
-  "generate_code_files",
-  "plan_code",
-  "write_code_files",
-  "audit_code_quality",
-  "verify_code_ui_fidelity",
-  "verify_code_rendered_preview",
-  "verify_code_business_assertions",
-  "verify_code_preview",
-  "repair_code_files",
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   "generate_document_text",
   "render_document_file",
   "generate_plantuml",
@@ -423,32 +373,8 @@ export const requirementTraceEntrySchema = z.object({
 });
 export type RequirementTraceEntry = z.infer<typeof requirementTraceEntrySchema>;
 
-export const codeTraceEntrySchema = z.object({
-  stage: z.enum([
-    "generate_file_operations",
-    "generate_implementation_brief",
-    "generate_file_manifest",
-    "generate_file_content",
-  ]),
-  attempt: z.number().int().min(1),
-  kind: z.enum([
-    "llm_output",
-    "parse_error",
-    "parsed_data",
-    "validation_error",
-    "repair_output",
-    "repaired_data",
-    "file_content",
-  ]),
-  path: z.string().min(1).optional(),
-  rawOutput: z.string().optional(),
-  rawOutputTruncated: z.boolean().optional(),
-  rawOutputOriginalLength: z.number().int().min(0).optional(),
-  parsedData: z.unknown().optional(),
-  errorMessage: z.string().optional(),
-  createdAt: z.string().min(1),
-});
-export type CodeTraceEntry = z.infer<typeof codeTraceEntrySchema>;
+
+
 
 export const requirementInputScreeningSchema = z.object({
   ignoredSpans: z.array(z.object({
@@ -508,64 +434,8 @@ export const designRunSnapshotSchema = z.object({
 });
 export type DesignRunSnapshot = z.infer<typeof designRunSnapshotSchema>;
 
-export const codeRunSnapshotSchema = z.object({
-  runId: z.string().min(1),
-  requirementText: z.string().optional(),
-  rules: requirementRulesSchema.optional(),
-  requirementBaseline: requirementBaselineSchema.nullable().optional(),
-  coverageMatrix: coverageMatrixSchema.nullable().default(null),
-  traceabilityMatrix: traceabilityMatrixSchema.nullable().default(null),
-  designModels: z.array(designDiagramModelSpecSchema),
-  designPlantUml: z.array(designPlantUmlArtifactSchema).default([]),
-  spec: codeGenerationSpecSchema.nullable(),
-  businessLogic: codeBusinessLogicSchema.nullable().default(null),
-  designToCodeMapping: designToCodeMappingSchema.nullable().default(null),
-  designModelCoverageReport: designModelCoverageReportSchema.nullable().default(null),
-  loadedCodeSkill: loadedCodeSkillSchema.nullable().default(null),
-  visualDirection: codeVisualDirectionSchema.nullable().default(null),
-  skillResourceDiscoveryPlan: codeSkillResourceDiscoveryPlanSchema.nullable().default(null),
-  skillResourcePreviews: codeSkillResourcePreviewResultSchema.nullable().default(null),
-  skillResourcePlan: codeSkillResourcePlanSchema.nullable().default(null),
-  codeSkillContext: codeSkillContextSchema.nullable().default(null),
-  appBlueprint: codeAppBlueprintSchema.nullable().default(null),
-  uiBlueprint: codeUiBlueprintSchema.nullable().default(null),
-  uiMockup: codeUiMockupSchema.nullable().default(null),
-  uiReferenceSpec: codeUiReferenceSpecSchema.nullable().default(null),
-  uiFidelityReport: codeUiFidelityReportSchema.nullable().default(null),
-  designTokens: codeDesignTokensSchema.nullable().default(null),
-  componentRegistry: codeComponentRegistrySchema.nullable().default(null),
-  uiIr: codeUiIrSchema.nullable().default(null),
-  visualDiffReport: codeVisualDiffReportSchema.nullable().default(null),
-  businessAssertionResults: codeBusinessAssertionResultSchema.nullable().default(null),
-  repairLoopSummary: codeRepairLoopSummarySchema.nullable().default(null),
-  selectedCodeSkills: z.array(codeSkillSelectionSchema).default([]),
-  skillDiagnostics: z.array(codeSkillDiagnosticsSchema).default([]),
-  filePlan: codeFilePlanSchema.nullable().default(null),
-  codeImplementationBrief: codeImplementationBriefSchema.nullable().default(null),
-  codeFileOperationManifest: codeFileOperationManifestResultSchema.nullable().default(null),
-  fileGenerationDiagnostics: z.array(codeFileGenerationDiagnosticSchema).default([]),
-  codeTrace: z.array(codeTraceEntrySchema).default([]),
-  codeGenerationMode: z.enum(["json_schema_operations", "segmented_file_generation"]).default("json_schema_operations"),
-  qualityDiagnostics: z.array(codeQualityDiagnosticSchema).default([]),
-  files: z.record(z.string().min(1), z.string()),
-  entryFile: z.string().min(1).nullable(),
-  dependencies: z.record(z.string().min(1), z.string().min(1)).default({}),
-  agentPlan: z.array(z.string().min(1)).default([]),
-  generationMode: z.enum(["continue", "regenerate"]).default("continue"),
-  changedFileCount: z.number().int().min(0).default(0),
-  diagnostics: z.array(
-    z.object({
-      stage: runStageSchema,
-      message: z.string().min(1),
-      at: z.string().min(1),
-    }),
-  ).default([]),
-  codeContextHash: z.string().nullable().default(null),
-  currentStage: runStageSchema.nullable(),
-  status: runStatusSchema,
-  error: runErrorSchema.nullable(),
-});
-export type CodeRunSnapshot = z.infer<typeof codeRunSnapshotSchema>;
+
+
 
 export const documentRunSnapshotSchema = z.object({
   runId: z.string().min(1),
@@ -657,26 +527,14 @@ export const artifactReadyRunEventSchema = z.object({
     "plantuml",
     "svg",
     "testCases",
-    "codeSpec",
-    "codeFiles",
-    "businessLogic",
-    "designToCodeMapping",
-    "designModelCoverageReport",
-    "uiMockup",
-    "uiReferenceSpec",
-    "uiFidelityReport",
-    "designTokens",
-    "componentRegistry",
-    "uiIr",
-    "codeSkills",
-    "codeSkill",
-    "visualDirection",
-    "skillResourceDiscoveryPlan",
-    "skillResourcePreviews",
-    "skillResourcePlan",
-    "codeSkillContext",
-    "visualDiffReport",
-    "businessAssertionResults",
+    
+    
+    
+    
+    
+    
+    
+    
     "document",
     "feasibilityContext",
     "feasibilityBusinessFlow",
@@ -698,35 +556,28 @@ export const artifactReadyRunEventSchema = z.object({
     ])
     .optional(),
   parallelGroup: z.string().min(1).optional(),
-  businessLogic: codeBusinessLogicSchema.optional(),
-  designToCodeMapping: designToCodeMappingSchema.optional(),
-  designModelCoverageReport: designModelCoverageReportSchema.optional(),
-  loadedCodeSkill: loadedCodeSkillSchema.optional(),
-  visualDirection: codeVisualDirectionSchema.optional(),
-  skillResourceDiscoveryPlan: codeSkillResourceDiscoveryPlanSchema.optional(),
-  skillResourcePreviews: codeSkillResourcePreviewResultSchema.optional(),
-  skillResourcePlan: codeSkillResourcePlanSchema.optional(),
-  codeSkillContext: codeSkillContextSchema.optional(),
-  uiMockup: codeUiMockupSchema.optional(),
-  uiReferenceSpec: codeUiReferenceSpecSchema.optional(),
-  uiFidelityReport: codeUiFidelityReportSchema.optional(),
-  designTokens: codeDesignTokensSchema.optional(),
-  componentRegistry: codeComponentRegistrySchema.optional(),
-  uiIr: codeUiIrSchema.optional(),
-  codeSkills: z.array(codeSkillSelectionSchema).optional(),
-  skillDiagnostics: z.array(codeSkillDiagnosticsSchema).optional(),
-  visualDiffReport: codeVisualDiffReportSchema.optional(),
-  businessAssertionResults: codeBusinessAssertionResultSchema.optional(),
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   coverageMatrix: coverageMatrixSchema.optional(),
   traceabilityMatrix: traceabilityMatrixSchema.optional(),
 });
 
-export const codeFileChangedRunEventSchema = z.object({
-  type: z.literal("code_file_changed"),
-  path: z.string().min(1),
-  content: z.string(),
-  reason: z.string().min(1),
-});
 
 export const completedRunEventSchema: z.ZodObject<{
   type: z.ZodLiteral<"completed">;
@@ -734,7 +585,6 @@ export const completedRunEventSchema: z.ZodObject<{
     [
       typeof runSnapshotSchema,
       typeof designRunSnapshotSchema,
-      typeof codeRunSnapshotSchema,
       typeof documentRunSnapshotSchema,
       typeof feasibilityRunSnapshotSchema,
     ]
@@ -744,7 +594,6 @@ export const completedRunEventSchema: z.ZodObject<{
   snapshot: z.union([
     runSnapshotSchema,
     designRunSnapshotSchema,
-    codeRunSnapshotSchema,
     documentRunSnapshotSchema,
     feasibilityRunSnapshotSchema,
   ]),
@@ -809,8 +658,7 @@ export type RunEvent = { eventId?: string; createdAt?: string } & (
   | z.infer<typeof llmChunkRunEventSchema>
   | z.infer<typeof stageProgressRunEventSchema>
   | z.infer<typeof artifactReadyRunEventSchema>
-  | z.infer<typeof codeFileChangedRunEventSchema>
-  | z.infer<typeof completedRunEventSchema>
+  |  z.infer<typeof completedRunEventSchema>
   | z.infer<typeof failedRunEventSchema>
   | z.infer<typeof cancelledRunEventSchema>
   | z.infer<typeof runActionRunEventSchema>);
@@ -823,7 +671,7 @@ export const runEventSchema: z.ZodType<RunEvent, z.ZodTypeDef, unknown> = z.disc
   llmChunkRunEventSchema,
   stageProgressRunEventSchema,
   artifactReadyRunEventSchema,
-  codeFileChangedRunEventSchema,
+  
   completedRunEventSchema,
   failedRunEventSchema,
   cancelledRunEventSchema,
@@ -844,7 +692,7 @@ export const startRunResponseSchema = z.object({
 export type StartRunResponse = z.infer<typeof startRunResponseSchema>;
 export const startDesignRunResponseSchema = startRunResponseSchema;
 export type StartDesignRunResponse = z.infer<typeof startDesignRunResponseSchema>;
-export const startCodeRunResponseSchema = startRunResponseSchema;
-export type StartCodeRunResponse = z.infer<typeof startCodeRunResponseSchema>;
+
+
 export const startDocumentRunResponseSchema = startRunResponseSchema;
 export type StartDocumentRunResponse = z.infer<typeof startDocumentRunResponseSchema>;

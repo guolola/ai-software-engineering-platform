@@ -221,7 +221,7 @@ describe("first-use onboarding", () => {
     expect(await screen.findByText("从系统需求开始")).toBeInTheDocument();
     for (const [title, kind] of [
       ["分析与 UML", "feasibility-home"],
-      ["设计、代码与测试", "design-home"],
+      ["设计与测试", "design-home"],
       ["文档交付", "documents-home"],
       ["跟踪项目", "documents-home"],
     ]) {

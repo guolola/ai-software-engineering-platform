@@ -20,7 +20,7 @@ export const onboardingZh = {
       requirements: { title: "需求模型", content: "在这里检查需求规则、选择目标模型，并在生成后查看对应的 UML 图。" },
       diagrams: { title: "UML 图与追踪", content: "具体图会在需求分析生成后出现在左侧模型树，届时还可以查看图中元素和追踪关系。" },
       design: { title: "设计模型", content: "需求模型准备好后，可继续生成设计类图、组件关系和交互设计。" },
-      code: { title: "代码与原型", content: "这里衔接设计产物、代码生成和预览；缺少上游产物时会显示原因。" },
+      
       tests: { title: "测试", content: "在这里查看测试模型与覆盖关系，按已完成的上游产物逐步推进。" },
       documents: { title: "说明书与交付", content: "生成的说明书和文档版本会集中在这里，方便检查和交付。" },
       tasks: { title: "生成任务", content: "顶部入口可查看正在运行或已完成的生成任务及进度。" },
@@ -30,7 +30,7 @@ export const onboardingZh = {
     mobile: {
       system: { title: "从系统需求开始", content: "输入项目目标和业务背景，生成需求规则后再继续后续阶段。" },
       analysis: { title: "分析与 UML", content: "可行性分析、需求模型和具体 UML 图构成分析阶段。图会在生成后出现。" },
-      build: { title: "设计、代码与测试", content: "设计模型连接需求与代码，随后可预览原型并检查测试覆盖。" },
+      build: { title: "设计与测试", content: "设计模型为外部 Coding Agent 提供实现依据，测试模块帮助检查需求覆盖。" },
       delivery: { title: "文档交付", content: "说明书汇总前面的产物，并保留可查看的文档版本。" },
       manage: { title: "跟踪项目", content: "顶部可查看生成任务、运行历史、项目设置和成员。左上角菜单可随时切换阶段。" },
     },
@@ -49,7 +49,7 @@ export const onboardingEn = {
     saveFailed: "Your guide progress could not be saved and may appear again next time.",
     startFailed: "The guide could not be opened. Refresh the page and try again.",
     empty: {
-      overview: { title: "Start with a project", content: "Each project keeps its requirements, models, code, and documents together across the development process." },
+      overview: { title: "Start with a project", content: "Each project keeps its requirements, models, tests, and documents together across the development process." },
       create: { title: "Create your first project", content: "Open the form here, name and describe your project, then choose who can see it. You will enter its workspace after creating it." },
     },
     desktop: {
@@ -58,7 +58,7 @@ export const onboardingEn = {
       requirements: { title: "Requirement models", content: "Review requirement rules, choose target models, and inspect their UML diagrams after generation." },
       diagrams: { title: "UML diagrams and traceability", content: "Generated diagrams appear in the model tree, where you can inspect elements and trace relationships." },
       design: { title: "Design models", content: "Once requirements are ready, continue with class, component, and interaction design." },
-      code: { title: "Code and prototypes", content: "Connect design artifacts to code generation and previews. Missing upstream work is explained here." },
+      
       tests: { title: "Testing", content: "Review test models and coverage, then advance as the required upstream artifacts become available." },
       documents: { title: "Documents and delivery", content: "Find generated specifications and document versions here for review and delivery." },
       tasks: { title: "Generation tasks", content: "Use this top action to inspect active and completed generation tasks and their progress." },
@@ -68,7 +68,7 @@ export const onboardingEn = {
     mobile: {
       system: { title: "Start with requirements", content: "Describe the project goals and context, then generate requirement rules before moving on." },
       analysis: { title: "Analysis and UML", content: "Feasibility, requirement models, and UML diagrams make up the analysis stage. Diagrams appear after generation." },
-      build: { title: "Design, code, and tests", content: "Design models connect requirements to code, prototypes, and test coverage." },
+      build: { title: "Design and tests", content: "Design models provide sources for external agents and test coverage." },
       delivery: { title: "Deliver documents", content: "Specifications collect the earlier artifacts and preserve reviewable document versions." },
       manage: { title: "Track the project", content: "The top bar has tasks, history, settings, and members. Use the upper-left menu to switch stages." },
     },

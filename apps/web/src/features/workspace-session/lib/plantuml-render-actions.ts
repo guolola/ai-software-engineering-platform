@@ -48,10 +48,7 @@ export function usePlantUmlRenderActions({
           ...current,
           [diagram]: {
             stage: "render_svg",
-            message: localizeCaughtFailure(
-              error,
-              "图形绘制失败，请检查模型后重试。",
-            ),
+            error: { code: "RUN_INTERNAL_ERROR", category: "internal", message: localizeCaughtFailure(error, "图形绘制失败，请检查模型后重试。"), retryable: true },
           },
         }));
         throw error;

@@ -2,7 +2,7 @@
 import {
   failedRunEventSchema,
   stageProgressRunEventSchema,
-  type CodeRunSnapshot,
+  
   type DiagramKind,
   type ProviderSettings,
   type RunError,
@@ -50,11 +50,7 @@ type DesignPipeline = (
   pngRenderClient?: PngRenderClient,
 ) => Promise<void>;
 
-type CodePipeline = (
-  record: RunRecord,
-  providerSettings: ProviderSettings,
-  llmTransport: LlmTransport,
-) => Promise<void>;
+
 
 type DocumentPipeline = (
   record: RunRecord,
@@ -134,7 +130,7 @@ function taskTypeForRecord(record: RunRecord): ProviderTaskType {
   const snapshot = record.snapshot;
   if ("selectedArtifacts" in snapshot) return "feasibility_analysis";
   if ("documentKind" in snapshot) return "document_generation";
-  if ("files" in snapshot) return "code_generation";
+  
   if ("designModelTraceability" in snapshot) return "design_modeling";
   return "requirements_to_uml";
 }
@@ -284,23 +280,13 @@ function createEntitlementConfirmingTransport({
 export function handleRunPipelineError(
   record: RunRecord,
   error: unknown,
-  addCodeDiagnostic: (
-    snapshot: CodeRunSnapshot,
-    stage: RunStage,
-    message: string,
-  ) => void,
+  
 ) {
   if (isRunCancelledError(error) || isRunCancelled(record)) return null;
   const runError = normalizeRunError(error);
   record.snapshot.status = "failed";
   record.snapshot.error = runError;
-  if ("files" in record.snapshot) {
-    addCodeDiagnostic(
-      record.snapshot as CodeRunSnapshot,
-      record.snapshot.currentStage ?? "write_code_files",
-      runError.message,
-    );
-  }
+  
   emitEvent(
     record,
     failedRunEventSchema.parse({
@@ -323,9 +309,9 @@ export function startRunRecordPipeline({
   documentLibrary,
   runStagePipeline,
   runDesignStagePipeline,
-  runCodeStagePipeline,
+  
   runDocumentStagePipeline,
-  addCodeDiagnostic,
+  
   documentInput,
   billingEntitlements,
   analyticsStore,
@@ -341,18 +327,14 @@ export function startRunRecordPipeline({
   documentLibrary: DocumentLibrary;
   runStagePipeline: RequirementPipeline;
   runDesignStagePipeline: DesignPipeline;
-  runCodeStagePipeline: CodePipeline;
+  
   runDocumentStagePipeline: DocumentPipeline;
   documentInput?: StartDocumentRunRequest;
   billingEntitlements?: Pick<
     BillingService,
     "confirmRunUsage" | "releaseRunUsage" | "compensateRunUsage"
   >;
-  addCodeDiagnostic: (
-    snapshot: CodeRunSnapshot,
-    stage: RunStage,
-    message: string,
-  ) => void;
+  
 }) {
   void runRunRecordPipeline({
     record,
@@ -365,9 +347,9 @@ export function startRunRecordPipeline({
     documentLibrary,
     runStagePipeline,
     runDesignStagePipeline,
-    runCodeStagePipeline,
+    
     runDocumentStagePipeline,
-    addCodeDiagnostic,
+    
     documentInput,
     billingEntitlements,
     analyticsStore,
@@ -427,7 +409,7 @@ export function startFeasibilityRecordPipeline({
         demo?.pngRenderClient ?? pngRenderClient,
       );
     } catch (error) {
-      terminalError = handleRunPipelineError(record, error, () => undefined);
+      terminalError = handleRunPipelineError(record, error);
     } finally {
       if (terminalError && isPlatformProviderRunError(terminalError)) {
         await billingEntitlements?.compensateRunUsage({
@@ -453,9 +435,9 @@ export async function runRunRecordPipeline({
   documentLibrary,
   runStagePipeline,
   runDesignStagePipeline,
-  runCodeStagePipeline,
+  
   runDocumentStagePipeline,
-  addCodeDiagnostic,
+  
   documentInput,
   billingEntitlements,
   analyticsStore,
@@ -471,18 +453,14 @@ export async function runRunRecordPipeline({
   documentLibrary: DocumentLibrary;
   runStagePipeline: RequirementPipeline;
   runDesignStagePipeline: DesignPipeline;
-  runCodeStagePipeline: CodePipeline;
+  
   runDocumentStagePipeline: DocumentPipeline;
   documentInput?: StartDocumentRunRequest;
   billingEntitlements?: Pick<
     BillingService,
     "confirmRunUsage" | "releaseRunUsage" | "compensateRunUsage"
   >;
-  addCodeDiagnostic: (
-    snapshot: CodeRunSnapshot,
-    stage: RunStage,
-    message: string,
-  ) => void;
+  
 }) {
   const taskType = taskTypeForRecord(record);
   const scheduledTransport = createRunLlmTransport({
@@ -528,9 +506,7 @@ export async function runRunRecordPipeline({
             conversation.transport,
             pngRenderClient,
           )
-        : taskType === "code_generation"
-          ? runCodeStagePipeline(record, providerSettings, conversation.transport)
-          : taskType === "design_modeling"
+        : taskType === "design_modeling"
             ? runDesignStagePipeline(
                 record,
                 providerSettings,
@@ -542,7 +518,7 @@ export async function runRunRecordPipeline({
 
     await runPromise;
   } catch (error) {
-    terminalError = handleRunPipelineError(record, error, addCodeDiagnostic);
+    terminalError = handleRunPipelineError(record, error);
   } finally {
     if (terminalError && isPlatformProviderRunError(terminalError)) {
       await billingEntitlements?.compensateRunUsage({

@@ -3,13 +3,14 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { AppI18nProvider } from "../../../shared/i18n";
-import { i18n } from "../../../shared/i18n";
+import { i18n, saveLocalePreference } from "../../../shared/i18n";
 import { FloatingAlertProvider } from "../../../shared/ui/floating-alert";
 import { AuthPage } from "./auth-page";
 
 afterEach(async () => {
   vi.unstubAllGlobals();
   window.history.pushState({}, "", "/");
+  saveLocalePreference("system");
   await i18n.changeLanguage("zh-CN");
 });
 
@@ -129,8 +130,12 @@ it("keeps terms validation next to the registration checkbox", async () => {
   expect(error.closest('[aria-live="polite"]')).toBeNull();
 });
 
-it("keeps all six MFA code slots inside the mobile form width", async () => {
-  await i18n.changeLanguage("zh-CN");
+it.each([
+  ["zh-CN", "邮箱或用户名", "密码", "登录", /请在 .+ 前完成验证。/u],
+  ["en", "Email or username", "Password", "Log in", /Complete verification before .+\./u],
+] as const)("shows clear MFA expiry copy and keeps all six code slots inside the mobile form in %s", async (locale, emailLabel, passwordLabel, loginLabel, expiryCopy) => {
+  saveLocalePreference(locale);
+  await i18n.changeLanguage(locale);
   window.history.pushState({}, "", "/login");
   vi.stubGlobal("fetch", vi.fn(async () =>
     new Response(JSON.stringify({
@@ -152,10 +157,12 @@ it("keeps all six MFA code slots inside the mobile form width", async () => {
     </AppI18nProvider>,
   );
 
-  await user.type(screen.getByLabelText("邮箱或用户名"), "teacher@example.edu");
-  await user.type(screen.getByLabelText("密码"), "password-123");
-  await user.click(screen.getByRole("button", { name: "登录" }));
+  await user.type(screen.getByLabelText(emailLabel), "teacher@example.edu");
+  await user.type(screen.getByLabelText(passwordLabel), "password-123");
+  await user.click(screen.getByRole("button", { name: loginLabel }));
 
+  expect(await screen.findByText(expiryCopy)).toBeInTheDocument();
+  expect(container.textContent).not.toMatch(/挑战|challenge/iu);
   await waitFor(() => {
     expect(container.querySelector('[data-slot="input-otp-group"]')).toBeInTheDocument();
   });

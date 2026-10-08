@@ -1,5 +1,4 @@
 // Owns documentation navigation, category grouping, and search result selection.
-import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "../../../shared/ui/badge";
 import {
@@ -10,12 +9,6 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "../../../shared/ui/sidebar";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "../../../shared/ui/input-group";
-import { Label } from "../../../shared/ui/label";
 import { i18n as appI18n } from "../../../shared/i18n";
 import type {
   ProductDocArticle,
@@ -29,7 +22,6 @@ type DocsSidebarProps = {
   searchQuery: string;
   searchResults: readonly ProductDocSearchResult[];
   selectedArticleId: string;
-  onSearchQueryChange: (query: string) => void;
   onSelectArticle: (articleId: string) => void;
 };
 
@@ -39,7 +31,6 @@ export function DocsSidebar({
   searchQuery,
   searchResults,
   selectedArticleId,
-  onSearchQueryChange,
   onSelectArticle,
 }: DocsSidebarProps) {
   const { t: translate, i18n } = useTranslation();
@@ -57,24 +48,6 @@ export function DocsSidebar({
       <div className="flex items-center gap-2">
         <h2 className="text-base font-semibold">{t("docs.directory")}</h2>
       </div>
-
-      <Label
-        className="mt-4 text-xs font-medium tracking-wide text-muted-foreground"
-        htmlFor="product-docs-search"
-      >
-        {t("docs.searchLabel")}
-      </Label>
-      <InputGroup className="mt-2">
-        <InputGroupAddon>
-          <Search />
-        </InputGroupAddon>
-        <InputGroupInput
-          id="product-docs-search"
-          value={searchQuery}
-          onChange={(event) => onSearchQueryChange(event.target.value)}
-          placeholder={t("docs.searchPlaceholder")}
-        />
-      </InputGroup>
 
       {trimmedQuery ? (
         <div className="mt-4 grid gap-2">

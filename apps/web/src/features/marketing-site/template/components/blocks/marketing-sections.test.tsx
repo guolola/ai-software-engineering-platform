@@ -1,6 +1,8 @@
 // Guards the homepage brand assets and the original benefits/FAQ presentation behavior.
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import { i18n } from '@/shared/i18n'
 
 import Benefits from './benefits/benefits'
 import Features from './features/features'
@@ -13,8 +15,17 @@ import { faqItems } from '../../content/faqs'
 import { logos, orbitLogos } from '../../content/trusted-brands'
 
 describe('marketing homepage sections', () => {
-  it('keeps the three example stages in separate chart columns', () => {
-    render(<Features />)
+  afterEach(async () => {
+    await i18n.changeLanguage('zh-CN')
+  })
+
+  it('keeps the three stages in separate chart columns without example copy', () => {
+    const { container } = render(<Features />)
+
+    expect(screen.getByText('项目概览')).toBeInTheDocument()
+    expect(screen.getByText('产物跟踪')).toBeInTheDocument()
+    expect(screen.getByText('项目阶段目标')).toBeInTheDocument()
+    expect(container.textContent).not.toContain('示例')
 
     const stages = screen.getAllByTestId('feature-stage')
     expect(stages).toHaveLength(3)
@@ -22,6 +33,16 @@ describe('marketing homepage sections', () => {
     expect(stages[0]).toHaveTextContent('28%')
     expect(stages[1]).toHaveTextContent('78%')
     expect(stages[2]).toHaveTextContent('32%')
+  })
+
+  it('shows English project and artifact labels without example copy', async () => {
+    await i18n.changeLanguage('en')
+    const { container } = render(<Features />)
+
+    expect(screen.getByText('Project overview')).toBeInTheDocument()
+    expect(screen.getByText('Artifact tracking')).toBeInTheDocument()
+    expect(screen.getByText('Project milestone')).toBeInTheDocument()
+    expect(container.textContent).not.toMatch(/example|sample/i)
   })
 
   it('shows seven distinct monochrome software brands with neutral copy', () => {

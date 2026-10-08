@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { I18nextProvider } from "react-i18next";
 import { i18n } from "./i18n";
 import {
+  DEFAULT_LOCALE,
   LOCALE_HTML_LANG,
   type AppLocale,
   type LocalePreference,
@@ -21,30 +22,11 @@ type I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
-function shouldUsePrerenderSafeLocale() {
-  if (typeof document === "undefined") return true;
-  return document.getElementById("root")?.dataset.prerendered === "true";
-}
-
-function initialLocaleState() {
-  if (typeof window === "undefined" || shouldUsePrerenderSafeLocale()) {
-    return {
-      preference: "system" as LocalePreference,
-      locale: "zh-CN" as AppLocale,
-    };
-  }
-  const preference = loadLocalePreference();
-  return {
-    preference,
-    locale: resolveLocalePreference(preference),
-  };
-}
-
 export function AppI18nProvider({ children }: { children: ReactNode }) {
-  const [preference, setPreferenceState] = useState<LocalePreference>(
-    () => initialLocaleState().preference,
-  );
-  const [locale, setLocale] = useState<AppLocale>(() => initialLocaleState().locale);
+  // SSR and the first browser render must agree, including preference-dependent classes.
+  // Restore browser settings after hydration without relying on a legacy root marker.
+  const [preference, setPreferenceState] = useState<LocalePreference>("system");
+  const [locale, setLocale] = useState<AppLocale>(DEFAULT_LOCALE);
 
   useEffect(() => {
     const savedPreference = loadLocalePreference();

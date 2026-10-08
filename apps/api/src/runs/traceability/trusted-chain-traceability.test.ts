@@ -12,7 +12,7 @@ import {
   assertTrustedChainAllowsCompletion,
   buildDesignStageTrustedChain,
   buildRequirementStageTrustedChain,
-  buildCodeStageTrustedChain,
+  
 } from "./trusted-chain-traceability.js";
 
 const loginRule = {
@@ -692,122 +692,7 @@ test("buildRequirementStageTrustedChain preserves non-functional requirements as
   assert.doesNotThrow(() => assertTrustedChainAllowsCompletion(trustedChain));
 });
 
-test("buildCodeStageTrustedChain blocks non-infrastructure code without requirement links", () => {
-  const baseline = buildRequirementBaseline({
-    runId: "run-code-orphan",
-    requirementText: loginRule.text,
-    rules: [loginRule],
-    createdAt: "2026-05-24T00:00:00.000Z",
-  });
-  const trustedChain = buildCodeStageTrustedChain({
-    runId: "run-code-orphan",
-    baseline,
-    files: {
-      "/src/App.tsx": "export default function App(){ return <main>Dashboard</main>; }",
-      "/src/docs/business-context.md": `# Business Context\n- ${loginRule.text}`,
-    },
-  });
 
-  assert.equal(
-    trustedChain.traceabilityMatrix.diagnostics.some(
-      (diagnostic) => diagnostic.code === "orphan-artifact",
-    ),
-    true,
-  );
-  assert.doesNotThrow(() => assertTrustedChainAllowsCompletion(trustedChain));
-});
 
-test("buildCodeStageTrustedChain blocks behavior requirements without passing business assertions", () => {
-  const baseline = buildRequirementBaseline({
-    runId: "run-code-assertion-gap",
-    requirementText: loginRule.text,
-    rules: [loginRule],
-    createdAt: "2026-05-24T00:00:00.000Z",
-  });
-  const trustedChain = buildCodeStageTrustedChain({
-    runId: "run-code-assertion-gap",
-    baseline,
-    files: {
-      "/src/App.tsx": "export default function App(){ return <button>登录后访问主要功能</button>; }",
-      "/BUSINESS_CONTEXT.md": `# Business Context\n- ${loginRule.text}`,
-    },
-    businessAssertionResults: {
-      runId: "run-code-assertion-gap",
-      generatedAt: "2026-05-24T00:00:00.000Z",
-      passed: false,
-      blockingFailureIds: ["CBA-001"],
-      assertions: [
-        {
-          id: "CBA-001",
-          requirementId: "REQ-001",
-          category: "permission",
-          description: "用户必须登录后才能访问主要功能。",
-          expectedBehavior: "访问主要功能前必须校验登录状态。",
-          verificationMethod: "static-code-scan",
-          evidenceArtifacts: ["/src/App.tsx"],
-          status: "failed",
-          severity: "critical",
-          message: "UI text mentions the requirement but no permission guard or behavior check was found.",
-        },
-      ],
-    },
-  });
 
-  assert.equal(
-    trustedChain.traceabilityMatrix.diagnostics.some(
-      (diagnostic) => diagnostic.code === "business-assertion-gap",
-    ),
-    true,
-  );
-  assert.doesNotThrow(() => assertTrustedChainAllowsCompletion(trustedChain));
-});
 
-test("buildCodeStageTrustedChain links passing business assertions as requirement tests", () => {
-  const baseline = buildRequirementBaseline({
-    runId: "run-code-assertion-pass",
-    requirementText: loginRule.text,
-    rules: [loginRule],
-    createdAt: "2026-05-24T00:00:00.000Z",
-  });
-  const trustedChain = buildCodeStageTrustedChain({
-    runId: "run-code-assertion-pass",
-    baseline,
-    files: {
-      "/src/App.tsx":
-        "const isLoggedIn = true; export default function App(){ return isLoggedIn ? <main>登录后访问主要功能</main> : <main>请先登录</main>; }",
-      "/BUSINESS_CONTEXT.md": `# Business Context\n- ${loginRule.text}`,
-    },
-    businessAssertionResults: {
-      runId: "run-code-assertion-pass",
-      generatedAt: "2026-05-24T00:00:00.000Z",
-      passed: true,
-      blockingFailureIds: [],
-      assertions: [
-        {
-          id: "CBA-001",
-          requirementId: "REQ-001",
-          category: "permission",
-          description: "用户必须登录后才能访问主要功能。",
-          expectedBehavior: "访问主要功能前必须校验登录状态。",
-          verificationMethod: "static-code-scan",
-          evidenceArtifacts: ["/src/App.tsx"],
-          status: "passed",
-          severity: "critical",
-          message: "Found permission guard evidence.",
-        },
-      ],
-    },
-  });
-
-  assert.deepEqual(trustedChain.coverageMatrix.rows[0]?.tests, ["test:CBA-001"]);
-  assert.equal(
-    trustedChain.traceabilityMatrix.links.some(
-      (link) =>
-        link.fromArtifactType === "requirement" &&
-        link.toArtifactType === "test" &&
-        link.toArtifactId === "CBA-001",
-    ),
-    true,
-  );
-  assert.doesNotThrow(() => assertTrustedChainAllowsCompletion(trustedChain));
-});

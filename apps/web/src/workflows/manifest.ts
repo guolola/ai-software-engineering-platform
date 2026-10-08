@@ -1,7 +1,7 @@
 // Describes the product workflow and artifact provenance contracts.
 export type { ArtifactProvenance } from "../entities/workspace/provenance";
 
-export type WorkflowRunKind = "requirements" | "design" | "code" | "document";
+export type WorkflowRunKind = "requirements" | "design" | "document";
 
 export interface WorkflowPrerequisite {
   id: string;
@@ -23,7 +23,7 @@ export interface WorkflowPrerequisiteState {
   hasRequirementText: boolean;
   hasRequirementModels: boolean;
   hasDesignModels: boolean;
-  hasCodeFiles: boolean;
+  
 }
 
 const hasRequirementText: WorkflowPrerequisite = {
@@ -64,14 +64,7 @@ export const WORKFLOW_MANIFEST: WorkflowStepDefinition[] = [
     outputArtifactTypes: ["designModel", "designPlantUml", "designSvg"],
     prerequisites: [hasRequirementModels],
   },
-  {
-    id: "code",
-    label: "前端原型",
-    runKind: "code",
-    inputArtifactTypes: ["requirementText", "requirementRule", "designModel"],
-    outputArtifactTypes: ["codeFile", "codeSpec", "uiMockup"],
-    prerequisites: [hasDesignModels],
-  },
+  
   {
     id: "requirements-document",
     label: "需求规格说明书",
@@ -84,7 +77,7 @@ export const WORKFLOW_MANIFEST: WorkflowStepDefinition[] = [
     id: "design-document",
     label: "软件设计说明书",
     runKind: "document",
-    inputArtifactTypes: ["requirementText", "designModel", "codeFile"],
+    inputArtifactTypes: ["requirementText", "designModel"],
     outputArtifactTypes: ["softwareDesignSpec"],
     prerequisites: [hasDesignModels],
   },

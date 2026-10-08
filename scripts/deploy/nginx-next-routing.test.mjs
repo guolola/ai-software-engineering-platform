@@ -73,7 +73,8 @@ test('accepts a directly configured Next proxy without a legacy web root', () =>
 
     assert.equal(preflight.configPath, configPath);
     assert.equal(preflight.original, directConfig);
-    assert.equal(preflight.migrated, directConfig);
+    assert.match(preflight.migrated, /oauth-protected-resource\|oauth-authorization-server\|openid-configuration/);
+    assert.equal(migrateNextRouting(preflight.migrated, deployPath), preflight.migrated);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

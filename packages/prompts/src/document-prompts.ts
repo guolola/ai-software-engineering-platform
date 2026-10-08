@@ -3,6 +3,8 @@ import type {
   DocumentKind,
 } from "@uml-platform/contracts";
 
+
+
 function truncateForPrompt(value: string, maxChars: number) {
   if (value.length <= maxChars) return value;
   return `${value.slice(0, Math.max(0, maxChars - 32))}\n...（内容已截断）`;

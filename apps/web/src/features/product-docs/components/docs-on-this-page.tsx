@@ -2,30 +2,31 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../../shared/ui/utils";
+import { ScrollArea } from "../../../shared/ui/scroll-area";
 import { i18n as appI18n } from "../../../shared/i18n";
 import type { ProductDocHeading } from "../lib/docs-markdown";
 
 type DocsOnThisPageProps = {
   headings: readonly ProductDocHeading[];
+  onSelectHeading: (id: string) => void;
 };
 
-export function DocsOnThisPage({ headings }: DocsOnThisPageProps) {
+export function DocsOnThisPage({ headings, onSelectHeading }: DocsOnThisPageProps) {
   const { t: translate, i18n } = useTranslation();
   const t = i18n.exists("docs.onThisPage") ? translate : appI18n.t.bind(appI18n);
   const visibleHeadings = headings.filter(
     (heading) => heading.level === 2 || heading.level === 3,
   );
   // Track the highlighted anchor: start from the URL hash, update on click.
-  const [activeHeadingId, setActiveHeadingId] = useState(() =>
-    decodeURIComponent(window.location.hash.replace(/^#/, "")),
-  );
+  const [activeHeadingId, setActiveHeadingId] = useState("");
 
   useEffect(() => {
     setActiveHeadingId(decodeURIComponent(window.location.hash.replace(/^#/, "")));
   }, [headings]);
 
   return (
-    <aside aria-label={t("docs.outlineAria")} className="hidden min-w-0 @[1040px]/docs:sticky @[1040px]/docs:top-24 @[1040px]/docs:block @[1040px]/docs:max-h-[calc(100dvh-7rem)] @[1040px]/docs:self-start @[1040px]/docs:overflow-y-auto">
+    <aside aria-label={t("docs.outlineAria")} className="hidden min-w-0 @[1040px]/docs:sticky @[1040px]/docs:top-8 @[1040px]/docs:block @[1040px]/docs:self-start">
+      <ScrollArea data-testid="docs-outline-scroll-area" className="h-[calc(100dvh-8rem)]" contentClassName="!block">
       <div className="border-l border-border pl-5 py-2">
         <div className="flex items-center gap-2">
           <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -44,10 +45,7 @@ export function DocsOnThisPage({ headings }: DocsOnThisPageProps) {
                   onClick={(event) => {
                     event.preventDefault();
                     setActiveHeadingId(heading.id);
-                    document.getElementById(heading.id)?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "start",
-                    });
+                    onSelectHeading(heading.id);
                     window.history.replaceState(
                       null,
                       "",
@@ -73,6 +71,7 @@ export function DocsOnThisPage({ headings }: DocsOnThisPageProps) {
           </p>
         )}
       </div>
+      </ScrollArea>
     </aside>
   );
 }

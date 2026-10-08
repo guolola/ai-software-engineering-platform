@@ -1,8 +1,8 @@
 // Builds deterministic workspace state slices when restoring saved run history snapshots.
 import { designTraceabilityTouchesDiagramKinds } from "@uml-platform/contracts";
-import type { CodeRunSnapshot } from "@uml-platform/contracts";
+import type {  } from "@uml-platform/contracts";
 import {
-  isCodeRunSnapshot,
+  
   isDesignRunSnapshot,
   isDocumentRunSnapshot,
   runHistorySnapshotRequirementText,
@@ -40,7 +40,7 @@ type RestoredRunUiState = {
 };
 
 export type RestoredWorkspaceArtifacts = {
-  kind: "requirements" | "design" | "code";
+  kind: "requirements" | "design";
   models: WorkspaceRecord["models"];
   requirementModelTraceability: WorkspaceRecord["requirementModelTraceability"];
   plantUml: WorkspaceRecord["plantUml"];
@@ -56,8 +56,8 @@ export type RestoredWorkspaceArtifacts = {
   designDiagramErrors: WorkspaceRecord["designDiagramErrors"];
   generatedDesignDiagrams: DesignDiagramType[];
   designInputFingerprints: WorkspaceRecord["designInputFingerprints"];
-  codeSnapshot: CodeRunSnapshot | null;
-  clearCodeState: boolean;
+  
+  
 };
 
 export type RestoredSnapshotPlan = {
@@ -91,22 +91,14 @@ function restoredRunUiState(
 }
 
 function restoredRequirementTrace(snapshot: RunHistorySnapshot) {
-  if (
-    isCodeRunSnapshot(snapshot) ||
-    isDesignRunSnapshot(snapshot) ||
-    isDocumentRunSnapshot(snapshot)
-  ) {
-    return [];
-  }
+  if (isDesignRunSnapshot(snapshot) || isDocumentRunSnapshot(snapshot)) return [];
   return snapshot.requirementTrace ?? [];
 }
 
 function restoredRunDiagnostics(snapshot: RunHistorySnapshot): RunDiagnostics {
   return {
     ...createEmptyDiagnostics(),
-    runKind: isCodeRunSnapshot(snapshot)
-      ? "code"
-      : isDesignRunSnapshot(snapshot)
+    runKind: isDesignRunSnapshot(snapshot)
         ? "design"
         : "requirements",
     runId: snapshot.runId,
@@ -114,29 +106,15 @@ function restoredRunDiagnostics(snapshot: RunHistorySnapshot): RunDiagnostics {
     finishedAt:
       terminalProgress(snapshot) === 100 ? new Date().toISOString() : null,
     streamText: runErrorMessage(snapshot) ?? "",
-    uiMockup: isCodeRunSnapshot(snapshot) ? snapshot.uiMockup : null,
-    uiReferenceSpec: isCodeRunSnapshot(snapshot)
-      ? snapshot.uiReferenceSpec
-      : null,
-    uiFidelityReport: isCodeRunSnapshot(snapshot)
-      ? snapshot.uiFidelityReport
-      : null,
-    visualDirection: isCodeRunSnapshot(snapshot)
-      ? snapshot.visualDirection
-      : null,
-    skillResourceDiscoveryPlan: isCodeRunSnapshot(snapshot)
-      ? snapshot.skillResourceDiscoveryPlan
-      : null,
-    skillResourcePreviews: isCodeRunSnapshot(snapshot)
-      ? snapshot.skillResourcePreviews
-      : null,
-    skillResourcePlan: isCodeRunSnapshot(snapshot)
-      ? snapshot.skillResourcePlan
-      : null,
-    codeSkillContext: isCodeRunSnapshot(snapshot)
-      ? snapshot.codeSkillContext
-      : null,
-    codeTrace: isCodeRunSnapshot(snapshot) ? (snapshot.codeTrace ?? []) : [],
+    
+    
+    
+    
+    
+    
+    
+    
+    
     requirementTrace: restoredRequirementTrace(snapshot),
     designTrace: isDesignRunSnapshot(snapshot)
       ? (snapshot.designTrace ?? [])
@@ -173,32 +151,7 @@ function emptyDesignArtifacts() {
   };
 }
 
-function restoredCodeArtifacts(
-  snapshot: CodeRunSnapshot,
-): RestoredWorkspaceArtifacts {
-  const restoredDesignModels = Object.fromEntries(
-    snapshot.designModels.map((model) => [getDesignModelId(model), model]),
-  ) as WorkspaceRecord["designModels"];
-  const restoredDesignDiagrams = snapshot.designModels.map(
-    (model) => model.diagramKind,
-  );
-  const restoredDesignPlantUml = Object.fromEntries(
-    snapshot.designPlantUml.map((artifact) => [
-      getDesignArtifactId(artifact),
-      artifact.source,
-    ]),
-  ) as WorkspaceRecord["designPlantUml"];
-  return {
-    kind: "code",
-    ...emptyRequirementArtifacts(),
-    ...emptyDesignArtifacts(),
-    designModels: restoredDesignModels,
-    designPlantUml: restoredDesignPlantUml,
-    generatedDesignDiagrams: restoredDesignDiagrams,
-    codeSnapshot: snapshot,
-    clearCodeState: false,
-  };
-}
+
 
 function restoredDesignArtifacts(input: {
   snapshot: RunHistorySnapshot;
@@ -271,8 +224,8 @@ function restoredDesignArtifacts(input: {
         currentDesignFingerprint,
       ]),
     ) as WorkspaceRecord["designInputFingerprints"],
-    codeSnapshot: null,
-    clearCodeState: true,
+    
+    
   };
 }
 
@@ -304,8 +257,8 @@ function restoredRequirementArtifacts(input: {
       ]),
     ) as WorkspaceRecord["diagramInputFingerprints"],
     ...emptyDesignArtifacts(),
-    codeSnapshot: null,
-    clearCodeState: true,
+    
+    
   };
 }
 
@@ -316,7 +269,7 @@ function restoredArtifacts(input: {
 }): RestoredWorkspaceArtifacts | null {
   const { snapshot } = input;
   if (isDocumentRunSnapshot(snapshot)) return null;
-  if (isCodeRunSnapshot(snapshot)) return restoredCodeArtifacts(snapshot);
+  
   if (isDesignRunSnapshot(snapshot)) return restoredDesignArtifacts(input);
   return restoredRequirementArtifacts({
     snapshot: snapshot as WorkspaceRunSnapshot,

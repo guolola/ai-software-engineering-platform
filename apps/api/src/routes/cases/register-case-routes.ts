@@ -51,7 +51,7 @@ export function registerCaseRoutes({
 
     const { project, ownerMember } = await authStore.createProject({
       ownerUserId: auth.user.id,
-      name: `${template.title} 示例项目`,
+      name: template.title,
       description: template.description,
       visibility: "private",
       organizationId: null,
@@ -147,12 +147,9 @@ async function buildTemplateWorkspaceState(
     currentState: requirementState,
     snapshot: designSnapshot,
   });
-  const codeState = restoreRunSnapshotToWorkspaceState({
-    currentState: designState,
-    snapshot: template.codeSnapshot,
-  });
+  
   return {
-    ...codeState,
+    ...designState,
     feasibilityInputs: feasibilitySnapshot.inputs,
     feasibilityBusinessFlow: feasibilitySnapshot.businessFlow,
     feasibilityContextModel: feasibilitySnapshot.contextModel,

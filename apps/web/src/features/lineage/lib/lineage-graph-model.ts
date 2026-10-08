@@ -16,10 +16,7 @@ import {
   type DiagramType,
 } from "../../../entities/diagram/model";
 import type { RequirementRule } from "../../../entities/requirement-rule/model";
-import {
-  formatCodeDiagnosticSummary,
-  hasCodeDiagnostics,
-} from "../../../shared/lib/code-diagnostics";
+
 import type { PlatformRunSummary } from "../../user-platform/services/platform-api";
 import {
   activeDesignProjectDiagramStatuses,
@@ -38,13 +35,12 @@ export type LineageStage =
   | "requirement-rules"
   | "requirement-models"
   | "design-models"
-  | "code-docs";
+  | "documents";
 
 export type LineageNodeKind =
   | "rule"
   | "requirement-model"
   | "design-model"
-  | "code"
   | "document";
 
 export type LineageNodeStatus =
@@ -137,11 +133,7 @@ export type LineageGraphInput = Pick<
   | "designStaleReasons"
   | "designTraceabilityStale"
   | "designGenerationBlockedReason"
-  | "codeFiles"
-  | "codeEntryFile"
-  | "codeSpec"
-  | "codeDiagnostics"
-  | "generationTasks"
+  |     "generationTasks"
   | "historyItems"
 > & {
   projectRuns?: PlatformRunSummary[];
@@ -151,14 +143,14 @@ export const LINEAGE_STAGE_ORDER: LineageStage[] = [
   "requirement-rules",
   "requirement-models",
   "design-models",
-  "code-docs",
+  "documents",
 ];
 
 const STAGE_LABELS: Record<LineageStage, string> = {
   "requirement-rules": "需求规则",
   "requirement-models": "需求模型",
   "design-models": "设计模型",
-  "code-docs": "产物",
+  "documents": "产物",
 };
 
 const REQUIRED_REQUIREMENT_DIAGRAMS = ["usecase", "class"] as const satisfies DiagramType[];
@@ -192,9 +184,7 @@ function designNodeId(diagram: DesignDiagramType) {
   return nodeId("design-model", diagram);
 }
 
-function codeNodeId() {
-  return nodeId("code", "prototype");
-}
+
 
 function documentNodeId(kind: DocumentKind) {
   return nodeId("document", kind);
@@ -276,12 +266,12 @@ function historyDocumentStatus(item: LineageGraphInput["historyItems"][number]) 
 }
 
 function historyRunKind(item: LineageGraphInput["historyItems"][number]) {
-  if (item.runKind === "requirements" || item.runKind === "design" || item.runKind === "code" || item.runKind === "document") {
+  if (item.runKind === "requirements" || item.runKind === "design" || item.runKind === "document") {
     return item.runKind;
   }
   if (item.snapshot) {
     if ("documentKind" in item.snapshot) return "document";
-    if ("files" in item.snapshot) return "code";
+    
     if ("requirementModels" in item.snapshot) return "design";
     return "requirements";
   }
@@ -310,7 +300,7 @@ function isRequirementHistorySnapshot(
 
 function interruptedHistoryForKind(
   input: LineageGraphInput,
-  kind: "requirements" | "design" | "code" | "document",
+  kind: "requirements" | "design" | "document",
   matches: (item: LineageGraphInput["historyItems"][number]) => boolean = () => true,
 ) {
   return input.historyItems.find(
@@ -330,19 +320,9 @@ function interruptedRunSummary(
     : "服务中断，可从运行历史重试或重新运行。";
 }
 
-function historyCodeSnapshot(item: LineageGraphInput["historyItems"][number]) {
-  return item.snapshot && "files" in item.snapshot ? item.snapshot : null;
-}
 
-function failedRegenerateCodeHistory(input: LineageGraphInput) {
-  return input.historyItems.find((item) => {
-    const snapshot = historyCodeSnapshot(item);
-    return (
-      snapshot?.status === "failed" &&
-      snapshot.generationMode === "regenerate"
-    );
-  });
-}
+
+
 
 function failedRulesHistory(input: LineageGraphInput) {
   return input.historyItems.find((item) => {
@@ -373,9 +353,7 @@ function failedRulesSummary(item: LineageGraphInput["historyItems"][number] | un
     : "需求规则抽取失败，旧规则仍可查看，可从运行历史重试。";
 }
 
-function hasCodeArtifact(input: LineageGraphInput) {
-  return Object.keys(input.codeFiles).length > 0 || Boolean(input.codeSpec);
-}
+
 
 function historyDocumentMissingArtifacts(
   item: LineageGraphInput["historyItems"][number],
@@ -807,56 +785,9 @@ function designReason(
   return "尚未生成，生成后才能驱动代码或设计说明书。";
 }
 
-function codeStatus(input: LineageGraphInput): LineageNodeStatus {
-  if (taskKindActive(input, "code")) return "running";
-  if (failedTaskForKind(input, "code")) return "error";
-  if (failedRegenerateCodeHistory(input)) return "error";
-  if (interruptedHistoryForKind(input, "code")) return "interrupted";
-  if (requirementSourceMissing(input) && hasCodeArtifact(input)) return "stale";
-  if (hasCodeArtifact(input) && hasCodeDiagnostics({ diagnostics: input.codeDiagnostics })) {
-    return "stale";
-  }
-  return hasCodeArtifact(input) ? "current" : "not-generated";
-}
 
-function codeReason(input: LineageGraphInput, status: LineageNodeStatus) {
-  if (status === "running") return "代码原型正在生成，可在生成任务中查看实时进度。";
-  if (status === "error") {
-    const failedTask = failedTaskForKind(input, "code");
-    if (failedTask) {
-      return failedTask.errorMessage ?? "代码生成失败，上一版仍可查看。";
-    }
-    const failedHistory = failedRegenerateCodeHistory(input);
-    const failedSnapshot = failedHistory ? historyCodeSnapshot(failedHistory) : null;
-    const detail =
-      (failedSnapshot?.error
-        ? localizeRunFailure(failedSnapshot.error, "代码重新生成失败。")
-        : null) ??
-      failedHistory?.errorMessage ??
-      failedHistory?.summary ??
-      "代码重新生成失败。";
-    return `代码重新生成失败，${hasCodeArtifact(input) ? "上一版仍可查看" : "当前没有可查看代码"}。${detail}`;
-  }
-  if (status === "interrupted") {
-    const interrupted = interruptedHistoryForKind(input, "code");
-    return `代码生成服务中断，${hasCodeArtifact(input) ? "上一版仍可查看，" : ""}${interruptedRunSummary(interrupted)}`;
-  }
-  if (status === "stale") {
-    if (requirementSourceMissing(input)) {
-      return "需求源头已删除，当前代码为旧产物，仍可查看但需重新输入需求并重跑。";
-    }
-    const summary = formatCodeDiagnosticSummary({
-      diagnostics: input.codeDiagnostics,
-    });
-    return `${summary ?? "代码生成存在诊断"}。当前代码仍可查看，建议复核诊断后继续生成或重新生成。`;
-  }
-  if (status === "current") {
-    return input.codeEntryFile
-      ? `入口文件 ${input.codeEntryFile} 已生成。`
-      : "代码原型已生成，可继续查看或重新生成。";
-  }
-  return "尚未生成代码原型。";
-}
+
+
 
 function documentStatus(input: LineageGraphInput, documentKind: DocumentKind): LineageNodeStatus {
   if (documentTaskActive(input, documentKind)) return "running";
@@ -1081,7 +1012,7 @@ function buildDesignNodes(input: LineageGraphInput): LineageNode[] {
 }
 
 function buildProductNodes(input: LineageGraphInput): LineageNode[] {
-  const code = codeStatus(input);
+  
   const requirementsDoc = documentStatus(input, "requirementsSpec");
   const designDoc = documentStatus(input, "softwareDesignSpec");
   const requirementsDocHistory = documentHistoryFor(input, "requirementsSpec");
@@ -1092,8 +1023,8 @@ function buildProductNodes(input: LineageGraphInput): LineageNode[] {
     {
       id: documentNodeId("requirementsSpec"),
       kind: "document" as const,
-      stage: "code-docs" as const,
-      stageLabel: STAGE_LABELS["code-docs"],
+      stage: "documents" as const,
+      stageLabel: STAGE_LABELS["documents"],
       label: "需求说明书",
       eyebrow: "Document",
       description: "汇总需求规则与需求模型的说明书。",
@@ -1113,8 +1044,8 @@ function buildProductNodes(input: LineageGraphInput): LineageNode[] {
     {
       id: documentNodeId("softwareDesignSpec"),
       kind: "document" as const,
-      stage: "code-docs" as const,
-      stageLabel: STAGE_LABELS["code-docs"],
+      stage: "documents" as const,
+      stageLabel: STAGE_LABELS["documents"],
       label: "设计说明书",
       eyebrow: "Document",
       description: "汇总设计模型、代码规格与接口约束。",
@@ -1131,22 +1062,7 @@ function buildProductNodes(input: LineageGraphInput): LineageNode[] {
       ),
       payload: { documentKind: "softwareDesignSpec" as const },
     },
-    {
-      id: codeNodeId(),
-      kind: "code" as const,
-      stage: "code-docs" as const,
-      stageLabel: STAGE_LABELS["code-docs"],
-      label: "代码原型",
-      eyebrow: "React Prototype",
-      description: "由设计模型生成可运行的前端原型。",
-      status: code,
-      reason: codeReason(input, code),
-      actionLabel: statusActionLabel(code),
-      hasViewableArtifact: Object.keys(input.codeFiles).length > 0 || Boolean(input.codeSpec),
-      upstreamIds: [],
-      downstreamIds: [],
-      recentEvents: recentEventsForKind(input, "code", "代码生成"),
-    },
+    
   ];
 }
 
@@ -1190,7 +1106,7 @@ function buildEdges(nodes: LineageNode[], input: LineageGraphInput) {
   }
 
   for (const designDiagram of designDiagramsFor(input)) {
-    addEdge(edges, nodesById, designNodeId(designDiagram), codeNodeId(), "实现输入");
+    
     addEdge(
       edges,
       nodesById,

@@ -39,7 +39,7 @@ function displayRunStatus(record: RunRecord) {
 function inferRunKind(snapshot: RunRecord["snapshot"]) {
   if ("selectedArtifacts" in snapshot) return "feasibility";
   if ("documentKind" in snapshot) return "document";
-  if ("files" in snapshot) return "code";
+  
   if ("designModelTraceability" in snapshot) return "design";
   return "requirements";
 }
@@ -78,46 +78,7 @@ function readMissingArtifactSummary(snapshot: RunRecord["snapshot"]) {
     .slice(0, MISSING_ARTIFACT_SUMMARY_LIMIT);
 }
 
-function readCodeDiagnosticSummary(snapshot: RunRecord["snapshot"]) {
-  if (!("files" in snapshot)) {
-    return {
-      count: 0,
-      summary: [] as string[],
-      qualityIssueCount: 0,
-    };
-  }
 
-  const diagnostics = Array.isArray(snapshot.diagnostics)
-    ? snapshot.diagnostics
-    : [];
-  const fileDiagnostics = Array.isArray(snapshot.fileGenerationDiagnostics)
-    ? snapshot.fileGenerationDiagnostics
-    : [];
-  const latestQualityDiagnostic = Array.isArray(snapshot.qualityDiagnostics)
-    ? snapshot.qualityDiagnostics.at(-1)
-    : null;
-  const qualityIssues = latestQualityDiagnostic?.issues ?? [];
-  const summary = [
-    ...diagnostics.map((diagnostic) => `${diagnostic.stage}：${diagnostic.message}`),
-    ...fileDiagnostics.map((diagnostic) => {
-      const target = diagnostic.path ? `${diagnostic.path} ` : "";
-      return `${diagnostic.stage}：${target}${diagnostic.message}`;
-    }),
-    ...qualityIssues.map((issue) => {
-      const target = issue.path ? `${issue.path} ` : "";
-      return `quality：${target}${issue.message}`;
-    }),
-  ]
-    .map((message) => message.trim().replace(/\s+/g, " "))
-    .filter(Boolean)
-    .slice(0, CODE_DIAGNOSTIC_SUMMARY_LIMIT);
-
-  return {
-    count: diagnostics.length + fileDiagnostics.length + qualityIssues.length,
-    summary,
-    qualityIssueCount: qualityIssues.length,
-  };
-}
 
 function readSelectedDiagrams(snapshot: RunRecord["snapshot"]) {
   return "selectedDiagrams" in snapshot && Array.isArray(snapshot.selectedDiagrams)
@@ -154,7 +115,7 @@ export function summarizeRunRecord(record: RunRecord) {
     : false;
   const diagramErrorSummary = readDiagramErrorSummary(snapshot);
   const missingArtifactSummary = readMissingArtifactSummary(snapshot);
-  const codeDiagnosticSummary = readCodeDiagnosticSummary(snapshot);
+  
   const actions = runActionEvents(record);
   const latestAction = actions.at(-1) ?? null;
   return {
@@ -175,9 +136,9 @@ export function summarizeRunRecord(record: RunRecord) {
         ? snapshot.missingArtifacts.filter((artifact) => artifact.trim()).length
         : 0,
     missingArtifactSummary,
-    codeDiagnosticCount: codeDiagnosticSummary.count,
-    codeDiagnosticSummary: codeDiagnosticSummary.summary,
-    codeQualityIssueCount: codeDiagnosticSummary.qualityIssueCount,
+    
+    
+    
     model: readSnapshotModel(snapshot) ?? null,
     runKind: inferRunKind(snapshot),
     documentKind:

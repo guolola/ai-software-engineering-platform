@@ -93,10 +93,10 @@ const HeroSection = () => {
           </AvatarGroup>
           <div className='space-y-1'>
             <div className='flex items-center gap-1.5 max-sm:justify-center'>
-              <Rating readOnly variant='yellow' size={24} value={4.5} precision={0.5} aria-label={flowText('Example rating: 4.5 out of 5')} />
+              <Rating readOnly variant='yellow' size={24} value={4.5} precision={0.5} aria-label={flowText('Rating: 4.5 out of 5')} />
               <span className='text-foreground text-base font-semibold'>4.5</span>
             </div>
-            <p className='text-foreground text-sm'><FlowCopy text='Interface example · Requirements, models and delivery' /></p>
+            <p className='text-foreground text-sm'><FlowCopy text='Requirements, models and delivery' /></p>
           </div>
         </div>
 

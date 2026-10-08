@@ -61,7 +61,6 @@ export function getProjectRunKind(run: PlatformRunSummary) {
   if (
     run.runKind === "requirements" ||
     run.runKind === "design" ||
-    run.runKind === "code" ||
     run.runKind === "document" ||
     run.runKind === "feasibility"
   ) {
@@ -117,14 +116,6 @@ export function getProjectRunStageLabel(run: PlatformRunSummary, t?: TFunction) 
     if (runKind === "requirements") return label("requirementSvg", "渲染需求图表");
     return label("svg", "渲染图表");
   }
-  if (
-    normalized.includes("write_code") ||
-    normalized.includes("repair_code") ||
-    normalized.includes("generate_code")
-  ) {
-    return label("code", "生成代码原型");
-  }
-  if (normalized.includes("verify_code")) return label("verifyCode", "验证代码预览");
   if (normalized.includes("generate_document")) {
     if (run.documentKind === "requirementsSpec") return label("requirementsDocument", "生成需求规格说明书");
     if (run.documentKind === "feasibilityStudy") return label("feasibilityDocument", "生成可行性研究报告");

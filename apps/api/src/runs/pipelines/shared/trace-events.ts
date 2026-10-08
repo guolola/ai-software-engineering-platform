@@ -1,12 +1,12 @@
 // Owns run trace mutation helpers shared by API pipelines and repair flows.
 import {
-  codeTraceEntrySchema,
+  
   designDiagramKindSchema,
   designTraceEntrySchema,
   diagramKindSchema,
   requirementTraceEntrySchema,
-  type CodeRunSnapshot,
-  type CodeTraceEntry,
+  
+  
   type DesignDiagramKind,
   type DesignRunSnapshot,
   type DesignTraceEntry,
@@ -139,28 +139,9 @@ export function appendDesignTrace(
   ];
 }
 
-function isCodeSnapshot(snapshot: RunRecord["snapshot"]): snapshot is CodeRunSnapshot {
-  return "files" in snapshot && "entryFile" in snapshot;
-}
 
-export function appendCodeTrace(
-  record: RunRecord,
-  entry: Omit<CodeTraceEntry, "createdAt">,
-) {
-  if (!isCodeSnapshot(record.snapshot)) {
-    return;
-  }
 
-  record.snapshot.codeTrace = [
-    ...(record.snapshot.codeTrace ?? []),
-    codeTraceEntrySchema.parse(
-      compactTraceRawOutput({
-        ...entry,
-        createdAt: new Date().toISOString(),
-      }),
-    ),
-  ];
-}
+
 
 export function designDiagramKindFromArtifact(
   artifact: AnyPlantUmlArtifact,

@@ -1,7 +1,7 @@
 // Verifies saved run history snapshots restore partial design artifacts consistently.
 import { describe, expect, it } from "vitest";
 import type {
-  CodeRunSnapshot,
+  
   DesignDiagramModelSpec,
   DesignRunSnapshot,
   DocumentRunSnapshot,
@@ -133,32 +133,32 @@ function completedCodeSnapshot(): CodeRunSnapshot {
     ],
     spec: null,
     businessLogic: null,
-    loadedCodeSkill: null,
-    visualDirection: null,
-    skillResourceDiscoveryPlan: null,
-    skillResourcePreviews: null,
-    skillResourcePlan: null,
-    codeSkillContext: null,
-    appBlueprint: null,
-    uiBlueprint: null,
-    uiMockup: null,
-    uiReferenceSpec: null,
-    uiFidelityReport: null,
-    designTokens: null,
-    componentRegistry: null,
-    uiIr: null,
-    visualDiffReport: null,
-    businessAssertionResults: null,
-    repairLoopSummary: null,
-    selectedCodeSkills: [],
-    skillDiagnostics: [],
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     filePlan: null,
-    codeImplementationBrief: null,
-    codeFileOperationManifest: null,
-    fileGenerationDiagnostics: [],
-    codeTrace: [],
-    codeGenerationMode: "json_schema_operations",
-    qualityDiagnostics: [],
+    
+    
+    
+    
+    
+    
     files: {
       "/src/App.tsx": "export default function App() { return null; }",
     },
@@ -168,7 +168,7 @@ function completedCodeSnapshot(): CodeRunSnapshot {
     generationMode: "continue",
     changedFileCount: 1,
     diagnostics: [],
-    codeContextHash: null,
+    
     currentStage: "verify_code_preview",
     status: "completed",
     error: null,
@@ -204,21 +204,5 @@ describe("createRestoredSnapshotPlan", () => {
     ).toThrow("说明书快照不能恢复为项目工作台。");
   });
 
-  it("restores code snapshots with design models and PlantUML but no stale rendered design artifacts", () => {
-    const plan = createRestoredSnapshotPlan({
-      snapshot: completedCodeSnapshot(),
-      rulesVersion: 1,
-      textVersion: 1,
-    });
-
-    expect(plan.artifacts?.kind).toBe("code");
-    expect(Object.keys(plan.artifacts?.designModels ?? {})).toEqual(["table"]);
-    expect(plan.artifacts?.designPlantUml).toEqual({
-      table: "@startuml\nclass users\n@enduml",
-    });
-    expect(plan.artifacts?.designSvgArtifacts).toEqual({});
-    expect(plan.artifacts?.designInputFingerprints).toEqual({});
-    expect(plan.artifacts?.generatedDesignDiagrams).toEqual(["table"]);
-    expect(plan.artifacts?.codeSnapshot?.runId).toBe("code-history");
-  });
+  
 });

@@ -69,6 +69,34 @@ describe('FloatingAlertProvider', () => {
     await waitFor(() => expect(screen.queryByText('保存成功')).not.toBeInTheDocument())
   })
 
+  it('sizes stacked alerts independently while allowing long text to wrap within the viewport', () => {
+    render(<FloatingAlertProvider><div>content</div></FloatingAlertProvider>)
+
+    act(() => {
+      floatingAlert.success('已复制')
+      floatingAlert.warning('请检查项目配置后重试', { description: 'https://example.com/' + 'a'.repeat(200) })
+    })
+
+    const alerts = screen.getAllByRole('alert')
+    for (const alert of alerts) {
+      const item = alert.closest('[data-slot="floating-alert-item"]') as HTMLElement
+      expect(item).toHaveClass('w-fit', 'max-w-full', 'min-w-0')
+      expect(item).not.toHaveClass('w-full')
+      expect(item.parentElement).toHaveClass('items-center')
+      expect(alert).toHaveClass('[overflow-wrap:anywhere]')
+    }
+    expect(screen.getByText('已复制')).toBeInTheDocument()
+    expect(screen.getByText('请检查项目配置后重试')).toBeInTheDocument()
+  })
+
+  it('centers the status icon and close button alongside a message without a description', () => {
+    render(<FloatingAlertProvider><AlertTrigger /></FloatingAlertProvider>)
+    fireEvent.click(screen.getByRole('button', { name: '显示提示' }))
+
+    expect(screen.getByRole('alert')).toHaveClass('items-center')
+    expect(screen.getByRole('button', { name: '关闭提示' }).parentElement).toHaveClass('top-1/2', '-translate-y-1/2')
+  })
+
   it('pauses while hovered and animates manual close', async () => {
     render(<FloatingAlertProvider><AlertTrigger tone='destructive' durationMs={40} /></FloatingAlertProvider>)
 

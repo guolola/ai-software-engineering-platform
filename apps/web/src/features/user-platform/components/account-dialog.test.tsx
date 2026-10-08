@@ -221,6 +221,7 @@ describe("AccountDialog generation usage", () => {
     const tabList = within(accountDialog).getByRole("tablist", { name: "设置" });
     const tabs = within(tabList).getAllByRole("tab");
     expect(tabs).toHaveLength(4);
+    expect(within(tabList).queryByRole("tab", { name: "外部工具连接" })).not.toBeInTheDocument();
 
     const profileTab = within(tabList).getByRole("tab", { name: "个人资料" });
     const securityTab = within(tabList).getByRole("tab", { name: "安全设置" });

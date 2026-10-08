@@ -57,36 +57,7 @@ export function deriveRunUiStateFromEvent(
   } satisfies RunUiState;
 }
 
-export function deriveCodeRunUiStateFromEvent(
-  current: RunUiState,
-  event: RunEvent,
-  progress: number | null | undefined,
-) {
-  return {
-    runStatus: statusFromRunEvent(event),
-    runProgress: progress ?? current.runProgress,
-    runMessage:
-      event.type === "code_file_changed"
-        ? `已写入 ${event.path}`
-        : event.type === "stage_progress"
-          ? (event.message ?? current.runMessage)
-          : event.type === "queued"
-            ? "代码生成任务已进入队列"
-            : event.type === "completed"
-              ? "files" in event.snapshot &&
-                event.snapshot.generationMode === "continue" &&
-                event.snapshot.changedFileCount === 0
-                ? "本次未产生文件变更"
-                : "代码生成完成"
-              : event.type === "cancelled"
-                ? event.message
-                : event.type === "failed"
-                  ? failedEventMessage(event)
-                  : current.runMessage,
-    errorMessage:
-      event.type === "failed" ? failedEventMessage(event) : current.errorMessage,
-  } satisfies RunUiState;
-}
+
 
 export function cancelledRunUiState(snapshot: CancelledRunSnapshot) {
   return {
@@ -115,13 +86,4 @@ export function completedRunUiState(message: string) {
   } satisfies RunUiState;
 }
 
-export function completedCodeRunUiState(snapshot: {
-  changedFileCount?: number;
-  generationMode?: "continue" | "regenerate";
-}) {
-  return completedRunUiState(
-    snapshot.generationMode === "continue" && snapshot.changedFileCount === 0
-      ? "本次未产生文件变更"
-      : "代码生成完成",
-  );
-}
+

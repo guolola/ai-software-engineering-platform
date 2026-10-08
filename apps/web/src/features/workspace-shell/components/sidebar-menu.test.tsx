@@ -189,7 +189,7 @@ describe("SidebarMenu", () => {
         .getAllByRole("button")
         .map((button) => button.textContent)
         .filter(Boolean),
-    ).toEqual(["系统需求", "可行性分析", "需求模型", "设计模型", "代码", "测试", "说明书"]);
+    ).toEqual(["系统需求", "可行性分析", "需求模型", "设计模型", "测试", "说明书"]);
     expect(screen.queryByRole("button", { name: "展开 可行性分析" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "业务流程图" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "系统环境图" })).not.toBeInTheDocument();
@@ -1861,7 +1861,7 @@ describe("SidebarMenu", () => {
     render(withWorkspaceProviders(<SidebarMenu />, repository));
 
     expect(await screen.findByText("设计模型")).toBeInTheDocument();
-    expect(screen.getByText("代码")).toBeInTheDocument();
+    expect(screen.queryByText("代码")).not.toBeInTheDocument();
     expect(screen.queryByText("收起侧边栏")).not.toBeInTheDocument();
     expect(screen.queryByText("文本需求")).not.toBeInTheDocument();
     expect(screen.queryByText("生成设计模型")).not.toBeInTheDocument();

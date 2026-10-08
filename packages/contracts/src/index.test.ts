@@ -9,19 +9,19 @@ import {
   designTraceEntrySchema,
   type DesignModelTraceabilityEntry,
   designDiagramModelsResultSchema,
-  codeRunSnapshotSchema,
-  codeBusinessAssertionResultSchema,
-  codeSkillResourceDiscoveryPlanSchema,
-  codeSkillResourcePreviewResultSchema,
-  codeSkillActionSchema,
-  codeSkillContextSchema,
-  codeSkillResourcePlanSchema,
-  codeSkillSchema,
-  codeTraceEntrySchema,
+  
+  
+  
+  
+  
+  
+  
+  
+  
   coverageMatrixSchema,
   traceabilityMatrixSchema,
-  codeVisualDirectionSchema,
-  codeUiIrResultSchema,
+  
+  
   renderStructuredModelRequestSchema,
   renderStructuredModelResponseSchema,
   renderSvgResponseSchema,
@@ -79,8 +79,8 @@ import {
   projectMemberRolePermissions,
   runEventSchema,
   runSnapshotSchema,
-  startCodeRunCommandSchema,
-  startCodeRunRequestSchema,
+  
+  
   startDesignRunCommandSchema,
   startDesignRunRequestSchema,
   startDocumentRunCommandSchema,
@@ -478,7 +478,7 @@ test("contracts describe coverage and bidirectional traceability matrices", () =
         rationale: "Use case covers the login requirement.",
         modelElements: ["requirements-model:usecase:uc-login"],
         designElements: ["design-model:sequence:msg-login"],
-        codeArtifacts: ["/src/App.tsx"],
+        
         tests: ["test:login"],
         reviewItems: [],
       },
@@ -495,7 +495,7 @@ test("contracts describe coverage and bidirectional traceability matrices", () =
           rationale: "invalid legacy status",
           modelElements: [],
           designElements: [],
-          codeArtifacts: [],
+          
           tests: [],
           reviewItems: [],
         },
@@ -540,52 +540,7 @@ test("contracts describe coverage and bidirectional traceability matrices", () =
   assert.equal(traceability.links.length, 2);
 });
 
-test("contracts describe requirement-linked code business assertions", () => {
-  const result = codeBusinessAssertionResultSchema.parse({
-    runId: "run-code-assertions",
-    generatedAt: "2026-05-24T00:00:00.000Z",
-    passed: false,
-    blockingFailureIds: ["CBA-001"],
-    assertions: [
-      {
-        id: "CBA-001",
-        requirementId: "REQ-001",
-        category: "permission",
-        description: "借阅者未登录时不能借书。",
-        expectedBehavior: "借书操作必须先校验借阅者登录状态。",
-        verificationMethod: "static-code-scan",
-        evidenceArtifacts: ["/src/features/borrow.ts"],
-        status: "failed",
-        severity: "critical",
-        message: "未发现登录权限校验。",
-      },
-    ],
-  });
 
-  assert.equal(result.assertions[0]?.requirementId, "REQ-001");
-  assert.equal(result.passed, false);
-  assert.throws(() =>
-    codeBusinessAssertionResultSchema.parse({
-      runId: "run-code-assertions",
-      generatedAt: "2026-05-24T00:00:00.000Z",
-      passed: true,
-      blockingFailureIds: [],
-      assertions: [
-        {
-          id: "CBA-001",
-          category: "permission",
-          description: "missing requirement id",
-          expectedBehavior: "invalid",
-          verificationMethod: "static-code-scan",
-          evidenceArtifacts: [],
-          status: "passed",
-          severity: "critical",
-          message: "invalid",
-        },
-      ],
-    }),
-  );
-});
 
 test("contracts validate representative stage payloads", () => {
   const rules = requirementRulesResultSchema.parse({
@@ -678,317 +633,60 @@ test("contracts validate representative stage payloads", () => {
   });
   assert.equal(event.type, "stage_progress");
 
-  const uiMockupEvent = runEventSchema.parse({
-    type: "artifact_ready",
-    stage: "generate_code_ui_mockup",
-    artifactKind: "uiMockup",
-    uiMockup: {
-      status: "completed",
-      model: "gpt-image-2",
-      prompt: "生成活动日历界面图",
-      summary: "公共活动日历主界面",
-      imageUrl: "https://example.com/mockup.png",
-      imageDataUrl: null,
-      errorMessage: null,
-      createdAt: new Date().toISOString(),
-    },
-  });
-  assert.equal(uiMockupEvent.type, "artifact_ready");
+  
+  
 
-  const uiIr = codeUiIrResultSchema.parse({
-    uiIr: {
-      designTokens: {
-        colors: {
-          primary: "#2563eb",
-          background: "#f8fafc",
-          surface: "#ffffff",
-          text: "#0f172a",
-          accent: "#f97316",
-        },
-        typography: { body: "14px system-ui" },
-        spacing: { "1": "4px", "3": "12px", "4": "16px" },
-        radius: { sm: "4px", md: "8px" },
-        shadow: { sm: "0 1px 2px rgba(0,0,0,.08)" },
-        density: "comfortable",
-      },
-      componentRegistry: {
-        components: [
-          {
-            name: "WorkspaceShell",
-            description: "业务工作台布局",
-            props: ["title"],
-            variants: ["default"],
-            usageRules: ["承载导航和主内容"],
-          },
-        ],
-      },
-      pages: [
-        {
-          id: "home",
-          route: "/",
-          name: "首页",
-          layout: "sidebar-content",
-          primaryActions: ["新增"],
-          componentTree: {
-            component: "WorkspaceShell",
-            purpose: "承载首页",
-            props: { title: "首页" },
-            dataBinding: null,
-            tokenRefs: ["colors.primary"],
-            children: [],
-          },
-        },
-      ],
-      dataBindings: ["records -> DataTable"],
-      interactions: ["点击新增打开表单"],
-      responsiveRules: ["mobile 纵向排列"],
-    },
-  });
-  assert.equal(uiIr.uiIr.pages[0]?.componentTree.component, "WorkspaceShell");
+  
 
-  const uiIrEvent = runEventSchema.parse({
-    type: "artifact_ready",
-    stage: "generate_code_ui_ir",
-    artifactKind: "uiIr",
-    uiIr: uiIr.uiIr,
-  });
-  assert.equal(uiIrEvent.type, "artifact_ready");
+  
+  
 
-  const codeSkill = codeSkillSchema.parse({
-    name: "react-prototype-quality",
-    description: "提升 React 原型质量",
-    triggers: ["React", "原型"],
-    appliesTo: ["planning", "implementation"],
-    priority: 80,
-    source: "builtin",
-    location: "apps/api/src/code-skills/builtin/react-prototype-quality/SKILL.md",
-    baseDir: "apps/api/src/code-skills/builtin/react-prototype-quality",
-    fileManifest: [
-      {
-        path: "apps/api/src/code-skills/builtin/react-prototype-quality/SKILL.md",
-        relativePath: "SKILL.md",
-        kind: "skill",
-        size: 120,
-      },
-    ],
-    content: "生成完整可运行代码。",
-  });
-  assert.equal(codeSkill.name, "react-prototype-quality");
+  
+  
 
-  const skillAction = codeSkillActionSchema.parse({
-    name: "design-system",
-    description: "查询设计系统",
-    command: "python",
-    args: ["scripts/search.py", "{query}", "--design-system"],
-    outputFormat: "markdown",
-  });
-  assert.equal(skillAction.command, "python");
-  assert.throws(() =>
-    codeSkillActionSchema.parse({
-      name: "bad",
-      description: "危险命令",
-      command: "rm",
-      args: ["-rf", "."],
-    }),
-  );
+  
+  
+  
 
-  const codeSkillsEvent = runEventSchema.parse({
-    type: "artifact_ready",
-    stage: "select_code_skills",
-    artifactKind: "codeSkills",
-    codeSkills: [
-      {
-        name: codeSkill.name,
-        description: codeSkill.description,
-        source: codeSkill.source,
-        location: codeSkill.location,
-        appliesTo: codeSkill.appliesTo,
-        priority: codeSkill.priority,
-        reason: "默认启用 React 原型质量技能。",
-      },
-    ],
-    skillDiagnostics: [],
-  });
-  assert.equal(codeSkillsEvent.type, "artifact_ready");
+  
+  
 
-  const codeSkillContext = codeSkillContextSchema.parse({
-    skillName: "ui-ux-pro-max",
-    alias: "@web-design",
-    query: "校园活动 dashboard React",
-    designSystem: "## Design System",
-    stackGuidelines: "{\"results\":[]}",
-    domainGuidelines: "{\"results\":[]}",
-    actionResults: [
-      {
-        name: "design-system",
-        description: "查询设计系统",
-        command: "python",
-        args: ["scripts/search.py", "校园活动", "--design-system"],
-        outputFormat: "markdown",
-        status: "completed",
-        stdout: "## Design System",
-        stderr: "",
-        exitCode: 0,
-        startedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
-      },
-    ],
-    diagnostics: [],
-  });
-  assert.equal(codeSkillContext.actionResults[0]?.status, "completed");
+  
+  
 
-  const skillResourcePlan = codeSkillResourcePlanSchema.parse({
-    skillName: "ui-ux-pro-max",
-    alias: "@web-design",
-    query: "校园活动 dashboard React responsive accessible",
-    requests: [
-      {
-        resourceType: "stack",
-        name: "react-stack",
-        query: "React prototype",
-        csvPath: "",
-        stack: "react",
-        domain: "",
-        actionName: "",
-        maxResults: 6,
-        reason: "获取 React 原型实现规则。",
-      },
-    ],
-    diagnostics: [],
-  });
-  assert.equal(skillResourcePlan.requests[0]?.stack, "react");
+  
+  
 
-  const visualDirection = codeVisualDirectionSchema.parse({
-    productType: "活动服务原型",
-    targetAudience: "学生和活动管理员",
-    toneKeywords: ["友好", "清爽"],
-    styleKeywords: ["soft cards", "community calendar"],
-    colorMood: "浅色蓝绿社区服务色板",
-    typographyMood: "清晰、圆润、易扫读",
-    layoutMood: "卡片式多页面业务工作台",
-    componentTexture: "柔和阴影和轻量边框",
-    interactionMood: "明确反馈、轻微动效",
-    avoidStyles: ["纯黑背景", "移动端原生交互"],
-    promptBrief: "friendly civic calendar, soft event cards, optimistic blue-green palette",
-  });
-  assert.match(visualDirection.promptBrief, /friendly civic calendar/);
+  
 
-  const skillResourceDiscoveryPlan = codeSkillResourceDiscoveryPlanSchema.parse({
-    skillName: "ui-ux-pro-max",
-    alias: "@web-design",
-    requests: [
-      {
-        path: "data/styles.csv",
-        reason: "理解可选视觉风格。",
-        expectedUse: "选择适合社区活动日历的卡片风格。",
-      },
-    ],
-    diagnostics: [],
-  });
-  assert.equal(skillResourceDiscoveryPlan.requests[0]?.path, "data/styles.csv");
+  
+  
 
-  const skillResourcePreviews = codeSkillResourcePreviewResultSchema.parse({
-    skillName: "ui-ux-pro-max",
-    alias: "@web-design",
-    previews: [
-      {
-        path: "data/styles.csv",
-        rowCount: 12,
-        headers: ["No", "Style Category", "Type"],
-        sampleRows: [{ No: "1", "Style Category": "Minimalism", Type: "General" }],
-        matchedHints: ["General"],
-        status: "completed",
-      },
-    ],
-    diagnostics: [],
-  });
-  assert.equal(skillResourcePreviews.previews[0]?.headers[1], "Style Category");
+  
+  
 
-  const skillResourcePlanEvent = runEventSchema.parse({
-    type: "artifact_ready",
-    stage: "plan_code_ui",
-    artifactKind: "skillResourcePlan",
-    skillResourcePlan,
-  });
-  assert.equal(skillResourcePlanEvent.type, "artifact_ready");
+  
+  
 
-  const codeSkillContextEvent = runEventSchema.parse({
-    type: "artifact_ready",
-    stage: "plan_code_ui",
-    artifactKind: "codeSkillContext",
-    codeSkillContext,
-  });
-  assert.equal(codeSkillContextEvent.type, "artifact_ready");
+  
+  
 
-  const visualDirectionEvent = runEventSchema.parse({
-    type: "artifact_ready",
-    stage: "plan_code_ui",
-    artifactKind: "visualDirection",
-    visualDirection,
-  });
-  assert.equal(visualDirectionEvent.type, "artifact_ready");
+  
+  
 
-  const skillResourceDiscoveryPlanEvent = runEventSchema.parse({
-    type: "artifact_ready",
-    stage: "plan_code_ui",
-    artifactKind: "skillResourceDiscoveryPlan",
-    skillResourceDiscoveryPlan,
-  });
-  assert.equal(skillResourceDiscoveryPlanEvent.type, "artifact_ready");
+  
+  
 
-  const skillResourcePreviewsEvent = runEventSchema.parse({
-    type: "artifact_ready",
-    stage: "plan_code_ui",
-    artifactKind: "skillResourcePreviews",
-    skillResourcePreviews,
-  });
-  assert.equal(skillResourcePreviewsEvent.type, "artifact_ready");
+  
+  
 
-  const codeSnapshot = codeRunSnapshotSchema.parse({
-    runId: "code-run",
-    requirementText: "生成活动报名原型",
-    rules: [],
-    designModels: [],
-    spec: null,
-    visualDirection,
-    skillResourceDiscoveryPlan,
-    skillResourcePreviews,
-    skillResourcePlan,
-    codeSkillContext,
-    selectedCodeSkills: codeSkillsEvent.codeSkills,
-    skillDiagnostics: [],
-    files: {},
-    entryFile: "/src/App.tsx",
-    codeTrace: [
-      {
-        stage: "generate_file_operations",
-        attempt: 1,
-        kind: "parse_error",
-        rawOutput: "{\"operations\":[{\"operation\":\"bad_operation\"}]}",
-        errorMessage: "operations.0.operation: Invalid enum value",
-        createdAt: new Date().toISOString(),
-      },
-    ],
-    currentStage: "select_code_skills",
-    status: "running",
-    error: null,
-  });
-  assert.equal(codeSnapshot.selectedCodeSkills.length, 1);
-  assert.equal(codeSnapshot.codeTrace.length, 1);
+  
+  
+  
 
-  const codeTraceEntry = codeTraceEntrySchema.parse({
-    stage: "generate_file_content",
-    attempt: 2,
-    kind: "validation_error",
-    path: "/src/App.tsx",
-    rawOutput: "```tsx\nexport default function App() { return null; }\n```",
-    rawOutputTruncated: true,
-    rawOutputOriginalLength: 12000,
-    errorMessage: "/src/App.tsx content still contains a Markdown fence",
-    createdAt: new Date().toISOString(),
-  });
-  assert.equal(codeTraceEntry.path, "/src/App.tsx");
-  assert.equal(codeTraceEntry.rawOutputTruncated, true);
+  
+  
+  
 
   const designTraceEntry = designTraceEntrySchema.parse({
     stage: "render_svg",
@@ -1322,48 +1020,8 @@ test("start run contracts accept optional project context", () => {
     }).projectId,
     "project-a",
   );
-  assert.equal(
-    startCodeRunRequestSchema.parse({
-      projectId: "project-a",
-      designModels: [
-        {
-          diagramKind: "sequence",
-          title: "顺序图",
-          summary: "设计调用",
-          notes: [],
-          participants: [
-            {
-              id: "user",
-              name: "用户",
-              participantType: "actor",
-            },
-          ],
-          messages: [],
-          fragments: [],
-        },
-      ],
-      providerSettings: baseProviderSettings,
-    }).projectId,
-    "project-a",
-  );
-  assert.throws(() =>
-    startCodeRunRequestSchema.parse({
-      projectId: "project-a",
-      requirementText: "项目需求",
-      rules: [],
-      designModels: [
-        {
-          diagramKind: "sequence",
-          title: "顺序图",
-          summary: "设计调用",
-          notes: [],
-          participants: [],
-          messages: [],
-          fragments: [],
-        },
-      ],
-    }),
-  );
+  
+  
   assert.equal(
     startDocumentRunRequestSchema.parse({
       projectId: "project-a",
@@ -1399,13 +1057,7 @@ test("start run contracts accept optional project context", () => {
     }).requestedDiagrams,
     ["sequence"],
   );
-  assert.equal(
-    startCodeRunCommandSchema.parse({
-      projectId: "project-a",
-      providerSettings: baseProviderSettings,
-    }).generationMode,
-    "continue",
-  );
+  
   assert.equal(
     startDocumentRunCommandSchema.parse({
       projectId: "project-a",

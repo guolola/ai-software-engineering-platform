@@ -38,11 +38,11 @@ export interface TranscriptStep {
 
 const order: RunStage[] = [
   "extract_rules", "generate_models", "generate_design_sequence", "generate_design_models",
-  "generate_plantuml", "render_svg", "verify_diagram_visual", "analyze_code_business_logic", "analyze_code_product",
-  "plan_code_ui", "generate_code_ui_mockup", "analyze_code_ui_mockup", "generate_code_ui_ir",
-  "load_web_design_skill", "select_code_skills", "plan_code_files", "generate_code_spec", "plan_code",
-  "generate_code_files", "write_code_files", "audit_code_quality", "verify_code_ui_fidelity",
-  "verify_code_rendered_preview", "verify_code_business_assertions", "verify_code_preview", "repair_code_files",
+  "generate_plantuml", "render_svg", "verify_diagram_visual",  
+     
+      
+     
+     
   "generate_document_text", "render_document_file", "generate_context", "render_context", "generate_business_flow", "render_business_flow", "generate_implementation", "generate_tests",
 ];
 const feasibilityStages = new Set<RunStage>([
@@ -65,10 +65,10 @@ export function readableTaskText(text: string) {
 
 function label(stage: RunStage) {
   const overrides: Partial<Record<RunStage, string>> = {
-    generate_code_ui_ir: "整理界面结构", load_web_design_skill: "准备界面设计规范",
-    select_code_skills: "选择界面设计规范", generate_plantuml: "生成图形描述",
+     
+     generate_plantuml: "生成图形描述",
     render_svg: "生成图形预览", verify_diagram_visual: "视觉检查", render_document_file: "排版并生成文档",
-    verify_code_business_assertions: "检查业务功能", verify_code_ui_fidelity: "检查页面与需求是否一致",
+     
   };
   return overrides[stage] ?? formatStageForDiagnostics(stage);
 }
@@ -250,37 +250,22 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
         mirrorOrder.set(call, eventIndex);
       } else {
         // Older streams have no finish event. Only known aggregate artifacts close a stage.
-        const legacyBoundary = ({ extract_rules: "requirementBaseline", generate_models: "model", generate_design_models: "model", analyze_code_business_logic: "businessLogic", plan_code_ui: "codeSpec", generate_code_spec: "codeSpec", generate_code_files: "codeFiles", render_document_file: "document" } as Partial<Record<RunStage, string>>)[event.stage];
+        const legacyBoundary = ({ extract_rules: "requirementBaseline", generate_models: "model", generate_design_models: "model",     render_document_file: "document" } as Partial<Record<RunStage, string>>)[event.stage];
         if (!lifecycleStages.has(event.stage) && event.artifactKind === legacyBoundary) {
           step.finished = true; step.status = "completed";
         }
         const artifactNames: Record<string, string> = {
           rules: "整理需求规则", requirementBaseline: "确认需求基线", businessLogic: "整理业务逻辑",
-          document: "生成可下载文档", codeFiles: "保存代码文件", uiMockup: "生成界面设计图",
-          uiFidelityReport: "检查页面与需求是否一致", visualDiffReport: "验证页面预览",
-          businessAssertionResults: "检查业务功能", codeSkillContext: "整理界面设计参考",
+          document: "生成可下载文档",  
+           
+           
         };
-        if (artifactNames[event.artifactKind] && (!activityStages.has(event.stage) || event.uiFidelityReport)) {
+        if (artifactNames[event.artifactKind] && !activityStages.has(event.stage)) {
           const call = getCall(step, `${event.stage}:artifact:${event.artifactKind}`, undefined);
           call.title = artifactNames[event.artifactKind]; call.status = "completed"; call.finishedAt = at;
-          if (event.uiFidelityReport) {
-            call.status = event.uiFidelityReport.passed ? "completed" : "failed";
-            call.message = readableTaskText(event.uiFidelityReport.summary);
-          }
         }
-        for (const [index, action] of (event.codeSkillContext?.actionResults ?? []).entries()) {
-          const call = getCall(step, `${event.eventId ?? event.stage}:reference:${index}`, action.startedAt);
-          call.title = `查询界面设计参考 ${index + 1}`;
-          call.status = action.status === "completed" ? "completed" : "failed";
-          call.finishedAt = action.completedAt; call.output = action.stdout;
-          if (call.status === "failed") call.message = "此项设计参考未能读取。";
-        }
+        
       }
-    } else if (event.type === "code_file_changed") {
-      const step = getStep(lastStage ?? "generate_code_files");
-      const call = getCall(step, `file:${event.path}`, at);
-      call.title = `写入 ${event.path}`; call.status = "completed"; call.finishedAt = at;
-      call.output = event.content; call.message = "文件已更新";
     } else if (event.type === "completed") {
       terminalAt = at;
       completed = event; status = "completed";
@@ -294,7 +279,6 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
         mirrorOrder.set(call, eventIndex);
       }
       if (failures) { status = "failed"; finalMessage = `生成结束，${failures} 个模型未完成，可重试失败项。`; }
-      else if ("files" in snapshot) finalMessage = `已生成 ${Object.keys(snapshot.files).length} 个代码文件，可以查看原型。`;
       else if ("documentKind" in snapshot) finalMessage = `文档已生成${snapshot.fileName ? `：${snapshot.fileName}` : ""}。`;
       else if ("svgArtifacts" in snapshot) {
         const visualReviews = "visualReviews" in snapshot ? Object.entries(snapshot.visualReviews ?? {}) : [];

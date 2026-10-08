@@ -13,6 +13,9 @@ import type {
 export const JSON_ONLY_SYSTEM_PROMPT =
   "你是一个严谨的软件需求与 UML 建模助手。你必须只返回 JSON，不要输出 Markdown、解释或代码围栏。";
 
+
+
+
 function truncateForPrompt(value: string, maxChars: number) {
   if (value.length <= maxChars) return value;
   return `${value.slice(0, Math.max(0, maxChars - 32))}\n...（内容已截断）`;
@@ -21,6 +24,7 @@ function truncateForPrompt(value: string, maxChars: number) {
 function stringifyForPrompt(value: unknown, maxChars: number) {
   return truncateForPrompt(JSON.stringify(value, null, 2), maxChars);
 }
+
 function selectedDiagramHardRules(selectedDiagrams: DiagramKind[]) {
   const unique = Array.from(new Set(selectedDiagrams));
   if (unique.length === 0) return "";

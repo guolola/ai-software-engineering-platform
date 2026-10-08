@@ -4,26 +4,26 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import {
   apiErrorResponseSchema,
-  codeRunSnapshotSchema,
+  
   documentRunSnapshotSchema,
   designRunSnapshotSchema,
   queuedRunEventSchema,
   runSnapshotSchema,
   repairRequirementRulesRequestSchema,
   repairRequirementRuleRequestSchema,
-  startCodeRunRequestSchema,
-  startCodeRunResponseSchema,
+  
+  
   startDesignRunRequestSchema,
   startDesignRunResponseSchema,
   startDocumentRunRequestSchema,
   startDocumentRunResponseSchema,
   startRunRequestSchema,
   startRunResponseSchema,
-  type CodeRunSnapshot,
+  
   type DocumentLibraryItem,
   type ProviderSettings,
   type RunStage,
-  type StartCodeRunRequest,
+  
   type StartDesignRunRequest,
   type StartDocumentRunRequest,
   type StartRunRequest,
@@ -35,7 +35,7 @@ import type { PngRenderClient } from "../../adapters/render/png-render-client.js
 import type { LlmScheduler } from "../../adapters/llm/llm-scheduler.js";
 import { projectDocumentWorkspaceId } from "../../documents/library/project-document-workspace.js";
 import {
-  createEmptyCodeSnapshot,
+  
   createEmptyDesignSnapshot,
   createEmptyDocumentSnapshot,
   createEmptySnapshot,
@@ -86,7 +86,7 @@ import { reserveBillingRunUsage } from "../../runs/billing/run-billing-gates.js"
 import { RUN_ROUTE_CONFIG } from "./run-route-config.js";
 import type { AdminAnalyticsStore } from "../../admin/admin-analytics-store.js";
 import {
-  resolveCodeRunInput,
+  
   resolveDesignRunInput,
   resolveDocumentRunInput,
   resolveRequirementRunInput,
@@ -114,7 +114,7 @@ import {
 } from "./run-access.js";
 import { createProjectRunAction } from "../../runs/actions/project-run-actions.js";
 import {
-  completeOfflineDemoCodeRun,
+  
   completeOfflineDemoDesignRun,
   completeOfflineDemoRequirementRun,
   createOfflineDemoDocumentInput,
@@ -228,11 +228,7 @@ type DesignPipeline = (
   renderClient: RenderClient,
 ) => Promise<void>;
 
-type CodePipeline = (
-  record: RunRecord,
-  providerSettings: ProviderSettings,
-  llmTransport: LlmTransport,
-) => Promise<void>;
+
 
 type DocumentPipeline = (
   record: RunRecord,
@@ -260,9 +256,9 @@ export function registerRunRoutes({
   defaultSseAllowOrigin,
   runStagePipeline,
   runDesignStagePipeline,
-  runCodeStagePipeline,
+  
   runDocumentStagePipeline,
-  addCodeDiagnostic,
+  
   runAccessGuard = defaultRunAccessGuard,
   providerConfigs,
   resolveProjectName,
@@ -285,13 +281,9 @@ export function registerRunRoutes({
   defaultSseAllowOrigin: string;
   runStagePipeline: RequirementPipeline;
   runDesignStagePipeline: DesignPipeline;
-  runCodeStagePipeline: CodePipeline;
+  
   runDocumentStagePipeline: DocumentPipeline;
-  addCodeDiagnostic: (
-    snapshot: CodeRunSnapshot,
-    stage: RunStage,
-    message: string,
-  ) => void;
+  
   runAccessGuard?: RunAccessGuard;
   providerConfigs?: ProviderConfigStore;
   resolveProjectName?: (projectId: string) => Promise<string | null | undefined>;
@@ -346,9 +338,9 @@ export function registerRunRoutes({
       documentLibrary,
       runStagePipeline,
       runDesignStagePipeline,
-      runCodeStagePipeline,
+      
       runDocumentStagePipeline,
-      addCodeDiagnostic,
+      
       documentInput,
       billingEntitlements: runBillingEntitlements,
       analyticsStore,
@@ -383,7 +375,7 @@ export function registerRunRoutes({
   };
 
   const handleOfflineDemoError = (record: RunRecord, error: unknown) => {
-    handleRunPipelineError(record, error, addCodeDiagnostic);
+    handleRunPipelineError(record, error);
   };
 
   const rejectBlockedRequirementBaseline = (
@@ -867,126 +859,7 @@ export function registerRunRoutes({
     return startDesignRunResponseSchema.parse({ runId });
   });
 
-  app.post(RUN_ROUTE_CONFIG.code.startPath, async (request, reply) => {
-    const metadata = await metadataForStartedRun(
-      request,
-      reply,
-      runAccessGuard,
-      "start_runs",
-    );
-    if (metadata === null) return runAccessDeniedMessage(reply);
-    const resolvedInput = await resolveCodeRunInput(
-      request.body,
-      metadata,
-      loadProjectWorkspace,
-    );
-    if (!resolvedInput.ok) {
-      reply.code(resolvedInput.statusCode);
-      return resolvedInput.body;
-    }
-    const input = resolvedInput.input;
-    if (await isOfflineDemoRun(input.projectId ?? metadata?.projectId)) {
-      const runId = randomUUID();
-      const record: RunRecord = {
-        snapshot: createEmptyCodeSnapshot(runId, input),
-        events: [],
-        listeners: new Set(),
-        terminal: false,
-        metadata,
-      };
-      runs.set(runId, record);
-      attachRunSideEffects(record);
-      emitEvent(record, queuedRunEventSchema.parse({ type: "queued" }));
-      void completeOfflineDemoCodeRun(record, input).catch((error) =>
-        handleOfflineDemoError(record, error),
-      );
-      reply.code(202);
-      return startCodeRunResponseSchema.parse({ runId });
-    }
-    const providerResolution = await resolveProviderSettingsForRun({
-      providerSettings: input.providerSettings,
-      metadata,
-      providerConfigs,
-      request,
-      reply,
-    });
-    if (!providerResolution.ok) {
-      return providerResolutionFailureResponse(reply, providerResolution);
-    }
-    const providerSettings = providerResolution.providerSettings;
-    const providerConfigId = await resolveProviderConfigIdForRun({
-      providerSettings: input.providerSettings,
-    });
-    const generationLimitCheck = await checkGenerationUsageLimit({
-      generationUsage,
-      runAccessGuard,
-      request,
-      reply,
-    });
-    if (generationLimitCheck !== true) return generationLimitCheck;
-    const limitCheck = await checkProviderUsageLimit({
-      usageTracker: providerUsageTracker,
-      providerConfigId,
-      metadata,
-      request,
-      taskType: "code_generation",
-      policy: providerRateLimitPolicy,
-      reply,
-    });
-    if (limitCheck !== true) return limitCheck;
-    const runId = randomUUID();
-    const runBillingEntitlements = await billingEntitlementsForProvider({
-      providerConfigId,
-      metadata,
-    });
-    const billingCheck = await reserveBillingRunUsage({
-      billingEntitlements: runBillingEntitlements,
-      metadata,
-      runId,
-      taskType: "code_generation",
-      reply,
-    });
-    if (billingCheck !== true) return billingCheck;
-    await recordProviderUsage({
-      usageTracker: providerUsageTracker,
-      providerConfigId,
-      metadata,
-      request,
-      taskType: "code_generation",
-    });
-    await recordGenerationUsage({
-      generationUsage,
-      runAccessGuard,
-      request,
-      taskType: "code_generation",
-      providerConfigId,
-    });
-    const record: RunRecord = {
-      snapshot: createEmptyCodeSnapshot(runId, input),
-      events: [],
-      listeners: new Set(),
-      terminal: false,
-      metadata,
-    };
-    rememberProviderSettings(record, input.providerSettings, {
-      providerConfigId,
-      model: providerSettings.model,
-    });
-    runs.set(runId, record);
-    attachRunSideEffects(record);
-
-    emitEvent(record, queuedRunEventSchema.parse({ type: "queued" }));
-
-    await startRecordPipeline({
-      record,
-      providerSettings,
-      providerConfigId,
-      billingEntitlements: runBillingEntitlements,
-    });
-
-    reply.code(202);
-    return startCodeRunResponseSchema.parse({ runId });
-  });
+  
 
   app.post(RUN_ROUTE_CONFIG.document.startPath, async (request, reply) => {
     const metadata = await metadataForStartedRun(
@@ -1053,7 +926,7 @@ export function registerRunRoutes({
         pngRenderClient,
         (stage) => emitOfflineDemoActivity(record, stage),
       ).catch((error) => {
-        handleRunPipelineError(record, error, addCodeDiagnostic);
+        handleRunPipelineError(record, error);
       });
       reply.code(202);
       return startDocumentRunResponseSchema.parse({ runId });
@@ -1427,20 +1300,7 @@ export function registerRunRoutes({
     return designRunSnapshotSchema.parse(record.snapshot);
   });
 
-  app.get(RUN_ROUTE_CONFIG.code.snapshotPath, async (request, reply) => {
-    const { runId } = request.params as { runId: string };
-    const record = await refreshRunRecordIfAvailable(runs, runId);
-    if (!record) {
-      reply.code(404);
-      return apiErrorResponseSchema.parse({
-        error: { code: "RUN_NOT_FOUND", category: "not_found", retryable: false },
-      });
-    }
-    if (!(await canReadRunRecord(request, reply, record, runAccessGuard, "view_runs"))) {
-      return reply;
-    }
-    return codeRunSnapshotSchema.parse(record.snapshot);
-  });
+  
 
   app.get(RUN_ROUTE_CONFIG.document.snapshotPath, async (request, reply) => {
     const { runId } = request.params as { runId: string };
@@ -1511,7 +1371,7 @@ export function registerRunRoutes({
   for (const route of [
     RUN_ROUTE_CONFIG.requirements,
     RUN_ROUTE_CONFIG.design,
-    RUN_ROUTE_CONFIG.code,
+    
     RUN_ROUTE_CONFIG.document,
   ]) {
     registerRunEventsRoute({

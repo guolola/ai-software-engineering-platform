@@ -1,6 +1,6 @@
 // Keeps project workspace state in step with terminal run snapshots when clients disconnect.
 import type {
-  CodeRunSnapshot,
+  
   DesignRunSnapshot,
   DocumentRunSnapshot,
   FeasibilityRunSnapshot,
@@ -14,11 +14,11 @@ import {
   restoreRunSnapshotToWorkspaceState,
 } from "../projects/workspace-snapshot-restore.js";
 
-type RestorableSnapshot = RunSnapshot | DesignRunSnapshot | CodeRunSnapshot;
+type RestorableSnapshot = RunSnapshot | DesignRunSnapshot;
 type AnySnapshot = RestorableSnapshot | DocumentRunSnapshot | FeasibilityRunSnapshot;
 
 type ProjectWorkspaceSync = (record: RunRecord) => Promise<void>;
-type RestorableRunKind = "requirements" | "design" | "code";
+type RestorableRunKind = "requirements" | "design";
 
 function isTerminalEvent(event: RunEvent | undefined) {
   return Boolean(
@@ -90,7 +90,7 @@ function mergeVisualReviews(state: Record<string, unknown>, snapshot: RunSnapsho
 }
 
 function inferRestorableRunKind(snapshot: RestorableSnapshot): RestorableRunKind {
-  if ("files" in snapshot) return "code";
+  
   if ("designModelTraceability" in snapshot) return "design";
   return "requirements";
 }
@@ -181,9 +181,7 @@ export function createProjectWorkspaceSync(
               "rules" in record.snapshot &&
               (record.snapshot.rules?.length ?? 0) > 0,
           });
-      const state = "files" in record.snapshot
-        ? restoredState
-        : mergeVisualReviews(restoredState, record.snapshot);
+      const state = mergeVisualReviews(restoredState, record.snapshot);
       const result = await authStore.saveProjectWorkspace({
         projectId,
         baseVersion: current.version,

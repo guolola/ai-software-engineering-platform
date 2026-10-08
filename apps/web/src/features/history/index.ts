@@ -9,7 +9,7 @@ export {
   deleteRunHistoryItem,
   getRunHistorySnapshotLabel,
   getRunHistorySnapshotSummary,
-  isCodeRunSnapshot,
+  
   isDesignRunSnapshot,
   isDocumentRunSnapshot,
   loadRunHistory,

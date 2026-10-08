@@ -285,7 +285,7 @@ export const coverageMatrixRowSchema = z.object({
   rationale: z.string().min(1),
   modelElements: z.array(z.string().min(1)),
   designElements: z.array(z.string().min(1)),
-  codeArtifacts: z.array(z.string().min(1)),
+  
   tests: z.array(z.string().min(1)),
   reviewItems: z.array(z.string().min(1)),
 });
@@ -301,7 +301,7 @@ export const traceabilityArtifactTypeSchema = z.enum([
   "requirement",
   "requirements-model",
   "design-model",
-  "code",
+  
   "test",
   "evidence",
 ]);

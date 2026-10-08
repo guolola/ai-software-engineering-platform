@@ -109,22 +109,22 @@ const ARTICLE_MANIFEST = [
     id: "quick-start",
     title: "快速开始",
     category: "overview",
-    summary: "用图书馆预约系统案例走完整流程，从系统需求、可行性分析到说明书证据。",
+    summary: "用图书馆预约系统走完整流程，从系统需求、可行性分析到说明书证据。",
     estimatedMinutes: 7,
     recommendedPath: true,
     sourcePath: "../content/quick-start.md",
     tags: ["新手", "完整路径", "图书馆预约系统", "入口"],
-    relatedArtifacts: ["项目", "需求规则", "可行性分析", "UML", "设计模型", "代码原型", "三类说明书"],
+    relatedArtifacts: ["项目", "需求规则", "可行性分析", "UML", "设计模型", "Coding Agent", "三类说明书"],
     screenshot: {
       src: "/help/images/docs-quick-start.png",
       alt: "项目内使用文档快速开始截图",
-      caption: "快速开始用一个真实项目案例串起全部页面和产物。",
+      caption: "快速开始用一个项目串起全部页面和产物。",
     },
     video: {
       src: TUTORIAL_QUICK_START_VIDEO_URL,
-      title: "快速开始项目演示视频",
+      title: "快速开始项目操作视频",
       description: "带着真实项目操作一遍，从项目入口、需求规则、UML、设计、代码、测试到说明书证据。",
-      caption: "项目演示视频",
+      caption: "项目操作视频",
     },
   },
   {
@@ -188,7 +188,7 @@ const ARTICLE_MANIFEST = [
     screenshot: {
       src: "/help/images/docs-workspace-shell.png",
       alt: "项目工作台顶部栏侧边栏和标签页截图",
-      caption: "工作台通过顶部栏和侧边栏连接需求、图、设计、代码、测试和说明书。",
+      caption: "工作台通过顶部栏和侧边栏连接需求、图、设计、测试和说明书。",
     },
   },
   {
@@ -384,20 +384,16 @@ const ARTICLE_MANIFEST = [
     },
   },
   {
-    id: "code-prototype",
-    title: "代码原型生成与预览",
+    id: "coding-agent",
+    title: "Coding Agent 接入与授权",
     category: "delivery",
-    summary: "根据设计上下文生成 React 原型，查看文件树、预览和质量诊断。",
+    summary: "连接外部 Agent，选择项目授权并检查成功调用记录。",
     estimatedMinutes: 10,
     recommendedPath: true,
-    sourcePath: "../content/code-prototype.md",
-    tags: ["代码原型", "文件树", "预览", "质量诊断", "业务断言"],
-    relatedArtifacts: ["CodeFile", "CodeSpec", "UI Mockup", "Preview", "QualityReport"],
-    screenshot: {
-      src: "/help/images/docs-code-preview.png",
-      alt: "代码文件树和预览截图",
-      caption: "代码页展示生成文件、运行预览和质量反馈。",
-    },
+    sourcePath: "../content/coding-agent.md",
+    tags: ["Coding Agent", "MCP", "桌面端", "CLI", "授权"],
+    relatedArtifacts: ["MCP Connection", "Project Grant", "Last Successful Call"],
+    
   },
   {
     id: "testing-coverage",
@@ -621,11 +617,11 @@ const EN_ARTICLE_TEXT: Record<
     tags: ["Design traceability", "Requirement mapping", "Lineage graph", "Low-confidence links"],
     relatedArtifacts: ["DesignTraceability", "RequirementTraceability", "LineageGraph"],
   },
-  "code-prototype": {
-    title: "Code prototype generation and preview",
-    summary: "Generate a React prototype from design context, then inspect the file tree, preview, and quality diagnostics.",
-    tags: ["Code prototype", "React", "Preview", "Diagnostics"],
-    relatedArtifacts: ["Code files", "Preview", "Quality diagnostics"],
+  "coding-agent": {
+    title: "Coding Agent connection and authorization",
+    summary: "Connect external agents, explicitly grant project access, and check successful MCP calls.",
+    tags: ["Coding Agent", "MCP", "Desktop", "CLI", "Authorization"],
+    relatedArtifacts: ["MCP Connection", "Project Grant", "Last Successful Call"],
   },
   "testing-coverage": {
     title: "Test cases and coverage relationships",

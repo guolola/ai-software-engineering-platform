@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  createEmptyCodeSnapshot,
+  
   createEmptyDesignSnapshot,
   createEmptyDocumentSnapshot,
   createEmptySnapshot,
@@ -60,44 +60,9 @@ test("createEmptyDesignSnapshot preserves the requested design selection", () =>
   assert.deepEqual(snapshot.requestedDiagrams, ["class"]);
 });
 
-test("createEmptyCodeSnapshot omits requirement facts from code runs", () => {
-  const snapshot = createEmptyCodeSnapshot("code-1", {
-    designModels: [],
-  });
 
-  assert.equal("requirementText" in snapshot, false);
-  assert.equal("rules" in snapshot, false);
-  assert.equal("requirementBaseline" in snapshot, false);
-});
 
-test("createEmptyCodeSnapshot carries trusted matrices directly into code verification", () => {
-  const requirementSnapshot = createEmptySnapshot(
-    "requirements-upstream",
-    rule.text,
-    ["usecase"],
-    [rule],
-  );
-  requirementSnapshot.status = "completed";
-  requirementSnapshot.coverageMatrix = {
-    runId: requirementSnapshot.runId,
-    rows: [],
-  };
-  requirementSnapshot.traceabilityMatrix = {
-    runId: requirementSnapshot.runId,
-    links: [],
-    diagnostics: [],
-  };
-  const snapshot = createEmptyCodeSnapshot("code-trusted", {
-    designModels: [],
-    requirementBaseline: requirementSnapshot.requirementBaseline,
-    coverageMatrix: requirementSnapshot.coverageMatrix,
-    traceabilityMatrix: requirementSnapshot.traceabilityMatrix,
-  });
 
-  assert.equal(snapshot.requirementBaseline?.requirements[0]?.id, "REQ-001");
-  assert.equal(snapshot.coverageMatrix?.runId, "requirements-upstream");
-  assert.equal(snapshot.traceabilityMatrix?.runId, "requirements-upstream");
-});
 
 test("createEmptyDocumentSnapshot preserves an empty baseline placeholder", () => {
   const snapshot = createEmptyDocumentSnapshot("doc-1", {

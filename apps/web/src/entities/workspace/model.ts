@@ -1,9 +1,9 @@
 import type {
   DesignDiagramModelSpec,
-  CodeGenerationSpec,
-  CodeBusinessLogic,
-  CodeRunSnapshot,
-  CodeUiMockup,
+  
+  
+  
+  
   DesignRunSnapshot,
   DesignModelTraceabilityEntry,
   DesignSvgArtifact,
@@ -31,7 +31,7 @@ import type { RequirementRule } from "../requirement-rule/model";
 
 export type WorkspaceRunSnapshot = RunSnapshot;
 export type WorkspaceDesignRunSnapshot = DesignRunSnapshot;
-export type WorkspaceCodeRunSnapshot = CodeRunSnapshot;
+
 export type RunStatus = "idle" | ContractRunStatus;
 
 export interface ManualModelEditStatus {
@@ -91,18 +91,18 @@ export interface WorkspaceRecord {
   designSvgArtifacts: Record<string, DesignSvgArtifact>;
   designDiagramErrors: Record<string, DiagramError>;
   manualModelEditStatus: Record<string, ManualModelEditStatus>;
-  codeSpec: CodeGenerationSpec | null;
-  codeBusinessLogic: CodeBusinessLogic | null;
-  codeFiles: Record<string, string>;
-  codeEntryFile: string | null;
-  codeDependencies: Record<string, string>;
-  codeUiMockup: CodeUiMockup | null;
-  codeAgentPlan: string[];
-  codeSkills: CodeRunSnapshot["selectedCodeSkills"];
-  codeSkillDiagnostics: CodeRunSnapshot["skillDiagnostics"];
-  codeSkillResourcePlan: CodeRunSnapshot["skillResourcePlan"];
-  codeSkillContext: CodeRunSnapshot["codeSkillContext"];
-  codeDiagnostics: CodeRunSnapshot["diagnostics"];
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   testGenerationResult: TestGenerationResult | null;
   requirementInputFingerprint: string | null;
   diagramInputFingerprints: Partial<Record<DiagramType, string>>;

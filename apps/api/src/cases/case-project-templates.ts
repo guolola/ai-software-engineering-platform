@@ -3,14 +3,14 @@ import {
   buildAcceptedRequirementSnapshot,
   buildFeasibilityImplementationFingerprint,
   type FeasibilityBusinessFlow,
-  codeRunSnapshotSchema,
+  
   completeFeasibilityImplementationPlanSchema,
   contextDiagramSpecSchema,
   designRunSnapshotSchema,
   feasibilityInputsSchema,
   feasibilityRunSnapshotSchema,
   runSnapshotSchema,
-  type CodeRunSnapshot,
+  
   type ContextTraceRow,
   type DesignDiagramKind,
   type DesignDiagramModelSpec,
@@ -39,7 +39,7 @@ export type CaseProjectTemplate = {
   feasibilitySnapshot: FeasibilityRunSnapshot;
   businessFlow: FeasibilityBusinessFlow & { plantUml: PlantUmlArtifact };
   designSnapshot: DesignRunSnapshot;
-  codeSnapshot: CodeRunSnapshot;
+  
 };
 
 type CaseSeed = {
@@ -68,7 +68,7 @@ const seeds = [
   {
     id: "lab-booking",
     title: "实验室预约系统",
-    description: "已预置实验室预约、审批、资源占用和通知链路的完整示例项目。",
+    description: "已预置实验室预约、审批、资源占用和通知链路。",
     backgroundKey: "booking",
     requirementText:
       "高校实验室预约平台。学生可以查看实验室空闲时段并提交预约申请，教师审核预约，管理员维护实验室设备和开放时间。系统需要避免时段冲突，并在审核通过或驳回时通知申请人。",
@@ -86,7 +86,7 @@ const seeds = [
   {
     id: "order-management",
     title: "订单管理系统",
-    description: "已预置订单创建、库存校验、发货通知和状态跟踪的完整示例项目。",
+    description: "已预置订单创建、库存校验、发货通知和状态跟踪。",
     backgroundKey: "orders",
     requirementText:
       "面向中小商家的订单管理系统。商家可以维护商品、创建订单、查看库存，客户可以提交订单并查询订单状态。系统需要在下单前校验库存，库存不足时给出明确提示，订单创建后通知仓储系统发货。",
@@ -104,7 +104,7 @@ const seeds = [
   {
     id: "device-monitoring",
     title: "设备监控系统",
-    description: "已预置设备数据采集、告警确认、严重告警通知和监控看板的完整示例项目。",
+    description: "已预置设备数据采集、告警确认、严重告警通知和监控看板。",
     backgroundKey: "iot",
     requirementText:
       "工业设备监控系统。边缘网关采集设备温度、振动和运行状态，平台实时展示异常告警，运维人员可以确认告警并记录处理结果。系统需要接入第三方短信服务，在严重告警时发送通知。",
@@ -122,7 +122,7 @@ const seeds = [
   {
     id: "library-lending",
     title: "图书馆借阅系统",
-    description: "已预置图书检索、借阅登记、归还处理和逾期提醒的完整示例项目。",
+    description: "已预置图书检索、借阅登记、归还处理和逾期提醒。",
     backgroundKey: "campus",
     requirementText:
       "校园图书馆借阅系统。读者可以检索图书、提交借阅申请并查看借阅状态，馆员负责登记借出和归还。系统需要维护图书库存，自动识别逾期记录，并向读者发送归还提醒。",
@@ -168,7 +168,7 @@ function buildCaseProjectTemplate(seed: CaseSeed): CaseProjectTemplate {
   const businessFlow = { ...flow, plantUml: generatePlantUmlArtifacts([flow.model])[0]! };
   const feasibilitySnapshot = buildFeasibilitySnapshot(seed, requirementSnapshot, businessFlow);
   const designSnapshot = buildDesignSnapshot(seed, requirementSnapshot);
-  const codeSnapshot = buildCodeSnapshot(seed, designSnapshot);
+  
   return {
     id: seed.id,
     title: seed.title,
@@ -178,7 +178,7 @@ function buildCaseProjectTemplate(seed: CaseSeed): CaseProjectTemplate {
     feasibilitySnapshot,
     businessFlow,
     designSnapshot,
-    codeSnapshot,
+    
   };
 }
 
@@ -317,7 +317,7 @@ function buildFeasibilitySnapshot(
     teamSize: 4,
     teamSkills: "TypeScript、React、关系型数据库与基础运维",
     availableResources: "案例模板假设具备基础开发、测试和部署资源",
-    references: "案例模板中的成本、收益和周期均为 AI 示例估算，需结合真实项目确认",
+    references: "成本、收益和周期均为预置估算，需结合实际项目确认",
     analysisYears: 3,
   });
   const implementationPlan = completeFeasibilityImplementationPlanSchema.parse({
@@ -470,93 +470,7 @@ function buildDesignSnapshot(seed: CaseSeed, requirementSnapshot: RunSnapshot): 
   });
 }
 
-function buildCodeSnapshot(seed: CaseSeed, designSnapshot: DesignRunSnapshot): CodeRunSnapshot {
-  const files = buildCodeFiles(seed);
-  const entryFile = "/src/main.tsx";
-  return codeRunSnapshotSchema.parse({
-    runId: `${seed.id}-code`,
-    coverageMatrix: null,
-    traceabilityMatrix: null,
-    designModels: designSnapshot.models,
-    designPlantUml: designSnapshot.plantUml,
-    spec: buildCodeSpec(seed),
-    businessLogic: buildCodeBusinessLogic(seed),
-    designToCodeMapping: null,
-    designModelCoverageReport: null,
-    loadedCodeSkill: null,
-    visualDirection: null,
-    skillResourceDiscoveryPlan: null,
-    skillResourcePreviews: null,
-    skillResourcePlan: null,
-    codeSkillContext: null,
-    appBlueprint: null,
-    uiBlueprint: null,
-    uiMockup: {
-      status: "completed",
-      model: "case-template",
-      prompt: `${seed.title} 示例项目静态原型`,
-      summary: `${seed.dashboardTitle} 已生成列表、状态、操作与规则提示。`,
-      imageUrl: null,
-      imageDataUrl: null,
-      errorMessage: null,
-      createdAt: generatedAt,
-    },
-    uiReferenceSpec: null,
-    uiFidelityReport: null,
-    designTokens: null,
-    componentRegistry: null,
-    uiIr: null,
-    visualDiffReport: null,
-    businessAssertionResults: null,
-    repairLoopSummary: null,
-    selectedCodeSkills: [],
-    skillDiagnostics: [],
-    filePlan: null,
-    codeImplementationBrief: null,
-    codeFileOperationManifest: null,
-    fileGenerationDiagnostics: [],
-    codeTrace: [],
-    codeGenerationMode: "json_schema_operations",
-    qualityDiagnostics: [
-      {
-        passed: true,
-        metrics: {
-          fileCount: Object.keys(files).length,
-          pageFileCount: 1,
-          componentFileCount: 2,
-        },
-        issues: [],
-      },
-    ],
-    files,
-    entryFile,
-    dependencies: {
-      "@vitejs/plugin-react": "^latest",
-      vite: "^latest",
-      typescript: "^latest",
-      react: "^latest",
-      "react-dom": "^latest",
-    },
-    agentPlan: [
-      "建立案例领域数据与状态枚举",
-      "实现看板、规则提示和操作流转",
-      "补充响应式样式和空状态提示",
-    ],
-    generationMode: "regenerate",
-    changedFileCount: Object.keys(files).length,
-    diagnostics: [
-      {
-        stage: "audit_code_quality",
-        message: "案例模板代码已通过静态结构校验。",
-        at: generatedAt,
-      },
-    ],
-    codeContextHash: `case-template:${seed.id}`,
-    currentStage: "audit_code_quality",
-    status: "completed",
-    error: null,
-  });
-}
+
 
 function buildRules(seed: CaseSeed): RequirementRule[] {
   return [
@@ -962,105 +876,8 @@ function buildDesignPlantUml(seed: CaseSeed): DesignPlantUmlArtifact[] {
   ];
 }
 
-function buildCodeSpec(seed: CaseSeed) {
-  return {
-    appName: seed.title,
-    summary: `${seed.dashboardTitle} React 原型，展示关键数据、状态流转和规则提示。`,
-    theme: {
-      name: "teaching-dashboard",
-      primaryColor: "#2563eb",
-      backgroundColor: "#f8fafc",
-      surfaceColor: "#ffffff",
-      textColor: "#0f172a",
-      accentColor: "#16a34a",
-      density: "compact",
-      tone: "清晰、克制、适合课程实验演示",
-    },
-    pages: [
-      { id: "page-dashboard", name: seed.dashboardTitle, route: "/", purpose: "集中处理案例业务流程", sourceDiagramIds: ["architecture-main", "sequence-main"] },
-    ],
-    components: [
-      { id: "component-status-board", name: "StatusBoard", responsibility: "展示状态分布和待办数据", sourceDiagramIds: ["class-design"] },
-      { id: "component-record-list", name: "RecordList", responsibility: "展示记录并触发状态操作", sourceDiagramIds: ["sequence-main"] },
-    ],
-    interactions: [
-      { id: "interaction-transition", trigger: seed.primaryAction, behavior: `将${seed.statusEntity}推进到${seed.states[1]}`, sourceDiagramIds: ["sequence-main"] },
-    ],
-    dataEntities: seed.entityNames.map((name, index) => ({
-      id: `entity-${index + 1}`,
-      name,
-      fields: [
-        { name: "id", type: "string", required: true },
-        { name: "name", type: "string", required: true },
-      ],
-      sourceDiagramIds: ["table-design"],
-    })),
-    implementationNotes: ["使用 React 本地状态模拟业务数据。", "所有状态和操作均来自案例模板需求规则。"],
-  };
-}
 
-function buildCodeBusinessLogic(seed: CaseSeed) {
-  return {
-    appName: seed.title,
-    domainSummary: seed.description,
-    coreWorkflow: `${seed.secondaryAction} -> ${seed.primaryAction} -> ${seed.approvalAction} -> ${seed.notificationRule}`,
-    actors: seed.actors.map((actor, index) => ({
-      id: `actor-${index + 1}`,
-      name: actor,
-      type: index === 2 ? "external" : "human",
-      responsibilities: [index === 0 ? seed.primaryAction : index === 1 ? seed.approvalAction : seed.notificationRule],
-    })),
-    businessEntities: seed.entityNames.map((name) => ({
-      id: `entity-${name}`,
-      name,
-      description: `${seed.title}中的${name}`,
-      fields: ["id", "name", "status"],
-      relationships: [`关联${seed.statusEntity}`],
-    })),
-    pageFlows: [
-      {
-        id: "flow-dashboard",
-        name: seed.dashboardTitle,
-        route: "/",
-        purpose: "完成案例主流程演示",
-        actors: [...seed.actors],
-        entryPoints: [seed.secondaryAction],
-        userActions: [seed.primaryAction, seed.approvalAction],
-        states: [...seed.states],
-        sourceRefs: ["sequence-main", "class-design"],
-      },
-    ],
-    stateMachines: [{ entity: seed.statusEntity, states: [...seed.states], transitions: [`${seed.states[0]} -> ${seed.states[1]}`, `${seed.states[1]} -> ${seed.states[2]}`, `${seed.states[1]} -> ${seed.states[3]}`] }],
-    permissions: [
-      { actor: seed.actors[0], allowedActions: [seed.secondaryAction, seed.primaryAction], restrictedActions: [seed.approvalAction] },
-      { actor: seed.actors[1], allowedActions: [seed.approvalAction], restrictedActions: [] },
-    ],
-    edgeCases: ["重复提交时保持幂等提示", "外部通知失败时保留可重试状态"],
-    frontendOperations: [seed.primaryAction, seed.approvalAction, "筛选状态"],
-    plantUmlTraceability: ["sequence-main", "class-design", "table-design"],
-  };
-}
 
-function buildCodeFiles(seed: CaseSeed) {
-  const records = [
-    { name: `${seed.entityNames[0]} A`, owner: seed.actors[0], status: seed.states[0], priority: "高" },
-    { name: `${seed.statusEntity} B`, owner: seed.actors[1], status: seed.states[1], priority: "中" },
-    { name: `${seed.entityNames[2]} C`, owner: seed.actors[2], status: seed.states[2], priority: "低" },
-  ];
-  return {
-    "/package.json": JSON.stringify(
-      {
-        scripts: { dev: "vite", build: "vite build" },
-        dependencies: { "@vitejs/plugin-react": "latest", vite: "latest", typescript: "latest", react: "latest", "react-dom": "latest" },
-        devDependencies: {},
-      },
-      null,
-      2,
-    ),
-    "/src/main.tsx": "import React from 'react';\nimport { createRoot } from 'react-dom/client';\nimport App from './App';\nimport './styles.css';\n\ncreateRoot(document.getElementById('root')!).render(<App />);\n",
-    "/src/App.tsx": `import { useMemo, useState } from 'react';\n\nconst initialRecords = ${JSON.stringify(records, null, 2)};\nconst states = ${JSON.stringify(seed.states)};\n\nexport default function App() {\n  const [records, setRecords] = useState(initialRecords);\n  const [filter, setFilter] = useState('全部');\n  const visibleRecords = useMemo(() => filter === '全部' ? records : records.filter((record) => record.status === filter), [filter, records]);\n  const statusCounts = states.map((state) => ({ state, count: records.filter((record) => record.status === state).length }));\n\n  function advanceRecord(name: string) {\n    setRecords((current) => current.map((record) => record.name === name ? { ...record, status: '${seed.states[2]}' } : record));\n  }\n\n  return (\n    <main className=\"app-shell\">\n      <section className=\"hero\">\n        <div>\n          <p className=\"eyebrow\">${seed.title}</p>\n          <h1>${seed.dashboardTitle}</h1>\n          <p>${seed.description}</p>\n        </div>\n        <button onClick={() => setRecords((current) => [{ name: '${seed.statusEntity} 新记录', owner: '${seed.actors[0]}', status: '${seed.states[1]}', priority: '高' }, ...current])}>${seed.primaryAction}</button>\n      </section>\n      <section className=\"status-grid\">\n        {statusCounts.map((item) => <article key={item.state}><span>{item.state}</span><strong>{item.count}</strong></article>)}\n      </section>\n      <section className=\"toolbar\">\n        <strong>状态筛选</strong>\n        {['全部', ...states].map((state) => <button key={state} className={filter === state ? 'active' : ''} onClick={() => setFilter(state)}>{state}</button>)}\n      </section>\n      <section className=\"records\">\n        {visibleRecords.map((record) => (\n          <article key={record.name}>\n            <div>\n              <h2>{record.name}</h2>\n              <p>{record.owner} · 优先级 {record.priority}</p>\n            </div>\n            <span>{record.status}</span>\n            <button onClick={() => advanceRecord(record.name)}>${seed.approvalAction}</button>\n          </article>\n        ))}\n      </section>\n      <aside className=\"rule-box\">\n        <strong>业务规则</strong>\n        <p>${seed.notificationRule}</p>\n        <p>状态流转：${seed.states.join(' -> ')}</p>\n      </aside>\n    </main>\n  );\n}\n`,
-    "/src/styles.css": "body{margin:0;font-family:Inter,system-ui,sans-serif;background:#f8fafc;color:#0f172a}.app-shell{min-height:100vh;padding:32px;display:grid;gap:20px}.hero{display:flex;justify-content:space-between;gap:24px;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:28px}.eyebrow{color:#2563eb;font-weight:700}h1{margin:4px 0 10px;font-size:36px}.hero button,.records button,.toolbar button{border:0;border-radius:6px;background:#2563eb;color:white;padding:10px 14px;font-weight:700}.status-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.status-grid article,.records article,.rule-box,.toolbar{background:white;border:1px solid #e2e8f0;border-radius:8px;padding:16px}.status-grid strong{display:block;font-size:30px;margin-top:8px}.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.toolbar button{background:#e2e8f0;color:#0f172a}.toolbar button.active{background:#16a34a;color:white}.records{display:grid;gap:12px}.records article{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center}.records h2{font-size:18px;margin:0 0 6px}.records p,.rule-box p{color:#475569;margin:0}.records span{background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:6px 10px;font-size:13px;font-weight:700}@media(max-width:760px){.hero,.records article{grid-template-columns:1fr;display:grid}.status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}\n",
-    "/index.html": "<!doctype html><html><head><meta charset=\"UTF-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/><title>Case Project</title></head><body><div id=\"root\"></div><script type=\"module\" src=\"/src/main.tsx\"></script></body></html>\n",
-  };
-}
+
+
 

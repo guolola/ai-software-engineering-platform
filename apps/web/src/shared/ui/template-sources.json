@@ -1,5 +1,17 @@
 [
   {
+    "template": "shadcn-studio",
+    "source": "https://shadcnstudio.com/r/components/base-nova/code-block-01.json",
+    "target": "src/shared/ui/code-block.tsx",
+    "sha256": "55c5ec51a68f93d7efd613b6a7c1acb2c4afec4449b9233421f6470022e3e842"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "components/shadcn-studio/blocks/faq-component-01/faq-component-01.tsx",
+    "target": "src/features/mcp-connections/components/project-usage-examples.tsx",
+    "sha256": "27ed1080755bf8312098dd7e3ae6f85d054a369e3cceedc0a05152b023fd9b7e"
+  },
+  {
     "template": "admincn",
     "source": "src/components/ui/button.tsx",
     "target": "src/shared/ui/button.tsx",
@@ -472,7 +484,7 @@
     "source": "src/components/blocks/hero-section/hero-section.tsx",
     "target": "src/features/marketing-site/template/components/blocks/hero-section/hero-section.tsx",
     "sha256": "c5a778534efa4496dd6ba8ce606f00904fd6e78949013bbe80abf2cc1c66af45",
-      "motionSha256": "efdc3d871004fe4dd30dbbcd35f900946417def796c91c1489784b07a9300af3"
+    "motionSha256": "efdc3d871004fe4dd30dbbcd35f900946417def796c91c1489784b07a9300af3"
   },
   {
     "template": "flow",

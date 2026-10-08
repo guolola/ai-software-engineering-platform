@@ -5,7 +5,7 @@ import { createPostgresPoolFromEnv, getDatabaseUrl } from "../db/postgres.js";
 import { withTransaction } from "../db/transactions.js";
 import { catalog, catalogById, findPromptForMessage, type CatalogEntry } from "./catalog.js";
 import type { LlmTransport, ChatMessage } from "../llm.js";
-import { loadWebDesignSkill } from "../code-skills.js";
+
 
 type Status = "draft" | "pending" | "published" | "superseded";
 export type PromptVersion = {
@@ -90,18 +90,11 @@ export class PromptRuntimeStore {
     if (!item) throw new PromptRuntimeError("运行时项目不存在", 404);
     const [versions, active] = await Promise.all([this.versions(id), this.publishedSnapshot()]);
     let defaultInstruction = item.instruction;
-    if (item.kind === "skill") {
-      try { defaultInstruction = loadWebDesignSkill().skill.content; } catch { /* keep the catalog summary if the runtime asset is unavailable */ }
-    }
-    const imagePrompt = id === "code.mockup";
     const variables = item.path[0] === "需求建模" ? ["已确认需求文本或规则", "需求基线及上游模型", "目标图类型或校验错误"]
       : item.path[0] === "可行性分析" ? ["需求规则与基线", "系统环境图和业务流程图", "候选方案或修复错误"]
       : item.path[0] === "设计建模" ? ["需求模型及用例事件流", "已生成的设计模型", "目标图类型或校验错误"]
-      : item.path[0] === "代码原型" ? ["业务逻辑和代码上下文", "界面方案与 Skill 资源", "图片、代码文件或校验结果"]
       : ["当前产物及文档类型", "原始内容和校验错误", "结构化模型及图源码"];
-    const readOnlyConstraints = item.kind === "skill" ? ["Skill 正文和资源文件由代码仓库维护"]
-      : imagePrompt ? ["图片画幅、视觉安全规则和应用蓝图由代码拼装"]
-      : ["系统消息与 JSON 输出要求", "响应 Schema 和字段契约", "图类型、追踪关系及安全规则"];
+    const readOnlyConstraints = ["系统消息与 JSON 输出要求", "响应 Schema 和字段契约", "图类型、追踪关系及安全规则"];
     const instruction = active[id]?.content ?? defaultInstruction;
     return { ...item, kind: item.kind ?? "prompt", editable: !item.kind,
       defaultInstruction, activeInstruction: instruction,

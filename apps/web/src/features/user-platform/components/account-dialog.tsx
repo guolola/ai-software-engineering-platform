@@ -886,7 +886,6 @@ export function AccountDialog({
                 </div>
 
               </TabsContent>
-
               <TabsContent value="global" keepMounted className="m-0 space-y-6">
                 <div className="border-b border-border pb-4">
                   <h3 className="text-lg font-semibold text-foreground">{t("account.globalSettings")}</h3>

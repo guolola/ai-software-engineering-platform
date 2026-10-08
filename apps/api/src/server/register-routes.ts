@@ -33,7 +33,7 @@ import type { PdfRenderClient } from "../adapters/render/pdf-render-client.js";
 import type { LlmTransport } from "../llm.js";
 import type { LlmScheduler } from "../adapters/llm/llm-scheduler.js";
 import type { RunQueue } from "../runs/queue/run-queue.js";
-import { runCodeStagePipeline } from "../runs/pipelines/code-pipeline.js";
+
 import { runDesignStagePipeline } from "../runs/pipelines/design-pipeline.js";
 import { runDocumentStagePipeline } from "../runs/pipelines/document-pipeline.js";
 import { runStagePipeline } from "../runs/pipelines/requirements-pipeline.js";
@@ -41,7 +41,7 @@ import {
   handleRunPipelineError,
   startRunRecordPipeline,
 } from "../runs/pipelines/run-record-pipeline-starter.js";
-import { addCodeDiagnostic } from "../runs/pipelines/code/code-run-diagnostics.js";
+
 import { createProjectWorkspaceSync } from "../routes/runs/project-workspace-sync.js";
 import type { GenerationUsageService } from "../generation/generation-usage.js";
 import type { AcademicAdminRepository } from "../db/academic-admin-repository.js";
@@ -194,7 +194,7 @@ export function registerApiRoutes({
       handleRunPipelineError(
         record,
         new Error("Run cannot be started because no usable provider config is available"),
-        addCodeDiagnostic,
+        
       );
       return;
     }
@@ -213,9 +213,9 @@ export function registerApiRoutes({
       documentLibrary,
       runStagePipeline,
       runDesignStagePipeline,
-      runCodeStagePipeline,
+      
       runDocumentStagePipeline,
-      addCodeDiagnostic,
+      
       analyticsStore,
     });
   };
@@ -328,9 +328,9 @@ export function registerApiRoutes({
     defaultSseAllowOrigin: DEFAULT_SSE_ALLOW_ORIGIN,
     runStagePipeline,
     runDesignStagePipeline,
-    runCodeStagePipeline,
+    
     runDocumentStagePipeline,
-    addCodeDiagnostic,
+    
     providerConfigs,
     resolveProjectName: async (projectId: string) => {
       const project = await authStore.getProject(projectId);

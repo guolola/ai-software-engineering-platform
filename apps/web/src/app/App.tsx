@@ -18,7 +18,7 @@ import {
   DesignDiagramView,
   DiagramView,
 } from "../features/diagrams/components/diagram-detail-page";
-import { CodeGenerationPage } from "../features/code/components/code-generation-page";
+
 import { DesignModelPage } from "../features/design/components/design-model-page";
 import { InstructionDocumentsPage } from "../features/documents/components/instruction-documents-page";
 import { RequirementsModelPage, SystemRequirementsPage } from "../features/requirements/components/text-requirement-page";
@@ -28,6 +28,8 @@ import { TestModelPage } from "../features/testing/components/test-model-page";
 import { MarketingHomePage } from "../features/marketing-site/components/marketing-home-page";
 import { applyRouteMetadata } from "../features/marketing-site/model/seo";
 import { ProductDocsPage } from "../features/product-docs/components/product-docs-page";
+import { McpConnectionsPage } from "../features/mcp-connections/components/mcp-connections-panel";
+import { McpConsentPage } from "../features/mcp-connections/components/mcp-consent-page";
 import { SidebarMenu } from "../features/workspace-shell/components/sidebar-menu";
 import {
   TopBar,
@@ -38,7 +40,7 @@ import {
   type ShellRoutePath,
 } from "./workspace-modules";
 import { matchAppRoute, type AppRoute } from "./app-routes";
-import { Workspace } from "../features/workspace-shell/components/workspace-placeholder";
+
 import { WorkspaceRepositoryProvider } from "../services/workspace-repository";
 import { WorkspaceShellProvider, useWorkspaceShell } from "../features/workspace-shell/state";
 import {
@@ -73,7 +75,7 @@ import {
 function StandaloneRoutePage({ route }: { route: Exclude<ShellRoutePath, "/workspace"> }) {
   const { t } = useTranslation();
   const meta = findShellRouteModule(route);
-  const routeKey = route === "/exam" ? "exam" : route === "/tutorial" ? "tutorial" : "workspace";
+  const routeKey = route === "/exam" ? "exam" : "workspace";
 
   return (
     <main className="flex min-h-[calc(100svh-5rem)] flex-1 bg-background">
@@ -95,6 +97,7 @@ function getProtectedRoutePath(route: AppRoute) {
   if (
     route.kind === "shell" ||
     route.kind === "dashboard" ||
+    route.kind === "mcp-connections" ||
     route.kind === "projects-index" ||
     route.kind === "projects-new" ||
     route.kind === "project-workspace" ||
@@ -354,14 +357,7 @@ function ProjectWorkspaceShell({
     case "document-editor":
       body = <InstructionDocumentsPage activeDocumentId={selection.documentId} />;
       break;
-    case "workspace-placeholder":
-      body =
-        selection.workspaceId === "code" ? (
-          <CodeGenerationPage />
-        ) : (
-          <Workspace title={selection.label} />
-        );
-      break;
+    
   }
 
   return (
@@ -479,16 +475,20 @@ export function Shell({ initialPath }: { initialPath?: string }) {
     setRoute(nextRoute);
   }, []);
 
+  // OAuth consent is a standalone screen while ordinary connection setup keeps the workbench shell.
+  const consentInteractionId = route.kind === "mcp-connections" && typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("interaction")
+    : null;
   const renderRoute = () => {
     if (route.kind === "marketing-home") {
       return <MarketingHomePage path={route.path} onNavigate={navigate} />;
     }
+    if (route.kind === "product-docs") {
+      return <ProductDocsPage onNavigate={navigate} />;
+    }
     if (route.kind === "shell") {
       if (route.path === "/workspace") {
         return <RedirectRoute to="/projects" onNavigate={navigate} />;
-      }
-      if (route.path === "/tutorial") {
-        return <ProductDocsPage onNavigate={navigate} />;
       }
       return <StandaloneRoutePage route={route.path as Exclude<ShellRoutePath, "/workspace">} />;
     }
@@ -512,6 +512,12 @@ export function Shell({ initialPath }: { initialPath?: string }) {
     }
     if (route.kind === "account-billing") {
       return <AccountBillingPage onNavigate={navigate} />;
+    }
+    if (route.kind === "mcp-connections") {
+      // This page preserves the OAuth interaction query when redirecting to platform login.
+      return consentInteractionId
+        ? <McpConsentPage interactionId={consentInteractionId} onNavigate={navigate} />
+        : <McpConnectionsPage onNavigate={navigate} />;
     }
     if (route.kind === "legacy-account") {
       return <RedirectRoute to="/projects" onNavigate={navigate} />;
@@ -543,8 +549,10 @@ export function Shell({ initialPath }: { initialPath?: string }) {
   const protectedRoutePath = getProtectedRoutePath(route);
   const routeContent = renderRoute();
   const showWorkspaceTopBar =
+    !consentInteractionId &&
     route.kind !== "project-workspace" &&
     route.kind !== "marketing-home" &&
+    route.kind !== "product-docs" &&
     route.kind !== "auth" &&
     route.kind !== "invitation-accept" &&
     route.kind !== "legacy-redirect" &&

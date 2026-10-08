@@ -717,7 +717,6 @@ export function SidebarMenu({
     openDiagramElement,
     openDiagramRelationship,
     openDocumentsHome,
-    openWorkspacePlaceholder,
   } = useWorkspaceShell();
   const selectedKey = getSelectionKey(selection);
   const {
@@ -735,7 +734,7 @@ export function SidebarMenu({
     sequenceSubtaskNodes,
     requirementRootStatus,
     designRootStatus,
-    codeRootStatus,
+    
     documentRootStatus,
   } = deriveSidebarDiagramState({
     generatedDiagrams,
@@ -1153,14 +1152,7 @@ export function SidebarMenu({
         }),
       ],
     },
-    {
-      key: "workspace:code",
-      label: t("workspace.tabs.labels.code"),
-      icon: <Code2 className="size-4 text-muted-foreground" />,
-      status: codeRootStatus,
-      statusTooltip: rootGenerationStatusTooltip(t("workspace.sidebar.codePrototype"), codeRootStatus, t),
-      onSelect: () => openWorkspacePlaceholder("code", t("workspace.tabs.labels.code")),
-    },
+    
     {
       key: "test",
       label: t("workspace.tabs.labels.tests"),

@@ -104,7 +104,7 @@ export function GenerationTranscript({ taskKey, steps, active, kind, model, queu
 }) {
   const { t } = useTranslation();
   const { viewportRef, contentRef, away, returnToLatest } = useTranscriptScroll(taskKey, steps);
-  const assistantKind = kind && ["requirements", "design", "code", "document", "feasibility"].includes(kind) ? kind : "unknown";
+  const assistantKind = kind && ["requirements", "design",  "document", "feasibility"].includes(kind) ? kind : "unknown";
   const thoughtLabel = t(`generation.thoughtProcess.${active ? "active" : "finished"}`);
   return <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" data-testid="generation-transcript">
     <ScrollArea className="min-h-0 flex-1" viewportRef={viewportRef} viewportClassName="[overflow-anchor:none]" contentClassName="!block">

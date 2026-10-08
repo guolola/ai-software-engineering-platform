@@ -1,9 +1,11 @@
 // Applies shared model semantics to manual workspace writes before they reach persistent storage.
 import { isDeepStrictEqual } from "node:util";
+import { stripRetiredCodeData } from "@uml-platform/contracts";
 import { deriveTableModel, getStageModelSchema, ModelSemanticError, validateModelInput, type ModelingStage, type TableDiagramSpec } from "@uml-platform/contracts";
 
 export function normalizeWorkspaceModelState(state: Record<string, unknown>, previousState: Record<string, unknown> = {}) {
-  const next = { ...state };
+  // Old browser sessions must not reintroduce retired prototype data after the migration.
+  const next = stripRetiredCodeData({ ...state });
   const normalize = (model: unknown, stage: ModelingStage, expectedKind?: string) => {
     const diagnostics = validateModelInput(model, stage);
     if (diagnostics.length) throw new ModelSemanticError(diagnostics);

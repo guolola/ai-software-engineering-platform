@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  createEmptyCodeSnapshot,
+  
   createEmptyDesignSnapshot,
   createEmptySnapshot,
 } from "../../records/snapshots.js";
@@ -87,35 +87,3 @@ test("appendDesignTrace leaves short rawOutput unchanged", () => {
   }
 });
 
-test("appendCodeTrace uses the same rawOutput cap", () => {
-  const previousLimit = process.env.UML_TRACE_RAW_OUTPUT_MAX_CHARS;
-  process.env.UML_TRACE_RAW_OUTPUT_MAX_CHARS = "90";
-
-  try {
-    const snapshot = createEmptyCodeSnapshot("code-trace", {
-      designModels: [],
-    });
-    const record = createRecord(snapshot);
-    const rawOutput = `${"x".repeat(140)}END`;
-
-    appendCodeTrace(record, {
-      stage: "generate_file_content",
-      attempt: 1,
-      kind: "file_content",
-      path: "/src/App.tsx",
-      rawOutput,
-    });
-
-    const entry = snapshot.codeTrace[0];
-    assert.equal(entry?.rawOutputTruncated, true);
-    assert.equal(entry?.rawOutputOriginalLength, rawOutput.length);
-    assert.equal(entry?.rawOutput?.length, 90);
-    assert.match(entry?.rawOutput ?? "", /END$/);
-  } finally {
-    if (previousLimit === undefined) {
-      delete process.env.UML_TRACE_RAW_OUTPUT_MAX_CHARS;
-    } else {
-      process.env.UML_TRACE_RAW_OUTPUT_MAX_CHARS = previousLimit;
-    }
-  }
-});

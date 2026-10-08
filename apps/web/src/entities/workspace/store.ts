@@ -1,6 +1,6 @@
 // Defines replaceable workspace persistence ports and an in-memory adapter.
 import type {
-  CodeRunSnapshot,
+  
   DesignRunSnapshot,
   DocumentRunSnapshot,
   RunSnapshot,
@@ -19,7 +19,6 @@ export interface ProjectRecord {
 export type PersistedRunSnapshot =
   | RunSnapshot
   | DesignRunSnapshot
-  | CodeRunSnapshot
   | DocumentRunSnapshot;
 
 export interface ArtifactRecord {

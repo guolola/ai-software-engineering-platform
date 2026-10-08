@@ -183,25 +183,25 @@ const RUN_STAGE_LABELS: Record<RunStage, string> = {
   generate_design_sequence: "规划设计序列",
   generate_design_models: "生成设计模型",
   generate_tests: "生成测试",
-  analyze_code_business_logic: "分析业务逻辑",
-  analyze_code_product: "分析产品结构",
-  plan_code_ui: "规划界面",
-  generate_code_ui_mockup: "生成界面原型",
-  analyze_code_ui_mockup: "分析界面原型",
-  generate_code_ui_ir: "生成界面中间表示",
-  load_web_design_skill: "加载设计技能",
-  select_code_skills: "选择代码技能",
-  plan_code_files: "规划代码文件",
-  generate_code_spec: "生成代码规格",
-  generate_code_files: "生成代码文件",
-  plan_code: "规划代码",
-  write_code_files: "写入代码文件",
-  audit_code_quality: "审查代码质量",
-  verify_code_ui_fidelity: "校验界面还原度",
-  verify_code_rendered_preview: "校验渲染预览",
-  verify_code_business_assertions: "校验业务断言",
-  verify_code_preview: "校验代码预览",
-  repair_code_files: "修复代码文件",
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   generate_document_text: "生成文档内容",
   render_document_file: "渲染文档文件",
   generate_plantuml: "生成 PlantUML",
@@ -305,7 +305,7 @@ function buildAdminRunStages(record: RunRecord) {
 function buildAdminDiagnosticEvents(record: RunRecord) {
   return record.events
     .map((event, index) => ({ event, createdAt: record.eventCreatedAt?.[index] ?? null }))
-    .filter(({ event }) => event.type !== "llm_chunk" && event.type !== "code_file_changed")
+    .filter(({ event }) => event.type !== "llm_chunk")
     .map(({ event, createdAt }) => ({
       type: event.type,
       stage: eventStage(event),

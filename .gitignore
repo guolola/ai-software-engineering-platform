@@ -13,7 +13,10 @@ build/
 # env / secrets
 .env
 .env.*
+*.env
+*.env.*
 !.env.example
+!*.env.example
 *.pem
 *.key
 *.p12
@@ -58,7 +61,8 @@ vite.config.*.timestamp-*
 .codex-*.log
 .codex-*.png
 /.codex-test-*.txt
-.local-*.log
+# Root-only scratch scripts, extracted content, and local verification results.
+/.local-*
 current-page*.png
 tmp-*.png
 tmp-code-page-validation*.png

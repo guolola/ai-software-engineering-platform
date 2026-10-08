@@ -43,7 +43,7 @@ const LIST_ICONS: WorkbenchProjectListItem["iconKind"][] = ["web", "mobile", "ca
 
 const WEEKDAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
-const RUN_KIND_STAGES = ["requirements", "design", "code", "document"] as const;
+const RUN_KIND_STAGES = ["requirements", "design",  "document"] as const;
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 

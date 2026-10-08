@@ -53,7 +53,6 @@ function task(overrides: Partial<GenerationTask>): GenerationTask {
     progress: 30,
     message: null,
     errorMessage: null,
-    previewReady: false,
     phaseSummary: null,
     technicalDetailsCollapsed: true,
     diagnostics: {
@@ -68,17 +67,17 @@ function task(overrides: Partial<GenerationTask>): GenerationTask {
       stageStartedAt: {},
       stageMessages: {},
       events: [],
-      uiMockup: null,
-      uiReferenceSpec: null,
-      uiFidelityReport: null,
-      visualDirection: null,
-      skillResourceDiscoveryPlan: null,
-      skillResourcePreviews: null,
-      skillResourcePlan: null,
-      codeSkillContext: null,
+      
+      
+      
+      
+      
+      
+      
+      
       requirementTrace: [],
       designTrace: [],
-      codeTrace: [],
+      
     },
     subtasks: [],
     startedAt: "2026-06-16T10:00:00.000Z",
@@ -109,10 +108,10 @@ function input(overrides: Partial<LineageGraphInput> = {}): LineageGraphInput {
     designStaleReasons: {},
     designTraceabilityStale: false,
     designGenerationBlockedReason: null,
-    codeFiles: {},
-    codeEntryFile: null,
-    codeSpec: null,
-    codeDiagnostics: [],
+    
+    
+    
+    
     generationTasks: [],
     historyItems: [],
     ...overrides,
@@ -126,9 +125,7 @@ describe("buildLineageGraph", () => {
     expect(graph.nodes.find((node) => node.id === "rule:empty")?.status).toBe(
       "not-generated",
     );
-    expect(graph.nodes.find((node) => node.id === "code:prototype")?.status).toBe(
-      "not-generated",
-    );
+    
     expect(
       graph.nodes.find((node) => node.id === "document:requirementsSpec")?.status,
     ).toBe("not-generated");
@@ -149,7 +146,7 @@ describe("buildLineageGraph", () => {
           sequence: designModel("sequence"),
         },
         generatedDesignDiagrams: ["class", "sequence"],
-        codeFiles: { "src/App.tsx": "export default function App() { return null; }" },
+        
       }),
     );
 
@@ -173,7 +170,6 @@ describe("buildLineageGraph", () => {
     expect(columns[3].nodes.map((node) => node.id)).toEqual([
       "document:requirementsSpec",
       "document:softwareDesignSpec",
-      "code:prototype",
     ]);
   });
 
@@ -199,8 +195,8 @@ describe("buildLineageGraph", () => {
           sequence: { diagramKind: "sequence", svg: "<svg>sequence</svg>" } as never,
           class: { diagramKind: "class", svg: "<svg>class</svg>" } as never,
         },
-        codeFiles: { "src/App.tsx": "export default function App() { return null; }" },
-        codeEntryFile: "src/App.tsx",
+        
+        
       }),
     );
 
@@ -213,55 +209,12 @@ describe("buildLineageGraph", () => {
     expect(
       graph.nodes.find((node) => node.id === "design-model:sequence")?.status,
     ).toBe("current");
-    expect(graph.nodes.find((node) => node.id === "code:prototype")?.status).toBe(
-      "current",
-    );
+    
   });
 
-  it("marks generated code with diagnostics as reviewable but still viewable", () => {
-    const graph = buildLineageGraph(
-      input({
-        codeFiles: { "src/App.tsx": "export default function App() { return null; }" },
-        codeEntryFile: "src/App.tsx",
-        codeDiagnostics: [
-          {
-            stage: "verify_code_preview",
-            message: "检测到真实网络请求痕迹，已保留本地 mock 数据。",
-            at: "2026-06-21T00:00:00.000Z",
-          },
-        ],
-      }),
-    );
+  
 
-    const codeNode = graph.nodes.find((node) => node.id === "code:prototype");
-    expect(codeNode?.status).toBe("stale");
-    expect(codeNode?.hasViewableArtifact).toBe(true);
-    expect(codeNode?.reason).toContain("代码诊断 1 项");
-    expect(codeNode?.reason).toContain("当前代码仍可查看");
-    expect(graph.defaultSelectedNodeId).toBe("code:prototype");
-  });
-
-  it("projects local preview build failures as reviewable code diagnostics", () => {
-    const graph = buildLineageGraph(
-      input({
-        codeFiles: { "src/App.tsx": "import './Missing';" },
-        codeEntryFile: "src/App.tsx",
-        codeDiagnostics: [
-          {
-            stage: "verify_code_preview",
-            message: "本地预览失败：/src/App.tsx 无法解析导入 ./Missing",
-            at: "2026-06-21T00:00:00.000Z",
-          },
-        ],
-      }),
-    );
-
-    const codeNode = graph.nodes.find((node) => node.id === "code:prototype");
-    expect(codeNode?.status).toBe("stale");
-    expect(codeNode?.hasViewableArtifact).toBe(true);
-    expect(codeNode?.reason).toContain("本地预览失败");
-    expect(codeNode?.reason).toContain("当前代码仍可查看");
-  });
+  
 
   it("marks old artifacts stale when the requirement source text is cleared", () => {
     const graph = buildLineageGraph(
@@ -289,10 +242,8 @@ describe("buildLineageGraph", () => {
         designStaleReasons: {
           sequence: "需求源头已删除，此设计模型为旧产物，需重新输入需求并重跑。",
         },
-        codeFiles: {
-          "src/App.tsx": "export default function App() { return null; }",
-        },
-        codeEntryFile: "src/App.tsx",
+        
+        
         historyItems: [
           {
             id: "run-doc",
@@ -311,7 +262,7 @@ describe("buildLineageGraph", () => {
     const ruleNode = graph.nodes.find((node) => node.id === "rule:REQ-001");
     const useCaseNode = graph.nodes.find((node) => node.id === "requirement-model:usecase");
     const designNode = graph.nodes.find((node) => node.id === "design-model:sequence");
-    const codeNode = graph.nodes.find((node) => node.id === "code:prototype");
+    
     const documentNode = graph.nodes.find(
       (node) => node.id === "document:requirementsSpec",
     );
@@ -322,9 +273,9 @@ describe("buildLineageGraph", () => {
     expect(useCaseNode?.hasViewableArtifact).toBe(true);
     expect(designNode?.status).toBe("stale");
     expect(designNode?.reason).toContain("需求源头已删除");
-    expect(codeNode?.status).toBe("stale");
-    expect(codeNode?.reason).toContain("需求源头已删除");
-    expect(codeNode?.hasViewableArtifact).toBe(true);
+    
+    
+    
     expect(documentNode?.status).toBe("stale");
     expect(documentNode?.reason).toContain("需求源头");
   });
@@ -387,74 +338,9 @@ describe("buildLineageGraph", () => {
     expect(documentNode?.reason).toContain("已在文档中心删除");
   });
 
-  it("projects interrupted run history onto lineage nodes as retryable service interruptions", () => {
-    const graph = buildLineageGraph(
-      input({
-        codeFiles: { "src/App.tsx": "export default function App() { return null; }" },
-        historyItems: [
-          {
-            id: "run-code-interrupted",
-            createdAt: "2026-06-21T00:00:00.000Z",
-            title: "代码生成",
-            snapshot: null,
-            providerModel: "gpt-5.5",
-            status: "interrupted",
-            runKind: "code",
-            stage: "write_code_files",
-            summary: "服务中断，可重试 · 阶段 write_code_files",
-            canRestore: false,
-            snapshotAvailable: true,
-          },
-        ],
-      }),
-    );
+  
 
-    const codeNode = graph.nodes.find((node) => node.id === "code:prototype");
-    expect(codeNode?.status).toBe("interrupted");
-    expect(codeNode?.reason).toContain("上一版仍可查看");
-    expect(codeNode?.reason).toContain("服务中断，可重试");
-    expect(codeNode?.actionLabel).toBe("重试");
-    expect(graph.summary.interrupted).toBe(1);
-    expect(graph.defaultSelectedNodeId).toBe("code:prototype");
-  });
-
-  it("projects failed code regenerations as old-code-viewable lineage errors", () => {
-    const graph = buildLineageGraph(
-      input({
-        codeFiles: {
-          "src/App.tsx": "export default function App() { return <main>old</main>; }",
-        },
-        codeEntryFile: "src/App.tsx",
-        historyItems: [
-          {
-            id: "code-run-failed-regenerate",
-            createdAt: "2026-06-21T00:10:00.000Z",
-            title: "代码重新生成",
-            providerModel: "gpt-5.5",
-            snapshot: {
-              runId: "code-run-failed-regenerate",
-              files: {},
-              entryFile: null,
-              generationMode: "regenerate",
-              status: "failed",
-              error: {
-                code: "RUN_INTERNAL_ERROR",
-                message: "代码重新生成失败",
-                category: "generation",
-                retryable: true,
-              },
-            } as never,
-          },
-        ],
-      }),
-    );
-
-    const codeNode = graph.nodes.find((node) => node.id === "code:prototype");
-    expect(codeNode?.status).toBe("error");
-    expect(codeNode?.hasViewableArtifact).toBe(true);
-    expect(codeNode?.reason).toContain("代码重新生成失败，上一版仍可查看");
-    expect(codeNode?.reason).toContain("代码重新生成失败");
-  });
+  
 
   it("keeps retry and rerun lineage visible in node recent events", () => {
     const graph = buildLineageGraph(

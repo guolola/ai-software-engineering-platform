@@ -119,9 +119,6 @@ function localizeLineageGraph(graph: LineageGraph, t: TFunction): LineageGraph {
           : "softwareDesignSpec";
         label = t(`lineage.products.${productKey}.label`);
         description = t(`lineage.products.${productKey}.description`);
-      } else if (node.kind === "code") {
-        label = t("lineage.products.code.label");
-        description = t("lineage.products.code.description");
       } else if (node.kind === "rule" && node.id.endsWith(":empty")) {
         label = t("lineage.products.emptyRules.label");
         description = t("lineage.products.emptyRules.description");
@@ -695,8 +692,6 @@ export function LineageGraphDialog({
           undefined,
           node.label,
         );
-      } else if (node.kind === "code") {
-        workspaceShell.openWorkspacePlaceholder("code", t("workspace.sidebar.code"));
       } else if (node.kind === "document") {
         workspaceShell.openDocumentsHome();
       }
@@ -724,10 +719,7 @@ export function LineageGraphDialog({
         void session.generateDesignDiagrams([node.payload.designDiagramKind]);
         return;
       }
-      if (node.kind === "code") {
-        void session.generateCodePrototype(node.status === "error" ? "regenerate" : "continue");
-        return;
-      }
+      
       if (node.payload?.documentKind === "requirementsSpec") {
         void session.generateRequirementsSpec();
       }

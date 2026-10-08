@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
-  CodeRunSnapshot,
+  
   DesignRunSnapshot,
 } from "@uml-platform/contracts";
 import type { WorkspaceRepository } from "../../../services/workspace-repository";
@@ -464,10 +464,7 @@ describe("TopBar", () => {
     expect(
       within(dialog).getByTestId("lineage-node-document:requirementsSpec"),
     ).toHaveAttribute("data-lineage-kind", "document");
-    expect(within(dialog).getByTestId("lineage-node-code:prototype")).toHaveAttribute(
-      "data-lineage-kind",
-      "code",
-    );
+    
 
     const usecaseNode = within(dialog).getByTestId(
       "lineage-node-requirement-model:usecase",
@@ -1581,46 +1578,7 @@ describe("TopBar", () => {
     expect(screen.getByText("失败")).toBeInTheDocument();
   });
 
-  it("shows code diagnostics from terminal server runs in the task drawer", async () => {
-    const repository: WorkspaceRepository = {
-      loadWorkspace: vi.fn(async () => createWorkspaceRecord()),
-      updateRequirementText: vi.fn(async () => {}),
-      startRun: vi.fn(),
-      subscribeToRun: vi.fn(),
-      getRunSnapshot: vi.fn(async () => createRunSnapshot()),
-      renderPlantUml: vi.fn(),
-      testProviderSettings: vi.fn(),
-      saveRunHistory: vi.fn(),
-      listRunHistory: vi.fn(async () => []),
-      restoreRunHistory: vi.fn(async () => null),
-      deleteRunHistory: vi.fn(async () => []),
-      clearRunHistory: vi.fn(async () => {}),
-    };
-    const completedCodeRun: PlatformRunSummary = {
-      runId: "server-code-diagnostics",
-      status: "completed",
-      stage: "verify_code_preview",
-      runKind: "code",
-      model: "gpt-5.5",
-      updatedAt: "2026-06-18T10:45:00.000Z",
-      codeDiagnosticCount: 1,
-      codeDiagnosticSummary: [
-        "verify_code_preview：检测到真实网络请求痕迹，已切换到本地 mock。",
-      ],
-      codeQualityIssueCount: 0,
-    };
-
-    render(
-      withWorkspaceProviders(
-        <TopBarTaskWithProjectRunsHarness projectRuns={[completedCodeRun]} />,
-        repository,
-      ),
-    );
-
-    const statusCard = screen.getByTestId("generation-transcript");
-    expect(within(statusCard).queryByText(/代码诊断/u)).not.toBeInTheDocument();
-    expect(within(statusCard).queryByText(/检测到真实网络请求痕迹/u)).not.toBeInTheDocument();
-  });
+  
 
   it("shows interrupted server runs instead of falling back to idle", async () => {
     const repository: WorkspaceRepository = {
@@ -2264,137 +2222,5 @@ describe("TopBar", () => {
     expect(screen.queryByRole("button", { name: "复制追踪内容" })).not.toBeInTheDocument();
   });
 
-  it("hides code skill resource internals in task details", async () => {
-    const codeSnapshot = {
-      runId: "code-skill-run",
-      requirementText: "生成公众活动日历",
-      rules: [],
-      designModels: [],
-      designPlantUml: [],
-      existingFiles: {},
-      files: {},
-      dependencies: {},
-      entryFile: "/src/App.tsx",
-      diagnostics: [],
-      qualityDiagnostics: [],
-      selectedCodeSkills: [],
-      skillDiagnostics: [],
-      businessLogic: null,
-      loadedCodeSkill: null,
-      skillResourcePlan: {
-        skillName: "ui-ux-pro-max",
-        alias: "@web-design",
-        query: "Public event calendar light design system",
-        requests: [
-          {
-            resourceType: "design-system",
-            name: "Public event calendar light design system",
-            query: "public calendar accessible light theme",
-            csvPath: "",
-            stack: "",
-            domain: "",
-            actionName: "",
-            maxResults: 5,
-            reason: "查询日历产品的浅色设计系统。",
-          },
-        ],
-        diagnostics: [],
-      },
-      codeSkillContext: {
-        skillName: "ui-ux-pro-max",
-        alias: "@web-design",
-        query: "Public event calendar light design system",
-        designSystem: "",
-        stackGuidelines: "",
-        domainGuidelines: "",
-        diagnostics: [],
-        actionResults: [
-          {
-            name: "React TypeScript CSS variables UI rules",
-            description: "React prototype rules",
-            command: "node-csv-resolver",
-            args: ["data/stacks/react.csv"],
-            outputFormat: "json",
-            status: "completed",
-            stdout: "Use React state for mock route tables. Use CSS variables for light and dark themes.",
-            stderr: "",
-            exitCode: 0,
-            startedAt: "2026-05-17T08:00:00.000Z",
-            completedAt: "2026-05-17T08:00:01.000Z",
-          },
-        ],
-      },
-      codeTrace: [
-        {
-          stage: "generate_file_operations",
-          attempt: 1,
-          kind: "parse_error",
-          rawOutput: "{\"operations\":[{\"operation\":\"bad_operation\"}]}",
-          errorMessage: "operations.0.operation: Invalid enum value",
-          createdAt: "2026-05-17T08:00:02.000Z",
-        },
-        {
-          stage: "generate_file_operations",
-          attempt: 2,
-          kind: "repaired_data",
-          parsedData: {
-            operations: [],
-          },
-          createdAt: "2026-05-17T08:00:03.000Z",
-        },
-      ],
-      currentStage: "plan_code_ui",
-      status: "completed",
-      error: null,
-      uiMockup: null,
-      uiReferenceSpec: null,
-      appBlueprint: null,
-      uiBlueprint: null,
-      spec: null,
-      filePlan: null,
-      agentPlan: [],
-      uiFidelityReport: null,
-      visualDiffReport: null,
-      repairLoopSummary: null,
-      designTokens: null,
-      componentRegistry: null,
-      uiIr: null,
-      codeContextHash: null,
-      changedFileCount: 0,
-    } as unknown as CodeRunSnapshot;
-    const repository: WorkspaceRepository = {
-      loadWorkspace: vi.fn(async () => createWorkspaceRecord()),
-      updateRequirementText: vi.fn(async () => {}),
-      startRun: vi.fn(),
-      subscribeToRun: vi.fn(),
-      getRunSnapshot: vi.fn(),
-      renderPlantUml: vi.fn(),
-      testProviderSettings: vi.fn(),
-      saveRunHistory: vi.fn(),
-      listRunHistory: vi.fn(async () => []),
-      restoreRunHistory: vi.fn(async () => ({
-        id: "history-code-skill",
-        createdAt: "2026-05-17T08:00:00.000Z",
-        title: "代码资源",
-        providerModel: "gpt-5.5",
-        snapshot: codeSnapshot,
-      })),
-      deleteRunHistory: vi.fn(async () => []),
-      clearRunHistory: vi.fn(async () => {}),
-    };
-
-    const user = userEvent.setup();
-    render(withWorkspaceProviders(<TopBarRestoreCodeSkillHarness />, repository));
-
-    await user.click(screen.getByRole("button", { name: "恢复代码资源" }));
-
-    expect((await screen.findAllByTestId("generation-task-step"))[0]).toBeInTheDocument();
-    expect(screen.queryByText("代码调试追踪")).not.toBeInTheDocument();
-    expect(screen.queryByText(/生成代码文件操作 \/ 全局 \/ 第 1 次 \/ 解析错误/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/operations\.0\.operation/)).not.toBeInTheDocument();
-    expect(screen.queryByText("界面方案资源")).not.toBeInTheDocument();
-    expect(screen.queryByText("资源查询结果")).not.toBeInTheDocument();
-    expect(screen.queryByText("React TypeScript CSS variables UI rules")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Use React state for mock route tables/)).not.toBeInTheDocument();
-  });
+  
 });

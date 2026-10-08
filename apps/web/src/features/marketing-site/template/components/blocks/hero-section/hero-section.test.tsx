@@ -31,11 +31,12 @@ describe('marketing hero', () => {
     expect(screen.getByRole('link', { name: '开始创建项目' })).toHaveAttribute('href', '/projects')
     expect(screen.getByRole('link', { name: '查看价格' })).toHaveAttribute('href', '/#pricing')
     const socialProof = screen.getByTestId('hero-social-proof')
-    expect(socialProof).toHaveTextContent('界面示例 · 需求 · 建模 · 交付')
+    expect(socialProof).toHaveTextContent('需求 · 建模 · 交付')
+    expect(container.textContent).not.toContain('示例')
     expect(socialProof).toHaveTextContent('4.5')
     expect(socialProof.querySelectorAll('[data-slot="avatar"]')).toHaveLength(4)
     expect(socialProof.querySelectorAll('[data-slot="rating-star"]')).toHaveLength(5)
-    expect(screen.getByRole('img', { name: '示例评分：满分 5 分中的 4.5 分' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: '评分：满分 5 分中的 4.5 分' })).toBeInTheDocument()
     for (const number of [11, 12, 13, 14]) {
       const asset = readFileSync(`public/marketing/avatars/avatar-${number}.png`)
       expect(asset.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a')
@@ -63,8 +64,9 @@ describe('marketing hero', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('🚀')
     expect(screen.getByRole('link', { name: 'Create a project' })).toHaveAttribute('href', '/projects')
     expect(screen.getByRole('link', { name: 'View pricing' })).toHaveAttribute('href', '/#pricing')
-    expect(screen.getByTestId('hero-social-proof')).toHaveTextContent('Interface example · Requirements · Models · Delivery')
-    expect(screen.getByRole('img', { name: 'Example rating: 4.5 out of 5' })).toBeInTheDocument()
+    expect(screen.getByTestId('hero-social-proof')).toHaveTextContent('Requirements · Models · Delivery')
+    expect(screen.getByTestId('hero-social-proof')).not.toHaveTextContent(/example/i)
+    expect(screen.getByRole('img', { name: 'Rating: 4.5 out of 5' })).toBeInTheDocument()
   })
 
   it('keeps the changing headline still when reduced motion is requested', () => {

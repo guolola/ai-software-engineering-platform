@@ -116,6 +116,8 @@ export function ProjectHistory({
     }
   };
 
+  
+
   const runAction = async (
     runId: string,
     action: "retry" | "rerun",
@@ -230,7 +232,7 @@ export function ProjectHistory({
     ["requirements", t("projectShell.historyUi.requirements")],
     ["feasibility", t("projectShell.historyUi.feasibility")],
     ["design", t("projectShell.historyUi.models")],
-    ["code", t("projectShell.historyUi.code")],
+    [ t("projectShell.historyUi.code")],
     ["document", t("projectShell.historyUi.documents")],
   ] as const;
   const filteredRuns = runs.filter((run) => {

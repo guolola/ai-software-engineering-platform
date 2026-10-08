@@ -1,7 +1,7 @@
 // Owns the fixed offline demo lifecycle for the student onboarding recording branch.
 import {
   artifactReadyRunEventSchema,
-  codeRunSnapshotSchema,
+  
   completedRunEventSchema,
   designTraceabilityTouchesDiagramKinds,
   designRunSnapshotSchema,
@@ -11,7 +11,7 @@ import {
   stageProgressRunEventSchema,
   stageStartedRunEventSchema,
   startDocumentRunRequestSchema,
-  type CodeRunSnapshot,
+  
   type DesignDiagramKind,
   type DesignRunSnapshot,
   type DiagramKind,
@@ -21,7 +21,7 @@ import {
   type RequirementBaseline,
   type RunSnapshot,
   type RunStage,
-  type StartCodeRunRequest,
+  
   type StartDesignRunRequest,
   type StartDocumentRunRequest,
   type StartRunRequest,
@@ -51,7 +51,7 @@ const fixture = {
   designSnapshot: designRunSnapshotSchema.parse(
     librarySeatDemoFixture.designSnapshot,
   ),
-  codeSnapshot: codeRunSnapshotSchema.parse(librarySeatDemoFixture.codeSnapshot),
+  
 };
 
 export const offlineDemoProviderSettings: ProviderSettings = {
@@ -116,7 +116,7 @@ function retargetBaseline(
 }
 
 function retargetSnapshotIds(
-  snapshot: RunSnapshot | DesignRunSnapshot | CodeRunSnapshot,
+  snapshot: RunSnapshot | DesignRunSnapshot,
   runId: string,
 ) {
   snapshot.runId = runId;
@@ -250,7 +250,7 @@ async function emitDemoStage(record: RunRecord, stages: ReturnType<typeof create
 
 function completeRecord(
   record: RunRecord,
-  snapshot: RunSnapshot | DesignRunSnapshot | CodeRunSnapshot,
+  snapshot: RunSnapshot | DesignRunSnapshot,
 ) {
   throwIfRunCancelled(record);
   snapshot.status = "completed";
@@ -425,57 +425,7 @@ export async function completeOfflineDemoDesignRun(
   completeRecord(record, designRunSnapshotSchema.parse(snapshot));
 }
 
-export async function completeOfflineDemoCodeRun(record: RunRecord, input: StartCodeRunRequest) {
-  const stages = createStageLifecycle(record);
-  const snapshot = clone(fixture.codeSnapshot);
-  retargetSnapshotIds(snapshot, record.snapshot.runId);
-  snapshot.generationMode = input.generationMode;
-  snapshot.changedFileCount = Object.keys(snapshot.files).length;
-  snapshot.currentStage = "verify_code_business_assertions";
-  snapshot.status = "queued";
-  record.snapshot = snapshot;
-  await emitDemoStage(record, stages, "analyze_code_business_logic", "离线演示：正在整理业务逻辑");
-  emitEvent(
-    record,
-    artifactReadyRunEventSchema.parse({
-      type: "artifact_ready",
-      stage: "analyze_code_business_logic",
-      artifactKind: "businessLogic",
-      businessLogic: snapshot.businessLogic ?? undefined,
-    }),
-  );
-  await emitDemoStage(record, stages, "generate_code_spec", "离线演示：正在整理代码规格");
-  emitEvent(
-    record,
-    artifactReadyRunEventSchema.parse({
-      type: "artifact_ready",
-      stage: "generate_code_spec",
-      artifactKind: "codeSpec",
-    }),
-  );
-  await emitDemoStage(record, stages, "generate_code_files", "离线演示：正在准备原型文件");
-  emitEvent(
-    record,
-    artifactReadyRunEventSchema.parse({
-      type: "artifact_ready",
-      stage: "generate_code_files",
-      artifactKind: "codeFiles",
-    }),
-  );
-  await emitDemoStage(record, stages, "verify_code_business_assertions", "离线演示：正在读取已保存的业务检查结果");
-  if (snapshot.businessAssertionResults) {
-    emitEvent(
-      record,
-      artifactReadyRunEventSchema.parse({
-        type: "artifact_ready",
-        stage: "verify_code_business_assertions",
-        artifactKind: "businessAssertionResults",
-        businessAssertionResults: snapshot.businessAssertionResults,
-      }),
-    );
-  }
-  completeRecord(record, codeRunSnapshotSchema.parse(snapshot));
-}
+
 
 export function createOfflineDemoDocumentInput(input: StartDocumentRunRequest) {
   // Feasibility has already passed server-side freshness checks; retain its two-diagram solution basis.

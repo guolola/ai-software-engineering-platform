@@ -19,6 +19,12 @@ const corsEnv = {
     : {}),
 };
 
+// All API workers must share these issuer, signing and cookie/cursor settings.
+const mcpEnv = Object.fromEntries([
+  "MCP_ENABLED", "MCP_PUBLIC_ORIGIN", "MCP_WEB_ORIGIN", "MCP_SHARED_SECRET",
+  "MCP_JWKS", "MCP_OAUTH_CLIENTS", "MCP_CIMD_ORIGINS",
+].filter((key) => process.env[key] !== undefined).map((key) => [key, process.env[key]]));
+
 const documentEnv = {
   ...(process.env.ONLYOFFICE_DOCUMENT_SERVER_URL
     ? { ONLYOFFICE_DOCUMENT_SERVER_URL: process.env.ONLYOFFICE_DOCUMENT_SERVER_URL }
@@ -200,6 +206,7 @@ const apiEnv = {
   ...releaseEnv,
   ...corsEnv,
   ...documentEnv,
+  ...mcpEnv,
   ...providerEnv,
   ...queueEnv,
   ...modelTaskTimeoutEnv,

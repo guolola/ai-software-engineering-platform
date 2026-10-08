@@ -41,7 +41,7 @@ export function mergeProjectedStatus(
 
 export function activeStatusForProjectRunKind(
   projectRuns: PlatformRunSummary[] | undefined,
-  runKind: "requirements" | "design" | "code" | "document",
+  runKind: "requirements" | "design" | "document",
   matches: (run: PlatformRunSummary) => boolean = () => true,
 ) {
   return (projectRuns ?? [])

@@ -2,15 +2,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type {
-  CodeBusinessLogic,
+  
   DiagramModelSpec,
   RequirementRule,
 } from "@uml-platform/contracts";
 import { buildRequirementBaseline } from "./baselines/requirement-baseline.js";
-import { buildCodeBusinessAssertionResults } from "./pipelines/code/code-business-assertions.js";
+
 import {
   assertTrustedChainAllowsCompletion,
-  buildCodeStageTrustedChain,
+  
   buildRequirementStageTrustedChain,
 } from "./traceability/trusted-chain-traceability.js";
 
@@ -309,142 +309,6 @@ test("trusted chain negative cases fail through their expected gates", () => {
   assert.equal(
     missingRoleBaseline.qualityReport.issues.some(
       (issue) => issue.code === "low-confidence",
-    ),
-    true,
-  );
-});
-
-test("code regression catches UI-only, orphan code, and orphan test evidence", () => {
-  const rule: RequirementRule = {
-    id: "login",
-    category: "业务规则",
-    text: "用户必须登录后才能访问主要功能。",
-    relatedDiagrams: ["usecase"],
-  };
-  const baseline = buildRequirementBaseline({
-    runId: "run-negative-code",
-    requirementText: rule.text,
-    rules: [rule],
-    createdAt: "2026-05-24T00:00:00.000Z",
-  });
-  const businessLogic: CodeBusinessLogic = {
-    appName: "访问控制",
-    domainSummary: "登录后访问主要功能。",
-    coreWorkflow: "用户登录后访问主要功能，未登录时显示异常反馈。",
-    actors: [
-      {
-        id: "actor-user",
-        name: "用户",
-        type: "human",
-        responsibilities: ["登录后访问主要功能"],
-      },
-    ],
-    businessEntities: [],
-    pageFlows: [
-      {
-        id: "page-main",
-        name: "主要功能",
-        route: "/main",
-        purpose: "登录后访问主要功能",
-        actors: ["用户"],
-        entryPoints: ["登录成功"],
-        userActions: ["访问主要功能"],
-        states: ["未登录", "已登录"],
-        sourceRefs: ["login"],
-      },
-    ],
-    stateMachines: [
-      {
-        entity: "会话",
-        states: ["未登录", "已登录"],
-        transitions: ["登录: 未登录 -> 已登录"],
-      },
-    ],
-    permissions: [
-      {
-        actor: "用户",
-        allowedActions: ["访问主要功能"],
-        restrictedActions: ["未登录访问主要功能"],
-      },
-    ],
-    edgeCases: ["未登录时显示请先登录反馈"],
-    frontendOperations: ["登录", "访问主要功能"],
-    plantUmlTraceability: ["usecase:uc-login"],
-  };
-  const uiOnlyAssertions = buildCodeBusinessAssertionResults({
-    runId: "run-negative-code-ui",
-    baseline,
-    businessLogic,
-    files: {
-      "/src/App.tsx": "export default function App(){ return <button>登录后访问主要功能</button>; }",
-    },
-    generatedAt: "2026-05-24T00:00:00.000Z",
-  });
-  assert.equal(uiOnlyAssertions.passed, false);
-
-  const uiOnlyChain = buildCodeStageTrustedChain({
-    runId: "run-negative-code-ui",
-    baseline,
-    files: {
-      "/src/App.tsx": "export default function App(){ return <button>登录后访问主要功能</button>; }",
-      "/BUSINESS_CONTEXT.md": `# Business Context\n- ${rule.text}`,
-    },
-    businessAssertionResults: uiOnlyAssertions,
-  });
-  assert.equal(
-    uiOnlyChain.traceabilityMatrix.diagnostics.some(
-      (diagnostic) => diagnostic.code === "business-assertion-gap",
-    ),
-    true,
-  );
-
-  const orphanCodeChain = buildCodeStageTrustedChain({
-    runId: "run-negative-code-orphan",
-    baseline,
-    files: {
-      "/src/Unrelated.tsx": "export function Unrelated(){ return '校园活动列表'; }",
-    },
-    businessAssertionResults: uiOnlyAssertions,
-  });
-  assert.equal(
-    orphanCodeChain.traceabilityMatrix.diagnostics.some(
-      (diagnostic) => diagnostic.code === "orphan-artifact",
-    ),
-    true,
-  );
-
-  const orphanTestChain = buildCodeStageTrustedChain({
-    runId: "run-negative-test-orphan",
-    baseline,
-    files: {
-      "/src/App.tsx":
-        "const isLoggedIn = true; export default function App(){ return isLoggedIn ? '登录后访问主要功能' : '请先登录'; }",
-    },
-    businessAssertionResults: {
-      runId: "run-negative-test-orphan",
-      generatedAt: "2026-05-24T00:00:00.000Z",
-      passed: true,
-      blockingFailureIds: [],
-      assertions: [
-        {
-          id: "CBA-ORPHAN",
-          requirementId: "REQ-999",
-          category: "business-behavior",
-          description: "无需求来源的测试。",
-          expectedBehavior: "不应被接受。",
-          verificationMethod: "static-code-scan",
-          evidenceArtifacts: ["/src/App.tsx"],
-          status: "passed",
-          severity: "critical",
-          message: "This assertion references no accepted requirement.",
-        },
-      ],
-    },
-  });
-  assert.equal(
-    orphanTestChain.traceabilityMatrix.diagnostics.some(
-      (diagnostic) =>
-        diagnostic.code === "fake-trace" && diagnostic.artifactType === "test",
     ),
     true,
   );

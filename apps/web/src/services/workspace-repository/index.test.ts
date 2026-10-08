@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   AtomicRequirement,
-  CodeRunSnapshot,
+  
   DiagramModelSpec,
   RequirementBaseline,
   RepairRequirementRulesRequest,
@@ -12,7 +12,7 @@ import {
   createHttpWorkspaceRepository,
   createMockWorkspaceRepository,
   type StartDocumentRunInput,
-  createStartCodeRunInput,
+  
   createStartRunInput,
 } from "./index";
 import {
@@ -45,59 +45,7 @@ function storeManagedUserSettings() {
   );
 }
 
-function createCodeRunSnapshot(
-  overrides: Partial<CodeRunSnapshot> = {},
-): CodeRunSnapshot {
-  const base: CodeRunSnapshot = {
-    runId: "code-run-test",
-    requirementText: "生成公众活动日历",
-    rules: [],
-    designModels: [],
-    designPlantUml: [],
-    spec: null,
-    businessLogic: null,
-    loadedCodeSkill: null,
-    visualDirection: null,
-    skillResourceDiscoveryPlan: null,
-    skillResourcePreviews: null,
-    skillResourcePlan: null,
-    codeSkillContext: null,
-    appBlueprint: null,
-    uiBlueprint: null,
-    uiMockup: null,
-    uiReferenceSpec: null,
-    uiFidelityReport: null,
-    designTokens: null,
-    componentRegistry: null,
-    uiIr: null,
-    visualDiffReport: null,
-    repairLoopSummary: null,
-    selectedCodeSkills: [],
-    skillDiagnostics: [],
-    filePlan: null,
-    codeImplementationBrief: null,
-    codeFileOperationManifest: null,
-    fileGenerationDiagnostics: [],
-    codeTrace: [],
-    codeGenerationMode: "json_schema_operations",
-    qualityDiagnostics: [],
-    files: {
-      "/src/App.tsx":
-        "export default function App() { return <main>ok</main>; }",
-    },
-    entryFile: "/src/App.tsx",
-    dependencies: {},
-    agentPlan: [],
-    generationMode: "regenerate",
-    changedFileCount: 1,
-    diagnostics: [],
-    codeContextHash: null,
-    currentStage: "verify_code_preview",
-    status: "completed",
-    error: null,
-  };
-  return { ...base, ...overrides };
-}
+
 
 function createAtomicRequirement(
   overrides: Partial<AtomicRequirement> = {},
@@ -207,46 +155,7 @@ describe("createStartRunInput", () => {
     });
   });
 
-  it("includes existing code files when starting a code agent run", () => {
-    localStorage.setItem(
-      "uml-lab-settings",
-      JSON.stringify({
-        apiBaseUrl: "https://ai.comfly.org",
-        apiKey: "sk-demo",
-        providerConfigId: "provider-config-1",
-        defaultModel: "gpt-5.5",
-        providerModelOptions: ["gpt-5.5"],
-        imageModel: "nano-banana-pro",
-        fontSize: "md",
-        autoGenerate: false,
-        showStaleBanner: true,
-      }),
-    );
-
-    const input = createStartCodeRunInput(
-      [
-        {
-          diagramKind: "sequence",
-          title: "顺序图",
-          summary: "流程",
-          notes: [],
-          participants: [],
-          messages: [],
-          fragments: [],
-        },
-      ],
-      [],
-      { "/src/App.tsx": "export default function App() { return null; }" },
-    );
-
-    expect(input.existingFiles["/src/App.tsx"]).toContain("return null");
-    expect(input.providerSettings).toMatchObject({
-      providerConfigId: "provider-config-1",
-      model: "gpt-5.5",
-    });
-    expect(input.providerSettings).not.toHaveProperty("apiKey");
-    expect("imageProviderSettings" in input).toBe(false);
-  });
+  
 });
 
 describe("createHttpWorkspaceRepository", () => {
@@ -358,108 +267,9 @@ describe("createHttpWorkspaceRepository", () => {
     );
   });
 
-  it("uses legacy code subscriptions when no project scope is available", async () => {
-    class MockEventSource {
-      onmessage: ((event: MessageEvent<string>) => void) | null = null;
-      onerror: (() => void) | null = null;
+  
 
-      close() {}
-
-      constructor(url: string) {
-        void url;
-        queueMicrotask(() => {
-          this.onmessage?.({
-            data: JSON.stringify({
-              type: "code_file_changed",
-              path: "/src/App.tsx",
-              content: "export default function App() { return <main />; }",
-              reason: "写入入口",
-            }),
-          } as MessageEvent<string>);
-          this.onmessage?.({
-            data: JSON.stringify({
-              type: "completed",
-              snapshot: {
-                runId: "code-run-1",
-                requirementText: "生成代码",
-                rules: [],
-                designModels: [],
-                spec: null,
-                files: {
-                  "/src/App.tsx":
-                    "export default function App() { return <main />; }",
-                },
-                entryFile: "/src/App.tsx",
-                dependencies: {},
-                agentPlan: ["写入口"],
-                diagnostics: [],
-                codeContextHash: "hash",
-                currentStage: "verify_code_preview",
-                status: "completed",
-                error: null,
-              },
-            }),
-          } as MessageEvent<string>);
-        });
-      }
-    }
-
-    vi.stubGlobal("EventSource", MockEventSource);
-    const repository = createHttpWorkspaceRepository();
-    const events: string[] = [];
-
-    await expect(
-      repository.subscribeToCodeRun!("code-run-1", (event) => {
-        if (event.type === "code_file_changed") {
-          events.push(event.path);
-        }
-      }),
-    ).resolves.toBeUndefined();
-
-    expect(events).toEqual(["/src/App.tsx"]);
-  });
-
-  it("surfaces lost-code polling errors through legacy fallback", async () => {
-    class MockEventSource {
-      onmessage: ((event: MessageEvent<string>) => void) | null = null;
-      onerror: (() => void) | null = null;
-
-      close() {}
-
-      constructor(url: string) {
-        void url;
-        queueMicrotask(() => {
-          this.onerror?.();
-        });
-      }
-    }
-
-    vi.stubGlobal("EventSource", MockEventSource);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              message:
-                "代码生成任务已丢失，可能是本地 API 服务重启，请重新生成",
-            }),
-            {
-              status: 404,
-              headers: {
-                "Content-Type": "application/json",
-              },
-            },
-          ),
-      ),
-    );
-
-    const repository = createHttpWorkspaceRepository();
-
-    await expect(
-      repository.subscribeToCodeRun!("missing-code-run", () => {}),
-    ).rejects.toThrow("代码生成任务已丢失");
-  });
+  
 
   it("rejects document operations when no project scope is available", async () => {
     localStorage.setItem(
@@ -635,14 +445,6 @@ describe("createHttpWorkspaceRepository", () => {
       ],
       providerSettings: managedProviderSettings,
     });
-    await repository.startCodeRun!(
-      createStartCodeRunInput(
-        [],
-        [],
-        { "/src/App.tsx": "export default function App() { return null; }" },
-        "continue",
-      ),
-    );
     await repository.startDocumentRun!({
       documentKind: "requirementsSpec",
       requirementText: "生成说明书",
@@ -716,16 +518,6 @@ describe("createHttpWorkspaceRepository", () => {
       providerSettings: managedProviderSettings,
     });
     expect(startDesignBody.existingDesignSvgArtifacts).toBeUndefined();
-    const startCodeCall = fetchMock.mock.calls.find(([url]) =>
-      String(url).endsWith("/api/code-runs"),
-    );
-    const startCodeBody = JSON.parse(String(startCodeCall?.[1]?.body));
-    expect(startCodeBody).toEqual({
-      projectId: "library-booking",
-      generationMode: "continue",
-      providerSettings: managedProviderSettings,
-    });
-    expect(startCodeBody.existingFiles).toBeUndefined();
 
     for (const [, options] of fetchMock.mock.calls) {
       const headers = options?.headers as Record<string, string>;
@@ -805,66 +597,7 @@ describe("createHttpWorkspaceRepository", () => {
     expect(body.state.requirementText).toBe("团队成员更新的需求");
   });
 
-  it("persists browser preview diagnostics to the project workspace", async () => {
-    const diagnostic = {
-      stage: "verify_code_preview" as const,
-      message: "本地预览失败：/src/App.tsx 无法解析导入 ./Missing",
-      at: "2026-06-21T00:00:00.000Z",
-    };
-    const fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
-      if (
-        url.endsWith("/api/projects/library-booking/workspace") &&
-        !options?.method
-      ) {
-        return new Response(
-          JSON.stringify({
-            projectId: "library-booking",
-            version: 2,
-            state: {
-              requirementText: "已保存的项目需求",
-              codeFiles: { "/src/App.tsx": "import './Missing';" },
-              codeEntryFile: "/src/App.tsx",
-              codeDiagnostics: [],
-            },
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      if (
-        url.endsWith("/api/projects/library-booking/workspace") &&
-        options?.method === "PUT"
-      ) {
-        return new Response(
-          JSON.stringify({
-            projectId: "library-booking",
-            version: 3,
-            state: JSON.parse(String(options.body)).state,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      return new Response(JSON.stringify({ message: "unexpected request" }), {
-        status: 500,
-      });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    storeManagedUserSettings();
-
-    const repository = createHttpWorkspaceRepository({
-      projectId: "library-booking",
-    });
-    storeManagedUserSettings();
-    await repository.loadWorkspace();
-    await repository.updateCodeDiagnostics?.([diagnostic]);
-
-    const saveCall = fetchMock.mock.calls.find(
-      ([url, options]) =>
-        String(url).endsWith("/api/projects/library-booking/workspace") &&
-        options?.method === "PUT",
-    );
-    const body = JSON.parse(String(saveCall?.[1]?.body));
-    expect(body.state.codeDiagnostics).toEqual([diagnostic]);
-  });
+  
 
   it("persists requirement rule freshness metadata through project conflict retries", async () => {
     const requirementText = "订单需求";
@@ -1071,23 +804,7 @@ describe("createHttpWorkspaceRepository", () => {
     expect(workspace.rulesVersion).toBe(1);
   });
 
-  it("keeps browser preview diagnostics in the mock repository", async () => {
-    const diagnostic = {
-      stage: "verify_code_preview" as const,
-      message: "本地预览失败：/src/App.tsx 无法解析导入 ./Missing",
-      at: "2026-06-21T00:00:00.000Z",
-    };
-    const repository = createMockWorkspaceRepository({
-      codeFiles: { "/src/App.tsx": "import './Missing';" },
-      codeEntryFile: "/src/App.tsx",
-    });
-
-    await repository.updateCodeDiagnostics?.([diagnostic]);
-
-    await expect(repository.loadWorkspace()).resolves.toMatchObject({
-      codeDiagnostics: [diagnostic],
-    });
-  });
+  
 
   it("does not start a project run when the pending workspace save failed", async () => {
     const fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
@@ -1350,92 +1067,7 @@ describe("createHttpWorkspaceRepository", () => {
     );
   });
 
-  it("does not start project code runs after a manual model save failed", async () => {
-    const fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
-      if (
-        url.endsWith("/api/projects/library-booking/workspace") &&
-        !options?.method
-      ) {
-        return new Response(
-          JSON.stringify({
-            projectId: "library-booking",
-            version: 6,
-            updatedAt: "2026-05-22T02:00:00.000Z",
-            updatedByUserId: "teacher-1",
-            state: {
-              requirementText: "已保存的项目需求",
-              rules: [],
-              selectedDiagramTypes: [],
-              designModels: {},
-            },
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
-      }
-      if (
-        url.endsWith("/api/projects/library-booking/workspace") &&
-        options?.method === "PUT"
-      ) {
-        return new Response(JSON.stringify({ message: "保存失败" }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      if (url.endsWith("/api/code-runs")) {
-        return new Response(JSON.stringify({ runId: "should-not-start-code" }), {
-          status: 202,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      return new Response(
-        JSON.stringify({
-          message: `unexpected request ${String(url)} ${options?.method ?? "GET"}`,
-        }),
-        { status: 500 },
-      );
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const repository = createHttpWorkspaceRepository({
-      projectId: "library-booking",
-    });
-    storeManagedUserSettings();
-    await repository.loadWorkspace();
-    await expect(
-      repository.saveDesignModelEdit!(
-        "sequence:uc_view_books",
-        {
-          diagramKind: "sequence",
-          modelId: "sequence:uc_view_books",
-          title: "顺序图",
-          summary: "用户查看图书。",
-          notes: [],
-          participants: [],
-          messages: [],
-        },
-        {
-          status: "dirty",
-          warning: "模型已手动修改",
-          editedAt: "2026-06-21T00:00:00.000Z",
-        },
-      ),
-    ).rejects.toThrow();
-
-    storeManagedUserSettings();
-    await expect(
-      repository.startCodeRun!(
-        createStartCodeRunInput(
-          [],
-          [],
-          { "/src/App.tsx": "export default function App() { return null; }" },
-          "continue",
-        ),
-      ),
-    ).rejects.toThrow();
-    expect(
-      fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/api/code-runs")),
-    ).toHaveLength(0);
-  });
+  
 
   it("persists pruned traceability with manual requirement model edits", async () => {
     const savedBodies: Array<Record<string, unknown>> = [];
@@ -4064,97 +3696,7 @@ describe("createHttpWorkspaceRepository", () => {
     expect(localStorage.getItem(RUN_HISTORY_STORAGE_KEY)).toContain("gpt-5.5");
   });
 
-  it("compacts mock code history debug fields while preserving generated files", async () => {
-    const repository = createMockWorkspaceRepository();
-    const rawOutput = `RAW_OUTPUT_${"x".repeat(5_000)}`;
-    const skillOutput = `SKILL_OUTPUT_${"y".repeat(5_000)}`;
-
-    await repository.saveRunHistory(
-      createCodeRunSnapshot({
-        runId: "code-large-debug",
-        loadedCodeSkill: {
-          alias: "@web-design",
-          name: "ui-ux-pro-max",
-          description: "Large skill",
-          aliases: ["@web-design"],
-          source: "project",
-          location: "apps/api/src/code-skills/ui-ux-pro-max/SKILL.md",
-          baseDir: "apps/api/src/code-skills/ui-ux-pro-max",
-          fileManifest: [],
-          content: `SKILL_MD_${"z".repeat(5_000)}`,
-          loadedAt: new Date().toISOString(),
-        },
-        codeSkillContext: {
-          skillName: "ui-ux-pro-max",
-          alias: "@web-design",
-          query: "public calendar",
-          designSystem: skillOutput,
-          stackGuidelines: skillOutput,
-          domainGuidelines: skillOutput,
-          actionResults: [
-            {
-              name: "react-stack",
-              description: "React rules",
-              command: "csv",
-              args: ["data/stacks/react.csv"],
-              outputFormat: "markdown",
-              status: "completed",
-              stdout: skillOutput,
-              stderr: "",
-              exitCode: 0,
-              startedAt: new Date().toISOString(),
-              completedAt: new Date().toISOString(),
-            },
-          ],
-          diagnostics: [],
-        },
-        skillResourcePreviews: {
-          skillName: "ui-ux-pro-max",
-          alias: "@web-design",
-          previews: [
-            {
-              path: "data/styles.csv",
-              rowCount: 100,
-              headers: ["No", "Category", "Guideline"],
-              sampleRows: [
-                {
-                  No: "1",
-                  Category: "Visual",
-                  Guideline: "A".repeat(1_000),
-                },
-              ],
-              matchedHints: [],
-              status: "completed",
-            },
-          ],
-          diagnostics: [],
-        },
-        codeTrace: [
-          {
-            stage: "generate_file_operations",
-            attempt: 1,
-            kind: "llm_output",
-            rawOutput,
-            parsedData: { rawOutput, nested: { skillOutput } },
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      }),
-      { providerModel: "claude-opus-4-6-thinking" },
-    );
-
-    const stored = localStorage.getItem(RUN_HISTORY_STORAGE_KEY) ?? "";
-    expect(stored).not.toContain(rawOutput);
-    expect(stored).not.toContain(skillOutput);
-    expect(stored).not.toContain("SKILL_MD_");
-
-    const history = await repository.listRunHistory();
-    const restored = history[0]?.snapshot as CodeRunSnapshot;
-    expect(restored.files["/src/App.tsx"]).toContain("export default");
-    expect(restored.entryFile).toBe("/src/App.tsx");
-    expect(restored.loadedCodeSkill).toBeNull();
-    expect(restored.skillResourcePreviews?.previews[0]?.sampleRows).toEqual([]);
-  });
+  
 
   it("prunes older mock history items when localStorage quota is exceeded", async () => {
     const originalSetItem = Storage.prototype.setItem;
@@ -4174,11 +3716,9 @@ describe("createHttpWorkspaceRepository", () => {
     const repository = createMockWorkspaceRepository();
     for (let index = 0; index < 6; index += 1) {
       await repository.saveRunHistory(
-        createCodeRunSnapshot({
+        createRunSnapshot({
           runId: `quota-run-${index}`,
-          files: {
-            "/src/App.tsx": `export default function App() { return <main>${"x".repeat(3_000)}</main>; }`,
-          },
+          requirementText: "x".repeat(3_000),
         }),
         { providerModel: "gpt-5.5" },
       );
