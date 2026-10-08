@@ -18,6 +18,10 @@ const copy: Record<string, Record<string, string>> = {
     "zh-CN": "开始创建项目",
     "en": "Create a project"
   },
+  "Connect a Coding Agent": {
+    "zh-CN": "接入 Coding Agent",
+    "en": "Connect a Coding Agent"
+  },
   "Learn more": {
     "zh-CN": "查看使用指南",
     "en": "Read the guide"
@@ -283,8 +287,8 @@ const copy: Record<string, Record<string, string>> = {
     "en": "Connect engineering with AI"
   },
   "Track every key metric in one clean dashboard - no code, no setup, just real-time insights that help you grow smarter.": {
-    "zh-CN": "从需求分析、UML 建模到代码和说明书，在一个项目中完成可追踪的实践流程。",
-    "en": "Work from requirements and UML models to agent implementation and specifications in one traceable project."
+    "zh-CN": "组织需求、UML 模型、测试与说明书，通过 MCP 接入任意支持 Streamable HTTP 的 Coding Agent，在自己的仓库中按所选技术栈实现与验证。",
+    "en": "Organize requirements, UML models, tests and specifications. Connect any Coding Agent supporting MCP Streamable HTTP to implement and verify in your own repository and technology stack."
   },
   "Welcome to dashboard": {
     "zh-CN": "项目工作区",

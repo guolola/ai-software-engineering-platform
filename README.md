@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://jianglisoftware.com">
-    <img src="https://img.shields.io/badge/Software%20Engineering-Practice%20Platform-181717?style=flat-square" alt="Software Engineering Practice Platform" />
+    <img src="./apps/web/public/brand/uml-platform-logo.png" width="120" height="120" alt="Software Engineering Practice Platform official logo" />
   </a>
 </p>
 
@@ -11,9 +11,9 @@
 # Software Engineering Practice Platform
 
 <p>
-  <strong>An AI-assisted workspace for UML modeling, trusted traceability, and Coding Agent integration</strong><br />
+  <strong>AI-assisted UML modeling and project context for any MCP-compatible Coding Agent</strong><br />
   From requirement baselines, feasibility studies, and UML models to external Coding Agents, tests, and engineering documents<br />
-  <sub>PlantUML rendering × trusted generation chains × read-only MCP context</sub>
+  <sub>PlantUML rendering × trusted generation chains × MCP Streamable HTTP</sub>
 </p>
 
 <p>
@@ -36,7 +36,7 @@
 
 ## Overview
 
-The Software Engineering Practice Platform is designed for software engineering courses, laboratory exercises, and project development. Its staged workspace establishes confirmed requirement facts before generating models and designs, then produces tests, documents, and reviewable evidence. External Coding Agents use the saved project sources through MCP to implement and test code in the student's own repository and technology stack.
+The Software Engineering Practice Platform is designed for software engineering courses, laboratory exercises, and project development. Its staged workspace establishes confirmed requirement facts before generating models and designs, then produces tests, documents, and reviewable evidence. Any Coding Agent that supports MCP Streamable HTTP and the platform's authentication can read saved project sources to implement and test code in the student's own repository and technology stack. Integration is not limited to the clients listed on the connection page.
 
 | 🧭 End-to-end stages | 🔗 Trust mechanisms | 📦 Deliverables |
 | --- | --- | --- |
@@ -56,7 +56,7 @@ The Software Engineering Practice Platform is designed for software engineering 
 - **A rebuilt product shell:** the responsive AdminCN workspace, project dashboard, navigation, account pages, and authentication flow now share one accessible component and theme system.
 - **Visible generation activity:** durable run activity events power a recoverable task conversation with streamed output, public reasoning summaries, parallel-call attribution, and terminal-state replay.
 - **Sharper engineering workflows:** model cards, editors, traceability, project administration, and document guidance are aligned around the same project state and action guards.
-- **External Coding Agents:** read saved requirements, structured models, PlantUML sources, dependencies, rules, and source versions through a technology-neutral MCP interface.
+- **Bring your own Coding Agent:** connect any client supporting MCP Streamable HTTP and the platform's authentication to read saved requirements, structured models, PlantUML sources, dependencies, rules, and source versions.
 - **A refreshed public experience:** the Flow landing page, localized content, light/dark palettes, pricing entry points, and in-app tutorial use the current product visuals.
 
 ## Online Access
@@ -188,6 +188,8 @@ The startup script checks the local OnlyOffice service, then launches the Web ap
 After signing in, add an OpenAI-compatible provider in account settings. Enter the provider's HTTPS base URL and API key, complete model discovery and the connection test, then select a default model. Production environments should use server-managed configurations and disable the legacy plaintext fallback.
 
 ### 5. Try Coding Agent integration
+
+The MCP server uses **Streamable HTTP**. Any compatible Coding Agent can use the endpoint with OAuth or a personal token; the listed client configurations are starting points. Your agent implements and tests code in your own repository using your chosen technology stack.
 
 For the PostgreSQL demo with MCP enabled, run `npm run dev:postgres:demo`. The command checks service ports and verifies the Web, API, rendering, and OAuth discovery paths before reporting success. Docker Desktop or compatible existing PostgreSQL and OnlyOffice services are required. The local MCP address is `http://localhost:3000/api/mcp`.
 

@@ -107,6 +107,9 @@ const HeroSection = () => {
           <Button asChild size='lg' variant='secondary' className='rounded-full px-5'>
             <Link href='/#pricing'><FlowCopy text='View pricing' /><ArrowRightIcon /></Link>
           </Button>
+          <Button asChild size='lg' variant='outline' className='rounded-full px-5'>
+            <Link href='/projects/connections'><FlowCopy text='Connect a Coding Agent' /><ArrowUpRightIcon /></Link>
+          </Button>
         </div>
 
         <motion.div data-testid='hero-capability-card-left' aria-hidden='true'

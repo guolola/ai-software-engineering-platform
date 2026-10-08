@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://jianglisoftware.com">
-    <img src="https://img.shields.io/badge/Software%20Engineering-Practice%20Platform-181717?style=flat-square" alt="Software Engineering Practice Platform" />
+    <img src="./apps/web/public/brand/uml-platform-logo.png" width="120" height="120" alt="软件工程实践平台官网 Logo" />
   </a>
 </p>
 
@@ -13,9 +13,9 @@
 # 软件工程实践平台
 
 <p>
-  <strong>AI 辅助 UML 建模、可信追踪与 Coding Agent 接入工作台</strong><br />
+  <strong>AI 辅助 UML 建模，通过 MCP 为任意兼容的 Coding Agent 提供项目依据</strong><br />
   从需求基线、可行性分析、UML 模型到外部 Coding Agent、测试与三类说明书<br />
-  <sub>PlantUML 渲染 × 可信链路 × 只读 MCP 上下文</sub>
+  <sub>PlantUML 渲染 × 可信链路 × MCP Streamable HTTP</sub>
 </p>
 
 <p>
@@ -38,7 +38,7 @@
 
 ## 项目简介
 
-软件工程实践平台面向软件工程课程、实验和项目开发。阶段化工作台先确认需求事实，再生成模型与设计，最后形成测试、文档及可复盘证据。外部 Coding Agent 通过 MCP 读取已保存的项目资料，在学生自己的仓库中按所选技术栈实现和测试代码。
+软件工程实践平台面向软件工程课程、实验和项目开发。阶段化工作台先确认需求事实，再生成模型与设计，最后形成测试、文档及可复盘证据。任意支持 MCP Streamable HTTP 和平台鉴权方式的 Coding Agent，都可以读取已保存的项目资料，在学生自己的仓库中按所选技术栈实现和测试代码。接入不限于连接页面列出的客户端。
 
 | 🧭 端到端阶段 | 🔗 可信机制 | 📦 可交付产物 |
 | --- | --- | --- |
@@ -56,7 +56,7 @@
 - **重建产品外壳**：响应式 AdminCN 工作区、项目仪表盘、导航、账号页面与认证流程统一使用可访问的组件和主题系统。
 - **生成过程可见**：持久化运行活动事件驱动可恢复的任务对话，支持流式输出、公开思考摘要、并行调用归属与终态重放。
 - **工程流程更清晰**：模型卡、编辑器、追踪关系、项目管理和文档指引统一围绕项目状态与操作守卫组织。
-- **接入外部 Coding Agent**：通过技术栈无关的 MCP 接口读取已保存的需求、结构化模型、PlantUML、依赖、规则与来源版本。
+- **接入你选择的 Coding Agent**：任意支持 MCP Streamable HTTP 和平台鉴权方式的客户端，都可以读取已保存的需求、结构化模型、PlantUML、依赖、规则与来源版本。
 - **公开体验焕新**：Flow 首页、本地化内容、明暗主题、定价入口和应用内教程均使用当前产品视觉。
 
 ## 在线访问
@@ -188,6 +188,8 @@ npm run dev
 登录后在账号设置中新增 OpenAI 兼容 Provider，填写供应商 HTTPS Base URL 与 API Key，完成模型发现和连接测试后选择默认模型。生产环境应使用服务端托管配置，并关闭 legacy 明文回退入口。
 
 ### 5. 体验 Coding Agent 接入
+
+MCP 服务使用 **Streamable HTTP**。任意兼容的 Coding Agent 都可以通过服务地址与 OAuth 或个人令牌接入，页面列出的客户端配置只是接入示例。Agent 在你自己的仓库中，按你选择的技术栈实现与测试代码。
 
 使用 `npm run dev:postgres:demo` 启动开启 MCP 的 PostgreSQL 演示环境。命令先检查端口，再验证网页、API、渲染和 OAuth 发现路径，全部通过后报告启动成功。需要 Docker Desktop，或已有兼容的 PostgreSQL 与 OnlyOffice 服务。本地 MCP 地址为 `http://localhost:3000/api/mcp`。
 
