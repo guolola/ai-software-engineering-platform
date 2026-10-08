@@ -1,5 +1,5 @@
 // Defines first-wave PostgreSQL migrations for identity, project, run, and document records.
-import type { Queryable } from "./transactions.js";
+import type { Queryable, TransactionPool } from "./transactions.js";
 import { mcpSchemaSql } from "../mcp/records/mcp-schema.js";
 import { retiredCodeDataSql } from "./retired-code-data.js";
 
@@ -1290,32 +1290,48 @@ export const migrations = [
 ] as const;
 
 export async function runMigrations(
-  db: Queryable,
+  db: Queryable | TransactionPool,
   migrationList: readonly { id: string; sql: string }[] = migrations,
 ) {
-  await db.query(`
-    create table if not exists ${migrationTableName} (
-      id text primary key,
-      applied_at timestamptz not null default now()
-    )
-  `);
+  // Pin the pool connection: the lock, SQL and ledger must share one transaction.
+  const connection = "connect" in db
+    ? { client: await db.connect(), pooled: true as const }
+    : { client: db, pooled: false as const };
+  const { client } = connection;
+  try {
+    await client.query("BEGIN");
+    // Serialize API/worker startup before even creating or reading the ledger.
+    await client.query("SELECT pg_advisory_xact_lock($1, $2)", [0x554d4c, 1]);
+    await client.query(`
+      create table if not exists ${migrationTableName} (
+        id text primary key,
+        applied_at timestamptz not null default now()
+      )
+    `);
 
-  const appliedRows = await db.query<{ id: string }>(
-    `select id from ${migrationTableName}`,
-  );
-  const applied = new Set(appliedRows.rows.map((row) => row.id));
-  const newlyApplied: string[] = [];
+    const appliedRows = await client.query<{ id: string }>(
+      `select id from ${migrationTableName}`,
+    );
+    const applied = new Set(appliedRows.rows.map((row) => row.id));
+    const newlyApplied: string[] = [];
 
-  for (const migration of migrationList) {
-    if (applied.has(migration.id)) continue;
+    for (const migration of migrationList) {
+      if (applied.has(migration.id)) continue;
 
-    await db.query(migration.sql);
-    // The ledger makes migration runs idempotent across API restarts/deploys.
-    await db.query(`insert into ${migrationTableName} (id) values ($1)`, [
-      migration.id,
-    ]);
-    newlyApplied.push(migration.id);
+      await client.query(migration.sql);
+      // Keep migration effects and their ledger entries in the same transaction.
+      await client.query(`insert into ${migrationTableName} (id) values ($1)`, [
+        migration.id,
+      ]);
+      newlyApplied.push(migration.id);
+    }
+
+    await client.query("COMMIT");
+    return newlyApplied;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    if (connection.pooled) connection.client.release();
   }
-
-  return newlyApplied;
 }

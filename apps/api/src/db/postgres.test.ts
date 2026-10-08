@@ -300,7 +300,10 @@ test("migration runner creates its ledger and skips already applied migrations",
   const applied = await runMigrations(client);
 
   assert.equal(applied.length, 0);
-  assert.match(client.queries[0] ?? "", new RegExp(`create table if not exists ${migrationTableName}`, "i"));
+  assert.equal(client.queries[0], "BEGIN");
+  assert.match(client.queries[1] ?? "", /pg_advisory_xact_lock/i);
+  assert.match(client.queries[2] ?? "", new RegExp(`create table if not exists ${migrationTableName}`, "i"));
+  assert.equal(client.queries.at(-1), "COMMIT");
   assert.doesNotMatch(client.queries.join("\n"), /create table if not exists users/i);
 });
 
@@ -313,6 +316,35 @@ test("migration runner applies missing migrations and records them", async () =>
   assert.match(client.queries.join("\n"), /create table if not exists users/i);
   assert.match(client.queries.join("\n"), /insert into schema_migrations/i);
 });
+
+test("migration runner uses one pool connection and releases it after commit", async () => {
+  const pool = new FakePool();
+  const applied = await runMigrations(pool, [{ id: "pool-test", sql: "SELECT 42" }]);
+
+  assert.deepEqual(applied, ["pool-test"]);
+  assert.equal(pool.connectCount, 1);
+  assert.equal(pool.releaseCount, 1);
+  assert.equal(pool.client.queries[0], "BEGIN");
+  assert.match(pool.client.queries[1]!, /pg_advisory_xact_lock/);
+  assert.equal(pool.client.queries.at(-1), "COMMIT");
+});
+
+for (const failedStep of ["BEGIN", "pg_advisory_xact_lock", "SELECT 42", "insert into schema_migrations"]) {
+  test(`migration runner rolls back and releases the pool connection when ${failedStep} fails`, async () => {
+    const pool = new FakePool();
+    const query = pool.client.query.bind(pool.client);
+    const failure = new Error("database operation failed");
+    pool.client.query = async (sql, params) => {
+      if (sql.includes(failedStep)) throw failure;
+      return query(sql, params);
+    };
+
+    await assert.rejects(runMigrations(pool, [{ id: "pool-test", sql: "SELECT 42" }]), failure);
+    assert.equal(pool.releaseCount, 1);
+    assert.equal(pool.client.queries.at(-1), "ROLLBACK");
+    assert.ok(!pool.client.queries.includes("COMMIT"));
+  });
+}
 
 test("migration runner applies billing compatibility when earlier migrations already ran", async () => {
   const appliedMigrationIds = migrations

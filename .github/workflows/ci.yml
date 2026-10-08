@@ -20,6 +20,20 @@ concurrency:
 jobs:
   test-build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: uml_user
+          POSTGRES_PASSWORD: uml_ci_password
+          POSTGRES_DB: uml_platform_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U uml_user -d uml_platform_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout
@@ -52,6 +66,8 @@ jobs:
         run: npm run audit:docs
 
       - name: Test
+        env:
+          UML_MIGRATION_TEST_DATABASE_URL: postgres://uml_user:uml_ci_password@127.0.0.1:5432/uml_platform_ci
         run: |
           npm run test:contracts
           npm run test:api

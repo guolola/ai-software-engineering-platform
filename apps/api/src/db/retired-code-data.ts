@@ -3,8 +3,7 @@ import { retiredCodeFields, retiredCodeStages } from "@uml-platform/contracts";
 const sqlArray = (values: readonly string[]) => `ARRAY[${values.map((value) => `'${value}'`).join(",")}]::text[]`;
 
 export const retiredCodeDataSql = `
--- Run in a single SQL transaction; old workers must be stopped before deployment.
-BEGIN;
+-- The migration runner owns the transaction and lock; old workers must be stopped before deployment.
 CREATE OR REPLACE FUNCTION pg_temp.strip_retired_code_data(data jsonb) RETURNS jsonb
 LANGUAGE plpgsql AS $body$
 DECLARE
@@ -59,5 +58,4 @@ WHERE payload IS DISTINCT FROM pg_temp.strip_retired_code_data(payload);
 DELETE FROM prompt_runtime_active WHERE prompt_id LIKE 'code.%' OR prompt_id = 'skill.ui-ux-pro-max';
 DELETE FROM prompt_runtime_versions WHERE prompt_id LIKE 'code.%' OR prompt_id = 'skill.ui-ux-pro-max';
 DROP FUNCTION pg_temp.strip_retired_code_data(jsonb);
-COMMIT;
 `;

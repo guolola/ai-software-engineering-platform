@@ -307,6 +307,7 @@ reload_pm2_for_release() {
   local release_dir="$1"
   local release_sha="$2"
   local started_at="$3"
+  local migrate_database="${4:-true}"
 
   (
     cd "$release_dir"
@@ -319,6 +320,11 @@ reload_pm2_for_release() {
     pm2 delete uml-api >/dev/null 2>&1 || true
     pm2 delete uml-render-service >/dev/null 2>&1 || true
     pm2 delete uml-web >/dev/null 2>&1 || true
+    # Stop old writers, then finish migrations before the concurrent PM2 startup.
+    # Explicit returns are required: this function also runs inside an `if !` condition.
+    if [[ "$migrate_database" == "true" ]]; then
+      run_timed "database migrations" node apps/api/dist/db/migrate.js || return 1
+    fi
     run_timed "pm2 start production processes" pm2 start ecosystem.config.cjs --env production
     sleep 2
 
@@ -384,7 +390,8 @@ rollback_to_previous_release() {
   previous_sha="$(basename "$PREVIOUS_RELEASE")"
   echo "Rolling back to previous release: $previous_sha"
   ln -sfnT "$PREVIOUS_RELEASE" "$DEPLOY_PATH/current"
-  reload_pm2_for_release "$PREVIOUS_RELEASE" "$previous_sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" || return 1
+  # Older releases have no migration CLI; rollback restores processes without rerunning new migrations.
+  reload_pm2_for_release "$PREVIOUS_RELEASE" "$previous_sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" false || return 1
   return "$routing_status"
 }
 

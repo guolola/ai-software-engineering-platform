@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { retiredCodeDataSql } from "./retired-code-data.js";
+import { runMigrations } from "./migrations.js";
 import { isRestorableRunSnapshot } from "../routes/projects/workspace-snapshot-restore.js";
 import { normalizeWorkspaceModelState } from "../normalizers/workspace/model-state.js";
 
@@ -37,7 +38,7 @@ test("migration purges only code data, preserves documents/billing, and is idemp
     await client.query("INSERT INTO project_workspace_states(project_id,state,source_run_id) VALUES ($1,$2,$3),($4,$5,null)", ["changed", { requirementText: "keep", codeFiles: { a: "obsolete" }, models: { prototype: { diagramKind: "prototype" } }, error: { code: "KEEP" }, history: [{ snapshot: { files: {} } }, { snapshot: { models: [] } }] }, "old-code", "unchanged", { requirementText: "also keep" }]);
     await client.query("INSERT INTO documents VALUES ('doc','old-code','keep document'); INSERT INTO billing_usage_reservations VALUES ('old-code',4);");
     await client.query("INSERT INTO prompt_runtime_versions VALUES ('old','code.business'),('keep','design.sequence'); INSERT INTO prompt_runtime_active VALUES ('code.business','old'),('design.sequence','keep');");
-    await client.query(retiredCodeDataSql);
+    await runMigrations(client, [{ id: "030_retire_code_prototypes", sql: retiredCodeDataSql }]);
     assert.deepEqual((await client.query("SELECT id FROM run_records")).rows, [{ id: "keep-design" }]);
     assert.equal((await client.query("SELECT * FROM run_events")).rows.length, 1);
     const changed = (await client.query("SELECT * FROM project_workspace_states WHERE project_id='changed'")).rows[0];
