@@ -272,6 +272,8 @@ export async function completeOfflineDemoRequirementRun(
   const stages = createStageLifecycle(record);
   const snapshot = clone(fixture.requirementSnapshot);
   retargetSnapshotIds(snapshot, record.snapshot.runId);
+  // Fixed demo artifacts still belong to the text submitted for this run.
+  snapshot.requirementText = input.requirementText;
   const availableKinds = requirementKinds(snapshot);
   const selectedKinds = selectedOrAvailable(input.selectedDiagrams, availableKinds);
   snapshot.selectedDiagrams = selectedKinds;

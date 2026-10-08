@@ -72,6 +72,20 @@ test("design demo shows FK structure correction with independently attributed ca
   assert.equal(incomplete.repairAttempts, 0);
 });
 
+test("demo rule and model snapshots retain the submitted requirement text", async (t) => {
+  const previous = process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS;
+  process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS = "0";
+  t.after(() => { if (previous === undefined) delete process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS; else process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS = previous; });
+
+  for (const selectedDiagrams of [[], ["usecase"]] as const) {
+    const run = record();
+    const requirementText = `本次提交的需求 ${selectedDiagrams.length}`;
+    await completeOfflineDemoRequirementRun(run, startRunRequestSchema.parse({ requirementText, selectedDiagrams: [...selectedDiagrams] }));
+    assert.equal(run.snapshot.requirementText, requirementText);
+    assert.equal(run.snapshot.status, "completed");
+  }
+});
+
 test("default demo pacing waits before output and stops promptly when cancelled", async (t) => {
   const previous = process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS;
   delete process.env.UML_DEMO_OFFLINE_STAGE_DELAY_MS;
