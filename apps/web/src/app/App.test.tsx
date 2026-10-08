@@ -1492,7 +1492,7 @@ describe("App shell routes", () => {
       window.history.pushState({}, "", "/projects/connections");
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect(await screen.findByLabelText("使用的软件")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "MCP 客户端" })).toBeVisible();
     expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(container.querySelector('[data-slot="sidebar"]')).not.toBeNull();
     expect(screen.queryByRole("heading", { name: "授权给 Codex" })).not.toBeInTheDocument();

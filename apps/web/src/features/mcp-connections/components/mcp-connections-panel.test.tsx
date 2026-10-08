@@ -1,6 +1,6 @@
-// Covers project selection guards, one-time credential display, revocation and client-specific configuration.
+// Covers catalog setup, one-time credential display, revocation and project consent guards.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { McpConnectionsPanel } from "./mcp-connections-panel";
 import { McpConsentPage, McpConsentPanel } from "./mcp-consent-page";
@@ -50,7 +50,45 @@ async function selectConsentProject(name = "图书管理系统") {
   fireEvent.focus(screen.getByRole("combobox", { name: "允许读取的项目" }));
   fireEvent.click(await screen.findByRole("option", { name }));
 }
+async function openClientGuide(name = "Cursor") {
+  fireEvent.click(await screen.findByRole("button", { name: `查看 ${name} 接入指南` }));
+  return screen.findByRole("dialog", { name: `连接 ${name}` });
+}
 describe("MCP connections", () => {
+  it("lists all twelve clients before opening setup and keeps the shared address on the page", async () => {
+    render(<McpConnectionsPanel onNavigate={vi.fn()} />);
+    await screen.findByRole("button", { name: "查看 Qoder 接入指南" });
+    expect(screen.getAllByRole("button", { name: /^查看 .+ 接入指南$/ })).toHaveLength(12);
+    for (const name of ["DeepSeek Harness", "Qoder", "Kimi Code", "MiniMax Code", "WorkBuddy", "TRAE", "Qwen Code", "Cursor", "VS Code MCP Agent", "Codex", "Claude", "MiniMax Agent"]) {
+      expect(screen.getByRole("button", { name: `查看 ${name} 接入指南` })).toBeVisible();
+    }
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "使用的软件" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "连接方式" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("连接名称")).not.toBeInTheDocument();
+    const address = screen.getByRole("textbox", { name: "MCP 地址" });
+    expect(address).toHaveValue(info.serverUrl);
+    expect(address.closest('[role="dialog"]')).toBeNull();
+  });
+  it("opens the selected client's configuration and documentation in its guide", async () => {
+    render(<McpConnectionsPanel onNavigate={vi.fn()} />);
+    const dialog = await openClientGuide("Cursor");
+    expect(within(dialog).getByLabelText("客户端配置")).toHaveTextContent(info.serverUrl!);
+    expect(within(dialog).queryByLabelText("终端与会话命令")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "查看客户端说明" })).toHaveAttribute("href", "https://cursor.com/docs/mcp");
+    expect(within(dialog).queryByText("qoder mcp list")).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("MCP 地址")).not.toBeInTheDocument();
+  });
+  it.each(["DeepSeek Harness", "MiniMax Code"])("starts %s with personal token authentication locked", async (name) => {
+    render(<McpConnectionsPanel onNavigate={vi.fn()} />);
+    const dialog = await openClientGuide(name);
+    const authentication = within(dialog).getByRole("combobox", { name: "连接方式" });
+    expect(authentication).toHaveTextContent("个人令牌");
+    expect(authentication).toBeDisabled();
+    expect(within(dialog).getByText("此客户端使用个人令牌连接，请先创建令牌并在客户端完成配置。")).toBeVisible();
+    expect(within(dialog).getByLabelText("连接名称")).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "创建 30 天个人令牌" })).toBeDisabled();
+  });
   it("shows an immediate lightweight notification after copying and reports clipboard failure", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
@@ -86,10 +124,11 @@ describe("MCP connections", () => {
   });
   it("omits the acceptance note and shows OAuth guidance without a card or alert", async () => {
     render(<McpConnectionsPanel onNavigate={vi.fn()} />);
-    const guidance = await screen.findByText("在客户端发起连接，在打开的平台页面登录并选择项目。没有跳转时可切换个人令牌方式。");
+    await openClientGuide();
+    const guidance = await screen.findByText("在客户端发起连接，在打开的平台页面登录并选择项目。若未跳转，请检查客户端的连接与鉴权状态。");
     expect(guidance.closest('[data-slot="card"], [role="alert"]')).toBeNull();
     expect(screen.getByText("传输协议：Streamable HTTP（流式 HTTP）。请在客户端使用本页 MCP 地址连接。")).toBeVisible();
-    expect(screen.getByLabelText("MCP 地址")).toHaveAccessibleDescription("传输协议：Streamable HTTP（流式 HTTP）。请在客户端使用本页 MCP 地址连接。");
+    expect(screen.getByLabelText("MCP 地址", { selector: "input" })).toHaveAccessibleDescription("传输协议：Streamable HTTP（流式 HTTP）。请在客户端使用本页 MCP 地址连接。");
     expect(screen.queryByText("客户端版本仍需实际验收，配置示例不代表已连接。")).not.toBeInTheDocument();
   });
   it("creates an account-wide token without project selection and closes the one-time display", async () => {
@@ -98,7 +137,7 @@ describe("MCP connections", () => {
       token: "once-only-token",
     });
     render(<McpConnectionsPanel onNavigate={vi.fn()} />);
-    await screen.findByLabelText("使用的软件");
+    await openClientGuide();
     screen.getByRole("combobox", { name: "连接方式" }).focus();
     await user.keyboard("[ArrowDown]");
     await user.click(
@@ -133,6 +172,7 @@ describe("MCP connections", () => {
     vi.mocked(mcpApi.connections).mockResolvedValue({ ...info, projects: [], connections: [] });
     vi.mocked(mcpApi.createToken).mockResolvedValue({ token: "account-token" });
     render(<McpConnectionsPanel onNavigate={vi.fn()} />);
+    await openClientGuide();
     const authentication = await screen.findByRole("combobox", { name: "连接方式" });
     expect(authentication).toHaveTextContent("浏览器授权");
     authentication.focus();
@@ -142,6 +182,98 @@ describe("MCP connections", () => {
     fireEvent.click(screen.getByRole("button", { name: "创建 30 天个人令牌" }));
     await waitFor(() => expect(mcpApi.createToken).toHaveBeenCalledWith("我的电脑", "test-csrf"));
     expect(screen.queryByText("当前没有可授权项目，请先创建或加入项目。")).not.toBeInTheDocument();
+  });
+  it.each(["Qoder", "WorkBuddy"])("offers only the documented desktop OAuth flow for %s", async (name) => {
+    render(<McpConnectionsPanel onNavigate={vi.fn()} />);
+    const dialog = await openClientGuide(name);
+    const authentication = within(dialog).getByRole("combobox", { name: "连接方式" });
+    expect(authentication).toHaveTextContent("浏览器授权");
+    expect(authentication).toBeDisabled();
+    expect(within(dialog).getByText("此处提供已核实的桌面端浏览器授权流程。")).toBeVisible();
+    expect(within(dialog).queryByRole("button", { name: "创建 30 天个人令牌" })).not.toBeInTheDocument();
+  });
+  it("offers OAuth and token authentication for the TRAE desktop IDE", async () => {
+    const user = userEvent.setup();
+    render(<McpConnectionsPanel onNavigate={vi.fn()} />);
+    const dialog = await openClientGuide("TRAE");
+    const authentication = within(dialog).getByRole("combobox", { name: "连接方式" });
+    expect(authentication).toHaveTextContent("浏览器授权");
+    expect(authentication).toBeEnabled();
+    authentication.focus();
+    await user.keyboard("[ArrowDown]");
+    await user.click(await screen.findByRole("option", { name: "个人令牌" }));
+    expect(within(dialog).getByLabelText("客户端配置")).toHaveTextContent("Bearer <YOUR_PERSONAL_TOKEN>");
+    expect(within(dialog).getByRole("button", { name: "创建 30 天个人令牌" })).toBeDisabled();
+  });
+  it("defaults Kimi desktop to token setup while preserving the documented CLI-assisted OAuth option", async () => {
+    const user = userEvent.setup();
+    render(<McpConnectionsPanel onNavigate={vi.fn()} />);
+    const dialog = await openClientGuide("Kimi Code");
+    const authentication = within(dialog).getByRole("combobox", { name: "连接方式" });
+    expect(authentication).toHaveTextContent("个人令牌");
+    expect(authentication).toBeEnabled();
+    expect(within(dialog).getByLabelText("客户端配置")).toHaveTextContent("bearerTokenEnvVar");
+    authentication.focus();
+    await user.keyboard("[ArrowDown]");
+    await user.click(await screen.findByRole("option", { name: "浏览器授权" }));
+    expect(within(dialog).getByRole("list")).toHaveTextContent("/mcp-config login uml-platform");
+    expect(within(dialog).queryByRole("button", { name: "创建 30 天个人令牌" })).not.toBeInTheDocument();
+  });
+  it("does not offer credential creation for the unverified MiniMax Agent web setup", async () => {
+    render(<McpConnectionsPanel onNavigate={vi.fn()} />);
+    const dialog = await openClientGuide("MiniMax Agent");
+    expect(within(dialog).getByText("网页版")).toBeVisible();
+    expect(within(dialog).getByText(/目前未找到官方明确的个人自定义远程 MCP 接入流程/)).toBeVisible();
+    expect(within(dialog).queryByRole("combobox", { name: "连接方式" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "创建 30 天个人令牌" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("客户端配置")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/在客户端发起连接，在打开的平台页面登录并选择项目/)).not.toBeInTheDocument();
+    expect(mcpApi.createToken).not.toHaveBeenCalled();
+  });
+  it("resets authentication and removes one-time credentials when closing and selecting another client", async () => {
+    const user = userEvent.setup();
+    vi.mocked(mcpApi.createToken).mockResolvedValue({ token: "client-specific-once-only-token" });
+    render(<McpConnectionsPanel onNavigate={vi.fn()} />);
+    await openClientGuide();
+    screen.getByRole("combobox", { name: "连接方式" }).focus();
+    await user.keyboard("[ArrowDown]");
+    await user.click(await screen.findByRole("option", { name: "个人令牌" }));
+    fireEvent.change(screen.getByLabelText("连接名称"), { target: { value: "临时客户端" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建 30 天个人令牌" }));
+    expect(await screen.findByLabelText("新令牌（仅展示一次）")).toHaveValue("client-specific-once-only-token");
+    await waitFor(() => expect(screen.getByRole("button", { name: "创建 30 天个人令牌" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    const dialog = await openClientGuide("Codex");
+    expect(within(dialog).getByRole("combobox", { name: "连接方式" })).toHaveTextContent("浏览器授权");
+    expect(within(dialog).queryByLabelText("终端与会话命令")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "查看客户端说明" })).toHaveAttribute("href", "https://learn.chatgpt.com/docs/developer-settings");
+    expect(screen.queryByLabelText("新令牌（仅展示一次）")).not.toBeInTheDocument();
+    screen.getByRole("combobox", { name: "连接方式" }).focus();
+    await user.keyboard("[ArrowDown]");
+    await user.click(await screen.findByRole("option", { name: "个人令牌" }));
+    expect(screen.getByLabelText("连接名称")).toHaveValue("");
+    expect(screen.queryByLabelText("新令牌（仅展示一次）")).not.toBeInTheDocument();
+  });
+  it("keeps the guide open while token creation is pending", async () => {
+    const user = userEvent.setup();
+    let finish!: (value: { token: string }) => void;
+    vi.mocked(mcpApi.createToken).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    render(<McpConnectionsPanel onNavigate={vi.fn()} />);
+    await openClientGuide("DeepSeek Harness");
+    fireEvent.change(screen.getByLabelText("连接名称"), { target: { value: "我的 Harness" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建 30 天个人令牌" }));
+    expect(screen.getByLabelText("连接名称")).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByRole("dialog", { name: "连接 DeepSeek Harness" })).toBeVisible();
+    await user.keyboard("[Escape]");
+    expect(screen.getByRole("dialog", { name: "连接 DeepSeek Harness" })).toBeVisible();
+    finish({ token: "pending-token" });
+    expect(await screen.findByLabelText("新令牌（仅展示一次）")).toHaveValue("pending-token");
+    await waitFor(() => expect(screen.getByLabelText("连接名称")).toBeEnabled());
+    await user.keyboard("[Escape]");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByLabelText("新令牌（仅展示一次）")).not.toBeInTheDocument();
   });
   it("describes account-wide connections using the account's accessible project scope", async () => {
     vi.mocked(mcpApi.connections).mockResolvedValue({ ...info, connections: [{ ...info.connections[0], kind: "pat", projectIds: [], projectScope: "account" }] });

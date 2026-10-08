@@ -4,95 +4,104 @@ export const mcpClients = [
     id: "deepseek",
     name: "DeepSeek Harness",
     mode: "pat",
-    location: "Harness profile 的 MCP 插件配置",
+    location: "桌面 profile 的 ~/.dsh/profiles/desktop/cordis.patch.yml",
     source:
-      "https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/mcp/mcp-client/README.md",
+      "https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/desktop/README.md",
   },
   {
     id: "qoder",
     name: "Qoder",
     mode: "oauth",
-    location: ".qoder/settings.json 的 mcpServers",
-    source: "https://docs.qoder.com/cli/mcp-reference",
+    location: "Extensions → Connectors → Add Connector → Add custom MCP",
+    source: "https://docs.qoder.com/qoder/connectors",
   },
   {
     id: "kimi",
     name: "Kimi Code",
-    mode: "oauth",
-    location: "MCP 配置文件；连接后使用 /mcp-config login",
+    mode: "pat",
+    location: "桌面端 ~/.kimi-code/mcp.json 或项目 .kimi-code/mcp.json",
     source:
-      "https://www.kimi.com/code/docs/en/kimi-code-cli/customization/mcp.html",
+      "https://www.kimi.com/code/docs/en/kimi-code-desktop/settings-and-extensions.html",
   },
   {
     id: "minimax",
     name: "MiniMax Code",
     mode: "pat",
-    location: "项目根目录 .mcp.json",
+    location: "插件管理 → MCP Servers；~/.minimax/mcp.json",
     source:
-      "https://github.com/MiniMax-AI/minimax-code/blob/main/docs/examples.md",
+      "https://agent.minimax.io/docs/code/agents/mcp",
   },
   {
     id: "workbuddy",
     name: "WorkBuddy",
-    mode: "manual",
-    location:
-      "设置 → MCP → 添加自定义服务；请确认当前版本支持远程 HTTP 与鉴权头",
+    mode: "oauth",
+    location: "插件 → MCP 服务器 → 配置 MCP；~/.workbuddy/mcp.json",
     source:
       "https://www.codebuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/MCP-Guide",
   },
   {
     id: "trae",
     name: "TRAE",
-    mode: "pat",
-    location: "MCP 自定义服务（Code / Work 版本分别验证）",
-    source: "https://docs.trae.cn/work_remote-mcp-server",
+    mode: "oauth",
+    location: "TRAE IDE 设置 → MCP → 添加 → 手动添加",
+    source: "https://docs.trae.cn/ide_add-mcp-servers",
   },
   {
     id: "qwen",
     name: "Qwen Code",
     mode: "oauth",
-    location: ".qwen/settings.json；HTTP 使用 httpUrl 字段",
+    location: "桌面端 ~/.qwen/settings.json 或项目 .qwen/settings.json",
     source:
-      "https://qwenlm.github.io/qwen-code-docs/en/developers/tools/mcp-server/",
+      "https://github.com/QwenLM/qwen-code/blob/main/packages/desktop/README.md",
   },
   {
     id: "cursor",
     name: "Cursor",
     mode: "oauth",
-    location: ".cursor/mcp.json",
+    location: "Cursor 桌面端 .cursor/mcp.json 或 ~/.cursor/mcp.json",
     source: "https://cursor.com/docs/mcp",
   },
   {
     id: "vscode",
     name: "VS Code MCP Agent",
     mode: "oauth",
-    location: ".vscode/mcp.json；顶层字段为 servers",
+    location: "VS Code 命令面板 → MCP: Add Server",
     source:
-      "https://code.visualstudio.com/docs/agents/reference/mcp-configuration",
+      "https://code.visualstudio.com/docs/agent-customization/mcp-servers",
   },
   {
     id: "codex",
     name: "Codex",
     mode: "oauth",
-    location: "用户配置 config.toml；随后进行 MCP 登录",
-    source: "https://learn.chatgpt.com/docs/extend/mcp?surface=cli",
+    location: "Codex 桌面应用设置中的 MCP 服务管理",
+    source: "https://learn.chatgpt.com/docs/developer-settings",
   },
   {
     id: "claude",
-    name: "Claude（Desktop / Code）",
+    name: "Claude",
     mode: "oauth",
-    location: "项目 .mcp.json；随后在 /mcp 中授权",
-    source: "https://code.claude.com/docs/en/mcp",
+    location: "Customize → Connectors → Add custom connector",
+    source: "https://claude.com/docs/connectors/custom/add-unlisted",
   },
   {
     id: "minimax-cloud",
-    name: "MiniMax Agent（云端）",
+    name: "MiniMax Agent",
     mode: "manual",
-    location: "云端版本单独验收，不能沿用 MiniMax Code 的连接结论",
+    location: "MiniMax Agent 网页端；自定义 MCP 接入方式尚待官方确认",
     source: "https://agent.minimax.io/",
   },
 ] as const;
 export type McpClientId = (typeof mcpClients)[number]["id"];
+
+// Only offer authentication modes documented for the selected product's default surface.
+export function clientAuthModes(id: McpClientId): readonly ("oauth" | "pat")[] {
+  if (id === "deepseek" || id === "minimax") return ["pat"];
+  if (id === "kimi") return ["pat", "oauth"];
+  if (id === "qoder" || id === "workbuddy") return ["oauth"];
+  if (id === "minimax-cloud") return [];
+  return ["oauth", "pat"];
+}
+
 export function clientConfiguration(
   id: McpClientId,
   url: string,
@@ -100,9 +109,9 @@ export function clientConfiguration(
 ) {
   const bearer = "Bearer <YOUR_PERSONAL_TOKEN>";
   if (id === "deepseek")
-    return `- id: uml-platform\n  name: '@deepseek-ai/dsh-mcp-client'\n  config:\n    serverName: uml-platform\n    transport: streamable-http\n    url: ${JSON.stringify(url)}\n    headers:\n      Authorization: ${JSON.stringify(bearer)}`;
-  if (id === "workbuddy" || id === "minimax-cloud")
-    return `服务地址：${url}\n传输：Streamable HTTP\n鉴权：优先 OAuth；仅支持请求头时使用 Authorization: ${bearer}\n需在实际客户端确认配置入口和支持能力。`;
+    return `- insert:\n    - id: uml-platform\n      name: '@deepseek-ai/dsh-mcp-client'\n      config:\n        serverName: uml-platform\n        transport: streamable-http\n        url: ${JSON.stringify(url)}\n        headers:\n          Authorization: ${JSON.stringify(bearer)}`;
+  // MiniMax Agent has no verified custom remote MCP configuration to copy.
+  if (id === "minimax-cloud") return "";
   if (id === "codex")
     return `[mcp_servers.uml_platform]\nurl = ${JSON.stringify(url)}${mode === "pat" ? '\nbearer_token_env_var = "UML_MCP_TOKEN"' : ""}`;
   const entry: Record<string, unknown> =
