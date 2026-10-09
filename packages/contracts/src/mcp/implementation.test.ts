@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   mcpImplementationPathSchema,
-  mcpImplementationReportSchema,
-  mcpImplementationSnapshotSchema,
+  mcpExpandedImplementationReportSchema as mcpImplementationReportSchema,
+  mcpExpandedImplementationSnapshotSchema as mcpImplementationSnapshotSchema,
   mcpImplementationTaskSchema,
 } from "./implementation.js";
 
@@ -25,7 +25,7 @@ function taskFixture() {
 function snapshotFixture() {
   const task = taskFixture();
   return {
-    version: 1 as const, projectId: "p", scope: { requirementIds: [], artifactIds: [] }, contextVersion: "context-v1",
+    version: 2 as const, projectId: "p", scope: { requirementIds: [], artifactIds: [] }, contextVersion: "context-v1",
     manifest: task.sourceArtifactIds.map((artifactId) => ({ artifactId, contentHash: hash, inputFingerprint: null, freshness: "current" as const })),
     tasks: [task],
   };
@@ -33,7 +33,7 @@ function snapshotFixture() {
 function reportFixture() {
   const snapshot = snapshotFixture();
   return {
-    version: 1 as const, projectId: "p", scope: snapshot.scope, contextVersion: snapshot.contextVersion,
+    version: 2 as const, projectId: "p", scope: snapshot.scope, contextVersion: snapshot.contextVersion,
     entries: [{
       taskId: snapshot.tasks[0].id, requirementIds: snapshot.tasks[0].requirementIds,
       designRefs: snapshot.tasks[0].designRefs, sourceVersions: snapshot.manifest, status: "implemented" as const,

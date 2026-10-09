@@ -55,6 +55,15 @@ async function openClientGuide(name = "Cursor") {
   return screen.findByRole("dialog", { name: `连接 ${name}` });
 }
 describe("MCP connections", () => {
+  it("links directly to the MCP article while connection status is loading", async () => {
+    render(<McpConnectionsPanel onNavigate={vi.fn()} />);
+    expect(screen.getByRole("status")).toHaveTextContent("正在读取连接状态");
+    const documentation = screen.getByRole("link", { name: "查看 MCP 文档" });
+    expect(documentation).toBeVisible();
+    expect(documentation).toHaveAttribute("href", "/tutorial?article=coding-agent");
+    await screen.findByRole("button", { name: "查看 Qoder 接入指南" });
+    expect(documentation).toBeVisible();
+  });
   it("lists all twelve clients before opening setup and keeps the shared address on the page", async () => {
     render(<McpConnectionsPanel onNavigate={vi.fn()} />);
     await screen.findByRole("button", { name: "查看 Qoder 接入指南" });
@@ -412,6 +421,7 @@ describe("MCP connections", () => {
     vi.mocked(mcpApi.connections).mockResolvedValue({ enabled: false });
     render(<McpConnectionsPanel onNavigate={vi.fn()} />);
     await screen.findByText("平台暂未开放 MCP 接入。");
+    expect(screen.getByRole("link", { name: "查看 MCP 文档" })).toHaveAttribute("href", "/tutorial?article=coding-agent");
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
   it("keeps actual client formats distinct without embedding credentials", () => {

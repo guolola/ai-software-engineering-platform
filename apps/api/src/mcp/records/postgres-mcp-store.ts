@@ -70,6 +70,9 @@ export function createPostgresMcpStore(db: Queryable): McpStore {
         [id, userId ?? null],
       );
     },
+    async listAdminConnections() {
+      return (await db.query<McpConnection>(`select ${columns} from mcp_connections order by created_at desc, id desc`)).rows.map((c) => normalize(c)!);
+    },
     async touchConnection(id) {
       await db.query(
         `update mcp_connections set last_used_at=now() where id=$1`,

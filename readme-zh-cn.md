@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://jianglisoftware.com">
-    <img src="./apps/web/public/brand/uml-platform-logo.png" width="120" height="120" alt="软件工程实践平台官网 Logo" />
+    <img src="./apps/web/public/brand/uml-platform-logo.svg" width="120" height="120" alt="软件工程实践平台官网 Logo" />
   </a>
 </p>
 

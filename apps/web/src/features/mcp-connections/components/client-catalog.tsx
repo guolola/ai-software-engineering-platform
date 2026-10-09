@@ -1,5 +1,6 @@
 // Presents the client directory and opens existing connection instructions from each catalog card.
-import { ArrowRight, Copy } from "lucide-react";
+import { ArrowRight, BookOpen, Copy } from "lucide-react";
+import Link from "next/link";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../shared/ui/button";
 import { Input } from "../../../shared/ui/input";
@@ -16,6 +17,11 @@ export function ClientCatalogHero() {
       <p className="mb-5 font-mono text-xs font-medium uppercase tracking-[0.16em] text-foreground sm:mb-6">{t("mcp.catalog.eyebrow")}</p>
       <h1 className="whitespace-pre-line text-4xl font-normal leading-[1.16] tracking-tight text-foreground sm:text-5xl xl:text-[3.6rem]">{t("mcp.catalog.title")}</h1>
       <p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground">{t("mcp.catalog.description")}</p>
+      <Button variant="outline" className="mt-6" role="link" nativeButton={false} render={<Link href="/tutorial?article=coding-agent" />}>
+        <BookOpen aria-hidden="true" className="size-4" />
+        {t("mcp.documentation")}
+        <ArrowRight aria-hidden="true" className="size-4" />
+      </Button>
     </div>
     <svg aria-hidden="true" viewBox="0 0 320 320" fill="none" className="aspect-square w-full max-w-72 justify-self-start sm:max-w-80 lg:justify-self-end">
       <path fill="#D6F255" d="M0 0h160v160H0z" />

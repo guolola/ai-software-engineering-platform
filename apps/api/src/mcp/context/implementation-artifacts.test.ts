@@ -11,6 +11,8 @@ import {
   snapshotInputFingerprint,
   mcpImplementationReportSchema,
   mcpImplementationSnapshotSchema,
+  compactImplementationSnapshot,
+  compactImplementationReport,
   type AtomicRequirement,
   type McpImplementationReport,
   type McpScope,
@@ -125,7 +127,11 @@ async function localRepository(t: TestContext, source: string) {
   const verifierPath = path.join(root, "uml-verify.mjs");
   // Execute exactly the source handed to an external agent, without importing the API implementation directly.
   await writeFile(verifierPath, source);
-  const { verifyImplementation: verify } = await import(pathToFileURL(verifierPath).href) as { verifyImplementation: Verify };
+  const { verifyImplementation: wireVerify } = await import(pathToFileURL(verifierPath).href) as { verifyImplementation: Verify };
+  const verify: Verify = (input) => wireVerify({ ...input,
+    snapshot: compactImplementationSnapshot(input.snapshot as ReturnType<typeof distributed>["snapshot"]),
+    report: compactImplementationReport(input.report as McpImplementationReport),
+  });
   return { root, verify };
 }
 async function writeImplementation(root: string, codeLimit: number, testLimit: number) {
@@ -147,7 +153,7 @@ async function implementedReport(root: string, source: ReturnType<typeof distrib
     { id: "syntax", kind: "engineering", command: process.execPath, args: ["--check", "src/loan-service.mjs"], criterionIds: [] },
     { id: "borrowing-acceptance", kind: "behavior", command: process.execPath, args: ["--test", "test/loan-service.test.mjs"], criterionIds },
   ];
-  return mcpImplementationReportSchema.parse(report);
+  return mcpImplementationReportSchema.parse(compactImplementationReport(report));
 }
 
 test("distributed snapshot and template bind real saved sources without recursive manifests or unstable versions", () => {

@@ -64,12 +64,49 @@ function validEntry(value) {
       Array.isArray(check.args) && check.args.every((arg) => typeof arg === 'string' && !arg.includes('\0')) && strings(check.criterionIds) &&
       boundedOptional(check.timeoutMs, 1000, 600000) && boundedOptional(check.maxOutputBytes, 1024, 4194304), (check) => check.id);
 }
+
+// Resolve wire references before the existing semantic checks. Missing/duplicate indices fail closed.
+function expandInput(value, kind) {
+  const header = ['version', 'projectId', 'scope', 'contextVersion'];
+  const resolve = (indices, pool) => {
+    if (!Array.isArray(pool) || !Array.isArray(indices) || !unique(indices) ||
+        indices.some((index) => !Number.isInteger(index) || index < 0 || index >= pool.length))
+      throw new Error('Invalid shared reference');
+    return indices.map((index) => pool[index]);
+  };
+  if (value?.version !== 2) throw new Error('Expected wire format version 2');
+  if (kind === 'snapshot') {
+    if (!fields(value, [...header, 'manifest', 'shared', 'tasks']) || !Array.isArray(value.tasks) ||
+        !fields(value.shared, ['sourceArtifactIds', 'designRefs', 'issues', 'guidance']) ||
+        !strings(value.shared.sourceArtifactIds) || !validList(value.shared.designRefs, validDesign, designKey) ||
+        !Array.isArray(value.shared.issues) || !value.shared.issues.every((item) => fields(item, ['code', 'severity', 'message']) &&
+          text(item.code) && text(item.message) && ['warning', 'blocking'].includes(item.severity)) ||
+        !Array.isArray(value.shared.guidance) || !value.shared.guidance.every(text)) throw new Error('Invalid snapshot pools');
+    const { shared, tasks, ...snapshot } = value;
+    return { ...snapshot, tasks: tasks.map((task) => {
+      if (!fields(task, ['id', 'title', 'requirementIds', 'sourceRefs', 'designRefs', 'acceptanceCriteria', 'dependsOnTaskIds', 'issueRefs', 'guidanceRefs']))
+        throw new Error('Invalid compact task');
+      const { sourceRefs, designRefs, issueRefs, guidanceRefs, ...rest } = task;
+      return { ...rest, sourceArtifactIds: resolve(sourceRefs, shared.sourceArtifactIds),
+        designRefs: resolve(designRefs, shared.designRefs), issues: resolve(issueRefs, shared.issues), guidance: resolve(guidanceRefs, shared.guidance) };
+    }) };
+  }
+  if (!fields(value, [...header, 'sourceVersions', 'entries']) || !Array.isArray(value.entries) ||
+      !Array.isArray(value.sourceVersions) || !value.sourceVersions.every(validVersion)) throw new Error('Invalid report pools');
+  const { sourceVersions, entries, ...report } = value;
+  return { ...report, entries: entries.map((entry) => {
+    if (!fields(entry, ['taskId', 'requirementIds', 'designRefs', 'sourceVersionRefs', 'status', 'plannedTargets', 'actualRefs', 'testRefs', 'checks'], ['inputRefs']))
+      throw new Error('Invalid compact entry');
+    const { sourceVersionRefs, ...rest } = entry;
+    return { ...rest, sourceVersions: resolve(sourceVersionRefs, sourceVersions) };
+  }) };
+}
 function validateInputs(snapshot, report) {
   const problems = [];
-  const snapshotValid = fields(snapshot, ['version', 'projectId', 'scope', 'contextVersion', 'manifest', 'tasks']) && snapshot.version === 1 &&
+  const snapshotValid = fields(snapshot, ['version', 'projectId', 'scope', 'contextVersion', 'manifest', 'tasks']) && snapshot.version === 2 &&
     text(snapshot.projectId) && validScope(snapshot.scope) && text(snapshot.contextVersion) &&
     validList(snapshot.manifest, validVersion, (version) => version.artifactId) && validList(snapshot.tasks, validTask, (task) => task.id);
-  const reportValid = fields(report, ['version', 'projectId', 'scope', 'contextVersion', 'entries']) && report.version === 1 &&
+  const reportValid = fields(report, ['version', 'projectId', 'scope', 'contextVersion', 'entries']) && report.version === 2 &&
     text(report.projectId) && validScope(report.scope) && text(report.contextVersion) && validList(report.entries, validEntry, (entry) => entry.taskId);
   if (!snapshotValid) problems.push(issue('invalid_snapshot', 'Snapshot fields, values or unique IDs are invalid.'));
   if (!reportValid) problems.push(issue('invalid_report', 'Report fields, values or unique IDs are invalid.'));
@@ -161,7 +198,12 @@ function runCheck(root, check) {
 }
 
 export async function verifyImplementation({ root, snapshot, report, runChecks = false }) {
-  const problems = validateInputs(snapshot, report);
+  const problems = [];
+  try { snapshot = expandInput(snapshot, 'snapshot'); }
+  catch { problems.push(issue('invalid_snapshot', 'Expected a valid version 2 snapshot with shared references.')); }
+  try { report = expandInput(report, 'report'); }
+  catch { problems.push(issue('invalid_report', 'Expected a valid version 2 report with source version references.')); }
+  if (!problems.length) problems.push(...validateInputs(snapshot, report));
   const result = { version: 1, overall: 'incomplete', verificationAuthority: 'not-executed',
     verificationScope: 'declared-commands-and-reference-consistency', acceptanceCoverage: 'agent-declared-not-independently-confirmed',
     issues: problems, entries: [],

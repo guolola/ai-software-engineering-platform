@@ -92,8 +92,8 @@ export const mcpImplementationTaskSchema = z.object({
 });
 export type McpImplementationTask = z.infer<typeof mcpImplementationTaskSchema>;
 
-export const mcpImplementationSnapshotSchema = z.object({
-  version: z.literal(1),
+export const mcpExpandedImplementationSnapshotSchema = z.object({
+  version: z.literal(2),
   projectId: id,
   scope: mcpScopeSchema,
   contextVersion: id,
@@ -129,7 +129,7 @@ export const mcpImplementationSnapshotSchema = z.object({
     });
   });
 });
-export type McpImplementationSnapshot = z.infer<typeof mcpImplementationSnapshotSchema>;
+export type McpImplementationSnapshot = z.infer<typeof mcpExpandedImplementationSnapshotSchema>;
 
 const actualRef = z.object({
   path: mcpImplementationPathSchema,
@@ -188,8 +188,8 @@ const reportEntry = z.object({
   });
 });
 
-export const mcpImplementationReportSchema = z.object({
-  version: z.literal(1),
+export const mcpExpandedImplementationReportSchema = z.object({
+  version: z.literal(2),
   projectId: id,
   scope: mcpScopeSchema,
   contextVersion: id,
@@ -197,4 +197,98 @@ export const mcpImplementationReportSchema = z.object({
 }).strict().superRefine((report, context) => {
   unique(report.entries, (entry) => entry.taskId, context, ["entries"]);
 });
-export type McpImplementationReport = z.infer<typeof mcpImplementationReportSchema>;
+export type McpImplementationReport = z.infer<typeof mcpExpandedImplementationReportSchema>;
+
+// Wire v2 interns shared values; expansion is internal and never repeats data in MCP output.
+const refs = z.array(z.number().int().min(0).max(99999)).max(10000).superRefine((values, context) => {
+  unique(values, String, context, []);
+});
+const taskObject = mcpImplementationTaskSchema.innerType();
+const compactSnapshot = z.object({
+  version: z.literal(2), projectId: id, scope: mcpScopeSchema, contextVersion: id,
+  manifest: sourceVersions,
+  shared: z.object({
+    sourceArtifactIds: ids,
+    designRefs: z.array(mcpImplementationDesignRefSchema).max(100000).superRefine((values, context) => {
+      unique(values, designRefKey, context, []);
+    }),
+    issues: z.array(taskObject.shape.issues.element).max(100000),
+    guidance: z.array(text).max(100000),
+  }).strict(),
+  tasks: z.array(taskObject.omit({ sourceArtifactIds: true, designRefs: true, issues: true, guidance: true }).extend({
+    sourceRefs: refs, designRefs: refs, issueRefs: refs, guidanceRefs: refs,
+  }).strict()).max(10000),
+}).strict().superRefine((snapshot, context) => {
+  snapshot.tasks.forEach((task, index) => {
+    for (const [field, pool] of [
+      ["sourceRefs", snapshot.shared.sourceArtifactIds], ["designRefs", snapshot.shared.designRefs],
+      ["issueRefs", snapshot.shared.issues], ["guidanceRefs", snapshot.shared.guidance],
+    ] as const) task[field].forEach((ref, position) => {
+      if (ref >= pool.length) context.addIssue({ code: z.ZodIssueCode.custom,
+        path: ["tasks", index, field, position], message: "Shared reference is out of range" });
+    });
+  });
+});
+
+const compactReport = z.object({
+  version: z.literal(2), projectId: id, scope: mcpScopeSchema, contextVersion: id,
+  // Versions belong to the report itself, never to the refreshed snapshot. Keep distinct historical versions.
+  sourceVersions: z.array(sourceVersion).max(100000),
+  entries: z.array(reportEntry.innerType().omit({ sourceVersions: true }).extend({ sourceVersionRefs: refs }).strict()).max(10000),
+}).strict().superRefine((report, context) => {
+  report.entries.forEach((entry, index) => entry.sourceVersionRefs.forEach((ref, position) => {
+    if (ref >= report.sourceVersions.length) context.addIssue({ code: z.ZodIssueCode.custom,
+      path: ["entries", index, "sourceVersionRefs", position], message: "Source version reference is out of range" });
+  }));
+});
+
+export const mcpImplementationSnapshotSchema = compactSnapshot.transform(({ shared, tasks, ...snapshot }) => ({
+  ...snapshot,
+  tasks: tasks.map(({ sourceRefs, designRefs, issueRefs, guidanceRefs, ...task }) => ({
+    ...task, sourceArtifactIds: sourceRefs.map((ref) => shared.sourceArtifactIds[ref]),
+    designRefs: designRefs.map((ref) => shared.designRefs[ref]),
+    issues: issueRefs.map((ref) => shared.issues[ref]), guidance: guidanceRefs.map((ref) => shared.guidance[ref]),
+  })),
+})).pipe(mcpExpandedImplementationSnapshotSchema);
+
+export const mcpImplementationReportSchema = compactReport.transform(({ sourceVersions, entries, ...report }) => ({
+  ...report, entries: entries.map(({ sourceVersionRefs, ...entry }) => ({
+    ...entry, sourceVersions: sourceVersionRefs.map((ref) => sourceVersions[ref]),
+  })),
+})).pipe(mcpExpandedImplementationReportSchema);
+
+export type McpCompactImplementationSnapshot = z.input<typeof mcpImplementationSnapshotSchema>;
+export type McpCompactImplementationReport = z.input<typeof mcpImplementationReportSchema>;
+// JSON Schema describes the wire data rather than the internal expanded representation.
+export const mcpImplementationReportWireSchema = compactReport;
+
+function pool<T>() {
+  const values: T[] = [], indices = new Map<string, number>();
+  return { values, ref(value: T) {
+    const key = JSON.stringify(value);
+    let index = indices.get(key);
+    if (index === undefined) { index = values.length; values.push(value); indices.set(key, index); }
+    return index;
+  } };
+}
+
+export function compactImplementationSnapshot(snapshot: McpImplementationSnapshot): McpCompactImplementationSnapshot {
+  const sources = pool<string>(), designs = pool<McpImplementationDesignRef>();
+  const issues = pool<McpImplementationTask["issues"][number]>(), guidance = pool<string>();
+  const tasks = snapshot.tasks.map(({ sourceArtifactIds, designRefs, issues: taskIssues, guidance: taskGuidance, ...task }) => ({
+    ...task, sourceRefs: sourceArtifactIds.map((value) => sources.ref(value)),
+    designRefs: designRefs.map((value) => designs.ref(value)),
+    issueRefs: taskIssues.map((value) => issues.ref(value)), guidanceRefs: taskGuidance.map((value) => guidance.ref(value)),
+  }));
+  return { ...snapshot, tasks, shared: {
+    sourceArtifactIds: sources.values, designRefs: designs.values, issues: issues.values, guidance: guidance.values,
+  } };
+}
+
+export function compactImplementationReport(report: McpImplementationReport): McpCompactImplementationReport {
+  const versions = pool<McpImplementationReport["entries"][number]["sourceVersions"][number]>();
+  const entries = report.entries.map(({ sourceVersions, ...entry }) => ({
+    ...entry, sourceVersionRefs: sourceVersions.map((value) => versions.ref(value)),
+  }));
+  return { ...report, entries, sourceVersions: versions.values };
+}

@@ -42,6 +42,7 @@ test("PostgreSQL migration, shared instances, atomic consumption, expiry and res
   assert.deepEqual(await second.getConnection("grant"), connection);
   const accountToken: McpConnection = { ...connection, id: "account-token", kind: "pat", projectIds: [], tokenHash: "account-token-hash" };
   await first.putConnection(accountToken);
+  assert.deepEqual(new Set((await second.listAdminConnections()).map((c) => c.id)), new Set(["grant", "account-token"]));
   assert.deepEqual(await second.findToken("account-token-hash"), accountToken);
   assert.equal(hasAccountProjectScope(accountToken), true);
   assert.equal(hasAccountProjectScope({ kind: "oauth", projectIds: [] }), false);

@@ -5,6 +5,7 @@ export const mcpZh = {
     clients: "MCP 客户端", sources: "读取项目需求、分析、设计与测试资料", remote: "远程 MCP 服务", readOnly: "只读访问项目资料", manual: "接入能力以客户端版本为准",
     installGuide: "查看接入指南", openGuide: "查看 {{name}} 接入指南", connectTitle: "连接 {{name}}", tokenOnly: "此客户端使用个人令牌连接，请先创建令牌并在客户端完成配置。", oauthOnly: "此处提供已核实的桌面端浏览器授权流程。",
   },
+  documentation: "查看 MCP 文档",
   copyCode: "复制代码", recordCount: "{{count}} 条", actions: "操作", retry: "重试",
   exampleProjectName: "某某自己项目", exampleProjectHelp: "我想处理的项目名称是“某某自己项目”。请先通过 MCP 查找该名称对应的项目，使用查到的项目标识读取资料；同名或无法确定时先向我确认，不默认使用第一个项目。", copyExample: "复制案例提示词",
   examples: {
@@ -40,6 +41,7 @@ export const mcpEn: typeof mcpZh = {
     clients: "MCP clients", sources: "Read project requirements, analysis, designs and tests", remote: "Remote MCP server", readOnly: "Read-only access to project sources", manual: "Availability depends on the client version",
     installGuide: "View setup guide", openGuide: "View {{name}} setup guide", connectTitle: "Connect {{name}}", tokenOnly: "This client uses a personal token. Create a token, then add it to the client's configuration.", oauthOnly: "This guide covers the verified desktop browser authorization flow.",
   },
+  documentation: "MCP documentation",
   copyCode: "Copy code", recordCount: "{{count}} records", actions: "Actions", retry: "Retry",
   exampleProjectName: "My project name", exampleProjectHelp: "My project is named “My project name”. Find that project through MCP and use its returned ID to read sources. Ask me if names are duplicated or the project is unclear; never pick the first project by default.", copyExample: "Copy example prompt",
   examples: {

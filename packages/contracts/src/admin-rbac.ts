@@ -30,6 +30,8 @@ export const adminPermissionSchema = z.enum([
   "admin.provider_configs.read",
   "admin.provider_configs.write",
   "admin.audit_logs.read",
+  "admin.mcp.read",
+  "admin.mcp.revoke",
   "admin.risk_events.read",
   "admin.rate_limits.read",
   "admin.rate_limits.write",
@@ -66,6 +68,8 @@ export const adminCapabilitySchema = z.enum([
   "viewProviderConfigs",
   "manageProviderConfigs",
   "viewAuditLogs",
+  "viewMcp",
+  "revokeMcp",
   "viewRiskEvents",
   "viewRateLimits",
   "viewSystemHealth",
@@ -78,6 +82,7 @@ const allAdminCapabilities = adminCapabilitySchema.options;
 export const adminRolePermissions = {
   super_admin: allAdminPermissions,
   system_operator: [
+    "admin.mcp.read",
     "admin.metrics.read",
     "admin.evaluations.read",
     "admin.projects.read",
@@ -108,6 +113,7 @@ export const adminRolePermissions = {
     "admin.documents.write",
   ],
   auditor: [
+    "admin.mcp.read",
     "admin.metrics.read",
     "admin.evaluations.read",
     "admin.users.read",
@@ -119,6 +125,8 @@ export const adminRolePermissions = {
     "admin.system_health.read",
   ],
   security_admin: [
+    "admin.mcp.read",
+    "admin.mcp.revoke",
     "admin.metrics.read",
     "admin.roles.write",
     "admin.users.read",
@@ -159,6 +167,7 @@ export const adminRoleDataScopes = {
 export const adminRoleCapabilities = {
   super_admin: allAdminCapabilities,
   system_operator: [
+    "viewMcp",
     "viewDashboard",
     "viewEvaluations",
     "viewProjects",
@@ -186,6 +195,7 @@ export const adminRoleCapabilities = {
     "manageDocuments",
   ],
   auditor: [
+    "viewMcp",
     "viewDashboard",
     "viewEvaluations",
     "viewUsers",
@@ -197,6 +207,8 @@ export const adminRoleCapabilities = {
     "viewSystemHealth",
   ],
   security_admin: [
+    "viewMcp",
+    "revokeMcp",
     "viewDashboard",
     "viewUsers",
     "manageUsers",

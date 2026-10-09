@@ -282,7 +282,11 @@ test("two users cannot exchange project IDs, tokens, artifact IDs or cursors; li
     }),
   );
   assert.equal(cursor.status, "refresh_required");
-  await s.store.revokeGrant(s.pat.connection.id);
+  const admin = s.authStore.createUser({ email: "pat-admin@example.test", displayName: "MCP Admin", passwordHash: "unused", systemRoles: ["security_admin"] });
+  s.authStore.updateUser(admin.id, { mfaEnabled: true });
+  const adminSession = s.authStore.createSession({ userId: admin.id, ipAddress: null, userAgent: null });
+  const adminRevoke = await s.app.inject({ method: "POST", url: `/api/admin/mcp/connections/${s.pat.connection.id}/revoke`, headers: { cookie: `uml_admin_session=${adminSession.id}` } });
+  assert.equal(adminRevoke.statusCode, 200, adminRevoke.body);
   assert.equal((await s.rpc("tools/list")).statusCode, 401);
   await assert.rejects(() =>
     service.get_implementation_context(
@@ -514,7 +518,11 @@ test("OAuth PKCE login, project consent, refresh and revocation round-trip", asy
     { "content-type": "application/x-www-form-urlencoded" },
   );
   assert.equal(refreshed.statusCode, 200, refreshed.body);
-  await s.store.revokeGrant(principal.id);
+  const admin = s.authStore.createUser({ email: "oauth-admin@example.test", displayName: "MCP Admin", passwordHash: "unused", systemRoles: ["security_admin"] });
+  s.authStore.updateUser(admin.id, { mfaEnabled: true });
+  const adminSession = s.authStore.createSession({ userId: admin.id, ipAddress: null, userAgent: null });
+  const adminRevoke = await s.app.inject({ method: "POST", url: `/api/admin/mcp/connections/${principal.id}/revoke`, headers: { cookie: `uml_admin_session=${adminSession.id}` } });
+  assert.equal(adminRevoke.statusCode, 200, adminRevoke.body);
   await assert.rejects(() =>
     s.access.authenticate(`Bearer ${refreshed.json().access_token}`),
   );
@@ -871,7 +879,10 @@ test("implementation bundle and verifier use normal paging, source manifests and
   assert.ok(mcpImplementationReportSchema.safeParse(bundle.reportTemplate).success);
   assert.equal(bundle.snapshot.contextVersion, contextVersion);
   assert.deepEqual(bundle.snapshot.manifest, manifest);
-  assert.ok(bundle.snapshot.tasks[0].sourceArtifactIds.includes("document:document-a"));
+  const snapshot = mcpImplementationSnapshotSchema.parse(bundle.snapshot);
+  assert.equal(bundle.snapshot.version, 2);
+  assert.equal(bundle.reportTemplate.version, 2);
+  assert.ok(snapshot.tasks[0].sourceArtifactIds.includes("document:document-a"));
   assert.match((await readPayload("implementation:validator")).source, /verifyImplementation/);
   const unchanged = await service.check_context_updates(mcpUpdatesInputSchema.parse({ projectId: s.a.id, scope, manifest: bundle.snapshot.manifest }));
   assert.deepEqual(unchanged.data.changes, []);

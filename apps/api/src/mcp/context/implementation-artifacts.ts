@@ -1,7 +1,10 @@
 // Packages a version-bound implementation snapshot, report template and portable local verifier.
 import {
-  mcpImplementationSnapshotSchema,
-  mcpImplementationReportSchema,
+  mcpExpandedImplementationSnapshotSchema,
+  mcpExpandedImplementationReportSchema,
+  mcpImplementationReportWireSchema,
+  compactImplementationSnapshot,
+  compactImplementationReport,
   type McpImplementationReport,
 } from "@uml-platform/contracts";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -12,23 +15,28 @@ import { implementationVerifierSource } from "../verification/verifier-source.js
 
 export function withImplementationArtifacts(context: ReturnType<typeof buildContext>, projectId: string) {
   const tasks = buildImplementationTasks(context.artifacts, context.scope);
-  const reportSchema = zodToJsonSchema(mcpImplementationReportSchema, { $refStrategy: "none" });
+  const reportSchema = zodToJsonSchema(mcpImplementationReportWireSchema, { $refStrategy: "root" });
   const sourceVersion = contentHash({
     sourceVersion: context.version, tasks, reportSchema, verifierHash: contentHash(implementationVerifierSource),
   });
-  const snapshot = mcpImplementationSnapshotSchema.parse({
-    version: 1, projectId, scope: context.scope, contextVersion: sourceVersion,
+  const expandedSnapshot = mcpExpandedImplementationSnapshotSchema.parse({
+    version: 2, projectId, scope: context.scope, contextVersion: sourceVersion,
     manifest: context.manifest, tasks,
   });
-  const reportTemplate: McpImplementationReport = mcpImplementationReportSchema.parse({
-    version: 1, projectId, scope: context.scope, contextVersion: sourceVersion,
+  const expandedReport: McpImplementationReport = mcpExpandedImplementationReportSchema.parse({
+    version: 2, projectId, scope: context.scope, contextVersion: sourceVersion,
     entries: tasks.map((task) => ({
       taskId: task.id, requirementIds: task.requirementIds, designRefs: [],
-      sourceVersions: snapshot.manifest.filter((item) => task.sourceArtifactIds.includes(item.artifactId)),
+      sourceVersions: expandedSnapshot.manifest.filter((item) => task.sourceArtifactIds.includes(item.artifactId)),
       status: "planned", plannedTargets: [], actualRefs: [], inputRefs: [], testRefs: [], checks: [],
     })),
   });
+  const snapshot = compactImplementationSnapshot(expandedSnapshot);
+  const reportTemplate = compactImplementationReport(expandedReport);
   const instructions = [
+    "格式 version=2。任务 sourceRefs/designRefs/issueRefs/guidanceRefs 分别是 snapshot.shared.sourceArtifactIds/designRefs/issues/guidance 的从 0 开始的数组索引；必须解析全部引用，不能遗漏告警。",
+    "报告 sourceVersions 是独立的历史版本池，每项 sourceVersionRefs 引用该池；更新任务依据时新增版本并更新该任务引用，不能覆盖其他未更新任务仍使用的旧版本。旧版快照和报告须重新生成，已有代码与测试保留。",
+    "合并不同报告时一起合并 sourceVersions 池并重映射条目的 sourceVersionRefs，不能直接拼接索引。任务 designRefs 是候选池索引；报告 designRefs 仍填写所选的完整设计引用对象。",
     "保存 snapshot 到 .uml-implementation-context.json；保存 reportTemplate 到 .uml-implementation.json，已有报告须合并保留真实实施记录。",
     "先为每项任务填写 plannedTargets；designRefs 是该任务可选的真实设计元素，按实际实现选择，不能把全部候选直接宣称为已实现。",
     "实现后登记实际文件、可选符号和当前文件字节的 SHA-256；验收测试 testRefs 对应 criterionIds。共享代码、配置与锁文件放入 inputRefs。",

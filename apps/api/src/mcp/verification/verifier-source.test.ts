@@ -8,8 +8,10 @@ import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import test, { type TestContext } from "node:test";
 import {
-  mcpImplementationSnapshotSchema,
-  mcpImplementationReportSchema,
+  mcpExpandedImplementationSnapshotSchema as mcpImplementationSnapshotSchema,
+  mcpExpandedImplementationReportSchema as mcpImplementationReportSchema,
+  compactImplementationSnapshot,
+  compactImplementationReport,
   type McpImplementationSnapshot,
   type McpImplementationReport,
 } from "@uml-platform/contracts";
@@ -45,14 +47,18 @@ async function fixture(t: TestContext, codeLimit = 5) {
   await writeFile(path.join(root, "package.json"), '{"private":true,"type":"module"}');
   const verifierPath = path.join(root, "uml-verify.mjs");
   await writeFile(verifierPath, implementationVerifierSource);
-  const { verifyImplementation: verify } = await import(pathToFileURL(verifierPath).href) as { verifyImplementation: Verify };
+  const { verifyImplementation: wireVerify } = await import(pathToFileURL(verifierPath).href) as { verifyImplementation: Verify };
+  const verify: Verify = (input) => wireVerify({ ...input,
+    snapshot: compactImplementationSnapshot(input.snapshot as McpImplementationSnapshot),
+    report: compactImplementationReport(input.report as McpImplementationReport),
+  });
   const versions = [
     { artifactId: "requirement:BORROW", contentHash: sha("最多5本"), inputFingerprint: null, freshness: "current" as const },
     { artifactId: "design:loan", contentHash: sha("loan-service"), inputFingerprint: "v1", freshness: "current" as const },
   ];
   const designRef = { artifactId: "design:loan", modelId: "loan", diagramKind: "class" as const, elementId: "loan-service", elementKind: "class", label: "LoanService" };
   const snapshot: McpImplementationSnapshot = {
-    version: 1, projectId: "library", scope: { requirementIds: [], artifactIds: [] }, contextVersion: "v1", manifest: versions,
+    version: 2, projectId: "library", scope: { requirementIds: [], artifactIds: [] }, contextVersion: "v1", manifest: versions,
     tasks: [{
       id: "implement:borrow", title: "借阅限制", requirementIds: ["BORROW"], sourceArtifactIds: versions.map((item) => item.artifactId), designRefs: [designRef],
       acceptanceCriteria: [
@@ -63,7 +69,7 @@ async function fixture(t: TestContext, codeLimit = 5) {
     }],
   };
   const report: McpImplementationReport = {
-    version: 1, projectId: snapshot.projectId, scope: snapshot.scope, contextVersion: snapshot.contextVersion,
+    version: 2, projectId: snapshot.projectId, scope: snapshot.scope, contextVersion: snapshot.contextVersion,
     entries: [{
       taskId: "implement:borrow", requirementIds: ["BORROW"], designRefs: [designRef], sourceVersions: structuredClone(versions),
       status: "implemented", plannedTargets: [{ path: "src/loan.mjs", responsibility: "借阅限制" }],
@@ -79,9 +85,52 @@ async function fixture(t: TestContext, codeLimit = 5) {
   // The executable fixture uses exactly the independently maintained wire contracts.
   mcpImplementationSnapshotSchema.parse(snapshot);
   mcpImplementationReportSchema.parse(report);
-  return { base, root, verifierPath, verify, snapshot, report };
+  return { base, root, verifierPath, verify, wireVerify, snapshot, report };
 }
 const codes = (assessment: Assessment) => [...assessment.issues, ...assessment.entries.flatMap((entry) => entry.issues)].map((item) => item.code);
+
+test("wire v2 rejects old formats and malformed references before executing any commands", async (t) => {
+  const f = await fixture(t);
+  for (const field of ["sourceRefs", "designRefs", "issueRefs", "guidanceRefs"] as const) {
+    for (const refs of [[99999], [-1], [0.5], [0, 0]]) {
+      const snapshot = compactImplementationSnapshot(f.snapshot);
+      snapshot.tasks[0][field] = refs;
+      const result = await f.wireVerify({ root: f.root, snapshot, report: compactImplementationReport(f.report), runChecks: true });
+      assert.ok(codes(result).includes("invalid_snapshot"), field);
+      assert.equal(result.verificationAuthority, "not-executed");
+    }
+  }
+  for (const refs of [[99999], [-1], [0.5], [0, 0]]) {
+    const report = compactImplementationReport(f.report);
+    report.entries[0].sourceVersionRefs = refs;
+    const result = await f.wireVerify({ root: f.root, snapshot: compactImplementationSnapshot(f.snapshot), report, runChecks: true });
+    assert.ok(codes(result).includes("invalid_report"));
+    assert.equal(result.verificationAuthority, "not-executed");
+  }
+  const old = await f.wireVerify({ root: f.root, snapshot: { ...f.snapshot, version: 1 }, report: { ...f.report, version: 1 }, runChecks: true });
+  assert.deepEqual(codes(old), ["invalid_snapshot", "invalid_report"]);
+});
+
+test("partial version-pool refresh cannot make another task's historical source evidence current", async (t) => {
+  const f = await fixture(t);
+  const second = structuredClone(f.snapshot.tasks[0]);
+  second.id = "implement:second";
+  second.acceptanceCriteria = second.acceptanceCriteria.map((criterion) => ({ ...criterion, id: `second:${criterion.id}` }));
+  f.snapshot.tasks.push(second);
+  const secondEntry = structuredClone(f.report.entries[0]);
+  secondEntry.taskId = second.id;
+  secondEntry.testRefs[0].criterionIds = second.acceptanceCriteria.map((criterion) => criterion.id);
+  secondEntry.checks[1].criterionIds = secondEntry.testRefs[0].criterionIds;
+  f.report.entries.push(secondEntry);
+  f.snapshot.manifest[0].contentHash = sha("new source");
+  f.report.entries[0].sourceVersions = structuredClone(f.snapshot.manifest);
+  const wire = compactImplementationReport(f.report);
+  assert.equal(wire.sourceVersions.length, 3);
+  const result = await f.wireVerify({ root: f.root, snapshot: compactImplementationSnapshot(f.snapshot), report: wire, runChecks: true });
+  assert.equal(result.entries[0].status, "verified");
+  assert.equal(result.entries[1].status, "stale");
+  assert.deepEqual(result.entries[1].checks, []);
+});
 
 test("distributed verifier is dependency-free and verifies actual loan boundaries only after explicit execution", async (t) => {
   const f = await fixture(t);
@@ -257,8 +306,8 @@ test("planned entries remain planned and cannot promote themselves to verified",
 
 test("CLI reads scoped local JSON, returns machine-readable assessment, and uses nonzero status until verified", async (t) => {
   const f = await fixture(t);
-  await writeFile(path.join(f.root, ".uml-implementation-context.json"), JSON.stringify(f.snapshot));
-  await writeFile(path.join(f.root, ".uml-implementation.json"), JSON.stringify(f.report));
+  await writeFile(path.join(f.root, ".uml-implementation-context.json"), JSON.stringify(compactImplementationSnapshot(f.snapshot)));
+  await writeFile(path.join(f.root, ".uml-implementation.json"), JSON.stringify(compactImplementationReport(f.report)));
   const beforeBytes = await readFile(path.join(f.root, ".uml-implementation.json"));
   const run = (extra: string[]) => spawnSync(process.execPath, [f.verifierPath, "--root", f.root, ...extra], { encoding: "utf8", windowsHide: true });
   const passive = run([]);
@@ -305,8 +354,8 @@ test("cyclic task dependencies verify together and propagate actual failure", as
 test("CLI invalidates otherwise passing execution when its snapshot changes", async (t) => {
   const f = await fixture(t);
   f.report.entries[0].checks[0].args = ["-e", "require('node:fs').appendFileSync('.uml-implementation-context.json', ' ')"];
-  await writeFile(path.join(f.root, ".uml-implementation-context.json"), JSON.stringify(f.snapshot));
-  await writeFile(path.join(f.root, ".uml-implementation.json"), JSON.stringify(f.report));
+  await writeFile(path.join(f.root, ".uml-implementation-context.json"), JSON.stringify(compactImplementationSnapshot(f.snapshot)));
+  await writeFile(path.join(f.root, ".uml-implementation.json"), JSON.stringify(compactImplementationReport(f.report)));
   const execution = spawnSync(process.execPath, [f.verifierPath, "--root", f.root, "--run-checks"], { encoding: "utf8", windowsHide: true });
   assert.equal(execution.status, 1);
   const assessment = JSON.parse(execution.stdout);

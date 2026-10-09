@@ -29,6 +29,7 @@ export interface McpStore {
   getConnection(id: string): Promise<McpConnection | undefined>;
   findToken(hash: string): Promise<McpConnection | undefined>;
   listConnections(userId: string): Promise<McpConnection[]>;
+  listAdminConnections(): Promise<McpConnection[]>;
   revokeConnection(id: string, userId?: string): Promise<void>;
   touchConnection(id: string): Promise<void>;
   putEntity(entity: OAuthEntity): Promise<void>;
@@ -63,6 +64,9 @@ export function createInMemoryMcpStore(): McpStore {
     },
     async listConnections(userId) {
       return copy([...connections.values()].filter((c) => c.userId === userId));
+    },
+    async listAdminConnections() {
+      return copy([...connections.values()]);
     },
     async revokeConnection(id, userId) {
       const c = connections.get(id);

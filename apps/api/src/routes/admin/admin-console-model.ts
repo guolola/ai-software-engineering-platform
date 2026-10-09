@@ -26,7 +26,7 @@ export function buildRolePermissions() {
       name: ADMIN_ROLE_NAMES[role],
       scope: Array.from(adminRoleDataScopes[role]).join(", "),
       permissions,
-      highRisk: permissions.some((permission) => permission.endsWith(".write")),
+      highRisk: permissions.some((permission) => permission.endsWith(".write") || permission === "admin.mcp.revoke"),
     };
   });
 }

@@ -43,6 +43,8 @@ SDK 固定为 `@modelcontextprotocol/server` 2.3.1、`@modelcontextprotocol/node
 四个工具继续只读。目录新增 `implementation:bundle` 和 `implementation:validator` 两个产物，经原有 `get_artifact` 完整分段读取，不增加远程代码执行或写回权限。
 
 - 实施包提供 `snapshot`、`reportTemplate`、`reportSchema` 和操作指引。任务关联真实需求、设计元素候选、验收条件及来源版本；按明确需求/产物范围选择任务，依赖资料不扩展实施授权范围。
+- 快照和报告使用 `version: 2`。`snapshot.shared` 统一存储来源 ID、候选设计元素、告警和指引；任务的 `sourceRefs`、`designRefs`、`issueRefs`、`guidanceRefs` 分别引用 `shared.sourceArtifactIds`、`shared.designRefs`、`shared.issues`、`shared.guidance`，索引从 0 开始。共享内容只传输一次，每项任务仍保留独立的关联范围和验收条件；解析全部告警引用后才能判断阻断状态。
+- 报告根部 `sourceVersions` 存储独立的历史版本池，条目的 `sourceVersionRefs` 引用该池。刷新单项任务时追加新版本并更新该项引用，不能覆盖未更新任务使用的旧版本，也不能从新快照自动补齐报告版本。相同来源可保留多个历史版本，验证时仍逐任务比较。`reportSchema` 用 JSON Schema `$ref` 复用字段定义。
 - 验收条件来自已保存原子需求，不把规则正文猜成验收条件。缺失验收、过期、冲突、被拒绝依据、无效追踪和不可读取说明书会阻止任务验证通过；仍允许完成明确部分并报告未决项。
 - 当前项目有效说明书以 `document:<id>` 提供当前 DOCX 正文（含表格单元格文字）及版本和内容哈希。不提取图片、嵌入对象、批注和页眉页脚。多份文档均保留，不推测优先级，不把正文与模型一致性或历史生成来源视为已核验。单份压缩文件上限 20 MiB，解压正文上限 4 MiB；超过 100 份项目文档时拒绝整轮读取，避免静默截断。
 - Agent 先维护计划位置，再登记实际代码文件、可选符号、文件字节 SHA-256、配置/间接依赖 `inputRefs`、测试文件与验收关联，以及本地验证命令。同一任务内以多对多方式登记需求、设计元素和代码引用，尚无设计元素到代码符号的逐对绑定；候选设计元素不是必须逐项生成的代码模板。
@@ -50,6 +52,8 @@ SDK 固定为 `@modelcontextprotocol/server` 2.3.1、`@modelcontextprotocol/node
 - `verified` 表示登记命令和引用一致性检查通过。验收关联仍由 Agent 声明；通用验证器不能独立证明指定测试名称已执行或业务语义覆盖，结果使用 `verificationScope` 和 `acceptanceCoverage` 明确此边界。它不是平台签发的远程证明。
 
 Agent 将实施包的 `snapshot` 保存为 `.uml-implementation-context.json`，从模板维护 `.uml-implementation.json`，将验证器产物的 `source` 保存为 `uml-verify.mjs`。这三个文件保留在目标仓库本地，加入本地忽略规则，不提交私有正文或临时报告。已有报告按任务合并，不能直接覆盖历史实施记录。
+
+此次格式切换不兼容 `version: 1` 快照和报告。使用旧格式的本地项目须重新获取实施包和验证器，并重新生成快照、登记报告证据及运行验证；保留已有代码与测试。新格式报告的共享池和条目引用需一起合并，不能直接拼接来自不同报告的索引。
 
 ```sh
 node uml-verify.mjs --root . --snapshot .uml-implementation-context.json --report .uml-implementation.json
@@ -65,7 +69,7 @@ node uml-verify.mjs --root . --snapshot .uml-implementation-context.json --repor
 
 [中文 README 的映射图](../../readme-zh-cn.md#需求设计与代码映射)展示了需求、分析模型、设计模型、说明书、实施任务、代码和测试的关联。实线对应现有能力，虚线对应后续自定义一致性算法；图中的关联不等于语义正确性证明。
 
-当前映射以 `taskId` 为中心。同一报告条目分别登记 `requirementIds`、`designRefs` 和 `actualRefs`，属于任务级多对多关联，尚无“设计元素 → 代码符号”的逐对绑定。任务的 `sourceArtifactIds` 指向依据产物，报告的 `sourceVersions` 记录本轮依据版本；计划位置 `plannedTargets` 不能代替实际实现引用。
+当前映射以 `taskId` 为中心。同一报告条目分别登记 `requirementIds`、`designRefs` 和 `actualRefs`，属于任务级多对多关联，尚无“设计元素 → 代码符号”的逐对绑定。任务的 `sourceRefs` 经共享池解析后指向依据产物，报告的 `sourceVersionRefs` 经报告版本池解析后记录本轮依据版本；计划位置 `plannedTargets` 不能代替实际实现引用。任务 `designRefs` 是共享候选池索引，报告 `designRefs` 则保存实际所选的完整设计引用对象。
 
 | 内容 | 借阅集成测试中的登记 | 本地验证器能够检查的部分 |
 | --- | --- | --- |
@@ -126,6 +130,24 @@ OAuth 使用固定版本 `oidc-provider` 9.12.2 的授权码与 PKCE；资源为
 
 发现路径包含 `/.well-known/oauth-protected-resource/api/mcp`、`/.well-known/oauth-authorization-server/api/mcp/oauth` 和 `/.well-known/openid-configuration/api/mcp/oauth`；兼容签发方路径下的发现地址。Next 开发代理和 Nginx 模板均将这些请求送往 API，不能回退到网页 HTML。现有部署的 Nginx 迁移也会补充窄范围发现代理。
 
+### 管理后台与使用追踪
+
+独立后台的 `/mcp` 提供使用用户、连接管理与调用记录，用户详情可跳转到对应用户筛选。接口始终注册在 `routes/admin/`，查询与撤销服务位于 `admin/mcp/`，复用同一 MCP 存储和现有工具审计，关闭外部接入后仍可查看历史和撤销连接。
+
+| 接口 | 行为 |
+| --- | --- |
+| `GET /api/admin/mcp/overview` | 历史使用用户数、当前有效连接、默认近 30 天工具调用统计 |
+| `GET /api/admin/mcp/users` | 全部留存历史汇总，可筛选仅创建连接且无使用记录的用户 |
+| `GET /api/admin/mcp/connections` | 用户、客户端、OAuth/PAT、授权范围和生命周期查询 |
+| `GET /api/admin/mcp/calls` | 默认近 30 天的工具调用；支持时间、用户、连接、客户端、工具、项目和结果筛选 |
+| `POST /api/admin/mcp/connections/:id/revoke` | 幂等撤销共享 grant，并记录管理员、连接、所属用户和操作结果 |
+
+列表服务端筛选分页，默认每页 20、最多 100。用户按最近调用、连接按创建、调用按发生时间倒序，同时间以 ID 稳定排序。共享 DTO 只投影管理所需字段，不返回令牌、哈希或 OAuth 凭据。内存与 PostgreSQL 使用相同管理服务；历史审计缺失或非法 JSON 不影响查询，无法证明的字段显示“未记录”。
+
+只有 `list_projects`、`get_implementation_context`、`get_artifact`、`check_context_updates` 的审计计入工具调用。仅失败调用仍属于使用；授权、创建令牌和撤销在连接详情单独展示，OAuth 端点记录保留在安全审计日志。最近成功使用能证明曾使用，但不能推算已清理的调用次数；统计明确仅覆盖当前留存审计。已过期、已撤销连接和对应历史使用者保留。账号级 PAT 显示“随账号当前项目权限”，按项目筛选时读取当前成员权限，不将空授权数组误判为无项目。
+
+`admin.mcp.read` 与 `admin.mcp.revoke` 对应 `viewMcp`、`revokeMcp` 能力。超级管理员、安全管理员可读及撤销，系统运维、审计员只读，其余角色不开放。管理 Cookie、MFA 与权限在服务端校验。撤销先阻止共享 grant，再清理 OAuth 实体，使 PAT/OAuth 后续调用和刷新立即失败；重复撤销成功且留存审计。该页面不提供客户端准入、限流或在线开关管理。
+
 ## 操作与维护
 
 本地 PostgreSQL 演示验收使用 `npm run dev:postgres:demo`，首次使用须安装项目依赖并启动 Docker Desktop（或已有兼容的数据库与文档服务）。命令检查并启动所需服务，显式开启 MCP，固定网页与授权入口为 `http://localhost:3000`，MCP 地址为 `http://localhost:3000/api/mcp`，由 Next 转发到本地 API 的 4101 端口，图形渲染固定使用 4002 端口。
@@ -169,6 +191,8 @@ API 开发进程使用 Node 自带文件监听，通过 `tsx` 加载 TypeScript�
 
 PostgreSQL 适配器测试在隔离的 PGlite PostgreSQL 引擎中执行真实迁移 SQL，验证共享存储、并发消费、到期和导出重载后的持久化；这不替代生产 PostgreSQL 集群和真实反向代理验收。前端测试覆盖 OAuth 默认不勾选项目、个人令牌无需项目选择、提交守卫、登录返回、一次性令牌展示和撤销。协议测试覆盖账号范围令牌读取后续创建的项目、空项目账号创建令牌、跨账号隔离及成员权限变化。
 
+管理测试覆盖历史/仅授权/仅失败用户、多连接、过期和撤销记录、无项目调用、非法元数据、过滤分页、角色/MFA/匿名拒绝访问及 PAT/OAuth 立即失效。独立后台完成真实 API 响应的跨仓库客户端验证，并以隔离真实 API 检查桌面、移动端和确认撤销流程；响应式测试替身只用于测试。`UML_ADMIN_CONSOLE_ROOT` 可启用跨仓库兼容性测试。
+
 验证命令：`npm run test:contracts`、`npm run test:api`、`npm run test:web`、`npm run typecheck:web`、`npm run build:api`、`npm run build:web`、`npm run test:deploy`、`npm run audit:architecture`、`npm run audit:docs`。开发者可先按对应文件运行针对性测试。Web 脚本可能重建文档生成文件，执行前保留已有工作区改动。
 
 演示启动检查使用 `node --test scripts/dev/*.test.mjs`，覆盖数据库复用、端口冲突、MCP 未开启、发现路径返回 HTML、授权地址不匹配及启动超时。启动成功只表示平台入口就绪，真实客户端授权和四工具调用仍需单独验收。
@@ -177,6 +201,9 @@ PostgreSQL 适配器测试在隔离的 PGlite PostgreSQL 引擎中执行真实�
 
 ## 相关文档
 
+- [管理契约](../../packages/contracts/src/mcp/admin.ts)
+- [管理路由与权限测试](../../apps/api/src/routes/admin/register-admin-mcp-routes.test.ts)
+- [管理查询服务](../../apps/api/src/admin/mcp/admin-mcp-service.ts)
 - [MCP 模块说明](../../apps/api/src/mcp/README.md)
 - [平台架构](../architecture/platform-overview.md)
 - [生产环境配置](../deployment/production-environment.md)
