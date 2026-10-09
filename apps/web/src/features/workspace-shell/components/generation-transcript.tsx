@@ -10,9 +10,7 @@ import { ChainOfThought, ChainOfThoughtContent, ChainOfThoughtHeader, ChainOfTho
 import { Shimmer } from "../../../shared/ui/ai/shimmer";
 import { cn } from "../../../shared/ui/utils";
 import type { TranscriptCall, TranscriptStep } from "../lib/generation-transcript";
-import { readableOutput } from "../lib/generation-transcript";
 import { useTranscriptScroll } from "../lib/use-transcript-scroll";
-import { TranscriptMarkdown } from "./transcript-markdown";
 import { DiagramReviewDetails } from "../../../entities/diagram/components/diagram-review-details";
 import { reviewProblemGroups } from "../../../entities/diagram/lib/review-presentation";
 
@@ -55,8 +53,7 @@ function QueueProgress({ queue }: { queue: GenerationQueueDetails }) {
 
 function ProcessCall({ call, showTitle }: { call: TranscriptCall; showTitle: boolean }) {
   const Icon = call.status === "completed" ? Check : call.status === "failed" ? X : Circle;
-  const prose = readableOutput(call);
-  // Mount only readable results; large reasoning and raw payloads slow down batch-task drawers.
+  // The task drawer shows progress, not generated prose; never parse or mount provider output here.
   return <div data-slot="generation-call" className="min-w-0 space-y-2 text-sm leading-6 text-muted-foreground">
     {showTitle && <div className="flex items-start gap-2">
       <Icon aria-hidden="true" className={cn("mt-1.5 size-3 shrink-0", call.status === "failed" && "text-destructive")} />
@@ -66,17 +63,15 @@ function ProcessCall({ call, showTitle }: { call: TranscriptCall; showTitle: boo
     {call.inputImages?.filter((image) => /^(?:https?:\/\/|data:image\/(?:png|jpe?g|gif|webp);base64,)/i.test(image.url)).map((image) => <ChainOfThoughtImage key={image.url} caption={image.caption ?? `${call.title}使用的图片`}>
       <img src={image.url} alt={image.caption ?? `${call.title}的输入图片`} className="max-h-80 max-w-full object-contain" loading="lazy" />
     </ChainOfThoughtImage>)}
-    {prose && <div data-reading-anchor=""><TranscriptMarkdown text={prose} compact /></div>}
     {call.review && <DiagramReviewDetails review={call.review} />}
     {call.message && !["failed", "pending_review"].includes(call.status) && /修复|重试|补跑|人工确认|跳过/.test(call.message) && <p className="break-words">{call.message}</p>}
   </div>;
 }
 
 function Stage({ step, active }: { step: TranscriptStep; active: boolean }) {
-  const hasProse = step.calls.some((call) => readableOutput(call));
-  const currentStatus = active ? step.calls.some((call) => call.thinking) ? "正在分析" : hasProse ? "正在生成" : "正在处理" : statusText[step.status];
+  const currentStatus = active ? step.calls.some((call) => call.thinking) ? "正在分析" : "正在处理" : statusText[step.status];
   // Retain repair explanations, but avoid filling the reading surface with successive progress notices.
-  const messages = step.messages.filter((message, index) => /修复|重试|失败|复核/.test(message) || (!hasProse && index === step.messages.length - 1));
+  const messages = step.messages.filter((message, index) => /修复|重试|失败|复核/.test(message) || index === step.messages.length - 1);
   const Icon = active ? LoaderCircle : step.status === "failed" ? X : step.stage.includes("verify") ? ScanEye : step.stage.includes("render") ? ImageIcon : FileText;
   return <ChainOfThoughtStep aria-label={step.title} data-testid="generation-task-step" data-active-step={active}
     icon={Icon} iconClassName={active ? "animate-spin motion-reduce:animate-none" : undefined}

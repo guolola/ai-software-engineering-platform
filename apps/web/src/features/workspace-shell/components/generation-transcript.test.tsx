@@ -1,4 +1,4 @@
-// Exercises stable prose, reader-owned process folding and viewport scrolling.
+// Exercises progress-only batch tasks, reader-owned process folding and viewport scrolling.
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { i18n } from "../../../shared/i18n";
@@ -42,24 +42,25 @@ describe("stage reading surface", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(toggle).toHaveAccessibleName("思考过程");
     expect(screen.queryByText("模型推理摘要：核对参与者")).not.toBeInTheDocument();
-    expect(screen.getByText("开始输出正文")).not.toBeVisible();
+    expect(screen.queryByText("开始输出正文")).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "输出总结" })).toHaveTextContent("完成");
     expect(screen.getByRole("region", { name: "输出总结" })).toBeVisible();
   });
 
-  it("animates only the active stage and preserves existing Markdown paragraph nodes", () => {
+  it("animates only the active stage without mounting streamed Markdown", () => {
     const calls = [steps[0].calls[0], { ...steps[0].calls[0], id: "b", title: "生成活动图", thinking: false }];
     const { container, rerender } = render(<GenerationTranscript taskKey="a" steps={[{ ...steps[0], calls }]} active finalMessage="" />);
     const heading = screen.getByText("生成模型");
-    const paragraph = screen.getAllByText("模型正文")[0];
+    expect(screen.queryByText("模型正文")).not.toBeInTheDocument();
     expect(container.querySelectorAll('[data-slot="ai-shimmer"]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-slot="chain-of-thought-step"][data-status="active"]')).toHaveLength(1);
     expect(screen.getAllByText("分析参与者与用例")[0]).not.toHaveAttribute("data-slot", "ai-shimmer");
     rerender(<GenerationTranscript taskKey="a" steps={[{ ...steps[0], calls: [{ ...calls[0], output: "模型正文新增\n\n- **要点**\n\n```ts\nconst x = 1\n```" }, calls[1]] }]} active finalMessage="" />);
     expect(screen.getByText("生成模型")).toBe(heading);
-    expect(screen.getByText("模型正文新增")).toBe(paragraph);
-    expect(screen.getByText("要点").tagName).toBe("STRONG");
-    expect(screen.getByText("const x = 1").closest("pre")).not.toBeNull();
+    expect(screen.queryByText("模型正文新增")).not.toBeInTheDocument();
+    expect(screen.queryByText("要点")).not.toBeInTheDocument();
+    expect(container.querySelector("pre")).toBeNull();
+    expect(container.querySelector('[data-slot="transcript-prose"]')).toBeNull();
   });
 
   it("keeps failures and retry controls visible when the process is folded", () => {
@@ -90,12 +91,12 @@ describe("stage reading surface", () => {
     expect(screen.queryByRole("button", { name: "思考过程 · 分析参与者与用例" })).not.toBeInTheDocument();
     expect(screen.queryByText("先检查参与者。")).not.toBeInTheDocument();
     expect(screen.queryByText("模型推理摘要：核对参与者")).not.toBeInTheDocument();
-    expect(screen.getByText("模型正文").closest('[data-slot="transcript-prose"]')).toHaveClass("text-black", "dark:text-foreground");
+    expect(screen.queryByText("模型正文")).not.toBeInTheDocument();
     rerender(<GenerationTranscript taskKey="reasoning" steps={[{ ...withReasoning[0], status: "completed", finished: true, calls: [{ ...withReasoning[0].calls[0], status: "completed", thinking: false, output: "模型正文" }] }]} active={false} finalMessage="完成" />);
     expect(container.querySelector('[data-slot="generation-reasoning"]')).toBeNull();
     expect(screen.queryByText("先检查参与者。")).not.toBeInTheDocument();
     expect(screen.queryByText("模型推理摘要：核对参与者")).not.toBeInTheDocument();
-    expect(screen.getByText("模型正文")).toBeVisible();
+    expect(screen.queryByText("模型正文")).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "输出总结" })).toHaveTextContent("完成");
   });
 
@@ -111,7 +112,7 @@ describe("stage reading surface", () => {
     expect(document.querySelectorAll('[data-slot="chain-of-thought-step"][data-status="active"]')).toHaveLength(2);
   });
 
-  it("groups generation, rendering and visual review into one timeline with compact stage descriptions", () => {
+  it("groups generation, rendering and visual review without generated descriptions", () => {
     const description = "展示学生和管理员与预约系统的交互关系。";
     const contextSteps: TranscriptStep[] = [
       { ...steps[0], stage: "generate_context", title: "生成系统环境图", finished: true, status: "completed", messages: [], calls: [{ ...steps[0].calls[0], output: description, status: "completed", thinking: false }] },
@@ -124,8 +125,7 @@ describe("stage reading surface", () => {
     expect(screen.getAllByRole("button", { name: "思考过程" })).toHaveLength(1);
     expect(within(chain as HTMLElement).getAllByTestId("generation-task-step")).toHaveLength(3);
     expect(screen.queryByRole("button", { name: "执行过程" })).not.toBeInTheDocument();
-    expect(screen.getByText(description).closest('[data-slot="transcript-prose"]')).toHaveClass("text-sm", "text-black", "dark:text-foreground");
-    expect(screen.getByText(description).closest('[data-slot="chain-of-thought-step-content"]')).not.toBeNull();
+    expect(screen.queryByText(description)).not.toBeInTheDocument();
     const image = screen.getByRole("img", { name: "视觉检查使用的环境图" });
     expect(image.closest('[data-testid="generation-task-step"]')).toHaveAttribute("aria-label", "视觉检查");
     expect(image.closest('[data-slot="chain-of-thought-image"]')).toHaveTextContent("视觉检查使用的环境图");
@@ -136,20 +136,23 @@ describe("stage reading surface", () => {
     expect(chain.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("keeps batch technical payloads out of the DOM while showing readable results and call status", () => {
+  it("keeps batch prose, technical summaries and reasoning out of the DOM while showing call status", () => {
     const reasoning = "批量推理内容".repeat(10_000);
     const calls = Array.from({ length: 20 }, (_, index) => ({
-      ...steps[0].calls[0], id: `model-${index}`, title: `模型 ${index + 1}`, technical: true,
+      ...steps[0].calls[0], id: `model-${index}`, title: `模型 ${index + 1}`, technical: index % 2 === 0,
       reasoning, summary: "批量推理摘要",
-      output: JSON.stringify({ summary: `模型 ${index + 1} 已生成`, source: "技术原文内容".repeat(10_000) }),
+      output: index % 2 === 0 ? JSON.stringify({ summary: `模型 ${index + 1} 已生成`, source: "技术原文内容".repeat(10_000) }) : "批量正文内容".repeat(10_000),
     }));
     const { container } = render(<GenerationTranscript taskKey="batch" steps={[{ ...steps[0], calls }]} active finalMessage="" />);
     expect(container.querySelectorAll('[data-slot="generation-call"]')).toHaveLength(20);
-    expect(screen.getByText("模型 20 已生成")).toBeVisible();
+    expect(screen.getByText("模型 20")).toBeVisible();
+    expect(screen.queryByText("模型 19 已生成")).not.toBeInTheDocument();
     expect(screen.getAllByText("正在处理")).toHaveLength(20);
     expect(container).not.toHaveTextContent("批量推理内容");
     expect(container).not.toHaveTextContent("批量推理摘要");
     expect(container).not.toHaveTextContent("技术原文内容");
+    expect(container).not.toHaveTextContent("批量正文内容");
+    expect(container.querySelector('[data-slot="transcript-prose"]')).toBeNull();
     expect(container.querySelector("pre")).toBeNull();
     expect(screen.queryByText(/查看技术原文/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "正在思考" }));

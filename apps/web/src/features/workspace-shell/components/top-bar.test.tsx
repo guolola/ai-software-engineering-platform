@@ -1658,7 +1658,7 @@ describe("TopBar", () => {
     expect(within(statusCard).queryByText("重试自 server-run-failed")).not.toBeInTheDocument();
   });
 
-  it("shows Chinese task stages and streamed details in the task drawer", async () => {
+  it("shows Chinese task stages and progress without streamed prose in the task drawer", async () => {
     let completeRun!: () => void;
     const snapshot = createRunSnapshot({
       runId: "run-task-details",
@@ -1734,7 +1734,8 @@ describe("TopBar", () => {
     expect(within(stageSection as HTMLElement).queryByText("渲染图像")).not.toBeInTheDocument();
     expect(screen.queryByText("执行详情")).not.toBeInTheDocument();
     expect(screen.queryByText("用户摘要")).not.toBeInTheDocument();
-    expect(screen.getByText("正在分析需求文本")).toBeInTheDocument();
+    expect(screen.getByText("正在抽取需求规则")).toBeInTheDocument();
+    expect(screen.queryByText("正在分析需求文本")).not.toBeInTheDocument();
     expect(screen.queryByText("收到模型输出")).not.toBeInTheDocument();
     expect(screen.queryByText("extract_rules")).not.toBeInTheDocument();
     expect(screen.queryByText("llm_chunk")).not.toBeInTheDocument();

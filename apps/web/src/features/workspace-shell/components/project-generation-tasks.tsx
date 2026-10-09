@@ -76,7 +76,7 @@ export function ProjectGenerationTasksDrawerContent({ projectRuns = emptyRuns, p
   const currentVisualReviews = useMemo(() => Object.fromEntries(
     Object.entries(session.visualReviews).filter(([key]) => key.startsWith(`${kind}:`)).map(([key, review]) => [key.slice(`${kind}:`.length), review]),
   ), [session.visualReviews, kind]);
-  const transcript = useMemo(() => projectGenerationTranscript(displayedEvents, fallbackStatus, selectedLocal?.subtasks, currentVisualReviews), [displayedEvents, fallbackStatus, selectedLocal?.subtasks, currentVisualReviews]);
+  const transcript = useMemo(() => projectGenerationTranscript(displayedEvents, fallbackStatus, selectedLocal?.subtasks, currentVisualReviews, { includeContent: false }), [displayedEvents, fallbackStatus, selectedLocal?.subtasks, currentVisualReviews]);
   const active = ["queued", "running"].includes(transcript.status);
   const queuedEvent = [...displayedEvents].reverse().find((event) => event.type === "queued");
   const queuedItems = active ? (selectedLocal?.subtasks ?? []).filter((subtask) =>

@@ -112,7 +112,9 @@ export function readableOutput(call: TranscriptCall) {
   catch { return ""; }
 }
 
-export function projectGenerationTranscript(events: RunEvent[], fallbackStatus = "running", subtasks: GenerationSubtask[] = [], currentVisualReviews: Record<string, DiagramVisualReview> = {}) {
+export function projectGenerationTranscript(events: RunEvent[], fallbackStatus = "running", subtasks: GenerationSubtask[] = [], currentVisualReviews: Record<string, DiagramVisualReview> = {}, options: { includeContent?: boolean } = {}) {
+  // Progress-only consumers retain lifecycle and findings without rebuilding large streamed text.
+  const includeContent = options.includeContent ?? true;
   const repairSubtask = subtasks.find((subtask) => subtask.id === "repair_rules");
   const rulesOnly = Boolean(repairSubtask) || events.some((event) =>
     event.type === "completed" && "selectedDiagrams" in event.snapshot &&
@@ -172,10 +174,11 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       }
       call.technical = event.format === "technical";
       if (event.inputImages?.length) call.inputImages = [...new Map([...(call.inputImages ?? []), ...event.inputImages].map((image) => [image.url, image])).values()];
-      if (event.phase === "output") { call.output += event.text ?? ""; call.thinking = false; }
-      if (event.phase === "reasoning") { call.reasoning = (call.reasoning ?? "") + (event.text ?? ""); call.thinking = true; }
+      if (event.phase === "output") { if (includeContent) call.output += event.text ?? ""; call.thinking = false; }
+      if (event.phase === "reasoning") { if (includeContent) call.reasoning = (call.reasoning ?? "") + (event.text ?? ""); call.thinking = true; }
       if (event.phase === "summary" && !legacyDemoSummaryCalls.has(event.callId)) {
-        call.summary += event.text ?? ""; call.thinking = true;
+        if (includeContent) call.summary += event.text ?? "";
+        call.thinking = true;
       }
       // A thinking marker alone contains no provider reasoning to display.
       if (event.phase === "completed" || event.phase === "failed") {
@@ -238,8 +241,10 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       }
     } else if (event.type === "llm_chunk" && !activityStages.has(event.stage)) {
       const call = getCall(getStep(event.stage), `${event.stage}:legacy`, at);
-      call.output += event.chunk;
-      call.technical = /^[\s]*[\[{`]/.test(call.output);
+      if (includeContent) {
+        call.output += event.chunk;
+        call.technical = /^[\s]*[\[{`]/.test(call.output);
+      }
     } else if (event.type === "artifact_ready") {
       const step = getStep(event.stage);
       const subtaskId = event.subtaskId ?? event.modelId ?? event.diagramKind;

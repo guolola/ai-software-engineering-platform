@@ -11,6 +11,27 @@ const activity = (id: string, callId: string, phase: RunActivityEvent["phase"], 
 });
 
 describe("generation transcript", () => {
+  it("projects progress without accumulating content while preserving attempts, legacy calls and failures", () => {
+    const body = "批量正文".repeat(10_000);
+    const events: RunEvent[] = [
+      activity("start", "a", "started"), activity("reasoning", "a", "reasoning", body),
+      activity("summary", "a", "summary", body), activity("output", "a", "output", body),
+      activity("failed", "a", "failed"),
+      { type: "stage_started", stage: "generate_document_text" },
+      { type: "llm_chunk", stage: "generate_document_text", chunk: body },
+      { type: "stage_finished", stage: "generate_document_text", status: "completed" },
+      { type: "failed", error: { code: "RUN_INTERNAL_ERROR", category: "internal", retryable: false, message: "模型服务暂不可用" } },
+    ];
+    const before = JSON.stringify(events);
+    const result = projectGenerationTranscript(events, "running", [], {}, { includeContent: false });
+    expect(result.steps[0].calls[0]).toMatchObject({ status: "failed", output: "", reasoning: "", summary: "", thinking: false });
+    expect(result.steps[1].calls[0]).toMatchObject({ status: "completed", output: "" });
+    expect(result.status).toBe("failed");
+    expect(result.finalMessage).toBe(projectGenerationTranscript(events).finalMessage);
+    expect(result.finalMessage).toBeTruthy();
+    expect(JSON.stringify(result)).not.toContain(body);
+    expect(JSON.stringify(events)).toBe(before);
+  });
   it("retains manual confirmation only for the same fingerprint in new review replay", () => {
     const check = { ...activity("check", "image", "completed"), stage: "verify_diagram_visual" as const, subtaskId: "usecase", operation: "visual_check" as const, round: 1 };
     const review = { status: "pending_review" as const, issues: ["待确认标签"], reason: "待确认", attempts: 1, checkedAt: "check-1", checkOutcome: "differences" as const, inputFingerprint: "new" };
