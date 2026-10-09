@@ -16,6 +16,38 @@ it("shows the payment order table headers and empty row before any connections e
   expect(table.querySelector("thead")).toHaveClass("bg-muted/40");
   expect(within(table).getByText("还没有外部工具连接。")).toHaveAttribute("colspan", "6");
   expect(screen.getByText("0 条")).toBeInTheDocument();
+  expect(screen.getByText("显示第 0–0 条，共 0 条")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "前往上一页" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "前往下一页" })).toBeDisabled();
+});
+
+it("pages connection records, revokes the visible credential, and clamps the page after refresh", async () => {
+  const user = userEvent.setup();
+  const onRevoke = vi.fn();
+  const records = Array.from({ length: 11 }, (_, index) => ({ ...connection, id: `pat-${index}`, name: `工具 ${index + 1}` }));
+  const view = (connections: Connection[]) => <AppI18nProvider><ConnectionRecordsTable connections={connections} projects={[]} disabled={false} stale={false} onRevoke={onRevoke} /></AppI18nProvider>;
+  const { rerender } = render(view(records));
+  expect(screen.getByText("显示第 1–5 条，共 11 条")).toBeInTheDocument();
+  expect(screen.queryByText("工具 6")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "前往下一页" }));
+  expect(screen.getByText("显示第 6–10 条，共 11 条")).toBeInTheDocument();
+  expect(screen.queryByText("工具 1")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "撤销 工具 6" }));
+  expect(onRevoke).toHaveBeenCalledWith(records[5]);
+  await user.click(screen.getByRole("button", { name: "前往下一页" }));
+  expect(screen.getByText("显示第 11–11 条，共 11 条")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "前往下一页" })).toBeDisabled();
+  rerender(view(records.slice(0, 2)));
+  expect(screen.getByText("工具 1", { selector: "p" })).toBeInTheDocument();
+  expect(screen.getByText("显示第 1–2 条，共 2 条")).toBeInTheDocument();
+  rerender(view(records));
+  expect(screen.getByText("显示第 1–5 条，共 11 条")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "2" }));
+  await user.click(screen.getByRole("combobox", { name: "每页显示条数" }));
+  await user.click(await screen.findByRole("option", { name: "25" }));
+  expect(screen.getByText("显示第 1–11 条，共 11 条")).toBeInTheDocument();
+  expect(screen.getByText("工具 11", { selector: "p" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "前往下一页" })).toBeDisabled();
 });
 
 it("shows account scope and passes the selected connection to revocation while guarding revoked records", async () => {

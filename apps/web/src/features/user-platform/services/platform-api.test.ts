@@ -4,6 +4,16 @@ import { platformApi } from "./platform-api";
 import { i18n } from "../../../shared/i18n/i18n";
 
 describe("platformApi", () => {
+  it('requests timed run events and forwards cancellation without changing ordinary run reads', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    await platformApi.getProjectRun('project', 'run');
+    await platformApi.getProjectRun('project', 'run', { includeEvents: true, signal: controller.signal });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/projects/project/runs/run');
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain('/api/projects/project/runs/run?includeEvents=true');
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).signal).toBe(controller.signal);
+  });
   afterEach(async () => {
     vi.unstubAllGlobals();
     await i18n.changeLanguage("zh-CN");

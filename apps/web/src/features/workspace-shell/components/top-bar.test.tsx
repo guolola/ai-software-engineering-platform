@@ -1,4 +1,6 @@
 // Verifies top bar navigation, run controls, theme toggles, and account/project menus.
+import { useReactFlowTestLayout } from '../../../test/react-flow-test-layout';
+import { useState } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,7 +15,7 @@ import {
   createWorkspaceRecord,
   withWorkspaceProviders,
 } from "../../../test/workspace-test-utils";
-import { buildLineageStepPath } from "../../lineage/components/lineage-graph-dialog";
+import { LineageGraphPage } from "../../lineage/components/lineage-graph-page";
 import { snapshotInputFingerprint } from "../../../shared/lib/fingerprint";
 import { useWorkspaceSession } from "../../workspace-session/state";
 import {
@@ -21,6 +23,8 @@ import {
   ProjectWorkspaceActions,
   TopBar,
 } from "./top-bar";
+
+useReactFlowTestLayout();
 
 const { toastMessage, toastSuccess, toastError } = vi.hoisted(() => ({
   toastMessage: vi.fn(),
@@ -151,11 +155,18 @@ function TopBarAnalysisTaskHarness() {
   );
 }
 
+function LineageGraphOnlyHarness() {
+  const [open, setOpen] = useState(false);
+  return <><button onClick={() => setOpen(true)}>链路图</button>
+    {open && <LineageGraphPage onViewArtifact={() => setOpen(false)} />}
+  </>;
+}
+
 function LineageRerunArtifactHarness() {
   const { generateDiagrams } = useWorkspaceSession();
   return (
     <>
-      <ProjectWorkspaceActions projectId="library-booking" onOpenDrawer={() => {}} />
+      <LineageGraphOnlyHarness />
       <button type="button" onClick={() => void generateDiagrams(["usecase"])}>
         重新生成用例模型
       </button>
@@ -163,9 +174,6 @@ function LineageRerunArtifactHarness() {
   );
 }
 
-function LineageGraphOnlyHarness() {
-  return <ProjectWorkspaceActions projectId="library-booking" onOpenDrawer={() => {}} />;
-}
 
 function TopBarRestoreHarness() {
   const { restoreRunHistory } = useWorkspaceSession();
@@ -214,16 +222,6 @@ describe("TopBar", () => {
       value: vi.fn(),
     });
     HTMLAnchorElement.prototype.click = vi.fn();
-  });
-
-  it("builds lineage connectors as readable step paths", () => {
-    const path = buildLineageStepPath(
-      { left: 0, right: 270, centerY: 100 },
-      { left: 350, right: 620, centerY: 260 },
-    );
-
-    expect(path).toBe("M 282 100 L 305 100 L 305 260 L 328 260");
-    expect(path).not.toContain(" C ");
   });
 
   it("uses the template header and button primitives", () => {
@@ -333,7 +331,7 @@ describe("TopBar", () => {
     expect(document.documentElement.lang).toBe("zh-CN");
   });
 
-  it("opens project run history without the removed local snapshot drawer action", async () => {
+  it("keeps only generation task controls in the project top bar", async () => {
     const repository: WorkspaceRepository = {
       loadWorkspace: vi.fn(async () => createWorkspaceRecord()),
       updateRequirementText: vi.fn(async () => {}),
@@ -369,14 +367,16 @@ describe("TopBar", () => {
     await user.click(screen.getByRole("button", { name: "生成任务" }));
     expect(onOpenDrawer).toHaveBeenCalledWith("tasks");
     expect(screen.queryByRole("button", { name: "历史快照" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "运行历史" }));
+    for (const name of ["链路图", "运行历史", "项目设置", "成员", "文档中心"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
 
     expect(toastMessage).not.toHaveBeenCalled();
     expect(screen.getByText("主内容保持不变")).toBeInTheDocument();
-    expect(onOpenDrawer).toHaveBeenCalledWith("history");
+    expect(onOpenDrawer).toHaveBeenCalledTimes(1);
   });
 
-  it("opens the lineage graph from the button before generation tasks", async () => {
+  it("uses the supplied workflow canvas with bounded height, controls and graph filters", async () => {
     const repository: WorkspaceRepository = {
       loadWorkspace: vi.fn(async () => createWorkspaceRecord()),
       updateRequirementText: vi.fn(async () => {}),
@@ -399,58 +399,37 @@ describe("TopBar", () => {
     const user = userEvent.setup();
     const { container } = render(
       withWorkspaceProviders(
-        <ProjectWorkspaceActions
-          projectId="library-booking"
-          onOpenDrawer={() => {}}
-        />,
+        <LineageGraphOnlyHarness />,
         repository,
       ),
     );
 
-    const buttons = screen.getAllByRole("button");
-    const lineageIndex = buttons.findIndex(
-      (button) => button.getAttribute("aria-label") === "链路图",
-    );
-    const taskIndex = buttons.findIndex(
-      (button) => button.getAttribute("aria-label") === "生成任务",
-    );
-    expect(lineageIndex).toBeGreaterThanOrEqual(0);
-    expect(lineageIndex).toBeLessThan(taskIndex);
-    const lineageButton = buttons[lineageIndex] as HTMLElement;
-    const taskButton = buttons[taskIndex] as HTMLElement;
-    expect(lineageButton).toHaveClass("hover:bg-muted");
-    expect(lineageButton).not.toHaveClass("bg-secondary");
-    expect(taskButton).toHaveTextContent("暂无任务");
-    expect(taskButton).toHaveClass("hover:bg-muted");
-    expect(taskButton).not.toHaveClass("bg-secondary", "text-secondary-foreground");
-
     await user.click(screen.getByRole("button", { name: "链路图" }));
 
     expect(
-      await screen.findByRole("dialog", { name: "全局链路图" }),
+      await screen.findByRole("region", { name: "全局链路图" }),
     ).toBeInTheDocument();
-    const dialog = screen.getByRole("dialog", { name: "全局链路图" });
-    expect(dialog).toHaveStyle({
-      width: "min(1580px, calc(100vw - 4rem))",
-      maxWidth: "min(1580px, calc(100vw - 4rem))",
-      height: "min(920px, calc(100vh - 4rem))",
-    });
-    const canvasScrollArea = within(dialog).getByTestId("lineage-canvas-scroll-area");
-    expect(canvasScrollArea.querySelectorAll('[data-slot="scroll-area-scrollbar"]')).toHaveLength(0);
-    const canvasViewport = canvasScrollArea.querySelector<HTMLElement>(
-      '[data-slot="scroll-area-viewport"]',
-    );
-    const scrollTo = vi.fn();
-    Object.defineProperty(canvasViewport, "scrollTo", { configurable: true, value: scrollTo });
-    await user.click(within(dialog).getByRole("button", { name: "重置视图" }));
-    expect(scrollTo).toHaveBeenCalledWith({ left: 0, top: 0, behavior: "smooth" });
-    expect(within(dialog).getByRole("region", { name: "需求规则" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("region", { name: "需求模型" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("region", { name: "设计模型" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("region", { name: "产物" })).toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "显示全部连线" })).not.toBeInTheDocument();
-    expect(container.querySelector(".react-flow__minimap")).not.toBeInTheDocument();
-    expect(container.querySelector(".react-flow__controls")).not.toBeInTheDocument();
+    const dialog = screen.getByRole("region", { name: "全局链路图" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(within(dialog).getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    const graphContent = within(dialog).getByTestId("lineage-content");
+    expect(graphContent).not.toHaveClass("border", "rounded-xl");
+    expect(graphContent).toHaveStyle({ height: `${window.innerHeight - 24}px` });
+    expect(within(dialog).queryByText("节点详情")).not.toBeInTheDocument();
+    expect(graphContent.querySelector('[data-template="workflow-builder-03"]')).toBeInTheDocument();
+    expect(container.querySelector('.react-flow__minimap')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: '选择工具' })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: '平移工具' }));
+    expect(within(dialog).getByRole('button', { name: '平移工具' })).toHaveClass('bg-secondary');
+    await user.click(within(dialog).getByRole('button', { name: '选择工具' }));
+    await user.click(within(dialog).getByRole('button', { name: '锁定画布' }));
+    expect(within(dialog).getByRole('button', { name: '解锁画布' })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: '解锁画布' }));
+    expect(within(dialog).getByRole('button', { name: '撤销布局' })).toBeDisabled();
+    await user.click(within(dialog).getAllByRole('button', { name: '重置布局' }).at(-1)!);
+    expect(within(dialog).getByRole('button', { name: '撤销布局' })).toBeEnabled();
+    await user.click(within(dialog).getByRole('button', { name: '撤销布局' }));
+    expect(within(dialog).getByRole('button', { name: '重做布局' })).toBeEnabled();
     expect(within(dialog).getByTestId("lineage-node-rule:empty")).toHaveAttribute(
       "data-lineage-kind",
       "rule",
@@ -472,20 +451,17 @@ describe("TopBar", () => {
     const classNode = within(dialog).getByTestId(
       "lineage-node-requirement-model:class",
     );
-    await user.click(usecaseNode);
-    const detailScrollArea = within(dialog).getByTestId("lineage-detail-scroll-area");
-    expect(detailScrollArea.querySelectorAll('[data-slot="scroll-area-scrollbar"]')).toHaveLength(0);
-    expect(classNode).toHaveClass("opacity-25");
+    fireEvent.click(usecaseNode);
+    expect(within(dialog).getByRole('complementary', { name: '节点详情' })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: '链路筛选' }));
+    await user.click(await screen.findByRole('menuitem', { name: '影响路径' }));
+    expect(classNode.closest('.react-flow__node')).toHaveStyle({ opacity: '0.25' });
+    await user.click(within(dialog).getByRole('button', { name: '收起节点详情' }));
+    expect(within(dialog).queryByRole('complementary', { name: '节点详情' })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: '链路筛选' }));
+    await user.click(await screen.findByRole('menuitem', { name: '全部链路' }));
+    expect(classNode.closest('.react-flow__node')).toHaveStyle({ opacity: '1' });
 
-    await user.click(within(dialog).getByRole("button", { name: "全部链路" }));
-    expect(
-      within(dialog).getByText("选择一个节点后查看上下游来源、影响范围和建议操作。"),
-    ).toBeInTheDocument();
-    expect(classNode).not.toHaveClass("opacity-25");
-
-    await user.click(within(dialog).getByRole("button", { name: "影响路径" }));
-    expect(usecaseNode).not.toHaveClass("opacity-25");
-    expect(classNode).not.toHaveClass("opacity-25");
   });
 
   it("opens a previous requirement artifact from the lineage graph while rerunning it", async () => {
@@ -562,14 +538,14 @@ describe("TopBar", () => {
     });
     await user.click(screen.getByRole("button", { name: "链路图" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "全局链路图" });
+    const dialog = await screen.findByRole("region", { name: "全局链路图" });
     const usecaseNode = within(dialog).getByTestId(
       "lineage-node-requirement-model:usecase",
     );
     expect(usecaseNode).toHaveAttribute("data-lineage-status", "running");
     expect(usecaseNode).toHaveAttribute("data-lineage-viewable", "true");
 
-    await user.click(usecaseNode);
+    fireEvent.click(usecaseNode);
     expect(
       within(dialog).getAllByText("此节点正在生成，可在生成任务中查看实时进度。").length,
     ).toBeGreaterThan(0);
@@ -578,9 +554,9 @@ describe("TopBar", () => {
     await user.click(viewPreviousButton);
 
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "全局链路图" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "全局链路图" })).not.toBeInTheDocument();
     });
-    expect(screen.queryByRole("dialog", { name: "全局链路图" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "全局链路图" })).not.toBeInTheDocument();
   });
 
   it("does not mark structured-only requirement models as current in the lineage graph", async () => {
@@ -630,14 +606,14 @@ describe("TopBar", () => {
 
     await user.click(await screen.findByRole("button", { name: "链路图" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "全局链路图" });
+    const dialog = await screen.findByRole("region", { name: "全局链路图" });
     const usecaseNode = within(dialog).getByTestId(
       "lineage-node-requirement-model:usecase",
     );
     expect(usecaseNode).toHaveAttribute("data-lineage-status", "stale");
     expect(usecaseNode).toHaveAttribute("data-lineage-viewable", "false");
 
-    await user.click(usecaseNode);
+    fireEvent.click(usecaseNode);
     expect(
       within(dialog).getAllByText("上游输入或追踪证据已变化，此节点需要更新。").length,
     ).toBeGreaterThan(0);

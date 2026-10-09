@@ -36,10 +36,12 @@ export function ProjectDocuments({
   projectId,
   documents,
   layout = "page",
+  pageTitle,
 }: {
   projectId: string;
   documents: PlatformDocument[];
   layout?: "page" | "drawer";
+  pageTitle?: string;
 }) {
   const { t, i18n } = useTranslation();
   const { showAlert } = useFloatingAlert();
@@ -186,7 +188,7 @@ export function ProjectDocuments({
     <div className="grid min-w-0 gap-4">
       <PageHeader
         size={layout === "drawer" ? "compact" : "default"}
-        title={t("projectShell.documentsUi.title")}
+        title={pageTitle ?? t("projectShell.documentsUi.title")}
         description={t("projectShell.documentsUi.description")}
         actions={
           <Button type="button" variant="outline" size="sm" onClick={() => void batchDownload()}>

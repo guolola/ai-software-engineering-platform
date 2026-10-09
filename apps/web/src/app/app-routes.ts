@@ -2,14 +2,14 @@ import type {
   AppRoute,
   AuthRoutePath,
   MarketingRoutePath,
-  ProjectRouteDrawer,
+  ProjectRouteSection,
   ShellRoutePath,
 } from "../shared/lib/app-route-types";
 export type {
   AppRoute,
   AuthRoutePath,
   MarketingRoutePath,
-  ProjectRouteDrawer,
+  ProjectRouteSection,
   ShellRoutePath,
 } from "../shared/lib/app-route-types";
 
@@ -61,13 +61,13 @@ export function matchAppRoute(pathname: string): AppRoute {
   if (pathname === "/projects") return { kind: "projects-index", path: "/projects" };
   if (pathname === "/projects/new") return { kind: "projects-new", path: "/projects/new" };
   const projectMatch = pathname.match(
-    /^\/projects\/([^/]+)(?:\/(settings|members|history|documents))?$/u,
+    /^\/projects\/([^/]+)(?:\/(lineage|settings|members|history|documents))?$/u,
   );
   if (projectMatch) {
     const projectId = decodeURIComponent(projectMatch[1]);
-    const drawer = projectMatch[2] as ProjectRouteDrawer | undefined;
-    return drawer
-      ? { kind: "project-workspace", path: pathname, projectId, drawer }
+    const section = projectMatch[2] as ProjectRouteSection | undefined;
+    return section
+      ? { kind: "project-workspace", path: pathname, projectId, section }
       : { kind: "project-workspace", path: pathname, projectId };
   }
 

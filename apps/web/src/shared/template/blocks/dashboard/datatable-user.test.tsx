@@ -17,6 +17,21 @@ afterEach(async () => {
 })
 
 describe('UserDatatable localization', () => {
+  it('changes the dashboard page size and returns to the first page', async () => {
+    const user = userEvent.setup()
+    const data = Array.from({ length: 12 }, (_, index) => ({ ...rows[0]!, id: `item-${index}`, user: `项目 ${index + 1}` }))
+    render(<I18nextProvider i18n={i18n}><UserDatatable data={data} /></I18nextProvider>)
+    expect(screen.getByText('显示第 1–5 条，共 12 条')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '前往下一页' }))
+    expect(screen.getByText('显示第 6–10 条，共 12 条')).toBeInTheDocument()
+    await user.click(screen.getByRole('combobox', { name: '每页显示条数' }))
+    await user.click(screen.getByRole('option', { name: '10' }))
+    expect(screen.getByText('显示第 1–10 条，共 12 条')).toBeInTheDocument()
+    expect(screen.getByText('项目 1')).toBeInTheDocument()
+    expect(screen.queryByText('项目 11')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '前往下一页' }))
+    expect(screen.getByText('显示第 11–12 条，共 12 条')).toBeInTheDocument()
+  })
   it('shows Chinese labels and filters using the underlying role value', async () => {
     await i18n.changeLanguage('zh-CN')
     const user = userEvent.setup()

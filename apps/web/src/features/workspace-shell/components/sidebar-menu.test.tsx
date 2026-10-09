@@ -15,6 +15,17 @@ import {
 import { useWorkspaceSession } from "../../workspace-session/state";
 import { useWorkspaceShell } from "../state";
 import { SidebarMenu } from "./sidebar-menu";
+import { useSidebar } from "../../../shared/ui/sidebar";
+
+function ProjectNavigationHarness({ onOpen }: { onOpen: (section: string) => void }) {
+  const { setOpen, setOpenMobile, openMobile } = useSidebar();
+  return <>
+    <button onClick={() => setOpen(false)}>折叠侧栏</button>
+    <button onClick={() => setOpenMobile(true)}>打开手机侧栏</button>
+    <output data-testid="mobile-open">{String(openMobile)}</output>
+    <SidebarMenu activeProjectSection="settings" onOpenProjectSection={onOpen} />
+  </>;
+}
 
 function TabsProbe() {
   const { openTabs, closeWorkspaceTab } = useWorkspaceShell();
@@ -125,6 +136,29 @@ function SidebarSequenceGenerationHarness() {
 }
 
 describe("SidebarMenu", () => {
+  it.each([1440, 390])("keeps project management accessible at viewport %s and closes mobile navigation", async width => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+    try {
+      const user = userEvent.setup();
+      const onOpen = vi.fn();
+      render(withWorkspaceProviders(<ProjectNavigationHarness onOpen={onOpen} />, createSidebarRepository()));
+      const navigation = screen.getByRole("navigation", { name: "项目导航" });
+      expect(screen.getByText("项目管理")).toBeInTheDocument();
+      expect(within(navigation).getByRole("button", { name: "项目设置" })).toHaveAttribute("aria-current", "page");
+      expect(within(navigation).getByRole("button", { name: "系统需求" })).not.toHaveAttribute("data-active");
+      await user.click(screen.getByRole("button", { name: "折叠侧栏" }));
+      await user.click(screen.getByRole("button", { name: "打开手机侧栏" }));
+      expect(screen.getByTestId("mobile-open")).toHaveTextContent("true");
+      await user.click(within(navigation).getByRole("button", { name: "运行历史" }));
+      expect(onOpen).toHaveBeenCalledWith("history");
+      expect(screen.getByTestId("mobile-open")).toHaveTextContent("false");
+      expect(within(navigation).getByRole("button", { name: "文档中心" })).toBeInTheDocument();
+      expect(within(navigation).getByRole("button", { name: "说明书" })).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    }
+  });
   it("navigates business-flow traceability, element groups and relationships with their own tab identities", async () => {
     const user = userEvent.setup();
     const repository = createSidebarRepository(createWorkspaceRecord({ rules: [createRule()], feasibilityBusinessFlow: createBusinessFlowArtifact() }));

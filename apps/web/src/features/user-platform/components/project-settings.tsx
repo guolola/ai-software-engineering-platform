@@ -47,11 +47,13 @@ export function ProjectSettings({
   membershipRole,
   layout = "page",
   onProjectDeleted,
+  pageTitle,
 }: {
   project: PlatformProject;
   membershipRole?: string | null;
   layout?: "page" | "drawer";
   onProjectDeleted?: (projectId: string) => void;
+  pageTitle?: string;
 }) {
   const { t } = useTranslation();
   const { showAlert } = useFloatingAlert();
@@ -188,7 +190,7 @@ export function ProjectSettings({
     <div className={cn(layout === "page" && "grid min-w-0 gap-6")}>
       {layout === "page" && (
         <PageHeader
-          title={t("projectSettings.basic")}
+          title={pageTitle ?? t("projectSettings.basic")}
           description={t("projectSettings.basicDescription")}
           className="mb-0 lg:mb-0"
         />

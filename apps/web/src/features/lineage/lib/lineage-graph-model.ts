@@ -15,7 +15,7 @@ import {
   type DesignDiagramType,
   type DiagramType,
 } from "../../../entities/diagram/model";
-import type { RequirementRule } from "../../../entities/requirement-rule/model";
+import type { RequirementRule, RuleCategory } from "../../../entities/requirement-rule/model";
 
 import type { PlatformRunSummary } from "../../user-platform/services/platform-api";
 import {
@@ -74,6 +74,8 @@ export type LineageNode = {
   downstreamIds: string[];
   recentEvents: LineageRecentEvent[];
   payload?: {
+    ruleId?: string;
+    ruleCategory?: RuleCategory;
     diagramKind?: DiagramKind;
     designDiagramKind?: DesignDiagramKind;
     documentKind?: DocumentKind;
@@ -944,6 +946,7 @@ function buildRuleNodes(input: LineageGraphInput): LineageNode[] {
       stageLabel: STAGE_LABELS["requirement-rules"],
       label: rule.id,
       eyebrow: rule.category,
+      payload: { ruleId: rule.id, ruleCategory: rule.category },
       description: rule.text,
       status,
       reason: ruleReason(input, rule),

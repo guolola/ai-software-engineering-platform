@@ -99,11 +99,13 @@ function stubBillingFetch({
   onSummary,
   onCreateOrder,
   failOrderCreation = false,
+  recentOrders,
 }: {
   order?: typeof billingOrder | typeof paidBillingOrder;
   onSummary?: () => void;
   onCreateOrder?: (body: unknown) => void;
   failOrderCreation?: boolean;
+  recentOrders?: Array<typeof billingOrder | typeof paidBillingOrder>;
 } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://127.0.0.1:4101");
@@ -124,7 +126,7 @@ function stubBillingFetch({
             creditAmount: 5,
             validUntil: "2026-07-05T04:00:00.000Z",
           },
-          recentOrders: [order],
+          recentOrders: recentOrders ?? [order],
         }),
         {
           status: 200,
@@ -205,6 +207,40 @@ describe("AccountBillingPage", () => {
     window.sessionStorage.clear();
     window.localStorage.clear();
     window.history.pushState({}, "", "/");
+  });
+
+  it("pages orders with dashboard controls and resumes the correct order on a later page", async () => {
+    const orders = Array.from({ length: 6 }, (_, index) => ({
+      ...paidBillingOrder, orderId: `paid-${index}`, merchantOrderNo: `PAID-${index}`,
+    }));
+    stubBillingFetch({ recentOrders: [...orders, billingOrder] });
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    renderWithI18n(<AccountBillingPage onNavigate={navigate} />);
+    expect(await screen.findByText("显示第 1–5 条，共 7 条")).toBeInTheDocument();
+    expect(screen.queryByText(billingOrder.merchantOrderNo)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "前往下一页" }));
+    expect(screen.getByText("显示第 6–7 条，共 7 条")).toBeInTheDocument();
+    expect(screen.queryByText("PAID-0")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "前往下一页" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "继续支付" }));
+    expect(navigate).toHaveBeenCalledWith(`/billing/alipay/return?orderId=${billingOrder.orderId}`);
+    await user.click(screen.getByRole("button", { name: "前往上一页" }));
+    expect(screen.getByText("PAID-0")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "前往下一页" }));
+    await user.click(screen.getByRole("combobox", { name: "每页显示条数" }));
+    await user.click(await screen.findByRole("option", { name: "10" }));
+    expect(screen.getByText("显示第 1–7 条，共 7 条")).toBeInTheDocument();
+    expect(screen.getByText("PAID-0")).toBeInTheDocument();
+  });
+
+  it("keeps a disabled first page for an empty order list", async () => {
+    stubBillingFetch({ recentOrders: [] });
+    renderWithI18n(<AccountBillingPage onNavigate={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByText("正在加载权益...")).not.toBeInTheDocument());
+    expect(screen.getByText("显示第 0–0 条，共 0 条")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "前往上一页" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "前往下一页" })).toBeDisabled();
   });
 
   it("renders the account gift-card selector and purchases the selected pack with Alipay directly", async () => {
@@ -324,6 +360,9 @@ describe("AccountBillingPage", () => {
     expect(screen.getByText("Order no.")).toBeInTheDocument();
     expect(screen.getByText("Pending")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Resume payment" })).toBeInTheDocument();
+    expect(screen.getByText("Showing 1 to 1 of 1 entries")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go to next page" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Rows per page" })).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Select a credit pack" })).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Select payment method" })).toBeInTheDocument();
     expect(screen.getAllByText("100-credit pack").length).toBeGreaterThan(0);

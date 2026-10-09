@@ -113,7 +113,7 @@ export const resources = {
         table: {
           user: "用户", role: "角色", plan: "方案", billing: "计费", status: "状态", actions: "操作",
           filter: "筛选{{field}}", all: "全部", selectAll: "选择本页全部", selectRow: "选择此行",
-          noResults: "没有匹配结果。", pageSummary: "显示第 {{start}}–{{end}} 条，共 {{total}} 条",
+          noResults: "没有匹配结果。", perPage: "每页", pageSize: "每页显示条数", pageSummary: "显示第 {{start}}–{{end}} 条，共 {{total}} 条",
           previous: "上一页", next: "下一页", previousPage: "前往上一页", nextPage: "前往下一页",
           deleteItem: "删除项目", viewItem: "查看项目", editItem: "编辑项目",
           delete: "删除", view: "查看", edit: "编辑", duplicate: "复制",
@@ -254,6 +254,9 @@ export const resources = {
         documentDeleted: "说明书已在文档中心删除，恢复后可重新下载。", redownload: "重新下载 DOCX", delete: "删除", deleteAria: "删除历史记录：{{title}}", clear: "清空历史",
       },
       lineage: {
+        generation: { title: "当前产物生成信息", unknownPerson: "生成人信息不可用", unrecorded: "耗时未记录", rulesBatch: "规则批次耗时", elapsed: "生成耗时（包含修复和渲染）", representative: "代表图：{{label}}" },
+        canvas: {"openPage":"打开对应页面","summary":"{{nodes}} 个节点 · {{edges}} 条连线","selectTool":"选择工具","handTool":"平移工具","zoomOut":"缩小","zoomIn":"放大","undo":"撤销布局","redo":"重做布局","lock":"锁定画布","unlock":"解锁画布","resetLayout":"重置布局","fitView":"适应画布","filters":"链路筛选","help":"画布帮助","helpText":"拖动节点调整布局，使用平移和缩放浏览链路。选择节点查看详情；布局仅用于当前视图。"},
+        showDetails: "展开节点详情", hideDetails: "收起节点详情",
         title: "全局链路图", description: "查看需求规则、需求模型、设计模型、代码和文档之间的上下游映射。", nodes: "{{count}} 个节点", close: "关闭链路图",
         noRelated: "暂无关联节点。", detail: "节点详情", detailHint: "选择一个节点后查看上下游来源、影响范围和建议操作。", viewOld: "查看旧版", viewArtifact: "查看产物",
         statusReason: "状态原因", upstream: "上游来源", downstream: "下游影响", recommendation: "建议操作", recent: "最近生成记录", noRecent: "暂无最近生成记录。",
@@ -264,7 +267,7 @@ export const resources = {
         statuses: { not_generated: "未生成", current: "最新", stale: "需更新", error: "错误", running: "生成中", interrupted: "服务中断" },
         kinds: { rule: "需求规则", requirement_model: "需求模型", design_model: "设计模型", document: "说明书",  }, more: "{{label}} 更多操作",
         stages: { requirement_rules: "需求规则", requirement_models: "需求模型", design_models: "设计模型", documents: "产物" },
-        actions: { generate: "生成", view: "查看", update: "更新", retry: "重试", progress: "查看进度" },
+        actions: { regenerate: "重新生成", generate: "生成", view: "查看", update: "更新", retry: "重试", progress: "查看进度" },
         products: {
           requirementsSpec: { label: "需求说明书", description: "汇总需求规则与需求模型的说明书。" },
           softwareDesignSpec: { label: "设计说明书", description: "汇总设计模型、代码规格与接口约束。" },
@@ -1018,6 +1021,7 @@ export const resources = {
       },
       modelPicker: { notSelected: "未选择模型", noModels: "当前模型供应商没有可用模型", selectProvider: "请先选择模型供应商", switch: "切换模型", modes: { strictJson: "严格 JSON", jsonObject: "JSON 模式", compatible: "兼容" } },
       projectShell: {
+        management: "项目管理",
         membersUi: {
           summary: "共 {{activeCount}} 名成员，包含 {{ownerCount}} 名所有者、{{editorCount}} 名编辑者、{{viewerCount}} 名查看者。另有 {{invitedCount}} 个待处理邀请。",
           readonly: "当前权限为只读，只能查看成员与邀请状态，无法邀请或修改成员角色。",
@@ -1597,7 +1601,7 @@ export const resources = {
         table: {
           user: "User", role: "Role", plan: "Plan", billing: "Billing", status: "Status", actions: "Actions",
           filter: "Select {{field}}", all: "All", selectAll: "Select all on this page", selectRow: "Select row",
-          noResults: "No results.", pageSummary: "Showing {{start}} to {{end}} of {{total}} entries",
+          noResults: "No results.", perPage: "Per page", pageSize: "Rows per page", pageSummary: "Showing {{start}} to {{end}} of {{total}} entries",
           previous: "Previous", next: "Next", previousPage: "Go to previous page", nextPage: "Go to next page",
           deleteItem: "Delete item", viewItem: "View item", editItem: "Edit item",
           delete: "Delete", view: "View", edit: "Edit", duplicate: "Duplicate",
@@ -1738,6 +1742,9 @@ export const resources = {
         documentDeleted: "The document was deleted from the document center. Restore it to download it again.", redownload: "Redownload DOCX", delete: "Delete", deleteAria: "Delete history entry: {{title}}", clear: "Clear history",
       },
       lineage: {
+        generation: { title: "Current artifact generation", unknownPerson: "Generator information unavailable", unrecorded: "Duration not recorded", rulesBatch: "Rule extraction batch duration", elapsed: "Generation duration (including repair and rendering)", representative: "Representative diagram: {{label}}" },
+        canvas: {"openPage":"Open corresponding page","summary":"{{nodes}} nodes · {{edges}} connections","selectTool":"Select tool","handTool":"Hand tool","zoomOut":"Zoom out","zoomIn":"Zoom in","undo":"Undo layout","redo":"Redo layout","lock":"Lock canvas","unlock":"Unlock canvas","resetLayout":"Reset layout","fitView":"Fit view","filters":"Lineage filters","help":"Canvas help","helpText":"Drag nodes to arrange the view; pan and zoom to explore. Select a node for details. Layout changes apply to this view only."},
+        showDetails: "Show node details", hideDetails: "Hide node details",
         title: "Global lineage graph", description: "Review upstream and downstream mappings among requirement rules, requirement models, design models, code, and documents.", nodes: "{{count}} nodes", close: "Close lineage graph",
         noRelated: "No related nodes.", detail: "Node details", detailHint: "Select a node to review upstream sources, downstream impact, and recommended actions.", viewOld: "View previous", viewArtifact: "View artifact",
         statusReason: "Status reason", upstream: "Upstream sources", downstream: "Downstream impact", recommendation: "Recommended action", recent: "Recent generations", noRecent: "No recent generation records.",
@@ -1748,7 +1755,7 @@ export const resources = {
         statuses: { not_generated: "Not generated", current: "Current", stale: "Needs update", error: "Error", running: "Generating", interrupted: "Interrupted" },
         kinds: { rule: "Requirement rules", requirement_model: "Requirement models", design_model: "Design models", document: "Documents",  }, more: "More actions for {{label}}",
         stages: { requirement_rules: "Requirement rules", requirement_models: "Requirement models", design_models: "Design models", documents: "Artifacts" },
-        actions: { generate: "Generate", view: "View", update: "Update", retry: "Retry", progress: "View progress" },
+        actions: { regenerate: "Regenerate", generate: "Generate", view: "View", update: "Update", retry: "Retry", progress: "View progress" },
         products: {
           requirementsSpec: { label: "Requirements specification", description: "Summarizes requirement rules and requirement models." },
           softwareDesignSpec: { label: "Software design specification", description: "Summarizes design models, code specifications, and interface constraints." },
@@ -2505,6 +2512,7 @@ export const resources = {
       },
       modelPicker: { notSelected: "No model selected", noModels: "The current model provider has no available models", selectProvider: "Select a model provider first", switch: "Switch model", modes: { strictJson: "Strict JSON", jsonObject: "JSON mode", compatible: "Compatible" } },
       projectShell: {
+        management: "Project management",
         membersUi: {
           summary: "{{activeCount}} members: {{ownerCount}} owners, {{editorCount}} editors, and {{viewerCount}} viewers. {{invitedCount}} invitations are pending.",
           readonly: "Your access is read-only. You can view members and invitations, but cannot invite members or change roles.",

@@ -1,4 +1,5 @@
 // Verifies top-level app routing, provider composition, shell layout behavior, and account/project entry flows.
+import { useReactFlowTestLayout } from '../test/react-flow-test-layout';
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -31,6 +32,8 @@ let loginApiMode: "failure" | "success" | "mfa-challenge" | "email-unverified";
 let authSessionMode: "authenticated" | "unauthenticated" | "offline";
 let accountMfaEnabled: boolean;
 let providerConfigFixtures: Array<Record<string, unknown>>;
+useReactFlowTestLayout();
+
 const projectUpdatedAt = "2026-05-22T02:00:00.000Z";
 const billingTestSkus = [
   {
@@ -1814,22 +1817,22 @@ describe("App shell routes", () => {
     expect(matchAppRoute("/projects/course-demo/settings")).toMatchObject({
       kind: "project-workspace",
       projectId: "course-demo",
-      drawer: "settings",
+      section: "settings",
     });
     expect(matchAppRoute("/projects/course-demo/members")).toMatchObject({
       kind: "project-workspace",
       projectId: "course-demo",
-      drawer: "members",
+      section: "members",
     });
     expect(matchAppRoute("/projects/course-demo/history")).toMatchObject({
       kind: "project-workspace",
       projectId: "course-demo",
-      drawer: "history",
+      section: "history",
     });
     expect(matchAppRoute("/projects/course-demo/documents")).toMatchObject({
       kind: "project-workspace",
       projectId: "course-demo",
-      drawer: "documents",
+      section: "documents",
     });
     expect(matchAppRoute("/account")).toMatchObject({ kind: "legacy-account", path: "/account" });
     expect(matchAppRoute("/account/security")).toMatchObject({
@@ -2922,7 +2925,7 @@ describe("App shell routes", () => {
 
     render(withWorkspaceProviders(<Shell />, createRepository()));
 
-    expect(await screen.findByRole("dialog", { name: "项目设置" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "项目设置" })).toBeInTheDocument();
     expect(screen.getByText("当前项目角色不能管理项目设置。")).toBeInTheDocument();
     expect(screen.getByLabelText("项目信息")).toBeDisabled();
     expect(screen.getByLabelText("项目描述")).toBeDisabled();
@@ -2931,7 +2934,7 @@ describe("App shell routes", () => {
     expect(screen.getByRole("button", { name: "删除项目" })).toBeDisabled();
   });
 
-  it("opens project workspace drawers from banner shortcuts without routing", async () => {
+  it("keeps task details in a drawer and opens members as a sidebar page", async () => {
     const user = userEvent.setup();
     projectApiMode = "authenticated";
     window.history.pushState({}, "", "/projects/library-booking");
@@ -2956,17 +2959,13 @@ describe("App shell routes", () => {
     });
 
     await user.click(await screen.findByRole("button", { name: "成员" }));
-
-    expect(window.location.pathname).toBe("/projects/library-booking");
-    expect(await screen.findByRole("dialog", { name: "成员管理" })).toBeInTheDocument();
-    expect(screen.getByTestId("project-workspace-drawer-layer")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/projects/library-booking/members");
+    expect(await screen.findByRole("region", { name: "项目成员与权限" })).toBeInTheDocument();
+    expect(screen.queryByTestId("project-workspace-drawer-layer")).not.toBeInTheDocument();
     expect(screen.getByText("项目导航")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "关闭成员管理抽屉" }));
+    await user.click(screen.getByRole("button", { name: "系统需求" }));
     expect(window.location.pathname).toBe("/projects/library-booking");
-    await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "成员管理" })).not.toBeInTheDocument();
-    });
+    expect(screen.queryByRole("region", { name: "项目成员与权限" })).not.toBeInTheDocument();
   });
 
   it("opens the real task drawer and selects the requested server run", async () => {
@@ -2999,34 +2998,69 @@ describe("App shell routes", () => {
     expect(window.location.pathname).toBe("/projects/library-booking");
   });
 
-  it("switches project workspace drawers from banner shortcuts while a drawer is open", async () => {
+  it("switches project management pages without opening overlays", async () => {
     const user = userEvent.setup();
     projectApiMode = "authenticated";
     window.history.pushState({}, "", "/projects/library-booking");
-
     render(withWorkspaceProviders(<Shell />, createRepository()));
-
-    expect(await screen.findByText("智慧图书馆预约系统")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "运行历史" }));
-
-    expect(await screen.findByRole("dialog", { name: "运行历史" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "关闭运行历史抽屉" }));
-    await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "运行历史" })).not.toBeInTheDocument();
-    });
-    await user.click(await screen.findByRole("button", { name: "文档中心" }));
-
-    expect(await screen.findByRole("dialog", { name: "文档中心" })).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/projects/library-booking");
+    const navigation = await screen.findByRole("navigation", { name: "项目导航" });
+    for (const [label, section, heading] of [
+      ["链路图", "lineage", "全局链路图"],
+      ["运行历史", "history", "运行历史"],
+      ["项目设置", "settings", "项目设置"],
+      ["成员", "members", "项目成员与权限"],
+      ["文档中心", "documents", "文档中心"],
+    ]) {
+      await user.click(within(navigation).getByRole("button", { name: label }));
+      expect(window.location.pathname).toBe('/projects/library-booking/' + section);
+      expect(await screen.findByRole("heading", { name: heading, level: 1 })).toBeInTheDocument();
+      expect(within(navigation).getByRole("button", { name: label })).toHaveAttribute("aria-current", "page");
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+      expect(screen.queryByTestId("project-workspace-drawer-layer")).not.toBeInTheDocument();
+      expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeNull();
+      expect(document.querySelector('[data-slot="sidebar-inset"] > header')).not.toHaveTextContent(label);
+    }
   });
 
-  it("opens project drawers from direct child routes", async () => {
+  it("keeps the project session and workspace mounted through menu and browser history changes", async () => {
+    const user = userEvent.setup();
+    const repository = createRepository();
     projectApiMode = "authenticated";
-    window.history.pushState({}, "", "/projects/library-booking/history");
+    window.history.pushState({}, "", "/projects/library-booking");
+    render(withWorkspaceProviders(<Shell />, repository));
+    const navigation = await screen.findByRole("navigation", { name: "项目导航" });
+    await waitFor(() => expect(screen.queryByTestId("platform-loading-screen")).not.toBeInTheDocument());
+    const authCalls = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes("/api/auth/me")).length;
+    const initialAuthCalls = authCalls();
+    const initialWorkspaceLoads = vi.mocked(repository.loadWorkspace).mock.calls.length;
+    await user.click(within(navigation).getByRole("button", { name: "需求模型" }));
+    expect(await screen.findByRole("heading", { name: "目标模型" })).toBeInTheDocument();
+    for (const name of ["链路图", "运行历史", "项目设置", "成员", "文档中心"]) {
+      await user.click(within(navigation).getByRole("button", { name }));
+      expect(screen.getByRole("navigation", { name: "项目导航" })).toBe(navigation);
+      expect(screen.queryByTestId("auth-check-placeholder")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("platform-loading-screen")).not.toBeInTheDocument();
+      expect(authCalls()).toBe(initialAuthCalls);
+    }
+    act(() => window.history.back());
+    expect(await screen.findByRole("heading", { name: "项目成员与权限" })).toBeInTheDocument();
+    act(() => window.history.forward());
+    expect(await screen.findByRole("heading", { name: "文档中心" })).toBeInTheDocument();
+    await user.click(within(navigation).getByRole("button", { name: "需求模型" }));
+    expect(window.location.pathname).toBe("/projects/library-booking");
+    expect(await screen.findByRole("heading", { name: "目标模型" })).toBeInTheDocument();
+    expect(authCalls()).toBe(initialAuthCalls);
+    expect(vi.mocked(repository.loadWorkspace).mock.calls.length).toBe(initialWorkspaceLoads);
+    expect(screen.queryByTestId("platform-loading-screen")).not.toBeInTheDocument();
+  });
 
+  it.each(["settings", "members", "history", "documents", "lineage"])("opens the %s section from a direct child route", async section => {
+    projectApiMode = "authenticated";
+    window.history.pushState({}, "", "/projects/library-booking/" + section);
     render(withWorkspaceProviders(<Shell />, createRepository()));
-
-    expect(await screen.findByRole("dialog", { name: "运行历史" })).toBeInTheDocument();
+    await screen.findByText("智慧图书馆预约系统");
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.queryByTestId("project-workspace-drawer-layer")).not.toBeInTheDocument();
     expect(screen.getByText("项目导航")).toBeInTheDocument();
   });
 
@@ -3039,8 +3073,8 @@ describe("App shell routes", () => {
 
     await user.click(await screen.findByRole("button", { name: "运行历史" }));
 
-    expect(await screen.findByRole("dialog", { name: "运行历史" })).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/projects/library-booking");
+    expect(await screen.findByRole("region", { name: "运行历史" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/projects/library-booking/history");
     expect(screen.getByText("项目导航")).toBeInTheDocument();
     expect(await screen.findByText("渲染需求图表")).toBeInTheDocument();
     expect(screen.getByText("渲染设计图表")).toBeInTheDocument();
@@ -3080,7 +3114,7 @@ describe("App shell routes", () => {
 
     await user.click(await screen.findByRole("button", { name: "成员" }));
 
-    expect(await screen.findByRole("dialog", { name: "成员管理" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "项目成员与权限" })).toBeInTheDocument();
     expect(screen.getByAltText("new-student 的头像")).toHaveAttribute(
       "src",
       "https://cdn.example.edu/new-student.png",
@@ -3333,7 +3367,7 @@ describe("App shell routes", () => {
 
     await user.click(await screen.findByRole("button", { name: "文档中心" }));
 
-    expect(await screen.findByRole("dialog", { name: "文档中心" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "文档中心" })).toBeInTheDocument();
     expect(await screen.findByText("requirements.docx")).toBeInTheDocument();
     expect(screen.getByText("OnlyOffice：编辑中")).toBeInTheDocument();
     expect(screen.getByText("编辑锁：teacher@example.edu")).toBeInTheDocument();

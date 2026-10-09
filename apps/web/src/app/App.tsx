@@ -39,7 +39,8 @@ import {
   findShellRouteModule,
   type ShellRoutePath,
 } from "./workspace-modules";
-import { matchAppRoute, type AppRoute } from "./app-routes";
+import { matchAppRoute, type AppRoute, type ProjectRouteSection } from "./app-routes";
+import { LineageGraphPage } from "../features/lineage/components/lineage-graph-page";
 
 import { WorkspaceRepositoryProvider } from "../services/workspace-repository";
 import { WorkspaceShellProvider, useWorkspaceShell } from "../features/workspace-shell/state";
@@ -53,6 +54,7 @@ import {
   InvitationAcceptPage,
   ProjectNewPage,
   ProjectWorkspaceDrawer,
+  ProjectSectionPage,
   type ProjectDrawerKind,
   ProjectWorkspaceAccessBoundary,
   ProjectsIndexPage,
@@ -94,13 +96,16 @@ function StandaloneRoutePage({ route }: { route: Exclude<ShellRoutePath, "/works
 }
 
 function getProtectedRoutePath(route: AppRoute) {
+  // Project sections share one authentication scope so menu changes keep the workspace mounted.
+  if (route.kind === "project-workspace") {
+    return `/projects/${encodeURIComponent(route.projectId)}`;
+  }
   if (
     route.kind === "shell" ||
     route.kind === "dashboard" ||
     route.kind === "mcp-connections" ||
     route.kind === "projects-index" ||
     route.kind === "projects-new" ||
-    route.kind === "project-workspace" ||
     route.kind === "legacy-account" ||
     route.kind === "account-billing" ||
     route.kind === "alipay-return"
@@ -113,7 +118,7 @@ function getProtectedRoutePath(route: AppRoute) {
 function ProjectWorkspaceShell({
   header,
   projectId,
-  routeDrawer,
+  projectSection,
   activeProjectDrawer,
   onActiveProjectDrawerChange,
   onOpenProviderSettings,
@@ -122,7 +127,7 @@ function ProjectWorkspaceShell({
 }: {
   header: React.ReactNode;
   projectId: string;
-  routeDrawer: ProjectDrawerKind | null;
+  projectSection: ProjectRouteSection | null;
   activeProjectDrawer: ProjectDrawerKind | null;
   onActiveProjectDrawerChange: (drawer: ProjectDrawerKind | null) => void;
   onOpenProviderSettings: () => void;
@@ -141,15 +146,17 @@ function ProjectWorkspaceShell({
   const projectOverview = useProjectOverview(projectId);
   const { startProjectTour } = useProjectOnboarding(projectId);
   const projectRuns = projectOverview.runs;
-  const activeDrawer = routeDrawer ?? activeProjectDrawer;
+  const projectPath = `/projects/${encodeURIComponent(projectId)}`;
   const traceabilityPrefix = t("traceability.title.scoped", { label: "" });
   const traceabilityScopeLabel = (label: string) =>
     label.startsWith(traceabilityPrefix) ? label.slice(traceabilityPrefix.length) : label;
   const closeDrawer = () => {
     onActiveProjectDrawerChange(null);
-    if (routeDrawer) {
-      onNavigate(`/projects/${encodeURIComponent(projectId)}`);
-    }
+  };
+  // Section routes share the mounted workspace; model navigation only changes its active view.
+  const returnToWorkspace = () => {
+    setOpenMobile(false);
+    if (projectSection) onNavigate(projectPath);
   };
 
   useEffect(() => {
@@ -160,6 +167,7 @@ function ProjectWorkspaceShell({
       if (target === "design-models") openDesignHome();
       if (target === "feasibility") openFeasibilityHome();
       if (target === "provider-settings") onOpenProviderSettings();
+      else if (projectSection) onNavigate(`/projects/${encodeURIComponent(projectId)}`);
     };
     window.addEventListener(PROJECT_WORKSPACE_TARGET_REQUEST_EVENT, openRequestedTarget);
     return () => {
@@ -171,6 +179,9 @@ function ProjectWorkspaceShell({
     openFeasibilityHome,
     openRequirementsText,
     openSystemRequirements,
+    projectId,
+    projectSection,
+    onNavigate,
   ]);
 
   let body: ReactNode;
@@ -360,10 +371,21 @@ function ProjectWorkspaceShell({
     
   }
 
+  if (projectSection === "lineage") {
+    body = <LineageGraphPage projectId={projectId} projectRuns={projectRuns} members={projectOverview.members} documents={projectOverview.documents} onViewArtifact={returnToWorkspace} />;
+  } else if (projectSection) {
+    body = <ProjectSectionPage projectId={projectId} section={projectSection} onNavigate={onNavigate} />;
+  }
+
   return (
     <DefaultPagesLayout
       sidebar={<DefaultSidebar resizeLabel={t("workspace.sidebar.resize")}>
-        <SidebarMenu projectRuns={projectRuns} onNavigateItemSelect={() => setOpenMobile(false)} />
+        <SidebarMenu
+          projectRuns={projectRuns}
+          activeProjectSection={projectSection}
+          onOpenProjectSection={section => onNavigate(`${projectPath}/${section}`)}
+          onNavigateItemSelect={returnToWorkspace}
+        />
       </DefaultSidebar>}
       header={React.isValidElement(header)
           ? React.cloneElement(header as React.ReactElement<TopBarProps>, {
@@ -387,7 +409,7 @@ function ProjectWorkspaceShell({
             >
               {body}
             </div>
-            <ProjectWorkspaceDrawer projectId={projectId} activeDrawer={activeDrawer} onNavigate={onNavigate} onClose={closeDrawer} preferredTaskRunId={preferredTaskRunId} />
+            <ProjectWorkspaceDrawer projectId={projectId} activeDrawer={activeProjectDrawer} onNavigate={onNavigate} onClose={closeDrawer} preferredTaskRunId={preferredTaskRunId} />
           </div>
         </div>
     </DefaultPagesLayout>
@@ -532,7 +554,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
             <ProjectWorkspaceShell
               header={<TopBar currentRoute={route.path} onNavigate={navigate} accountDialogOpen={accountDialogOpen} onAccountDialogOpenChange={setAccountDialogOpen} globalSettingsRequestId={globalSettingsRequestId} />}
               projectId={route.projectId}
-              routeDrawer={route.drawer ?? null}
+              projectSection={route.section ?? null}
               activeProjectDrawer={activeProjectDrawer}
               onActiveProjectDrawerChange={setActiveProjectDrawer}
               onOpenProviderSettings={openProviderSettings}

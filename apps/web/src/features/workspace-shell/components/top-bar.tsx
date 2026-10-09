@@ -6,19 +6,14 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Activity,
   AlertCircle,
-  BookOpen,
   Boxes,
   CheckCircle2,
   CircleHelp,
-  GitBranch,
-  History,
   Home,
   Loader2,
   Menu,
   Moon,
-  Settings2,
   Sun,
-  Users,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -48,7 +43,6 @@ import {
   SHELL_ROUTE_MODULES,
   type ShellRoutePath,
 } from "../../../entities/workspace/modules";
-import { LineageGraphDialog } from "../../lineage/components/lineage-graph-dialog";
 import { LanguagePreferenceMenu } from "../../../shared/i18n/components/language-preference-menu";
 import { ThemePresetMenu } from "../../../shared/template/layout/theme-preset-menu";
 
@@ -62,7 +56,7 @@ export type TopBarProps = {
   globalSettingsRequestId?: number;
   projectDrawer?: {
     projectId: string;
-    onOpenDrawer: (kind: "tasks" | "history" | "members" | "documents" | "settings") => void;
+    onOpenDrawer: (kind: "tasks") => void;
     projectRuns?: PlatformRunSummary[];
     projectName?: string;
     onStartTour?: () => void;
@@ -71,7 +65,7 @@ export type TopBarProps = {
 
 type ProjectWorkspaceActionsProps = {
   projectId: string;
-  onOpenDrawer: (kind: "tasks" | "history" | "members" | "documents" | "settings") => void;
+  onOpenDrawer: (kind: "tasks") => void;
   projectRuns?: PlatformRunSummary[];
   onStartTour?: () => void;
 };
@@ -257,7 +251,6 @@ export function ProjectWorkspaceActions({
   onStartTour,
 }: ProjectWorkspaceActionsProps) {
   const { t } = useTranslation();
-  const [lineageOpen, setLineageOpen] = useState(false);
   const {
     runStatus,
     runProgress,
@@ -295,26 +288,6 @@ export function ProjectWorkspaceActions({
           <CircleHelp className="size-5" />
         </Button>
       )}
-      {lineageOpen && (
-        <LineageGraphDialog
-          open={lineageOpen}
-          onOpenChange={setLineageOpen}
-          projectRuns={projectRuns}
-        />
-      )}
-      <Button
-        variant="ghost"
-        className={taskStatusButtonClass}
-        title={t("status.lineage")}
-        aria-label={t("status.lineage")}
-        onClick={() => setLineageOpen(true)}
-      >
-        <GitBranch className="size-5" />
-        <span className="hidden max-w-28 truncate font-semibold xl:inline">
-          {t("status.lineage")}
-        </span>
-      </Button>
-
       <Button
         id="onboarding-tasks-action"
         variant="ghost"
@@ -344,48 +317,6 @@ export function ProjectWorkspaceActions({
                 })
               : t(`status.run.${visibleRunStatus}`)}
         </span>
-      </Button>
-
-      <Button
-        id="onboarding-history-action"
-        type="button"
-        variant="ghost"
-        className="h-9 shrink-0 px-2.5"
-        onClick={() => onOpenDrawer("history")}
-      >
-        <History className="size-5" />
-        {t("status.runHistory")}
-      </Button>
-
-      <Button
-        id="onboarding-settings-action"
-        type="button"
-        variant="ghost"
-        className="h-9 shrink-0 px-2.5"
-        onClick={() => onOpenDrawer("settings")}
-      >
-        <Settings2 className="size-5" />
-        {t("projectShell.sections.settings")}
-      </Button>
-
-      <Button
-        type="button"
-        variant="ghost"
-        className="h-9 shrink-0 px-2.5"
-        onClick={() => onOpenDrawer("members")}
-      >
-        <Users className="size-5" />
-        {t("projectShell.drawer.membersShort")}
-      </Button>
-
-      <Button
-        type="button"
-        variant="ghost"
-        className="h-9 shrink-0 px-2.5"
-        onClick={() => onOpenDrawer("documents")}
-      >
-        <BookOpen className="size-5" />
-        {t("projectShell.sections.documents")}
       </Button>
     </div>
   );

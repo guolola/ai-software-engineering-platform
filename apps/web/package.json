@@ -26,6 +26,7 @@
     "@radix-ui/react-portal": "^1.1.9",
     "@tanstack/react-table": "^8.21.3",
     "@uml-platform/contracts": "0.0.1",
+    "@xyflow/react": "^12.12.0",
     "bowser": "^2.14.1",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "0.7.1",

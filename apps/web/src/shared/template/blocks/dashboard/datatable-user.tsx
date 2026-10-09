@@ -27,8 +27,6 @@ import {
   EyeIcon,
   ChevronUpIcon,
   ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   EllipsisVerticalIcon
 } from 'lucide-react'
 
@@ -44,12 +42,11 @@ import {
   DropdownMenuTrigger
 } from '@/shared/ui/dropdown-menu'
 import { Label } from '@/shared/ui/label'
-import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from '@/shared/ui/pagination'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip'
 
-import { usePagination } from '@/shared/template/blocks/dashboard/use-pagination'
+import { DashboardTablePagination } from './table-pagination'
 import { i18n as appI18n } from '@/shared/i18n'
 
 import { cn } from '@/shared/ui/utils'
@@ -235,12 +232,6 @@ const UserDatatable = ({ data }: { data: Item[] }) => {
     onPaginationChange: setPagination
   })
 
-  const { pages, showLeftEllipsis, showRightEllipsis } = usePagination({
-    currentPage: table.getState().pagination.pageIndex + 1,
-    totalPages: table.getPageCount(),
-    paginationItemsToDisplay: 2
-  })
-
   return (
     <div className='w-full'>
       <div className='border-b'>
@@ -314,76 +305,14 @@ const UserDatatable = ({ data }: { data: Item[] }) => {
         </Table>
       </div>
 
-      <div className='flex items-center justify-between gap-3 px-6 py-4 max-sm:flex-col md:max-lg:flex-col'>
-        <p className='text-muted-foreground text-sm whitespace-nowrap' aria-live='polite'>
-          {t('dashboard.table.pageSummary', {
-            start: table.getRowCount() === 0 ? 0 : table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1,
-            end: Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getRowCount()),
-            total: table.getRowCount()
-          })}
-        </p>
-
-        <div>
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <Button
-                  className='disabled:pointer-events-none disabled:opacity-50'
-                  variant='ghost'
-                  onClick={() => table.previousPage()}
-                  disabled={!table.getCanPreviousPage()}
-                  aria-label={t('dashboard.table.previousPage')}
-                >
-                  <ChevronLeftIcon aria-hidden='true' />
-                  {t('dashboard.table.previous')}
-                </Button>
-              </PaginationItem>
-
-              {showLeftEllipsis && (
-                <PaginationItem>
-                  <PaginationEllipsis />
-                </PaginationItem>
-              )}
-
-              {pages.map(page => {
-                const isActive = page === table.getState().pagination.pageIndex + 1
-
-                return (
-                  <PaginationItem key={page}>
-                    <Button
-                      size='icon'
-                      className={`${!isActive && 'bg-primary/10 text-primary hover:bg-primary/20 focus-visible:ring-primary/20 dark:focus-visible:ring-primary/40'}`}
-                      onClick={() => table.setPageIndex(page - 1)}
-                      aria-current={isActive ? 'page' : undefined}
-                    >
-                      {page}
-                    </Button>
-                  </PaginationItem>
-                )
-              })}
-
-              {showRightEllipsis && (
-                <PaginationItem>
-                  <PaginationEllipsis />
-                </PaginationItem>
-              )}
-
-              <PaginationItem>
-                <Button
-                  className='disabled:pointer-events-none disabled:opacity-50'
-                  variant='ghost'
-                  onClick={() => table.nextPage()}
-                  disabled={!table.getCanNextPage()}
-                  aria-label={t('dashboard.table.nextPage')}
-                >
-                  {t('dashboard.table.next')}
-                  <ChevronRightIcon aria-hidden='true' />
-                </Button>
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      </div>
+      <DashboardTablePagination
+        total={table.getRowCount()}
+        page={table.getState().pagination.pageIndex + 1}
+        pageSize={table.getState().pagination.pageSize}
+        onPageChange={(page) => table.setPageIndex(page - 1)}
+        onPageSizeChange={(pageSize) => setPagination({ pageIndex: 0, pageSize })}
+        t={t}
+      />
     </div>
   )
 }

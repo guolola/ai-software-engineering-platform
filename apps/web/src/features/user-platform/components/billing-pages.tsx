@@ -42,6 +42,7 @@ import {
 } from "../../../shared/ui/dialog";
 import { cn } from "../../../shared/ui/utils";
 import { PageContainer } from "../../../shared/template/layout/page";
+import { DashboardTablePagination } from "../../../shared/template/blocks/dashboard/table-pagination";
 import { useAppI18n } from "../../../shared/i18n";
 import { billingApi } from "../services/billing-api";
 import { floatingAlert } from "../../../shared/ui/floating-alert";
@@ -956,6 +957,13 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
   const [summaryError, setSummaryError] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [resumingOrderId, setResumingOrderId] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState(5);
+  const [orderPage, setOrderPage] = useState(1);
+  const orders = summary?.recentOrders ?? [];
+  const orderPageCount = Math.max(1, Math.ceil(orders.length / pageSize));
+  const currentOrderPage = Math.min(orderPage, orderPageCount);
+  useEffect(() => { setOrderPage((current) => Math.min(current, orderPageCount)); }, [orderPageCount]);
+  const visibleOrders = orders.slice((currentOrderPage - 1) * pageSize, currentOrderPage * pageSize);
   const refreshSummary = () => {
     setSummaryLoading(true);
     billingApi
@@ -1083,7 +1091,7 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-border text-muted-foreground">
-                    {summary.recentOrders.map((order) => (
+                    {visibleOrders.map((order) => (
                       <TableRow key={order.orderId} className="transition-colors hover:bg-muted/30">
                         <TableCell className="px-5 py-3 font-mono text-xs text-muted-foreground">
                           {order.merchantOrderNo}
@@ -1132,6 +1140,10 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
                 {t("billing.orders.empty")}
               </div>
             )}
+            <div className="border-t border-border">
+              <DashboardTablePagination total={orders.length} page={currentOrderPage} pageSize={pageSize} onPageChange={setOrderPage}
+                onPageSizeChange={(size) => { setPageSize(size); setOrderPage(1); }} t={t} />
+            </div>
           </Card>
         </section>
       </div>

@@ -26,8 +26,8 @@ export const TOUR_ITEMS: Record<TourId, readonly TourItem[]> = {
     { key: "desktop.tests", selector: '[data-onboarding-nav="test"]', side: "right", stage: "tests" },
     { key: "desktop.documents", selector: '[data-onboarding-nav="documents"]', side: "right", stage: "documents" },
     { key: "desktop.tasks", selector: "#onboarding-tasks-action", side: "bottom" },
-    { key: "desktop.history", selector: "#onboarding-history-action", side: "bottom" },
-    { key: "desktop.management", selector: "#onboarding-settings-action", side: "bottom" },
+    { key: "desktop.history", selector: "#onboarding-history-action", side: "right" },
+    { key: "desktop.management", selector: "#onboarding-settings-action", side: "right" },
   ],
   "first-project-mobile": [
     { key: "mobile.system", selector: "#requirement-text", side: "top", stage: "system" },

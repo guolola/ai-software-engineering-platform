@@ -9,7 +9,7 @@ export type AuthRoutePath =
   | "/reset-password";
 
 export type MarketingRoutePath = "/";
-export type ProjectRouteDrawer = "settings" | "members" | "history" | "documents";
+export type ProjectRouteSection = "lineage" | "settings" | "members" | "history" | "documents";
 
 export type AppRoute =
   | { kind: "marketing-home"; path: MarketingRoutePath }
@@ -30,5 +30,5 @@ export type AppRoute =
       kind: "project-workspace";
       path: string;
       projectId: string;
-      drawer?: ProjectRouteDrawer;
+      section?: ProjectRouteSection;
     };

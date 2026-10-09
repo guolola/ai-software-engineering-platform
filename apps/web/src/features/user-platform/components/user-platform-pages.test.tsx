@@ -201,9 +201,10 @@ describe("ProjectWorkspaceDrawer", () => {
       ),
     );
 
-    expect(await screen.findByText("项目设置")).toBeInTheDocument();
-    expect(screen.getByText("成员")).toBeInTheDocument();
-    expect(screen.getByText("文档中心")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "生成任务" })).toBeInTheDocument();
+    for (const name of ["项目设置", "成员", "文档中心"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
     expect(screen.queryByText("已同步")).not.toBeInTheDocument();
     expect(screen.queryByText("运行中 2")).not.toBeInTheDocument();
     expect(screen.queryByText("项目状态：active")).not.toBeInTheDocument();

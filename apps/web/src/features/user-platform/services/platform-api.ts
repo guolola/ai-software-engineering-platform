@@ -784,13 +784,13 @@ export const platformApi = {
       runs: PlatformRunSummary[];
     }>(`/api/projects/${projectId}/runs`);
   },
-  getProjectRun(projectId: string, runId: string) {
+  getProjectRun(projectId: string, runId: string, options: { includeEvents?: boolean; signal?: AbortSignal } = {}) {
     return requestJson<{
       projectId: string;
       run: PlatformRunSummary;
       snapshot?: RunHistorySnapshot;
       events?: unknown[];
-    }>(`/api/projects/${projectId}/runs/${runId}`);
+    }>(`/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}${options.includeEvents ? '?includeEvents=true' : ''}`, { signal: options.signal });
   },
   cancelProjectRun(projectId: string, runId: string) {
     return requestJson<{

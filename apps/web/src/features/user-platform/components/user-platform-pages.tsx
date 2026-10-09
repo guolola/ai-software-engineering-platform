@@ -70,7 +70,6 @@ import { ProjectHistory } from "./project-history";
 import { ProjectMembers } from "./project-members";
 import { PageFrame, SectionCard } from "./project-page-layout";
 import { ProjectSettings } from "./project-settings";
-import { LineageGraphDialog } from "../../lineage/components/lineage-graph-dialog";
 import { buildLoginRedirectPath } from "../lib/auth-page-routing";
 export { AuthPage } from "./auth-page";
 export { AccountPage, AccountSecurityPage } from "./account-pages";
@@ -433,38 +432,41 @@ export function ProjectSectionPage({
 
   return (
     <PageFrame onNavigate={onNavigate}>
-      <PageHeader
-        title={sectionTitle}
-        description={t(`projectShell.sectionDescriptions.${section}`, { project: projectName })}
-        actions={<Button type="button" variant="outline" onClick={() => onNavigate(`/projects/${projectId}`)}>
-          {t("projectShell.backToWorkspace")}
-        </Button>}
-      />
-      {overview.loading && (
-        <SectionCard>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            {t("projectShell.loadingProjectData")}
-          </div>
-        </SectionCard>
-      )}
-      {!overview.loading && accessMessage}
-      {!overview.loading && !accessMessage && overview.project && section === "settings" && (
-        <ProjectSettings
-          project={overview.project}
-          membershipRole={overview.membership?.role ?? null}
-          onProjectDeleted={() => onNavigate("/projects")}
-        />
-      )}
-      {!overview.loading && !accessMessage && overview.project && section === "members" && (
-        <ProjectMembers project={overview.project} members={overview.members} />
-      )}
-      {!overview.loading && !accessMessage && overview.project && section === "history" && (
-        <ProjectHistory projectId={projectId} initialRuns={overview.runs} members={overview.members} />
-      )}
-      {!overview.loading && !accessMessage && overview.project && section === "documents" && (
-        <ProjectDocuments projectId={projectId} documents={overview.documents} />
-      )}
+      <section aria-label={sectionTitle} className="flex min-w-0 flex-col gap-6">
+        {section !== "settings" && section !== "documents" && <PageHeader
+          title={sectionTitle}
+          description={t(`projectShell.sectionDescriptions.${section}`, { project: projectName })}
+          actions={<Button type="button" variant="outline" onClick={() => onNavigate(`/projects/${encodeURIComponent(projectId)}`)}>
+            {t("projectShell.backToWorkspace")}
+          </Button>}
+        />}
+        {overview.loading && (
+          <SectionCard>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              {t("projectShell.loadingProjectData")}
+            </div>
+          </SectionCard>
+        )}
+        {!overview.loading && accessMessage}
+        {!overview.loading && !accessMessage && overview.project && section === "settings" && (
+          <ProjectSettings
+            project={overview.project}
+            membershipRole={overview.membership?.role ?? null}
+            pageTitle={sectionTitle}
+            onProjectDeleted={() => onNavigate("/projects")}
+          />
+        )}
+        {!overview.loading && !accessMessage && overview.project && section === "members" && (
+          <ProjectMembers project={overview.project} members={overview.members} membershipRole={overview.membership?.role ?? null} />
+        )}
+        {!overview.loading && !accessMessage && overview.project && section === "history" && (
+          <ProjectHistory projectId={projectId} initialRuns={overview.runs} members={overview.members} />
+        )}
+        {!overview.loading && !accessMessage && overview.project && section === "documents" && (
+          <ProjectDocuments projectId={projectId} documents={overview.documents} pageTitle={sectionTitle} />
+        )}
+      </section>
     </PageFrame>
   );
 }

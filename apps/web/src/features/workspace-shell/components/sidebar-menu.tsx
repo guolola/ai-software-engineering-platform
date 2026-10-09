@@ -42,7 +42,12 @@ import {
   ClipboardCheck,
   Wrench,
   TableProperties,
+  History,
+  Settings2,
+  Users,
+  BookOpen,
 } from "lucide-react";
+import type { ProjectRouteSection } from "../../../shared/lib/app-route-types";
 import { cn } from "../../../shared/ui/utils";
 import { floatingAlert } from "../../../shared/ui/floating-alert";
 import type { PlatformRunSummary } from "../../user-platform/services/platform-api";
@@ -92,6 +97,8 @@ type Node = {
 type SidebarMenuProps = {
   onNavigateItemSelect?: () => void;
   projectRuns?: PlatformRunSummary[];
+  activeProjectSection?: ProjectRouteSection | null;
+  onOpenProjectSection?: (section: ProjectRouteSection) => void;
 };
 
 const KIND_ICON: Record<SemanticElementKind, ReactNode> = {
@@ -664,8 +671,11 @@ function buildPendingDesignDiagramNode(
 export function SidebarMenu({
   onNavigateItemSelect,
   projectRuns = [],
+  activeProjectSection = null,
+  onOpenProjectSection,
 }: SidebarMenuProps = {}) {
   const { t } = useTranslation();
+  const { setOpenMobile } = useSidebar();
   const [openKeys, setOpenKeys] = useState<Set<string>>(() => new Set());
   const {
     generatedDiagrams,
@@ -718,7 +728,7 @@ export function SidebarMenu({
     openDiagramRelationship,
     openDocumentsHome,
   } = useWorkspaceShell();
-  const selectedKey = getSelectionKey(selection);
+  const selectedKey = activeProjectSection ? "" : getSelectionKey(selection);
   const {
     requirementModelViewable,
     designModelViewable,
@@ -1169,6 +1179,14 @@ export function SidebarMenu({
     },
   ];
 
+  const projectItems: { section: ProjectRouteSection; label: string; icon: ReactNode; id?: string }[] = [
+    { section: "lineage", label: t("status.lineage"), icon: <GitBranch /> },
+    { section: "history", label: t("status.runHistory"), icon: <History />, id: "onboarding-history-action" },
+    { section: "settings", label: t("projectShell.sections.settings"), icon: <Settings2 />, id: "onboarding-settings-action" },
+    { section: "members", label: t("projectShell.drawer.membersShort"), icon: <Users /> },
+    { section: "documents", label: t("projectShell.drawer.documents"), icon: <BookOpen /> },
+  ];
+
   return (
     <nav aria-label={t("workspace.sidebar.navigation")} className="h-full w-full">
       <SidebarGroup>
@@ -1179,6 +1197,27 @@ export function SidebarMenu({
           </TemplateSidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
+      {onOpenProjectSection && <SidebarGroup>
+        <SidebarGroupLabel>{t("projectShell.management")}</SidebarGroupLabel>
+        <SidebarGroupContent>
+          <TemplateSidebarMenu>
+            {projectItems.map(item => <SidebarMenuItem key={item.section}>
+              <SidebarMenuButton
+                id={item.id}
+                tooltip={item.label}
+                aria-label={item.label}
+                aria-current={activeProjectSection === item.section ? "page" : undefined}
+                isActive={activeProjectSection === item.section}
+                className="data-active:bg-primary/10!"
+                onClick={() => {
+                  onOpenProjectSection(item.section);
+                  setOpenMobile(false);
+                }}
+              >{item.icon}<span>{item.label}</span></SidebarMenuButton>
+            </SidebarMenuItem>)}
+          </TemplateSidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>}
     </nav>
   );
 }
