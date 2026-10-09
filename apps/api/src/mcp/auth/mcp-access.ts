@@ -7,6 +7,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import type { Provider } from "oidc-provider";
+import type { DocumentLibrary } from "../../documents/library/document-library.js";
 import {
   hasProjectPermission,
   type AuthStore,
@@ -39,6 +40,7 @@ export function createMcpAccess(
   store: McpStore,
   config: McpConfig,
   provider: Provider,
+  documentLibrary?: DocumentLibrary,
 ) {
   async function active(connection: McpConnection | undefined) {
     if (
@@ -67,6 +69,7 @@ export function createMcpAccess(
   return {
     store,
     authStore,
+    documentLibrary,
     config,
     async authenticate(header: string | undefined) {
       const match = /^Bearer ([^\s]+)$/i.exec(header ?? "");

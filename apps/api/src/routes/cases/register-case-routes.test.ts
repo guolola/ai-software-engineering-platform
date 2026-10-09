@@ -176,12 +176,10 @@ test("case project creation seeds every marketing case workspace", async () => {
     const designSvgArtifacts = workspace.state.designSvgArtifacts as Record<string, { svg: string }>;
     assert.ok(Object.keys(designSvgArtifacts).length >= 4);
     assert.ok(Object.values(designSvgArtifacts).every((artifact) => artifact.svg.includes("<svg")));
-    assert.ok(Object.keys(workspace.state.codeFiles as Record<string, unknown>).length >= 4);
-    assert.equal(workspace.state.codeEntryFile, "/src/main.tsx");
-    assert.ok((workspace.state.codeFiles as Record<string, string>)["/src/main.tsx"]);
-    assert.ok((workspace.state.codeFiles as Record<string, string>)["/src/App.tsx"]);
-    assert.ok(workspace.state.codeSpec);
-    assert.ok(workspace.state.codeBusinessLogic);
+    // Case workspaces retain evidence; Coding Agents implement locally instead of restoring retired prototypes.
+    for (const key of ["codeFiles", "codeEntryFile", "codeSpec", "codeBusinessLogic"]) {
+      assert.equal(key in workspace.state, false);
+    }
     assert.ok(workspace.state.feasibilityContextModel);
     assert.ok(readFeasibilityBusinessFlowArtifact(workspace.state.feasibilityBusinessFlow));
     assert.match(String(workspace.state.feasibilityContextPlantUml), /@startuml/u);

@@ -1,10 +1,7 @@
 // Composes the MCP client catalog, setup dialogs and revocable connection records.
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Copy } from "lucide-react";
 import { Button } from "../../../shared/ui/button";
-import { Input } from "../../../shared/ui/input";
-import { Label } from "../../../shared/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "../../../shared/ui/alert";
 import { Skeleton } from "../../../shared/ui/skeleton";
 import { floatingAlert } from "../../../shared/ui/floating-alert";
@@ -49,10 +46,10 @@ export function McpConnectionsPanel({ onNavigate }: { onNavigate: (path: string)
     <section className="min-w-0 space-y-12 pb-8 sm:space-y-16" aria-label={t("mcp.title")}>
       <ClientCatalogHero />
       {state.loading ? (
-        <div aria-busy="true" className="space-y-5">
+        <div aria-busy="true" className="@container/mcp-catalog space-y-5">
           <p role="status">{t("mcp.loading")}</p>
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-72 rounded-none" />)}
+          <div className="grid grid-cols-1 gap-6 @[36rem]/mcp-catalog:grid-cols-2 @[56rem]/mcp-catalog:grid-cols-3">
+            {Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-80 rounded-xl" />)}
           </div>
         </div>
       ) : (
@@ -60,19 +57,8 @@ export function McpConnectionsPanel({ onNavigate }: { onNavigate: (path: string)
           {state.error && <Alert variant="destructive"><AlertTitle>{state.error}</AlertTitle><AlertDescription>{t("mcp.stale")}</AlertDescription><Button variant="outline" disabled={state.busy || state.refreshing} onClick={state.retry}>{t("mcp.retry")}</Button></Alert>}
           {state.info && !state.info.enabled && <Alert><AlertTitle>{t("mcp.status.disabled")}</AlertTitle><AlertDescription>{t("mcp.disabled")}</AlertDescription></Alert>}
           {state.info?.enabled && <>
-            <ClientCatalog onSelect={selectClient} />
-            <section className="min-w-0 border-y py-6" aria-label={t("mcp.address")}>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 space-y-2">
-                  <Label htmlFor="mcp-address" className="text-base font-medium">{t("mcp.address")}</Label>
-                  <p id="mcp-transport-help" className="text-sm leading-6 text-muted-foreground">{t("mcp.transportHelp")}</p>
-                </div>
-                <div className="flex min-w-0 flex-wrap gap-2 lg:w-1/2">
-                  <Input id="mcp-address" aria-describedby="mcp-transport-help" className="min-w-0 flex-1 font-mono text-xs" readOnly value={state.info.serverUrl ?? ""} />
-                  <Button variant="outline" disabled={!state.info.serverUrl} onClick={() => void copy(state.info?.serverUrl ?? "")}><Copy className="size-4" />{t("mcp.copyAddress")}</Button>
-                </div>
-              </div>
-            </section>
+            <ClientCatalog onSelect={selectClient} serverUrl={state.info.serverUrl ?? ""} onCopy={copy} />
+
             <div className="min-w-0 space-y-6">
               <div className="space-y-3">
                 <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">{t("mcp.guide")}</h2>

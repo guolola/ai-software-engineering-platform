@@ -4,13 +4,9 @@ import { markdownModules } from './docs-content.generated';
 
 export type ProductDocCategoryId =
   | "overview"
-  | "project"
-  | "workspace"
   | "model-provider"
   | "requirements"
-  | "feasibility"
   | "models"
-  | "design"
   | "delivery"
   | "support";
 
@@ -53,624 +49,1191 @@ type ProductDocArticleManifestItem = Omit<
 
 export const PRODUCT_DOC_CATEGORIES: readonly ProductDocCategory[] = [
   {
-    id: "overview",
-    label: "总览与映射",
-    description: "完整路径、页面入口和全链路产物映射。",
+    "id": "overview",
+    "label": "开始使用",
+    "description": "创建项目、熟悉界面，完成第一次生成。"
   },
   {
-    id: "project",
-    label: "项目与账号",
-    description: "项目首页、创建项目、成员、设置和账号全局配置。",
+    "id": "model-provider",
+    "label": "账号与模型",
+    "description": "连接模型服务，设置默认模型，管理生成次数。"
   },
   {
-    id: "workspace",
-    label: "工作台基础",
-    description: "顶部栏、侧边栏、标签页、生成任务和运行历史。",
+    "id": "requirements",
+    "label": "需求与可行性",
+    "description": "确认业务规则，评估边界、流程和实现路线。"
   },
   {
-    id: "model-provider",
-    label: "模型与 Provider",
-    description: "推荐模型、个人 Provider、平台权益和模型列表测试。",
+    "id": "models",
+    "label": "建模与设计",
+    "description": "生成模型，检查元素、关系和需求覆盖。"
   },
   {
-    id: "requirements",
-    label: "系统需求",
-    description: "需求输入、规则确认、质量提示、AI 修复和需求基线。",
+    "id": "delivery",
+    "label": "实现与交付",
+    "description": "连接编程助手，准备测试并导出说明书。"
   },
   {
-    id: "feasibility",
-    label: "可行性分析",
-    description: "系统环境图、业务与系统流程图、候选实现方案、成本收益、风险、结论和研究报告。",
-  },
-  {
-    id: "models",
-    label: "UML 与模型详情",
-    description: "需求模型、图表、元素详情、PlantUML、SVG 和追踪矩阵。",
-  },
-  {
-    id: "design",
-    label: "设计与追踪",
-    description: "设计模型、用例实现、设计详情和需求到设计映射。",
-  },
-  {
-    id: "delivery",
-    label: "交付与复盘",
-    description: "测试、说明书、运行历史和证据。",
-  },
-  {
-    id: "support",
-    label: "账号与排障",
-    description: "模型配置、账号、权限和常见问题。",
-  },
+    "id": "support",
+    "label": "任务与排障",
+    "description": "查看进度与历史，解决权限和生成问题。"
+  }
 ];
 
 const ARTICLE_MANIFEST = [
   {
-    id: "quick-start",
-    title: "快速开始",
-    category: "overview",
-    summary: "用图书馆预约系统走完整流程，从系统需求、可行性分析到说明书证据。",
-    estimatedMinutes: 7,
-    recommendedPath: true,
-    sourcePath: "../content/quick-start.md",
-    tags: ["新手", "完整路径", "图书馆预约系统", "入口"],
-    relatedArtifacts: ["项目", "需求规则", "可行性分析", "UML", "设计模型", "Coding Agent", "三类说明书"],
-    screenshot: {
-      src: "/help/images/docs-quick-start.png",
-      alt: "项目内使用文档快速开始截图",
-      caption: "快速开始用一个项目串起全部页面和产物。",
-    },
-    video: {
-      src: TUTORIAL_QUICK_START_VIDEO_URL,
-      title: "快速开始项目操作视频",
-      description: "带着真实项目操作一遍，从项目入口、需求规则、UML、设计、代码、测试到说明书证据。",
-      caption: "项目操作视频",
-    },
+    "id": "quick-start",
+    "title": "快速开始",
+    "category": "overview",
+    "summary": "创建第一个项目，整理需求、检查模型并导出说明书。",
+    "estimatedMinutes": 5,
+    "recommendedPath": true,
+    "sourcePath": "../content/quick-start.md",
+    "tags": [
+      "新手",
+      "快速开始",
+      "图书馆预约系统",
+      "完整流程"
+    ],
+    "relatedArtifacts": [
+      "项目",
+      "需求规则",
+      "需求模型",
+      "说明书"
+    ],
+    "video": {
+      "src": TUTORIAL_QUICK_START_VIDEO_URL,
+      "title": "快速开始项目操作视频",
+      "description": "通过演示了解整体流程；实际入口与操作名称以本页文字步骤为准。",
+      "caption": "辅助演示 · 以当前文字步骤为准"
+    }
   },
   {
-    id: "feature-map",
-    title: "页面入口与全链路映射",
-    category: "overview",
-    summary: "把顶部导航、项目抽屉、工作台页签和下游产物对应起来。",
-    estimatedMinutes: 8,
-    recommendedPath: true,
-    sourcePath: "../content/feature-map.md",
-    tags: ["页面入口", "全链路映射", "产物关系", "导航"],
-    relatedArtifacts: ["页面入口", "工作台标签", "产物映射", "运行证据"],
-    screenshot: {
-      src: "/help/images/docs-feature-map.png",
-      alt: "页面入口与全链路映射文档截图",
-      caption: "从入口到产物的映射表帮助用户知道每一步在哪里查看。",
-    },
+    "id": "project-basics",
+    "title": "创建与进入项目",
+    "category": "overview",
+    "summary": "按三个步骤创建项目，选择可见范围并进入工作台。",
+    "estimatedMinutes": 3,
+    "recommendedPath": true,
+    "sourcePath": "../content/project-basics.md",
+    "tags": [
+      "项目首页",
+      "创建项目",
+      "项目卡片",
+      "新建项目"
+    ],
+    "relatedArtifacts": [
+      "项目",
+      "成员权限"
+    ]
   },
   {
-    id: "project-basics",
-    title: "项目首页与项目创建",
-    category: "project",
-    summary: "查看项目列表、创建实验项目、进入项目工作台并识别项目状态。",
-    estimatedMinutes: 8,
-    recommendedPath: true,
-    sourcePath: "../content/project-basics.md",
-    tags: ["项目首页", "创建项目", "项目卡片", "项目入口"],
-    relatedArtifacts: ["项目", "成员权限", "个人模型设置", "运行历史"],
-    screenshot: {
-      src: "/help/images/docs-project-home.png",
-      alt: "项目首页和项目卡片截图",
-      caption: "项目首页是进入工作台、创建项目和查看项目状态的入口。",
-    },
+    "id": "workspace-shell",
+    "title": "认识项目工作台",
+    "category": "overview",
+    "summary": "找到阶段入口、模型子菜单、标签页和顶部项目操作。",
+    "estimatedMinutes": 4,
+    "recommendedPath": true,
+    "sourcePath": "../content/workspace-shell.md",
+    "tags": [
+      "工作台",
+      "顶部栏",
+      "侧边栏",
+      "标签页",
+      "链路图"
+    ],
+    "relatedArtifacts": [
+      "项目导航",
+      "模型树",
+      "标签页"
+    ]
   },
   {
-    id: "account-global-settings",
-    title: "账号设置与全局模型配置",
-    category: "project",
-    summary: "从顶部账号入口进入设置弹窗，管理个人资料、安全和托管 Provider。",
-    estimatedMinutes: 7,
-    recommendedPath: false,
-    sourcePath: "../content/account-global-settings.md",
-    tags: ["账号", "全局设置", "模型配置", "托管 Provider", "默认模型"],
-    relatedArtifacts: ["账号会话", "MFA", "Provider 配置", "工作台偏好"],
-    screenshot: {
-      src: "/help/images/docs-account-global-settings.png",
-      alt: "账号设置弹窗全局设置截图",
-      caption: "模型配置只在账号设置弹窗的全局设置中选择。",
-    },
+    "id": "feature-map",
+    "title": "页面入口与工作流程",
+    "category": "overview",
+    "summary": "从你想完成的任务出发，找到页面入口和下一步。",
+    "estimatedMinutes": 3,
+    "recommendedPath": false,
+    "sourcePath": "../content/feature-map.md",
+    "tags": [
+      "页面入口",
+      "全链路映射",
+      "产物关系",
+      "导航"
+    ],
+    "relatedArtifacts": [
+      "页面入口",
+      "阶段结果",
+      "来源关系"
+    ]
   },
   {
-    id: "workspace-shell",
-    title: "项目工作台：顶部栏、侧边栏与标签页",
-    category: "workspace",
-    summary: "理解项目工作台的导航、页签、侧边栏状态和跨阶段入口。",
-    estimatedMinutes: 8,
-    recommendedPath: true,
-    sourcePath: "../content/workspace-shell.md",
-    tags: ["工作台", "顶部栏", "侧边栏", "标签页", "链路图"],
-    relatedArtifacts: ["工作台页签", "模型树", "生成任务", "链路图"],
-    screenshot: {
-      src: "/help/images/docs-workspace-shell.png",
-      alt: "项目工作台顶部栏侧边栏和标签页截图",
-      caption: "工作台通过顶部栏和侧边栏连接需求、图、设计、测试和说明书。",
-    },
+    "id": "project-drawers",
+    "title": "项目设置与成员管理",
+    "category": "overview",
+    "summary": "修改项目资料、邀请成员，并查找项目任务和文档。",
+    "estimatedMinutes": 4,
+    "recommendedPath": false,
+    "sourcePath": "../content/project-drawers.md",
+    "tags": [
+      "项目设置",
+      "成员管理",
+      "邀请",
+      "文档中心"
+    ],
+    "relatedArtifacts": [
+      "项目设置",
+      "成员",
+      "邀请",
+      "说明书文件"
+    ]
   },
   {
-    id: "project-drawers",
-    title: "项目抽屉：设置、成员、任务、历史与文档",
-    category: "workspace",
-    summary: "使用项目工作台右侧抽屉管理项目资料、成员、生成任务和文档记录。",
-    estimatedMinutes: 8,
-    recommendedPath: false,
-    sourcePath: "../content/project-drawers.md",
-    tags: ["项目设置", "成员管理", "生成任务", "运行历史", "文档中心"],
-    relatedArtifacts: ["项目设置", "成员", "运行记录", "说明书文件"],
-    screenshot: {
-      src: "/help/images/docs-project-drawers.png",
-      alt: "项目工作台右侧抽屉截图",
-      caption: "项目抽屉承载项目设置、成员、生成任务、运行历史和文档中心。",
-    },
+    "id": "account-global-settings",
+    "title": "账号设置与默认模型",
+    "category": "model-provider",
+    "summary": "在全局设置选择供应商和默认模型，并管理账号偏好。",
+    "estimatedMinutes": 3,
+    "recommendedPath": true,
+    "sourcePath": "../content/account-global-settings.md",
+    "tags": [
+      "账号",
+      "全局设置",
+      "模型配置",
+      "托管 Provider",
+      "默认模型"
+    ],
+    "relatedArtifacts": [
+      "账号资料",
+      "默认模型",
+      "工作台偏好"
+    ]
   },
   {
-    id: "generation-tasks-history",
-    title: "生成任务、运行历史与证据复盘",
-    category: "workspace",
-    summary: "查看排队、运行、失败、重试、恢复快照和证据状态。",
-    estimatedMinutes: 10,
-    recommendedPath: true,
-    sourcePath: "../content/generation-tasks-history.md",
-    tags: ["生成任务", "运行历史", "重试", "恢复快照", "证据"],
-    relatedArtifacts: ["RunSnapshot", "RunEvent", "CoverageMatrix"],
-    screenshot: {
-      src: "/help/images/docs-generation-task.png",
-      alt: "生成任务和运行历史抽屉截图",
-      caption: "生成任务展示阶段进度，运行历史保留可复盘证据。",
-    },
+    "id": "provider-configuration",
+    "title": "配置模型供应商",
+    "category": "model-provider",
+    "summary": "添加个人模型供应商，获取模型列表，测试后保存默认配置。",
+    "estimatedMinutes": 4,
+    "recommendedPath": true,
+    "sourcePath": "../content/provider-configuration.md",
+    "tags": [
+      "Provider",
+      "API Key",
+      "获取模型列表",
+      "测试托管配置",
+      "供应商"
+    ],
+    "relatedArtifacts": [
+      "供应商配置",
+      "模型列表",
+      "连接测试"
+    ]
   },
   {
-    id: "recommended-models",
-    title: "模型选择指南",
-    category: "model-provider",
-    summary: "根据当前 Provider 的可用模型，从兼容性、质量、稳定性、速度和成本选择适合各生成阶段的模型。",
-    estimatedMinutes: 8,
-    recommendedPath: true,
-    sourcePath: "../content/recommended-models.md",
-    tags: ["模型选择", "结构化输出", "稳定性", "成本", "Provider"],
-    relatedArtifacts: ["兼容性测试", "Provider 配置", "运行历史", "质量结果", "供应商账单"],
-    screenshot: {
-      src: "/help/images/docs-provider-configuration.png",
-      alt: "模型与 Provider 配置截图",
-      caption: "模型选择需要结合当前 Provider 的可用列表和真实任务验证。",
-    },
+    "id": "recommended-models",
+    "title": "模型选择指南",
+    "category": "model-provider",
+    "summary": "用小样例比较模型的结果、稳定性、速度和成本。",
+    "estimatedMinutes": 3,
+    "recommendedPath": true,
+    "sourcePath": "../content/recommended-models.md",
+    "tags": [
+      "模型选择",
+      "结构化输出",
+      "稳定性",
+      "成本",
+      "Provider"
+    ],
+    "relatedArtifacts": [
+      "验证样例",
+      "运行结果",
+      "供应商账单"
+    ]
   },
   {
-    id: "provider-configuration",
-    title: "配置 Provider",
-    category: "model-provider",
-    summary: "添加个人模型供应商，获取模型列表，测试通过后保存为默认 Provider。",
-    estimatedMinutes: 8,
-    recommendedPath: true,
-    sourcePath: "../content/provider-configuration.md",
-    tags: ["Provider", "API Key", "获取模型列表", "测试托管配置", "权益次数"],
-    relatedArtifacts: ["ProviderConfig", "模型列表", "默认模型", "平台权益"],
-    screenshot: {
-      src: "/help/images/docs-provider-configuration.png",
-      alt: "添加 Provider 表单截图",
-      caption: "个人自配 Provider 不消耗平台权益次数，保存前需要获取模型列表并测试通过。",
-    },
+    "id": "billing-entitlements",
+    "title": "生成权益与账单",
+    "category": "model-provider",
+    "summary": "查看生成次数、购买次数包，或继续有效的待支付订单。",
+    "estimatedMinutes": 3,
+    "recommendedPath": true,
+    "sourcePath": "../content/billing-entitlements.md",
+    "tags": [
+      "生成权益",
+      "次数包",
+      "账户账单",
+      "订单历史",
+      "继续支付",
+      "支付宝"
+    ],
+    "relatedArtifacts": [
+      "可用次数",
+      "订单",
+      "权益流水"
+    ]
   },
   {
-    id: "billing-entitlements",
-    title: "生成权益、购买与订单处理",
-    category: "model-provider",
-    summary: "查看生成次数、购买次数包、检查订单状态并继续未完成的支付宝订单。",
-    estimatedMinutes: 7,
-    recommendedPath: true,
-    sourcePath: "../content/billing-entitlements.md",
-    tags: ["生成权益", "次数包", "账户账单", "订单历史", "继续支付", "支付宝"],
-    relatedArtifacts: ["EntitlementLedger", "PaymentOrder", "BillingSku", "ProviderConfig"],
-    screenshot: {
-      src: "/help/images/docs-billing.png",
-      alt: "生成权益余额、订单历史和继续支付截图",
-      caption: "账户账单集中展示权益余额、订单状态和待支付订单恢复入口。",
-    },
+    "id": "requirements",
+    "title": "整理需求与确认规则",
+    "category": "requirements",
+    "summary": "把业务描述整理为需求规则，检查补齐内容并确认修复。",
+    "estimatedMinutes": 5,
+    "recommendedPath": true,
+    "sourcePath": "../content/requirements.md",
+    "tags": [
+      "需求输入",
+      "需求规则",
+      "AI 修复",
+      "智能修复",
+      "规则确认",
+      "质量提示"
+    ],
+    "relatedArtifacts": [
+      "需求文本",
+      "需求规则",
+      "质量提示",
+      "修复候选"
+    ]
   },
   {
-    id: "requirements",
-    title: "需求输入、规则确认与 AI 修复",
-    category: "requirements",
-    summary: "在系统需求页录入文本、生成规则、处理质量提示并确认下游输入。",
-    estimatedMinutes: 12,
-    recommendedPath: true,
-    sourcePath: "../content/requirements.md",
-    tags: ["需求输入", "需求规则", "AI 修复", "规则确认", "质量提示"],
-    relatedArtifacts: ["需求文本", "需求规则", "质量报告", "修复候选", "需求基线"],
-    screenshot: {
-      src: "/help/images/docs-requirement-ai-repair.png",
-      alt: "需求规则确认和 AI 修复截图",
-      caption: "需求规则确认会决定后续可行性分析、UML、设计、代码和说明书的输入质量。",
-    },
+    "id": "requirement-baseline",
+    "title": "处理需求待确认项",
+    "category": "requirements",
+    "summary": "处理需求已修改、修复待确认和下游生成被阻塞的提示。",
+    "estimatedMinutes": 3,
+    "recommendedPath": false,
+    "sourcePath": "../content/requirement-baseline.md",
+    "tags": [
+      "需求质量",
+      "需求基线",
+      "待确认",
+      "阻塞原因",
+      "质量提示"
+    ],
+    "relatedArtifacts": [
+      "已确认需求",
+      "待确认项",
+      "需更新状态"
+    ]
   },
   {
-    id: "requirement-baseline",
-    title: "需求质量、基线与待确认项",
-    category: "requirements",
-    summary: "理解质量提示、待确认修复、需求基线和下游阻塞原因。",
-    estimatedMinutes: 8,
-    recommendedPath: false,
-    sourcePath: "../content/requirement-baseline.md",
-    tags: ["需求质量", "需求基线", "待确认", "阻塞原因", "质量提示"],
-    relatedArtifacts: ["RequirementBaseline", "QualityReport", "ReviewCandidate"],
-    screenshot: {
-      src: "/help/images/docs-requirement-quality-baseline.png",
-      alt: "需求质量和基线状态截图",
-      caption: "需求基线记录后续阶段使用的是哪一版规则和文本。",
-    },
+    "id": "feasibility-analysis",
+    "title": "完成可行性分析",
+    "category": "requirements",
+    "summary": "生成边界与业务流程图，比较方案，并保持研究报告依据有效。",
+    "estimatedMinutes": 6,
+    "recommendedPath": true,
+    "sourcePath": "../content/feasibility-analysis.md",
+    "tags": [
+      "可行性分析",
+      "系统环境图",
+      "业务与系统流程图",
+      "实现方案",
+      "成本收益",
+      "风险",
+      "五类结论"
+    ],
+    "relatedArtifacts": [
+      "系统环境图",
+      "业务与系统流程图",
+      "实现方案",
+      "研究报告"
+    ]
   },
   {
-    id: "feasibility-analysis",
-    title: "可行性分析：系统环境图、业务流程、实现方案与研究报告",
-    category: "feasibility",
-    summary: "从已确认需求生成系统环境图和业务流程，以两张图及补充资料形成实现方案，并检查研究报告的依赖有效性。",
-    estimatedMinutes: 14,
-    recommendedPath: true,
-    sourcePath: "../content/feasibility-analysis.md",
-    tags: ["可行性分析", "系统环境图", "业务与系统流程图", "活动图", "实现方案", "成本收益", "风险", "五类结论", "可行性研究报告"],
-    relatedArtifacts: ["FeasibilityContextModel", "ImplementationPlan", "FeasibilityStudy", "TraceabilityMatrix"],
-    screenshot: {
-      src: "/help/images/docs-feasibility.png",
-      alt: "可行性分析系统环境图和实现方案产物概览截图",
-      caption: "可行性分析概览展示产物状态；生成实现方案时会自动勾选缺失或过期的系统环境图与业务流程图。",
-    },
+    "id": "uml-models",
+    "title": "生成与查看需求模型",
+    "category": "models",
+    "summary": "按业务问题选择需求模型，生成图表并核对需求来源。",
+    "estimatedMinutes": 5,
+    "recommendedPath": true,
+    "sourcePath": "../content/uml-models.md",
+    "tags": [
+      "UML",
+      "PlantUML",
+      "SVG",
+      "功能结构图",
+      "用例模型",
+      "模型树"
+    ],
+    "relatedArtifacts": [
+      "需求模型",
+      "图源码",
+      "SVG 图片",
+      "跟踪矩阵"
+    ]
   },
   {
-    id: "uml-models",
-    title: "需求 UML 模型与图表查看",
-    category: "models",
-    summary: "认识 7 类需求模型、PlantUML、SVG 图表、模型树和渲染状态。",
-    estimatedMinutes: 10,
-    recommendedPath: true,
-    sourcePath: "../content/uml-models.md",
-    tags: ["UML", "PlantUML", "SVG", "功能结构图", "用例模型", "模型树"],
-    relatedArtifacts: ["RequirementModel", "PlantUML", "SVG", "diagramErrors"],
-    screenshot: {
-      src: "/help/images/docs-uml-overview.png",
-      alt: "需求 UML 图表查看截图",
-      caption: "需求 UML 页面展示结构化模型、图表和渲染状态。",
-    },
+    "id": "uml-model-detail",
+    "title": "查看与编辑模型详情",
+    "category": "models",
+    "summary": "定位元素与关系，检查来源，修改后保存重绘。",
+    "estimatedMinutes": 5,
+    "recommendedPath": true,
+    "sourcePath": "../content/uml-model-detail.md",
+    "tags": [
+      "模型详情页",
+      "元素列表",
+      "追踪矩阵",
+      "跟踪矩阵",
+      "手动重绘"
+    ],
+    "relatedArtifacts": [
+      "模型元素",
+      "关系",
+      "图源码",
+      "来源映射"
+    ]
   },
   {
-    id: "uml-model-detail",
-    title: "模型详情页、元素列表与追踪矩阵",
-    category: "models",
-    summary: "进入模型详情页查看元素、关系、图源码、手动重绘和需求追踪矩阵。",
-    estimatedMinutes: 10,
-    recommendedPath: true,
-    sourcePath: "../content/uml-model-detail.md",
-    tags: ["模型详情页", "元素列表", "追踪矩阵", "手动重绘", "模型详情"],
-    relatedArtifacts: ["模型元素", "关系", "PlantUML 源码", "TraceabilityMatrix"],
-    screenshot: {
-      src: "/help/images/docs-uml-model-detail.png",
-      alt: "模型详情页元素列表和追踪矩阵截图",
-      caption: "模型详情页用来定位每个元素来自哪条需求、影响哪些下游产物。",
-    },
+    "id": "design-models",
+    "title": "生成与检查设计模型",
+    "category": "models",
+    "summary": "细化架构、对象交互、页面和数据库，并核对设计依赖。",
+    "estimatedMinutes": 5,
+    "recommendedPath": true,
+    "sourcePath": "../content/design-models.md",
+    "tags": [
+      "设计模型",
+      "用例实现设计",
+      "设计类图",
+      "页面导航图",
+      "数据库设计"
+    ],
+    "relatedArtifacts": [
+      "设计模型",
+      "设计图",
+      "需求来源"
+    ]
   },
   {
-    id: "design-models",
-    title: "设计模型生成与设计详情",
-    category: "design",
-    summary: "基于需求模型生成 7 类设计模型，查看设计图、元素详情和失败状态。",
-    estimatedMinutes: 10,
-    recommendedPath: true,
-    sourcePath: "../content/design-models.md",
-    tags: ["设计模型", "用例实现设计", "设计类图", "界面关系图", "数据库设计"],
-    relatedArtifacts: ["DesignModel", "DesignPlantUML", "DesignSVG", "DesignDiagram"],
-    screenshot: {
-      src: "/help/images/docs-design-overview.png",
-      alt: "设计模型首页和设计图截图",
-      caption: "设计阶段承接需求模型，输出架构、时序、类图、界面和数据库设计。",
-    },
+    "id": "design-traceability",
+    "title": "检查需求到设计的覆盖",
+    "category": "models",
+    "summary": "从需求找到设计元素，检查缺失覆盖和待复核关系。",
+    "estimatedMinutes": 4,
+    "recommendedPath": true,
+    "sourcePath": "../content/design-traceability.md",
+    "tags": [
+      "设计追踪矩阵",
+      "需求到设计映射",
+      "链路图",
+      "低置信关系",
+      "跟踪矩阵"
+    ],
+    "relatedArtifacts": [
+      "需求到设计映射",
+      "待复核关系",
+      "链路图"
+    ]
   },
   {
-    id: "design-traceability",
-    title: "需求到设计的追踪链路",
-    category: "design",
-    summary: "检查需求元素如何映射到设计模型、设计元素和上游设计引用。",
-    estimatedMinutes: 10,
-    recommendedPath: true,
-    sourcePath: "../content/design-traceability.md",
-    tags: ["设计追踪矩阵", "需求到设计映射", "链路图", "低置信关系"],
-    relatedArtifacts: ["DesignTraceability", "RequirementTraceability", "LineageGraph"],
-    screenshot: {
-      src: "/help/images/docs-design-traceability.png",
-      alt: "设计追踪矩阵和链路图截图",
-      caption: "设计追踪用于证明每条需求是否被设计产物覆盖。",
-    },
+    "id": "coding-agent",
+    "title": "Coding Agent 接入与授权",
+    "category": "delivery",
+    "summary": "了解 MCP 可读取的资料与四项工具能力，完成接入，并实现功能或同步需求变更。",
+    "estimatedMinutes": 10,
+    "recommendedPath": true,
+    "sourcePath": "../content/coding-agent.md",
+    "tags": [
+      "Coding Agent",
+      "编程助手",
+      "MCP",
+      "只读工具",
+      "版本同步",
+      "客户端目录",
+      "桌面端",
+      "CLI",
+      "授权"
+    ],
+    "relatedArtifacts": [
+      "项目资料",
+      "需求与设计依据",
+      "测试与覆盖",
+      "来源版本",
+      "客户端连接",
+      "项目授权"
+    ]
   },
   {
-    id: "coding-agent",
-    title: "Coding Agent 接入与授权",
-    category: "delivery",
-    summary: "连接外部 Agent，选择项目授权并检查成功调用记录。",
-    estimatedMinutes: 10,
-    recommendedPath: true,
-    sourcePath: "../content/coding-agent.md",
-    tags: ["Coding Agent", "MCP", "桌面端", "CLI", "授权"],
-    relatedArtifacts: ["MCP Connection", "Project Grant", "Last Successful Call"],
-    
+    "id": "testing-coverage",
+    "title": "测试用例与覆盖关系",
+    "category": "delivery",
+    "summary": "生成业务测试用例，检查正常、异常和边界场景的覆盖。",
+    "estimatedMinutes": 4,
+    "recommendedPath": true,
+    "sourcePath": "../content/testing-coverage.md",
+    "tags": [
+      "测试用例",
+      "覆盖关系",
+      "测试场景",
+      "黑盒测试"
+    ],
+    "relatedArtifacts": [
+      "测试用例",
+      "预期结果",
+      "覆盖关系"
+    ]
   },
   {
-    id: "testing-coverage",
-    title: "测试用例与覆盖关系",
-    category: "delivery",
-    summary: "从需求和设计生成测试用例，按场景筛选并检查覆盖关系。",
-    estimatedMinutes: 8,
-    recommendedPath: true,
-    sourcePath: "../content/testing-coverage.md",
-    tags: ["测试用例", "覆盖关系", "测试场景", "黑盒测试"],
-    relatedArtifacts: ["BlackBoxTestCase", "TestCoverageRelation", "RequirementRule"],
-    screenshot: {
-      src: "/help/images/docs-testing.png",
-      alt: "测试用例和覆盖关系截图",
-      caption: "测试页把需求、设计和测试场景对应起来。",
-    },
+    "id": "documents-delivery",
+    "title": "说明书生成与下载",
+    "category": "delivery",
+    "summary": "准备文档所需产物，调整样式，检查版本并下载 DOCX。",
+    "estimatedMinutes": 4,
+    "recommendedPath": true,
+    "sourcePath": "../content/documents-delivery.md",
+    "tags": [
+      "说明书",
+      "说明书版本",
+      "可行性研究报告",
+      "DOCX",
+      "样式",
+      "版本",
+      "下载",
+      "OnlyOffice"
+    ],
+    "relatedArtifacts": [
+      "需求规格说明书",
+      "软件设计说明书",
+      "可行性研究报告",
+      "文档版本"
+    ]
   },
   {
-    id: "documents-delivery",
-    title: "说明书生成、样式、版本与下载",
-    category: "delivery",
-    summary: "生成需求、设计或可行性说明书，调整样式，在线编辑并管理版本。",
-    estimatedMinutes: 9,
-    recommendedPath: true,
-    sourcePath: "../content/documents-delivery.md",
-    tags: ["说明书", "说明书版本", "可行性研究报告", "DOCX", "样式", "版本", "下载", "OnlyOffice"],
-    relatedArtifacts: ["RequirementsSpec", "SoftwareDesignSpec", "FeasibilityStudy", "DocumentVersion"],
-    screenshot: {
-      src: "/help/images/docs-documents.png",
-      alt: "说明书生成和文档版本截图",
-      caption: "说明书页负责生成、管理、下载和复用项目文档。",
-    },
+    "id": "generation-tasks-history",
+    "title": "查看生成任务与运行历史",
+    "category": "support",
+    "summary": "查看当前进度和失败子项，核对历史结果与可用恢复操作。",
+    "estimatedMinutes": 4,
+    "recommendedPath": false,
+    "sourcePath": "../content/generation-tasks-history.md",
+    "tags": [
+      "生成任务",
+      "运行历史",
+      "重试",
+      "恢复快照",
+      "证据"
+    ],
+    "relatedArtifacts": [
+      "任务进度",
+      "失败信息",
+      "历史结果"
+    ]
   },
   {
-    id: "account-models-faq",
-    title: "账号、模型配置与权限问题",
-    category: "support",
-    summary: "处理登录、权限、全局模型配置、项目模型策略和生成权益问题。",
-    estimatedMinutes: 8,
-    recommendedPath: false,
-    sourcePath: "../content/account-models-faq.md",
-    tags: ["账号", "权限", "模型配置", "全局设置", "MFA"],
-    relatedArtifacts: ["UserSession", "ProviderConfig", "ProjectMembership"],
-    screenshot: {
-      src: "/help/images/docs-account-global-settings.png",
-      alt: "账号设置和全局模型配置截图",
-      caption: "账号和模型配置问题统一从顶部账号入口排查。",
-    },
+    "id": "account-models-faq",
+    "title": "账号、模型与权限问题",
+    "category": "support",
+    "summary": "按现象定位登录、项目权限、模型服务和账单问题。",
+    "estimatedMinutes": 4,
+    "recommendedPath": false,
+    "sourcePath": "../content/account-models-faq.md",
+    "tags": [
+      "账号",
+      "权限",
+      "模型配置",
+      "全局设置",
+      "MFA"
+    ],
+    "relatedArtifacts": [
+      "登录会话",
+      "成员角色",
+      "模型配置",
+      "订单状态"
+    ]
   },
   {
-    id: "troubleshooting",
-    title: "生成、渲染与修复排障",
-    category: "support",
-    summary: "定位生成失败、渲染失败、AI 修复失败、模型不可用和说明书缺图。",
-    estimatedMinutes: 10,
-    recommendedPath: false,
-    sourcePath: "../content/troubleshooting.md",
-    tags: ["排障", "生成失败", "渲染失败", "AI 修复失败", "说明书缺图", "模型不可用"],
-    relatedArtifacts: ["RunError", "diagramErrors", "RepairRecord", "DocumentMissingArtifact"],
-    screenshot: {
-      src: "/help/images/docs-troubleshooting.png",
-      alt: "生成失败和排障信息截图",
-      caption: "排障时先看生成任务，再看运行历史和对应页面的错误提示。",
-    },
-  },
+    "id": "troubleshooting",
+    "title": "生成问题排查",
+    "category": "support",
+    "summary": "从页面提示定位阻塞、生成失败、图表缺失或过期结果。",
+    "estimatedMinutes": 4,
+    "recommendedPath": false,
+    "sourcePath": "../content/troubleshooting.md",
+    "tags": [
+      "排障",
+      "生成失败",
+      "渲染失败",
+      "AI 修复失败",
+      "说明书缺图",
+      "模型不可用"
+    ],
+    "relatedArtifacts": [
+      "错误提示",
+      "任务记录",
+      "上游状态"
+    ]
+  }
 ] satisfies readonly ProductDocArticleManifestItem[];
 
 type ProductDocsLocale = "zh-CN" | "en";
 
 const EN_CATEGORY_TEXT: Record<ProductDocCategoryId, Pick<ProductDocCategory, "label" | "description">> = {
-  overview: {
-    label: "Overview and map",
-    description: "Full path, page entry points, and artifact mapping across the workflow.",
-  },
-  project: {
-    label: "Projects and account",
-    description: "Project home, project creation, members, settings, and account-level model configuration.",
-  },
-  workspace: {
-    label: "Workspace basics",
-    description: "Top bar, sidebar, tabs, generation tasks, and run history.",
+  "overview": {
+    "label": "Get started",
+    "description": "Create a project, learn the workspace and complete your first workflow."
   },
   "model-provider": {
-    label: "Models and providers",
-    description: "Recommended models, personal providers, platform credits, and model discovery tests.",
+    "label": "Account and models",
+    "description": "Connect model providers, choose defaults and manage generation credits."
   },
-  requirements: {
-    label: "System requirements",
-    description: "Requirement input, rule confirmation, quality prompts, AI repair, and the requirement baseline.",
+  "requirements": {
+    "label": "Requirements and feasibility",
+    "description": "Confirm business rules, system boundaries, workflows and implementation choices."
   },
-  feasibility: {
-    label: "Feasibility analysis",
-    description: "System Context Diagrams (System Environment Diagrams), candidate implementation plans, cost-benefit analysis, risks, conclusions, and reports.",
+  "models": {
+    "label": "Modeling and design",
+    "description": "Generate models and review elements, relationships and requirement coverage."
   },
-  models: {
-    label: "UML and model details",
-    description: "Requirement models, diagrams, element details, PlantUML, SVG, and traceability.",
+  "delivery": {
+    "label": "Implementation and delivery",
+    "description": "Connect a Coding Agent, prepare tests and export specifications."
   },
-  design: {
-    label: "Design and traceability",
-    description: "Design models, use case realization, design details, and requirement-to-design mapping.",
-  },
-  delivery: {
-    label: "Delivery and review",
-    description: "Testing, specifications, run history, and evidence review.",
-  },
-  support: {
-    label: "Account and troubleshooting",
-    description: "Model configuration, account access, permissions, and common issues.",
-  },
+  "support": {
+    "label": "Tasks and troubleshooting",
+    "description": "Inspect progress and history, and resolve access or generation problems."
+  }
 };
 
-const EN_ARTICLE_TEXT: Record<
-  string,
-  {
-    title: string;
-    summary: string;
-    tags: readonly string[];
-    relatedArtifacts: readonly string[];
-  }
-> = {
+const EN_ARTICLE_TEXT: Record<string, { title: string; summary: string; tags: readonly string[]; relatedArtifacts: readonly string[] }> = {
   "quick-start": {
-    title: "Quick start",
-    summary: "Walk through the library booking case from system requirements and feasibility analysis to specification evidence.",
-    tags: ["Beginner", "Full path", "Library booking", "Entry points"],
-    relatedArtifacts: ["Project", "Requirement rules", "Feasibility analysis", "UML", "Design models", "Code prototype", "Specifications"],
-  },
-  "feature-map": {
-    title: "Page entry points and workflow map",
-    summary: "Connect top navigation, project drawers, workspace tabs, and downstream artifacts.",
-    tags: ["Entry points", "Workflow map", "Artifacts", "Navigation"],
-    relatedArtifacts: ["Page entries", "Workspace tabs", "Artifact map", "Run evidence"],
+    "title": "Quick start",
+    "tags": [
+      "Beginner",
+      "Full path",
+      "Library booking",
+      "Entry points"
+    ],
+    "relatedArtifacts": [
+      "Project",
+      "Requirement rules",
+      "Requirement models",
+      "Specifications"
+    ],
+    "summary": "Create your first project, review requirements and models, and export a specification."
   },
   "project-basics": {
-    title: "Project home and project creation",
-    summary: "View project lists, create lab projects, enter the workspace, and identify project states.",
-    tags: ["Project home", "Create project", "Project cards", "Project entry"],
-    relatedArtifacts: ["Project", "Member access", "Personal model settings", "Run history"],
-  },
-  "account-global-settings": {
-    title: "Account settings and global model configuration",
-    summary: "Open settings from the account entry to manage profile, security, and hosted providers.",
-    tags: ["Account", "Global settings", "Model configuration", "Hosted provider", "Default model"],
-    relatedArtifacts: ["Account session", "MFA", "Provider configuration", "Workspace preferences"],
+    "title": "Create and open a project",
+    "tags": [
+      "Project home",
+      "Create project",
+      "Project cards",
+      "Project entry"
+    ],
+    "relatedArtifacts": [
+      "Project",
+      "Member access"
+    ],
+    "summary": "Create a project in three steps, choose its visibility and open the workspace."
   },
   "workspace-shell": {
-    title: "Project workspace: top bar, sidebar, and tabs",
-    summary: "Understand workspace navigation, tabs, sidebar state, and cross-stage entry points.",
-    tags: ["Workspace", "Top bar", "Sidebar", "Tabs", "Lineage graph"],
-    relatedArtifacts: ["Workspace tabs", "Model tree", "Generation tasks", "Lineage graph"],
+    "title": "Find your way around the workspace",
+    "tags": [
+      "Workspace",
+      "Top bar",
+      "Sidebar",
+      "Tabs",
+      "Lineage graph"
+    ],
+    "relatedArtifacts": [
+      "Project navigation",
+      "Model tree",
+      "Tabs"
+    ],
+    "summary": "Locate stages, model details, tabs and project actions."
+  },
+  "feature-map": {
+    "title": "Find a feature and its workflow",
+    "tags": [
+      "Entry points",
+      "Workflow map",
+      "Artifacts",
+      "Navigation"
+    ],
+    "relatedArtifacts": [
+      "Entry points",
+      "Stage results",
+      "Source relationships"
+    ],
+    "summary": "Find the right page and next step for the task you want to complete."
   },
   "project-drawers": {
-    title: "Project drawers: settings, members, tasks, history, and documents",
-    summary: "Use the right-side project drawers to manage project data, members, generation tasks, and documents.",
-    tags: ["Project settings", "Members", "Generation tasks", "Run history", "Documents"],
-    relatedArtifacts: ["Project settings", "Members", "Run records", "Specification files"],
+    "title": "Manage project settings and members",
+    "tags": [
+      "Project settings",
+      "Members",
+      "Generation tasks",
+      "Run history",
+      "Documents"
+    ],
+    "relatedArtifacts": [
+      "Project settings",
+      "Members",
+      "Invitations",
+      "Documents"
+    ],
+    "summary": "Update project details, invite collaborators and find project documents."
   },
-  "generation-tasks-history": {
-    title: "Generation tasks, run history, and evidence review",
-    summary: "Inspect queued, running, failed, retried, restored, and evidence-backed runs.",
-    tags: ["Generation tasks", "Run history", "Retry", "Restore snapshot", "Evidence"],
-    relatedArtifacts: ["RunSnapshot", "RunEvent", "CoverageMatrix"],
-  },
-  "recommended-models": {
-    title: "Model selection guide",
-    summary: "Choose models for each generation stage using the provider's current catalog, compatibility, quality, reliability, latency, and cost.",
-    tags: ["Model selection", "Structured output", "Reliability", "Cost", "Provider"],
-    relatedArtifacts: ["Compatibility tests", "Provider configuration", "Run history", "Quality results", "Provider billing"],
+  "account-global-settings": {
+    "title": "Account settings and default model",
+    "tags": [
+      "Account",
+      "Global settings",
+      "Model configuration",
+      "Hosted provider",
+      "Default model"
+    ],
+    "relatedArtifacts": [
+      "Account profile",
+      "Default model",
+      "Workspace preferences"
+    ],
+    "summary": "Select a provider and default model in global settings, and manage account preferences."
   },
   "provider-configuration": {
-    title: "Configure a provider",
-    summary: "Add a personal model provider, discover available models, test connectivity, and save it as the default provider.",
-    tags: ["Provider", "API key", "Model discovery", "Hosted configuration test", "Credits"],
-    relatedArtifacts: ["ProviderConfig", "Model list", "Default model", "Platform credits"],
+    "title": "Configure a model provider",
+    "tags": [
+      "Provider",
+      "API key",
+      "Model discovery",
+      "Hosted configuration test",
+      "Credits"
+    ],
+    "relatedArtifacts": [
+      "Provider configuration",
+      "Model catalog",
+      "Connection test"
+    ],
+    "summary": "Add a personal provider, fetch its models, test the connection and save your defaults."
+  },
+  "recommended-models": {
+    "title": "Model selection guide",
+    "tags": [
+      "Model selection",
+      "Structured output",
+      "Reliability",
+      "Cost",
+      "Provider"
+    ],
+    "relatedArtifacts": [
+      "Validation sample",
+      "Run results",
+      "Provider billing"
+    ],
+    "summary": "Compare available models using a small sample, reliability, latency and actual cost."
   },
   "billing-entitlements": {
-    title: "Generation credits, purchases, and orders",
-    summary: "Review generation credits, buy a credit package, inspect order states, and resume an unfinished Alipay order.",
-    tags: ["Generation credits", "Credit package", "Billing", "Order history", "Resume payment", "Alipay"],
-    relatedArtifacts: ["EntitlementLedger", "PaymentOrder", "BillingSku", "ProviderConfig"],
+    "title": "Generation credits and billing",
+    "tags": [
+      "Generation credits",
+      "Credit package",
+      "Billing",
+      "Order history",
+      "Resume payment",
+      "Alipay"
+    ],
+    "relatedArtifacts": [
+      "Generation credits",
+      "Orders",
+      "Credit ledger"
+    ],
+    "summary": "Check generation credits, buy a package or resume a valid unpaid order."
   },
-  requirements: {
-    title: "System requirements, rule confirmation, and AI repair",
-    summary: "Enter requirement text, generate rules, handle quality prompts, and confirm the inputs used by downstream stages.",
-    tags: ["Requirements", "Requirement rules", "AI repair", "Rule confirmation", "Quality prompts"],
-    relatedArtifacts: ["Requirement text", "Requirement rules", "Quality report", "Repair candidates", "Requirement baseline"],
+  "requirements": {
+    "title": "Write and confirm requirement rules",
+    "tags": [
+      "Requirements",
+      "Requirement rules",
+      "AI repair",
+      "Rule confirmation",
+      "Quality prompts"
+    ],
+    "relatedArtifacts": [
+      "Requirement text",
+      "Rules",
+      "Quality notices",
+      "Repair suggestions"
+    ],
+    "summary": "Turn business descriptions into rules, review suggested additions and confirm repairs."
   },
   "requirement-baseline": {
-    title: "Requirement quality, baseline, and pending confirmations",
-    summary: "Understand quality prompts, pending repairs, baselines, and downstream blocking reasons.",
-    tags: ["Requirement quality", "Requirement baseline", "Pending confirmation", "Blocking reason", "Quality prompts"],
-    relatedArtifacts: ["RequirementBaseline", "QualityReport", "ReviewCandidate"],
+    "title": "Resolve pending requirement reviews",
+    "tags": [
+      "Requirement quality",
+      "Requirement baseline",
+      "Pending confirmation",
+      "Blocking reason",
+      "Quality prompts"
+    ],
+    "relatedArtifacts": [
+      "Confirmed requirements",
+      "Pending reviews",
+      "Outdated results"
+    ],
+    "summary": "Resolve changed-text, pending-repair and prerequisite notices before continuing."
   },
   "feasibility-analysis": {
-    title: "Feasibility analysis: System Environment Diagram, implementation plan, and report",
-    summary: "Generate a System Environment Diagram and editable implementation options from accepted rules, then keep the feasibility report current.",
-    tags: ["Feasibility analysis", "System Environment Diagram", "Implementation plan", "Cost-benefit", "Risks", "Five conclusions", "Feasibility report"],
-    relatedArtifacts: ["FeasibilityContextModel", "ImplementationPlan", "FeasibilityStudy", "TraceabilityMatrix"],
+    "title": "Complete a feasibility analysis",
+    "tags": [
+      "Feasibility analysis",
+      "System Environment Diagram",
+      "Implementation plan",
+      "Cost-benefit",
+      "Risks",
+      "Five conclusions",
+      "Feasibility report"
+    ],
+    "relatedArtifacts": [
+      "System Environment Diagram",
+      "Business and System Flow Diagram",
+      "Implementation options",
+      "Feasibility report"
+    ],
+    "summary": "Review system boundaries and business flows, compare implementation options and prepare a current report."
   },
   "uml-models": {
-    title: "Requirement UML models and diagram viewing",
-    summary: "Learn the seven requirement model types, PlantUML, SVG diagrams, model tree, and render states.",
-    tags: ["UML", "PlantUML", "SVG", "Work breakdown", "Use case model", "Model tree"],
-    relatedArtifacts: ["RequirementModel", "PlantUML", "SVG", "diagramErrors"],
+    "title": "Generate and review requirement models",
+    "tags": [
+      "UML",
+      "PlantUML",
+      "SVG",
+      "Work breakdown",
+      "Use case model",
+      "Model tree"
+    ],
+    "relatedArtifacts": [
+      "Requirement models",
+      "Diagram source",
+      "SVG images",
+      "Traceability"
+    ],
+    "summary": "Choose model types for your questions, generate diagrams and check their requirement sources."
   },
   "uml-model-detail": {
-    title: "Model detail page, element list, and traceability matrix",
-    summary: "Open model details to inspect elements, relationships, source code, manual redraw, and requirement traceability.",
-    tags: ["Model detail", "Element list", "Traceability matrix", "Manual redraw", "Model details"],
-    relatedArtifacts: ["Model elements", "Relationships", "PlantUML source", "TraceabilityMatrix"],
+    "title": "Inspect and edit model details",
+    "tags": [
+      "Model detail",
+      "Element list",
+      "Traceability matrix",
+      "Manual redraw",
+      "Model details"
+    ],
+    "relatedArtifacts": [
+      "Model elements",
+      "Relationships",
+      "Diagram source",
+      "Source links"
+    ],
+    "summary": "Find elements and relationships, check their sources, then save and redraw valid changes."
   },
   "design-models": {
-    title: "Design model generation and design details",
-    summary: "Generate seven design model types from requirement models and inspect design diagrams, element details, and failures.",
-    tags: ["Design models", "Use case realization", "Design class diagram", "UI relationship diagram", "Database design"],
-    relatedArtifacts: ["DesignModel", "DesignPlantUML", "DesignSVG", "DesignDiagram"],
+    "title": "Generate and review design models",
+    "tags": [
+      "Design models",
+      "Use case realization",
+      "Design class diagram",
+      "UI relationship diagram",
+      "Database design"
+    ],
+    "relatedArtifacts": [
+      "Design models",
+      "Design diagrams",
+      "Requirement sources"
+    ],
+    "summary": "Develop architecture, interactions, navigation and database designs from their required sources."
   },
   "design-traceability": {
-    title: "Requirement-to-design traceability",
-    summary: "Check how requirement elements map to design models, design elements, and upstream design references.",
-    tags: ["Design traceability", "Requirement mapping", "Lineage graph", "Low-confidence links"],
-    relatedArtifacts: ["DesignTraceability", "RequirementTraceability", "LineageGraph"],
+    "title": "Check requirement-to-design coverage",
+    "tags": [
+      "Design traceability",
+      "Requirement mapping",
+      "Lineage graph",
+      "Low-confidence links"
+    ],
+    "relatedArtifacts": [
+      "Requirement-to-design links",
+      "Pending reviews",
+      "Lineage graph"
+    ],
+    "summary": "Follow requirement sources into design elements and review missing or uncertain coverage."
   },
   "coding-agent": {
-    title: "Coding Agent connection and authorization",
-    summary: "Connect external agents, explicitly grant project access, and check successful MCP calls.",
-    tags: ["Coding Agent", "MCP", "Desktop", "CLI", "Authorization"],
-    relatedArtifacts: ["MCP Connection", "Project Grant", "Last Successful Call"],
+    "title": "Coding Agent connection and authorization",
+    "tags": [
+      "Coding Agent",
+      "MCP",
+      "Read-only tools",
+      "Source versions",
+      "Desktop",
+      "CLI",
+      "Authorization"
+    ],
+    "relatedArtifacts": [
+      "Project sources",
+      "Requirements and design",
+      "Tests and coverage",
+      "Applied source manifest",
+      "Client connection",
+      "Project authorization"
+    ],
+    "summary": "Understand the four MCP capabilities and available sources, connect a client, then implement features or apply source changes."
   },
   "testing-coverage": {
-    title: "Test cases and coverage relationships",
-    summary: "Generate test cases from requirements and design, filter by scenario, and inspect coverage relationships.",
-    tags: ["Test cases", "Coverage", "Test scenarios", "Black-box testing"],
-    relatedArtifacts: ["BlackBoxTestCase", "TestCoverageRelation", "RequirementRule"],
+    "title": "Test cases and coverage",
+    "tags": [
+      "Test cases",
+      "Coverage",
+      "Test scenarios",
+      "Black-box testing"
+    ],
+    "relatedArtifacts": [
+      "Test cases",
+      "Expected results",
+      "Coverage links"
+    ],
+    "summary": "Generate business test cases and review normal, exception and boundary coverage."
   },
   "documents-delivery": {
-    title: "Specification generation, style, versions, and download",
-    summary: "Generate requirements, design, or feasibility documents, adjust styling, edit online, and manage versions.",
-    tags: ["Specification", "Document versions", "Feasibility report", "DOCX", "Style", "Download", "OnlyOffice"],
-    relatedArtifacts: ["RequirementsSpec", "SoftwareDesignSpec", "FeasibilityStudy", "DocumentVersion"],
+    "title": "Generate and download specifications",
+    "tags": [
+      "Specification",
+      "Document versions",
+      "Feasibility report",
+      "DOCX",
+      "Style",
+      "Download",
+      "OnlyOffice"
+    ],
+    "relatedArtifacts": [
+      "Requirements specification",
+      "Design specification",
+      "Feasibility report",
+      "Document versions"
+    ],
+    "summary": "Prepare the required sources, adjust styling, review versions and download DOCX files."
+  },
+  "generation-tasks-history": {
+    "title": "Inspect generation tasks and history",
+    "tags": [
+      "Generation tasks",
+      "Run history",
+      "Retry",
+      "Restore snapshot",
+      "Evidence"
+    ],
+    "relatedArtifacts": [
+      "Task progress",
+      "Failure details",
+      "Saved results"
+    ],
+    "summary": "Inspect active progress, failed subtasks and saved results before retrying or restoring."
   },
   "account-models-faq": {
-    title: "Account, model configuration, and permission issues",
-    summary: "Handle sign-in, permissions, global model configuration, project model policy, and generation credits.",
-    tags: ["Account", "Permissions", "Model configuration", "Global settings", "MFA"],
-    relatedArtifacts: ["UserSession", "ProviderConfig", "ProjectMembership"],
+    "title": "Account, model and permission issues",
+    "tags": [
+      "Account",
+      "Permissions",
+      "Model configuration",
+      "Global settings",
+      "MFA"
+    ],
+    "relatedArtifacts": [
+      "Sessions",
+      "Member roles",
+      "Model configuration",
+      "Order status"
+    ],
+    "summary": "Find the right checks for sign-in, project permissions, model services and billing."
   },
-  troubleshooting: {
-    title: "Troubleshooting generation, rendering, and repair",
-    summary: "Diagnose generation failures, render failures, AI repair failures, unavailable models, and missing document diagrams.",
-    tags: ["Troubleshooting", "Generation failure", "Render failure", "AI repair failure", "Missing diagrams", "Unavailable model"],
-    relatedArtifacts: ["RunError", "diagramErrors", "RepairRecord", "DocumentMissingArtifact"],
-  },
+  "troubleshooting": {
+    "title": "Troubleshoot generation problems",
+    "tags": [
+      "Troubleshooting",
+      "Generation failure",
+      "Render failure",
+      "AI repair failure",
+      "Missing diagrams",
+      "Unavailable model"
+    ],
+    "relatedArtifacts": [
+      "Error messages",
+      "Task records",
+      "Upstream status"
+    ],
+    "summary": "Locate blocked actions, failed jobs, missing diagrams and outdated results."
+  }
+};
+
+// Keep English reading paths task-specific instead of repeating a generic placeholder.
+const EN_ARTICLE_GUIDANCE: Record<string, [string, string, string[], string, string]> = {
+  "quick-start": [
+    "Open [Projects](/projects).",
+    "Sign in and choose an available model.",
+    [
+      "Create a project and describe the business in **System requirements**.",
+      "Choose **Start analysis**, review the rules and resolve repair candidates.",
+      "Generate and review models, then prepare and download a specification."
+    ],
+    "Rules connect business text to models, tests and specifications.",
+    "Read the inline prerequisite notice when an action is unavailable."
+  ],
+  "project-basics": [
+    "Open [Projects](/projects) and choose **New project**.",
+    "Sign in; course binding can remain unassigned.",
+    [
+      "Fill in the project name, description and background.",
+      "Select visibility and any course or team binding.",
+      "Confirm, create and open the project."
+    ],
+    "Each project keeps its own sources, results and history.",
+    "For an invited project, use the account associated with the invitation."
+  ],
+  "workspace-shell": [
+    "Open any project.",
+    "Your account needs project access.",
+    [
+      "Choose a stage from the sidebar.",
+      "Expand a model to view elements, relationships or traceability.",
+      "Switch open views using tabs; inspect tasks and history from top actions."
+    ],
+    "Stage home pages generate results; model submenus show details.",
+    "On small screens, use **Open project navigation**."
+  ],
+  "feature-map": [
+    "Use the project sidebar and top actions.",
+    "Reading docs does not require sign-in; project actions require access.",
+    [
+      "Start with **System requirements**, then choose feasibility, modeling or design.",
+      "Use **Tests** to review coverage and **Documents** to export deliverables.",
+      "Open [Coding Agent](/projects/connections) for external implementation."
+    ],
+    "Follow requirement sources into models, designs, tests and documents.",
+    "Use Generation tasks for progress and Run history for past results."
+  ],
+  "project-drawers": [
+    "Use project top actions or **Open project actions**.",
+    "Management operations depend on your member role.",
+    [
+      "Edit project details in **Project settings**.",
+      "Invite collaborators and review roles in **Members**.",
+      "Find progress, saved results and files in Tasks, History and Documents."
+    ],
+    "Project management applies to the current project; model defaults are account settings.",
+    "Read confirmations before archiving, transferring or deleting a project."
+  ],
+  "account-global-settings": [
+    "Account menu → **Settings → Global settings**.",
+    "Sign in and have access to a provider.",
+    [
+      "Select a provider and a default model from its catalog.",
+      "Test the configuration, then save.",
+      "Confirm the actual choice on the generation page."
+    ],
+    "Defaults initialize generation choices; run records show actual usage.",
+    "Add a personal provider or ask an administrator if no configuration is available."
+  ],
+  "provider-configuration": [
+    "Account menu → **Settings → Global settings → Hosted model configuration**.",
+    "Prepare a compatible Base URL and API key.",
+    [
+      "Add a provider and enter its name, URL and key.",
+      "Fetch models, select a default and pass the connection test.",
+      "Save the provider, then save global settings."
+    ],
+    "Personal providers use their own billing and do not consume platform credits.",
+    "Saving requires model discovery and a successful test."
+  ],
+  "recommended-models": [
+    "Select a model in Global settings or on the generation page.",
+    "Connect a provider and prepare a repeatable small sample.",
+    [
+      "Test access using a model from the current catalog.",
+      "Compare requirement quality, valid diagrams and source coverage on the same input.",
+      "Compare reliability, latency and actual cost before choosing."
+    ],
+    "Real task results complement basic connection tests.",
+    "Evaluate long specifications separately from short tasks."
+  ],
+  "billing-entitlements": [
+    "Open [Billing](/account/billing).",
+    "Sign in and check balance, terms and expiry.",
+    [
+      "Review current credits before buying a package.",
+      "Complete payment, then refresh the same order and balance.",
+      "Resume valid pending orders instead of creating duplicates."
+    ],
+    "Paid orders create credit entries; provider account billing is separate.",
+    "If credits are delayed, refresh and keep the order reference before contacting support."
+  ],
+  "requirements": [
+    "Project sidebar → **System requirements**.",
+    "Use an editable project and an available model.",
+    [
+      "Describe roles, workflows, constraints and failure behavior.",
+      "Select **Start analysis**, or **Update requirement rules** for changed existing text.",
+      "Confirm quality notices or request repairs, then accept or reject candidates."
+    ],
+    "Confirmed rules feed analysis, models, tests and documents.",
+    "Review rules again when their source text changes."
+  ],
+  "requirement-baseline": [
+    "Open rule reviews and quality notices in **System requirements**.",
+    "Generated rules or pending review candidates exist.",
+    [
+      "Compare rules with the current text.",
+      "Accept or reject candidates, and confirm applicable quality notices.",
+      "Recheck the prerequisite notice before continuing."
+    ],
+    "The baseline is the confirmed source version used downstream.",
+    "An outdated result may remain visible, but still needs review against current sources."
+  ],
+  "feasibility-analysis": [
+    "Project sidebar → **Feasibility analysis**.",
+    "Confirm rules and choose an available model.",
+    [
+      "Generate the System Environment Diagram and Business and System Flow Diagram.",
+      "Generate options, completing missing or outdated dependencies when requested.",
+      "Review costs, risks and conclusions, save changes and prepare the report."
+    ],
+    "Options depend on rules, both diagrams and supplemental facts.",
+    "Old plans missing flow dependencies must be regenerated after the diagrams are ready."
+  ],
+  "uml-models": [
+    "Project sidebar → **Requirement models**.",
+    "Confirm rules and resolve prerequisite notices.",
+    [
+      "Select the types of model needed for your business questions.",
+      "Generate, then inspect progress in **Generation tasks**.",
+      "Review the diagrams, elements, relationships and requirement sources."
+    ],
+    "Structured models produce diagram source and SVG images for downstream use.",
+    "Successful rendering still requires a business review."
+  ],
+  "uml-model-detail": [
+    "Expand a model and open elements, relationships or traceability.",
+    "The model has been generated.",
+    [
+      "Find the target element using search or filters.",
+      "Check relationship endpoints and requirement sources.",
+      "Edit, resolve field errors, save and redraw, then review affected results."
+    ],
+    "Business elements carry source links; database lines follow table constraints.",
+    "Repair references to deleted elements before saving."
+  ],
+  "design-models": [
+    "Project sidebar → **Design models**.",
+    "Prepare the sources required by each selected design type.",
+    [
+      "Select architecture, interactions, classes, navigation, database or deployment designs.",
+      "Check dependencies and generate.",
+      "Inspect details and source links before using the designs."
+    ],
+    "Use cases support realization design; domain concepts support classes and tables.",
+    "Check use cases and event flows if realization designs are missing."
+  ],
+  "design-traceability": [
+    "Open design traceability or the top **Lineage graph** action.",
+    "Save requirement and design models with element-level source links.",
+    [
+      "Find a rule and its requirement model element.",
+      "Follow the link to a design element.",
+      "Open the design and verify the behavior, resolving missing or pending coverage."
+    ],
+    "A link locates evidence; the design content must satisfy the requirement.",
+    "If the matrix is empty, check that saved models include element-level mappings."
+  ],
+  "coding-agent": [
+    "Open [Coding Agent](/projects/connections) beside Projects.\n\n### Four read-only capabilities\n\n| Your task | MCP tool | Result |\n| --- | --- | --- |\n| Find the intended project | `list_projects` | Search authorized projects and obtain their stable IDs |\n| Inspect implementation sources | `get_implementation_context` | Read a whole-project or scoped directory with dependencies, review states, issues and source versions |\n| Read a complete source | `get_artifact` | Retrieve the selected requirement, model or test as version-checked JSON chunks |\n| Continue after sources change | `check_context_updates` | Compare an applied manifest and report added, modified, deleted or stale sources |\n\nDescribe the job to your coding assistant; it can call these tools for you.",
+    "Sign in, save the sources you want to use, and prepare the external client and repository. Unsaved drafts are not read. Tell the assistant the intended feature, stack and acceptance criteria; incomplete diagrams do not prevent work on clearly specified parts.",
+    [
+      "**Connect the client.** Find its card, open **View setup guide**, and use the supplied MCP address and client-specific instructions.",
+      "**Authorize access.** Browser authorization lasts 30 days and covers explicitly selected projects that remain accessible. The page creates 30-day personal tokens for all projects the account can currently access, including projects joined or created later. Store the one-time token in client credentials or an environment variable.",
+      "**Describe the task and review its sources.** Tell the assistant the project name and feature, and confirm the intended project if names are duplicated. Ask it to list the available requirements, designs and tests, plus any missing, conflicting, pending or outdated information. Have it fully read the relevant material, inspect the repository, and explain its implementation scope and checks. If platform sources change during the work, ask it to refresh before continuing. The assistant handles pagination, chunked reads and version checks; you do not need to enter protocol parameters.",
+      "**Implement a focused task.** For example: “Find my Library booking project, inspect this repository, and read the booking requirements, acceptance criteria, analysis, design and saved tests. Explain missing, conflicting, pending or stale sources. Preserve the existing stack and my changes, implement only student booking, then run available tests and report passed, failed and unverified checks.”",
+      "**Continue from applied versions.** Ask the assistant to read `.uml-platform.json`, verify the server and project, call `check_context_updates`, then read changed sources and modify affected code and tests. Update only versions actually applied; preserve the previous manifest on failure or interruption.",
+      "**Verify both outcomes.** **Last successful call** verifies MCP use. Review the external assistant's file changes and executed tests separately. Revoke unused connections."
+    ],
+    "### What saved data is available\n\n| Source | Available content |\n| --- | --- |\n| Requirements | Original text, rules, structured requirements and acceptance criteria, quality reports, assumptions, conflicts and repair candidates |\n| Feasibility | Saved implementation constraints, environment and business-flow models, their source links, and candidate plans |\n| Analysis and design | Structured model elements and relationships, PlantUML source and traceability |\n| Tests | Saved cases and coverage relationships |\n\nFunctional scopes retain global requirement context and dependencies; they do not grant new access. Models without traceability can be missed by a narrow scope, so inspect the whole directory when warned.\n\n`current`, `stale` and `unknown` describe source freshness, not business correctness or human approval. The assistant must check review states and inconsistencies too. Explicit requirements and the existing repository take precedence over unconfirmed technology advice.\n\nThe assistant uses its own file tools to maintain `.uml-platform.json` with server URL, project ID, scope and `appliedManifest`. The MCP server does not write this file. Keep tokens, passwords and private source bodies out of it.",
+    "**Can MCP edit the platform or generate models?** No. These four tools cannot create, modify or delete platform resources, confirm requirements, start generation pipelines, or write local code. Use the platform to update and save sources; the external assistant implements and tests them.\n\n**Can it download documents or diagrams?** The tools do not download DOCX/SVG files, browse document libraries or read run history. They return structured sources and PlantUML, excluding provider credentials.\n\n**Does connected mean finished?** No. A successful call does not mean the assistant is continuously online, code is complete or tests passed. The connection does not push source changes automatically; check updates before continuing.\n\n**What if sources conflict or are incomplete?** The read-only tools report uncertainty without repairing it. The assistant should explain the issue and seek clarification while working on clearly defined parts. Expired, revoked or inaccessible project authorization must be renewed or corrected."
+  ],
+  "testing-coverage": [
+    "Project sidebar → **Tests**.",
+    "Confirmed rules and a use-case model are required; design models add context.",
+    [
+      "Generate test cases and filter by scenario type.",
+      "Review preconditions, inputs, steps and expected outcomes.",
+      "Check requirement coverage and update vague source material."
+    ],
+    "Generated test cases need execution against the implemented program.",
+    "Coverage counts alone do not prove correctness or passing tests."
+  ],
+  "documents-delivery": [
+    "Project sidebar → **Documents**, or the document library.",
+    "Prepare current sources required by the chosen document type.",
+    [
+      "Select a type and resolve missing or outdated source notices.",
+      "Adjust style, generate and review content and images.",
+      "Check the version and download the DOCX; use online editing when available."
+    ],
+    "Documents preserve source content from their generation time.",
+    "Regenerate deliverables after changing upstream requirements or models."
+  ],
+  "generation-tasks-history": [
+    "Use **Generation tasks** and **Run history** in project top actions.",
+    "A generation task has been started in the project.",
+    [
+      "Expand the current task to inspect stages or failures.",
+      "Find completed records by time and type.",
+      "Review inputs and results before retrying or restoring."
+    ],
+    "Tasks explain current progress; history keeps earlier results.",
+    "A restored snapshot may still be outdated compared with current requirements."
+  ],
+  "account-models-faq": [
+    "Use account Settings, project Members or [Billing](/account/billing).",
+    "Confirm the current account.",
+    [
+      "Check invitations and roles for project access.",
+      "Test the selected provider in Global settings for model issues.",
+      "Inspect Billing for credits, and Security or Sessions for account access."
+    ],
+    "Identity, member permissions, model access and credits are separate checks.",
+    "For expired MCP authorization, use the Coding Agent connection guide."
+  ],
+  "troubleshooting": [
+    "Start with the current notice, then inspect tasks and history.",
+    "Identify the affected stage and keep the visible task reference.",
+    [
+      "Read the exact prerequisite or failure message.",
+      "Correct the failed item's input or upstream dependency.",
+      "Retry only the affected work and inspect the resulting artifact."
+    ],
+    "Trace errors from the page to the task and its source.",
+    "A failed task and an outdated result have different causes."
+  ]
 };
 
 function buildEnglishContent(article: ProductDocArticleManifestItem, title: string, summary: string) {
-  const tags = EN_ARTICLE_TEXT[article.id]?.tags ?? article.tags;
+  const guidance = EN_ARTICLE_GUIDANCE[article.id];
   const artifacts = EN_ARTICLE_TEXT[article.id]?.relatedArtifacts ?? article.relatedArtifacts;
+  // Reuse the current, task-specific screenshots so translated guides cannot retain old UI assets.
+  const screenshots = [...new Set(
+    [...(markdownModules[article.sourcePath] ?? "").matchAll(/!\[[^\]]*\]\((\/help\/images\/[^)]+)\)/gu)]
+      .map((match) => match[1]),
+  )];
   return [
-    `# ${title}`,
-    "",
-    summary,
-    "",
-    "## When to use this page",
-    "Use this article when you need to understand where the feature lives, what input it expects, and which artifact or evidence it produces in the platform workflow.",
-    "",
-    "## Recommended workflow",
-    "1. Open the related project or workspace entry from the top navigation or project drawer.",
-    "2. Check prerequisites such as sign-in status, project membership, provider configuration, and completed upstream artifacts.",
-    "3. Run the action, review generated results, and use task history or traceability panels to verify evidence.",
-    "4. Return to the project home or workspace tabs when you need to continue with the next stage.",
-    "",
-    "## Key artifacts",
-    artifacts.map((item) => `- ${item}`).join("\n"),
-    "",
-    "## Search tags",
-    tags.map((item) => `- ${item}`).join("\n"),
+    `# ${title}`, "",
+    "## When to use this page", summary, "",
+    "## Where to find it", guidance[0], "",
+    "## Before you begin", guidance[1], "",
+    "## Steps", ...guidance[2].map((step, index) => `${index + 1}. ${step}`),
+    ...(screenshots.length ? ["", "Current interface shown with Chinese labels and demonstration project data. Select an image to enlarge it.", "", ...screenshots.flatMap((src, index) => [`![${title}: screenshot ${index + 1} (Chinese interface)](${src})`, ""])] : []), "",
+    "## Results", artifacts.map((item) => `- ${item}`).join("\n"), "",
+    "## How the results connect", guidance[3], "",
+    "## Common questions", guidance[4],
   ].join("\n");
 }
 

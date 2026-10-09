@@ -8,7 +8,7 @@ import { Rating } from '@/features/marketing-site/template/components/ui/rating'
 export type TestimonialItem = {
   name: string
   username: string
-  avatar: string
+  avatar: React.ReactNode
   content: React.ReactNode
   rating: number
 }
@@ -22,13 +22,12 @@ const TestimonialCard = ({ testimonial }: { testimonial: TestimonialItem }) => {
       <CardContent className='flex justify-between gap-3 max-sm:flex-col max-sm:items-stretch'>
         <div className='flex items-center gap-3'>
           <Avatar className='size-12'>
-            <AvatarImage src={testimonial.avatar} alt={flowText(testimonial.name)} />
-            <AvatarFallback className='text-sm'>
-              {testimonial.name
-                .split(' ')
-                .map(n => n[0])
-                .join('')}
-            </AvatarFallback>
+            {typeof testimonial.avatar === 'string' ? <>
+              <AvatarImage src={testimonial.avatar} alt={flowText(testimonial.name)} />
+              <AvatarFallback className='text-sm'>
+                {testimonial.name.split(' ').map(n => n[0]).join('')}
+              </AvatarFallback>
+            </> : testimonial.avatar}
           </Avatar>
           <div className='flex flex-col gap-0.5'>
             <CardTitle className='flex items-center gap-1 text-base'>{flowText(testimonial.name)}</CardTitle>

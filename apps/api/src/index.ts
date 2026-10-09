@@ -195,7 +195,7 @@ export async function createApiServer(options?: {
     disableBillingEntitlementGuard: options?.disableBillingEntitlementGuard,
   });
 
-  await registerMcpModule({ app, authStore, pool, production: runtimeNodeEnv === "production" });
+  await registerMcpModule({ app, authStore, documentLibrary, pool, production: runtimeNodeEnv === "production" });
   return app;
 }
 

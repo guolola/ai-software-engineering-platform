@@ -1426,7 +1426,7 @@ export const resources = {
         badge: "项目内使用文档",
         title: "软件工程实践平台使用手册",
         description:
-          "面向普通用户，把项目创建、系统需求、可行性分析、UML、设计、代码原型、测试、三类说明书、权益购买和排障收进项目内。",
+          "按操作任务查找指南：创建项目、整理需求、生成模型、连接编程助手、测试与交付。",
         openProjects: "进入项目",
         maintainedNotice: "文档内容随项目代码维护，截图和路径以当前版本为准。",
         backToQuickStart: "回到快速开始",
@@ -2913,7 +2913,7 @@ export const resources = {
         badge: "In-product docs",
         title: "Software Engineering Practice Platform Guide",
         description:
-          "A user-oriented guide covering projects, system requirements, feasibility analysis, UML, design, code prototypes, testing, three document types, billing, and troubleshooting.",
+          "Task-based guides for projects, requirements, modeling, coding agents, testing, and delivery.",
         openProjects: "Open projects",
         maintainedNotice: "Docs are maintained with the project code. Screenshots and paths reflect the current version.",
         backToQuickStart: "Back to quick start",

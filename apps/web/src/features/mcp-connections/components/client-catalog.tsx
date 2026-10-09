@@ -1,7 +1,10 @@
 // Presents the client directory and opens existing connection instructions from each catalog card.
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Copy } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../../shared/ui/button";
+import { Input } from "../../../shared/ui/input";
+import { Label } from "../../../shared/ui/label";
+import AppIntegration from "./app-integration-03/app-integration-03";
 import { mcpClients, type McpClientId } from "../model/client-configurations";
 import { ClientIcon } from "./client-icon";
 
@@ -33,33 +36,46 @@ export function ClientCatalogHero() {
   </div>;
 }
 
-export function ClientCatalog({ onSelect }: { onSelect: (id: McpClientId, trigger: HTMLButtonElement) => void }) {
+export function ClientCatalog({ onSelect, serverUrl, onCopy }: {
+  onSelect: (id: McpClientId, trigger: HTMLButtonElement) => void;
+  serverUrl: string;
+  onCopy: (value: string) => Promise<boolean>;
+}) {
   const { t } = useTranslation();
 
-  return <section className="min-w-0 space-y-6" aria-labelledby="mcp-client-catalog-title">
-    <h2 id="mcp-client-catalog-title" className="text-2xl font-medium leading-8 text-foreground sm:text-3xl">{t("mcp.catalog.clients")}</h2>
-    <div className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {mcpClients.map((client) => <article key={client.id} className="flex min-w-0 flex-col border border-border bg-background p-6 transition-colors hover:border-foreground/40">
-        <ClientIcon clientId={client.id} />
-        <h3 className="mb-5 mt-6 min-h-14 break-words text-[22px] font-medium leading-7 text-foreground">{client.name}</h3>
-        <ul className="list-disc space-y-2 pl-4 text-sm leading-6 text-muted-foreground marker:text-foreground">
-          <li>{t("mcp.catalog.sources")}</li>
-          <li>{t("mcp.catalog.readOnly")}</li>
-          <li>{t(client.mode === "manual" ? "mcp.catalog.manual" : "mcp.catalog.remote")}</li>
-        </ul>
-        <div className="mt-auto pt-8">
-          <Button
-            variant="link"
-            className="h-auto max-w-full justify-start gap-2 rounded-none border-0 p-0 text-sm font-medium text-foreground underline underline-offset-4 hover:text-foreground/70"
-            aria-label={t("mcp.catalog.openGuide", { name: client.name })}
-            aria-haspopup="dialog"
-            onClick={(event) => onSelect(client.id, event.currentTarget)}
-          >
-            {t("mcp.catalog.installGuide")}
-            <ArrowRight aria-hidden="true" className="size-4" />
-          </Button>
-        </div>
-      </article>)}
-    </div>
-  </section>;
+  return <AppIntegration
+    title={t("mcp.address")}
+    description={t("mcp.transportHelp")}
+    titleId="mcp-client-catalog-title"
+    header={<div className="space-y-4">
+      <h2 id="mcp-client-catalog-title" className="text-2xl font-semibold md:text-3xl lg:text-4xl">
+        <Label htmlFor="mcp-address" className="justify-center text-2xl font-semibold md:text-3xl lg:text-4xl">{t("mcp.address")}</Label>
+      </h2>
+      <p id="mcp-transport-help" className="mx-auto max-w-4xl text-xl leading-8 text-muted-foreground">{t("mcp.transportHelp")}</p>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 pt-2 sm:flex-row">
+        <Input id="mcp-address" aria-describedby="mcp-transport-help" className="h-11 min-w-0 flex-1 font-mono text-sm" readOnly value={serverUrl} />
+        <Button variant="outline" className="h-11" disabled={!serverUrl} onClick={() => void onCopy(serverUrl)}><Copy aria-hidden="true" className="size-4" />{t("mcp.copyAddress")}</Button>
+      </div>
+    </div>}
+    integrations={mcpClients.map((client) => ({
+      id: client.id,
+      name: client.name,
+      icon: <ClientIcon clientId={client.id} className="size-8.5 [&_svg]:size-8" />,
+      description: <ul className="list-disc space-y-2 pl-4 text-sm leading-6 marker:text-foreground">
+        <li>{t("mcp.catalog.sources")}</li>
+        <li>{t("mcp.catalog.readOnly")}</li>
+        <li>{t(client.mode === "manual" ? "mcp.catalog.manual" : "mcp.catalog.remote")}</li>
+      </ul>,
+      action: <Button
+        variant="link"
+        className="h-auto max-w-full justify-start gap-2 whitespace-normal p-0 text-left text-sm font-medium text-foreground"
+        aria-label={t("mcp.catalog.openGuide", { name: client.name })}
+        aria-haspopup="dialog"
+        onClick={(event) => onSelect(client.id, event.currentTarget)}
+      >
+        {t("mcp.catalog.installGuide")}
+        <ArrowRight aria-hidden="true" className="size-4" />
+      </Button>,
+    }))}
+  />;
 }

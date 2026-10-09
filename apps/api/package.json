@@ -24,10 +24,12 @@
     "fastify": "5.2.1",
     "ioredis": "^5.11.1",
     "ip2region": "^2.3.0",
+    "jszip": "^3.10.1",
     "nodemailer": "^6.9.16",
     "oidc-provider": "9.12.2",
     "openai": "^6.44.0",
     "pg": "^8.21.0",
+    "saxes": "^6.0.0",
     "zod": "3.24.4",
     "zod-to-json-schema": "3.24.6"
   },

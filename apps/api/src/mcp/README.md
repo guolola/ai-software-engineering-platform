@@ -2,13 +2,19 @@
 
 ## 职责
 
-为外部 coding agent 提供经用户授权的已保存项目依据。提供四个只读工具、技术栈中立的上下文、来源版本、OAuth 与个人令牌。
+为外部 coding agent 提供经用户授权的已保存项目依据。提供四个只读工具、技术栈中立的上下文、实施任务与代码映射契约、独立本地验证器、来源版本、OAuth 与个人令牌。
 
 ## 边界
 
-`context/` 只提取白名单领域数据、范围与依赖；`tools/` 负责读取及分页；`auth/` 负责协议配置、身份和项目授权；`records/` 负责授权与 OAuth 持久化；`server/` 组装 SDK 和依赖。HTTP 适配在 [`routes/mcp/`](../routes/mcp/register-mcp-routes.ts)，合同在 [`packages/contracts/src/mcp/`](../../../../packages/contracts/src/mcp/index.ts)。
+`context/` 提取白名单领域数据、当前项目说明书正文、范围与依赖，并组织实施任务和分发产物；`verification/` 提供无需平台依赖的本地验证器源码，服务器不执行该源码；`tools/` 负责读取及分页；`auth/` 负责协议配置、身份和项目授权；`records/` 负责授权与 OAuth 持久化；`server/` 组装 SDK 和依赖。HTTP 适配在 [`routes/mcp/`](../routes/mcp/register-mcp-routes.ts)，合同在 [`packages/contracts/src/mcp/`](../../../../packages/contracts/src/mcp/index.ts)。
 
 不导入前端状态、不使用原型生成提示、不读取供应商密钥，不启动 LLM 或代码流水线。工具没有本地文件写入能力；本地关联文件由 agent 自己维护。
+
+### 映射与一致性验证
+
+以 `taskId` 关联需求、设计元素、实际代码、测试与来源版本。目前是任务级多对多登记，尚无设计元素到代码符号的逐对绑定。现有本地验证器核对引用、文件哈希，并在显式启用 `--run-checks` 后执行登记命令；自定义一致性算法可通过 `checks` 接入，逐规则结果和算法版本仍需后续扩展。
+
+参见[中文 README 映射图](../../../../readme-zh-cn.md#需求设计与代码映射)、[借阅映射示例](../../../../docs/integrations/coding-agent-mcp.md#映射示例与证据边界)与[一致性算法接入](../../../../docs/integrations/coding-agent-mcp.md#接入自定义一致性算法)。
 
 ## 使用或常用命令
 

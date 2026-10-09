@@ -595,9 +595,9 @@ test("admin metrics expose cumulative overview and single-day generation breakdo
   assert.equal(response.statusCode, 200);
   const body = response.json();
   assert.equal(body.metricWindow.timeZone, "Asia/Shanghai");
-  assert.equal(body.metrics.find((item: { label: string }) => item.label === "生成次数")?.value, "8");
+  assert.equal(body.metrics.find((item: { label: string }) => item.label === "生成次数")?.value, "6");
   assert.equal(body.metrics.find((item: { label: string }) => item.label === "今日生成次数"), undefined);
-  assert.equal(body.metrics.find((item: { label: string }) => item.label === "模型调用量")?.value, "13");
+  assert.equal(body.metrics.find((item: { label: string }) => item.label === "模型调用量")?.value, "9");
   assert.equal(body.metrics.find((item: { label: string }) => item.label === "文档生成量")?.value, "2");
   assert.equal(body.metrics.find((item: { label: string }) => item.label === "平均耗时")?.value === "n/a", false);
   assert.doesNotMatch(JSON.stringify(body), /first-pass|live auth store|live project store/);
@@ -647,8 +647,8 @@ test("admin metrics expose cumulative overview and single-day generation breakdo
   });
   assert.equal(yesterdayResponse.statusCode, 200);
   const yesterdayBody = yesterdayResponse.json();
-  assert.equal(yesterdayBody.metrics.find((item: { label: string }) => item.label === "生成次数")?.value, "8");
-  assert.equal(yesterdayBody.metrics.find((item: { label: string }) => item.label === "模型调用量")?.value, "13");
+  assert.equal(yesterdayBody.metrics.find((item: { label: string }) => item.label === "生成次数")?.value, "6");
+  assert.equal(yesterdayBody.metrics.find((item: { label: string }) => item.label === "模型调用量")?.value, "9");
   const yesterdayTotalRequirements = new Map(
     yesterdayBody.totalGenerationBreakdown.map((row: { taskType: string }) => [row.taskType, row]),
   ).get("requirements_to_uml") as Record<string, unknown>;
@@ -2355,7 +2355,7 @@ test("admin run list classifies run kinds and returns readable summaries", async
   const { project } = authStore.createProject({
     ownerUserId: operator.id,
     name: "任务项目",
-    description: "四类任务归类测试",
+    description: "三类任务归类测试",
     visibility: "private",
   });
   const provider = await providerConfigs.create({
@@ -2467,7 +2467,7 @@ test("admin run list classifies run kinds and returns readable summaries", async
     artifactSummary: { title: string };
     artifactItems: Array<{ type: string; preview?: unknown; previewAvailable: boolean }>;
   }>;
-  assert.deepEqual(listedRuns.map((item) => item.id), ["run-design", "run-code", "run-doc", "run-req"]);
+  assert.deepEqual(listedRuns.map((item) => item.id), ["run-design", "run-doc", "run-req"]);
   for (const { snapshot, expectedType, expectedTitle } of snapshots) {
     const run = listedRuns.find((item) => item.id === snapshot.runId);
     assert.ok(run);

@@ -4,7 +4,6 @@ import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '@/shared/i18n'
-import { orbitLogos } from '@/features/marketing-site/template/content/trusted-brands'
 import HeroSection from './platform-hero-section'
 
 const reducedMotion = vi.hoisted(() => ({ value: false }))
@@ -45,12 +44,27 @@ describe('marketing hero', () => {
     expect(screen.getByTestId('hero-capability-card-left')).toHaveTextContent('需求 → UML 模型')
     expect(screen.getByTestId('hero-capability-card-right')).toHaveTextContent('模型 → 代码与文档')
     const orbit = screen.getByTestId('hero-orbit')
+    const centerLogo = orbit.querySelector('[data-slot="product-logo"]')
+    expect(centerLogo).toHaveClass('size-full')
+    expect(centerLogo).toHaveAttribute('data-variant', 'badge')
+    expect(centerLogo?.parentElement).not.toHaveClass('bg-card', 'border', 'rounded-2xl')
     expect(orbit).toHaveClass('pointer-events-none')
     const brandMarks = orbit.querySelectorAll('[data-brand-name]')
     expect(brandMarks).toHaveLength(12)
-    expect(Array.from(brandMarks, mark => mark.getAttribute('data-brand-name'))).toEqual(orbitLogos.map(logo => logo.name))
+    expect(Array.from(brandMarks, mark => mark.getAttribute('data-brand-name'))).toEqual([
+      'Codex', 'Claude Code', 'Cursor', 'WorkBuddy', 'Qoder', 'TRAE',
+      'GitHub Copilot', 'Cline', 'Windsurf', 'Roo Code', 'OpenCode', 'VS Code'
+    ])
     expect(orbit.querySelectorAll('[data-brand-name] img')).toHaveLength(12)
-    for (const logo of orbit.querySelectorAll('[data-brand-name] img')) expect(logo).toHaveClass('grayscale')
+    for (const logo of orbit.querySelectorAll('[data-brand-name] img')) expect(logo).not.toHaveClass('grayscale')
+    for (const brand of ['Codex', 'Claude Code', 'WorkBuddy', 'Qoder', 'TRAE', 'VS Code']) {
+      const logo = orbit.querySelector('[data-brand-name="' + brand + '"] img')
+      expect(logo).not.toHaveClass('dark:invert')
+    }
+    expect(orbit.querySelector('[data-brand-name="Qoder"] img')?.parentElement).toHaveClass('bg-white')
+    for (const brand of ['Cursor', 'GitHub Copilot', 'Cline', 'Windsurf', 'Roo Code', 'OpenCode']) {
+      expect(orbit.querySelector('[data-brand-name="' + brand + '"] img')).toHaveClass('dark:invert')
+    }
     expect(orbit.querySelectorAll('[data-brand-name] svg')).toHaveLength(0)
     expect(orbit.querySelector('img[src="/marketing/logos/github.svg"]')).toBeNull()
     expect(container.querySelectorAll('#home .cell').length).toBeGreaterThan(0)

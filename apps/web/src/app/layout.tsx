@@ -7,8 +7,8 @@ export const metadata: Metadata = {
   title: '软件工程实践平台',
   description: 'UML 软件工程实践平台',
   icons: {
-    icon: [{ url: '/brand/uml-platform-logo.png', type: 'image/png' }],
-    shortcut: '/brand/uml-platform-logo.png'
+    icon: [{ url: '/brand/uml-platform-logo.svg', type: 'image/svg+xml' }],
+    shortcut: '/brand/uml-platform-logo.svg'
   }
 };
 

@@ -4,6 +4,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
 import type { OrbitBrandLogo } from '@/features/marketing-site/template/content/trusted-brands'
+import { cn } from '@/shared/ui/utils'
 import LeftLine from './hero-leftline'
 import RightLine from './hero-rightline'
 import { HERO_ORBIT_CENTER, HERO_ORBIT_HEIGHT, HERO_ORBIT_VISIBLE_TOP, HERO_ORBIT_WIDTH, LEFT_LINE_WIDTH, heroOrbitPaths } from './hero-orbit-paths'
@@ -49,8 +50,9 @@ function OrbitIcon({ item, size }: { item: OrbitBrandLogo; size: number }) {
 
   return (
     <motion.div data-brand-name={item.name} style={{ position: 'absolute', left: path.fromX - size / 2, top: path.fromY - HERO_ORBIT_VISIBLE_TOP - size / 2, width: size, height: size, zIndex: 5, x, y, opacity, scale }}>
-      <div className='bg-card flex size-full items-center justify-center rounded-full border p-2 shadow-sm'>
-        <img src={item.image} alt='' width={size} height={size} className='size-full object-contain grayscale dark:invert' />
+      <div className={cn('flex size-full items-center justify-center rounded-full border p-2 shadow-sm', item.lightBackground ? 'bg-white' : 'bg-card')}>
+        {/* Preserve brand colors; only black-and-white marks invert for contrast in dark mode. */}
+        <img src={item.image} alt='' width={size} height={size} className={cn('size-full object-contain', item.monochrome && 'dark:invert')} />
       </div>
     </motion.div>
   )

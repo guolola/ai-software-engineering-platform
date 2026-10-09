@@ -59,7 +59,8 @@ export function searchProductDocs(
       const summary = normalizeText(article.summary);
       const tags = normalizeText(article.tags.join(" "));
       const artifacts = normalizeText(article.relatedArtifacts.join(" "));
-      const content = normalizeText(article.content);
+      const readableContent = getReadableContent(article.content);
+      const content = normalizeText(readableContent);
       const titleMatch = title.includes(normalizedQuery);
       const summaryMatch = summary.includes(normalizedQuery);
       const tagMatch = tags.includes(normalizedQuery);
@@ -75,11 +76,11 @@ export function searchProductDocs(
       return {
         article,
         score,
-        matchedText: titleMatch
-          ? article.title
-          : summaryMatch
-            ? article.summary
-            : getContentSnippet(article.content, normalizedQuery),
+        // Titles are already visible above the excerpt. Metadata-only matches use
+        // the authored summary instead of exposing the start of the Markdown file.
+        matchedText: titleMatch || summaryMatch || !contentMatch
+          ? article.summary || readableContent.slice(0, 80)
+          : getContentSnippet(readableContent, normalizedQuery),
       };
     })
     .filter((result): result is ProductDocSearchResult => Boolean(result))
@@ -100,6 +101,28 @@ function stripInlineMarkdown(value: string) {
   return value
     .replace(/\[([^\]]+)\]\([^)]+\)/gu, "$1")
     .replace(/[`*_~]/gu, "")
+    .trim();
+}
+
+function getReadableContent(markdown: string) {
+  // Clean before indexing and slicing so a clipped excerpt cannot expose a partial
+  // link or authoring marker. Keep labels and code text that readers can see.
+  return markdown
+    .replace(/<!--[\s\S]*?-->/gu, "")
+    .replace(/^[ \t]{0,3}#[ \t]+[^\r\n]*$/gmu, "")
+    .replace(/^[ \t]*(?:`{3,}|~{3,})[^\r\n]*$/gmu, "")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/gu, "$1")
+    .replace(/^[ \t]*(?:>[ \t]?)+/gmu, "")
+    .replace(/^\[!(?:NOTE|TIP|WARNING)\][ \t]*/gmu, "")
+    .replace(/^[ \t]{0,3}#{2,6}[ \t]+/gmu, "")
+    .replace(/^[ \t]*\|[-:| \t]+\|[ \t]*$/gmu, "")
+    .replace(/^[ \t]*\|(.+)\|[ \t]*$/gmu, (_match, cells: string) => cells.replace(/\|/gu, " · "))
+    .replace(/^[ \t]*(?:[-*+]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?/gmu, "")
+    .replace(/(\*\*|__|~~)([^\r\n]*?)\1/gu, "$2")
+    .replace(/\*([^*\r\n]+)\*/gu, "$1")
+    .replace(/(?<![\p{L}\p{N}_])_([^_\r\n]+)_(?![\p{L}\p{N}_])/gu, "$1")
+    .replace(/`+([^`]+)`+/gu, "$1")
+    .replace(/\s+/gu, " ")
     .trim();
 }
 

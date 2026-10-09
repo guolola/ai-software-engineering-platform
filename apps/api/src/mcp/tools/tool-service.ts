@@ -1,5 +1,7 @@
 // Implements four read-only tools with principal-bound pagination and optimistic source-version checks.
 import { z } from "zod";
+import { readDocumentSources } from "../context/document-sources.js";
+import { withImplementationArtifacts } from "../context/implementation-artifacts.js";
 import {
   mcpListProjectsInputSchema,
   mcpContextInputSchema,
@@ -83,7 +85,8 @@ export function createMcpToolService(
   async function read(projectId: string, scope: McpScope) {
     const project = await access.project(principal, projectId);
     const workspace = await access.authStore.getProjectWorkspace(projectId);
-    const context = buildContext(workspace?.state ?? {}, normalizeScope(scope));
+    const documents = access.documentLibrary ? await readDocumentSources(access.documentLibrary, projectId) : [];
+    const context = withImplementationArtifacts(buildContext(workspace?.state ?? {}, normalizeScope(scope), documents), projectId);
     return {
       ...context,
       project: { id: project.id, name: project.name },
@@ -166,8 +169,9 @@ export function createMcpToolService(
           scope: context.scope,
           contextVersion: context.version,
           workspaceSaved: context.workspaceSaved,
+          implementation: context.implementation,
           artifacts: paged.items.map(artifactDirectory),
-          manifest: paged.items.map((a) => a.version),
+          manifest: paged.items.filter((a) => a.stage !== "implementation").map((a) => a.version),
           manifestComplete:
             paged.remaining === 0 && paged.items.length === paged.total,
           total: paged.total,
@@ -222,7 +226,7 @@ export function createMcpToolService(
     },
     async check_context_updates(input: z.infer<typeof mcpUpdatesInputSchema>) {
       const context = await read(input.projectId, input.scope);
-      const changes = compareManifest(input.manifest, context.manifest);
+      const changes = compareManifest(input.manifest.filter((item) => !item.artifactId.startsWith("implementation:")), context.manifest);
       const paged = page(
         changes,
         {
@@ -255,6 +259,7 @@ export function createMcpToolService(
           unknownIds: context.unknownIds,
           issues: context.issues,
           requiresRefresh: changes.length > 0,
+          implementation: context.implementation,
         },
       );
     },

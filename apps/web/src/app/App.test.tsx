@@ -1492,7 +1492,7 @@ describe("App shell routes", () => {
       window.history.pushState({}, "", "/projects/connections");
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect(await screen.findByRole("heading", { name: "MCP 客户端" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "MCP 地址" })).toBeVisible();
     expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(container.querySelector('[data-slot="sidebar"]')).not.toBeNull();
     expect(screen.queryByRole("heading", { name: "授权给 Codex" })).not.toBeInTheDocument();
@@ -1579,6 +1579,124 @@ describe("App shell routes", () => {
     expect(screen.queryByRole("button", { name: "关闭 工作台" })).not.toBeInTheDocument();
   });
 
+  it("keeps the platform shell mounted across sidebar navigation and history while revalidating target content", async () => {
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    vi.useFakeTimers();
+    const fetchMock = vi.mocked(fetch);
+    const defaultFetch = fetchMock.getMockImplementation();
+    let pendingAuth: ReturnType<typeof createDeferred<Response>> | null = null;
+    authSessionMode = "authenticated";
+    projectApiMode = "authenticated";
+    window.history.pushState({}, "", "/dashboard");
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), "http://127.0.0.1:4101");
+      if (url.pathname === "/api/auth/me" && pendingAuth) return pendingAuth.promise;
+      if (url.pathname === "/api/mcp/connections") return Response.json({ enabled: true, serverUrl: "http://localhost:3000/api/mcp", csrf: "consent-csrf", projects: [], connections: [] });
+      if (!defaultFetch) throw new Error("Default fetch mock is not installed");
+      return defaultFetch(input, init);
+    });
+
+    try {
+      const { container } = render(withWorkspaceProviders(<Shell />, createRepository()));
+      await act(flushResolvedPromises);
+      expect(screen.getByTestId("dashboard-shell")).toBeInTheDocument();
+      const banner = screen.getByRole("banner");
+      const sidebar = container.querySelector('[data-slot="sidebar"]')!;
+      const destinations = [
+        { path: "/projects", heading: "项目首页" },
+        { path: "/projects/connections", heading: "MCP 地址" },
+        { path: "/exam", heading: "考试" },
+        { path: "/account/billing", heading: "权益与账单" },
+        { path: "/dashboard", heading: null },
+      ];
+      // Hold each server check so even a slow network cannot hide a shell remount.
+      for (const destination of destinations) {
+        pendingAuth = createDeferred<Response>();
+        const target = sidebar.querySelector<HTMLAnchorElement>('[data-slot="sidebar-group"] a[href="' + destination.path + '"]')!;
+        fireEvent.click(target);
+        await act(flushResolvedPromises);
+        expect(window.location.pathname).toBe(destination.path);
+        expect(screen.getByRole("banner")).toBe(banner);
+        expect(container.querySelector('[data-slot="sidebar"]')).toBe(sidebar);
+        expect(screen.getByTestId("auth-check-placeholder")).toHaveAttribute("aria-busy", "true");
+        expect(screen.queryByTestId("platform-loading-screen")).not.toBeInTheDocument();
+        if (destination.heading) {
+          expect(screen.queryByRole("heading", { name: destination.heading })).not.toBeInTheDocument();
+        }
+        await act(async () => {
+          pendingAuth!.resolve(createAuthMeResponse());
+          pendingAuth = null;
+          await flushResolvedPromises();
+        });
+        expect(screen.getByRole("banner")).toBe(banner);
+        expect(container.querySelector('[data-slot="sidebar"]')).toBe(sidebar);
+        expect(screen.queryByTestId("auth-check-placeholder")).not.toBeInTheDocument();
+        if (destination.heading) {
+          expect(screen.getByRole("heading", { name: destination.heading })).toBeInTheDocument();
+        } else {
+          expect(screen.getByTestId("dashboard-shell")).toBeInTheDocument();
+        }
+      }
+
+      pendingAuth = createDeferred<Response>();
+      act(() => {
+        window.history.replaceState({}, "", "/account/billing");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+      await act(flushResolvedPromises);
+      expect(screen.getByRole("banner")).toBe(banner);
+      expect(container.querySelector('[data-slot="sidebar"]')).toBe(sidebar);
+      expect(screen.queryByTestId("account-billing-dashboard")).not.toBeInTheDocument();
+      await act(async () => {
+        pendingAuth!.resolve(createAuthMeResponse());
+        pendingAuth = null;
+        await flushResolvedPromises();
+      });
+      expect(screen.getByTestId("account-billing-dashboard")).toBeInTheDocument();
+      expect(screen.getByRole("banner")).toBe(banner);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("redirects an expired session during platform navigation without mounting target content", async () => {
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const user = userEvent.setup();
+    const authDeferred = createDeferred<Response>();
+    const fetchMock = vi.mocked(fetch);
+    const defaultFetch = fetchMock.getMockImplementation();
+    let holdAuth = false;
+    authSessionMode = "authenticated";
+    window.history.pushState({}, "", "/dashboard");
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), "http://127.0.0.1:4101");
+      if (url.pathname === "/api/auth/me" && holdAuth) return authDeferred.promise;
+      if (!defaultFetch) throw new Error("Default fetch mock is not installed");
+      return defaultFetch(input, init);
+    });
+    const { container } = render(withWorkspaceProviders(<Shell />, createRepository()));
+    await screen.findByTestId("dashboard-shell");
+    const banner = screen.getByRole("banner");
+    const sidebar = container.querySelector('[data-slot="sidebar"]')!;
+    holdAuth = true;
+    fetchMock.mockClear();
+    await user.click(sidebar.querySelector<HTMLAnchorElement>('a[href="/account/billing"]')!);
+    expect(screen.getByRole("banner")).toBe(banner);
+    expect(screen.queryByTestId("account-billing-dashboard")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/billing/"))).toBe(false);
+
+    await act(async () => {
+      authDeferred.resolve(Response.json({ message: "Authentication required" }, { status: 401 }));
+      await flushResolvedPromises();
+    });
+    expect(window.location.pathname).toBe("/login");
+    expect(window.location.search).toBe("?redirect=%2Faccount%2Fbilling&reason=session-expired");
+    expect(await screen.findByLabelText("邮箱或用户名")).toBeInTheDocument();
+    expect(banner).not.toBeInTheDocument();
+    expect(sidebar).not.toBeInTheDocument();
+    expect(screen.queryByTestId("account-billing-dashboard")).not.toBeInTheDocument();
+  });
+
   it("hides workspace tools on signed-in standalone pages", async () => {
     authSessionMode = "authenticated";
     window.history.pushState({}, "", "/exam");
@@ -1605,8 +1723,8 @@ describe("App shell routes", () => {
     expect(document.querySelector('[data-slot="sidebar-container"]')).not.toBeInTheDocument();
     expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes("/api/auth/me"))).toBe(false);
 
-    await user.click(screen.getByRole("button", { name: "项目首页与项目创建" }));
-    expect(screen.getByRole("heading", { name: "项目首页与项目创建" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "创建与进入项目" }));
+    expect(screen.getByRole("heading", { name: "创建与进入项目" })).toHaveFocus();
     await user.click(screen.getByRole("link", { name: "主页" }));
     await waitFor(() => expect(window.location.pathname).toBe("/"));
   });
@@ -1634,13 +1752,10 @@ describe("App shell routes", () => {
     expect(screen.getByLabelText("搜索使用文档")).toBeInTheDocument();
     expect(screen.queryByText("完整飞书文档整理中")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "模型配置" })).not.toBeInTheDocument();
-    expect(screen.getByAltText("项目内使用文档快速开始截图")).toHaveAttribute(
-      "src",
-      "/help/images/docs-quick-start.png",
-    );
-    expect(screen.getAllByRole("button", { name: /项目首页与项目创建/u }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: /模型详情页、元素列表与追踪矩阵/u }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: /说明书生成、样式、版本与下载/u }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "创建与进入项目" })).toHaveAttribute("href", "/tutorial?article=project-basics");
+    expect(screen.getAllByRole("button", { name: /创建与进入项目/u }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /查看与编辑模型详情/u }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /说明书生成与下载/u }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: /Coding Agent 接入与授权/u }).length).toBeGreaterThan(0);
     expect(screen.queryByText("项目导航")).not.toBeInTheDocument();
     expect(document.querySelector('[data-slot="sidebar-inset"] > footer')).not.toBeInTheDocument();

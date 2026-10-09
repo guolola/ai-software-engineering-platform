@@ -129,7 +129,7 @@ const HeroSection = () => {
       {/* The decorative orbit overlaps the CTA row, so it must not intercept link clicks. */}
       <div ref={orbitContainerRef} data-testid='hero-orbit' className='pointer-events-none relative z-10 -mt-10 w-full overflow-hidden sm:-mt-14' style={{ height: HERO_ORBIT_HEIGHT * orbitScale }}>
         <div className='absolute top-0 left-1/2' style={{ width: HERO_ORBIT_WIDTH, transform: 'translateX(-50%) scale(' + orbitScale + ')', transformOrigin: 'top center' }}>
-          <OrbitConnections items={orbitLogos} centerImage={<div className='bg-card flex size-full items-center justify-center rounded-2xl border shadow-lg'><FlowLogo className='size-15 object-contain' /></div>} />
+          <OrbitConnections items={orbitLogos} centerImage={<FlowLogo variant='badge' className='size-full drop-shadow-lg' />} />
           <div className='pointer-events-none absolute -inset-x-10 -inset-y-15 mx-auto max-w-425' aria-hidden='true'>
             <div className='from-background via-background/80 absolute inset-y-0 left-0 z-6 w-24 bg-linear-to-r to-transparent sm:w-32 lg:w-48' />
             <div className='from-background via-background/80 absolute inset-y-0 right-0 z-6 w-24 bg-linear-to-l to-transparent sm:w-32 lg:w-48' />

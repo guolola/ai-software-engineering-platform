@@ -11,9 +11,9 @@
 # Software Engineering Practice Platform
 
 <p>
-  <strong>AI-assisted UML modeling and project context for any MCP-compatible Coding Agent</strong><br />
-  From requirement baselines, feasibility studies, and UML models to external Coding Agents, tests, and engineering documents<br />
-  <sub>PlantUML rendering × trusted generation chains × MCP Streamable HTTP</sub>
+  <strong>Turn requirements into UML models, and trace them through designs and tests</strong><br />
+  An AI-assisted workspace for reviewing requirement rules, diagrams, coverage, and engineering documents<br />
+  <sub>PlantUML source and SVG · traceability matrices · DOCX export</sub>
 </p>
 
 <p>
@@ -23,20 +23,47 @@
 </p>
 
 <p>
-  <img src="https://img.shields.io/badge/Release-v2.0.0-2563eb?style=flat-square" alt="Current release v2.0.0" />
+  <img src="https://img.shields.io/badge/Version-v2.0.0-2563eb?style=flat-square" alt="Current product version v2.0.0" />
   <img src="https://img.shields.io/badge/Frontend-React%20%2B%20Next.js-61dafb?style=flat-square" alt="React and Next.js" />
   <img src="https://img.shields.io/badge/API-Fastify%20%2B%20Zod-111827?style=flat-square" alt="Fastify and Zod" />
   <img src="https://img.shields.io/badge/UML-PlantUML-f59e0b?style=flat-square" alt="PlantUML" />
   <img src="https://img.shields.io/badge/Runtime-Node.js%2022-339933?style=flat-square" alt="Node.js 22" />
 </p>
 
-> Turn system requirements, feasibility studies, UML models, design artifacts, tests, and documents into traceable engineering deliverables, and supply their implementation context to external Coding Agents.
+> Start with a requirement, inspect the generated models, and check how designs and tests relate to the original rules.
 
 </div>
 
+## Follow a seat-reservation example
+
+Use this input, translated from the [quick-start guide](apps/web/src/features/product-docs/content/quick-start.md), to explore the workflow:
+
+```text
+Students can sign in, find available library seats, and reserve a seat for a selected date and time slot.
+A student cannot make duplicate reservations for the same time slot. The system sends a notification after a successful reservation.
+Administrators can manage seats, review reservation records, and handle exceptional cancellations.
+```
+
+| Step | What to inspect |
+| --- | --- |
+| Confirm the requirements | Check the extracted rules and repair suggestions, including the duplicate-reservation rule. |
+| Generate requirement models | Start with use cases and domain concepts; inspect their elements, PlantUML, SVG, and links to requirement rules. |
+| Continue with designs and tests | Follow the prerequisite prompts, then check design traceability and test coverage against the confirmed rules. |
+| Prepare deliverables | Generate the applicable DOCX documents, review their diagrams and text, and download them. Use task history to investigate failures. |
+
+Start with the [online platform](https://jianglisoftware.com) and [user guide](https://jianglisoftware.com/tutorial). A real generation run requires a configured, available model. This is an input walkthrough; configured offline demo projects use fixed example data rather than live model output.
+
+**Workspace interface illustration:** the dashboard below contains sample figures that illustrate the layout. They are not live usage metrics or the recorded results of this example.
+
+![Project dashboard illustration with sample figures](apps/web/public/marketing/generated/workbench-dashboard-light.png)
+
+If this workflow is useful to you, star the repository to bookmark it and follow future improvements.
+
 ## Overview
 
-The Software Engineering Practice Platform is designed for software engineering courses, laboratory exercises, and project development. Its staged workspace establishes confirmed requirement facts before generating models and designs, then produces tests, documents, and reviewable evidence. Any Coding Agent that supports MCP Streamable HTTP and the platform's authentication can read saved project sources to implement and test code in the student's own repository and technology stack. Integration is not limited to the clients listed on the connection page.
+The Software Engineering Practice Platform is an AI-assisted workspace for software engineering courses and project development. Confirm requirement rules, generate UML and design models, inspect their traceability, and produce test cases and engineering documents. Generated results remain subject to human review.
+
+The repository also implements a read-only MCP interface for supplying saved project context to external Coding Agents. Real-client compatibility and generated-code acceptance testing remain pending; see the [MCP integration guide](docs/integrations/coding-agent-mcp.md).
 
 | 🧭 End-to-end stages | 🔗 Trust mechanisms | 📦 Deliverables |
 | --- | --- | --- |
@@ -49,14 +76,14 @@ The Software Engineering Practice Platform is designed for software engineering 
 - **Produce usable deliverables:** models, implementation context, tests, and documents share the same project sources, reducing manual transfer work.
 - **Keep models replaceable:** securely validated OpenAI-compatible providers can be used without binding the workflow to a single model vendor.
 
-> The current product interface and online tutorial are primarily available in Simplified Chinese. This README provides an English technical overview for international readers and contributors.
+> The current product interface and online tutorial are primarily available in Simplified Chinese. This README provides an English technical overview for international readers.
 
 ### v2.0 highlights
 
 - **A rebuilt product shell:** the responsive AdminCN workspace, project dashboard, navigation, account pages, and authentication flow now share one accessible component and theme system.
 - **Visible generation activity:** durable run activity events power a recoverable task conversation with streamed output, public reasoning summaries, parallel-call attribution, and terminal-state replay.
 - **Sharper engineering workflows:** model cards, editors, traceability, project administration, and document guidance are aligned around the same project state and action guards.
-- **Bring your own Coding Agent:** connect any client supporting MCP Streamable HTTP and the platform's authentication to read saved requirements, structured models, PlantUML sources, dependencies, rules, and source versions.
+- **Provide context to Coding Agents:** the read-only MCP implementation exposes saved requirements, models, PlantUML, dependencies, rules, and source versions. Client-specific authorization and tool calls still require validation.
 - **A refreshed public experience:** the Flow landing page, localized content, light/dark palettes, pricing entry points, and in-app tutorial use the current product visuals.
 
 ## Online Access
@@ -88,15 +115,11 @@ The platform is intended for coursework, conventional business systems, and prot
 
 ## Interface Preview
 
-<p align="center"><strong>Current v2 homepage and project dashboard in light mode</strong></p>
+<p align="center"><strong>Current v2 homepage in light mode</strong></p>
 
 ### 🌐 Official homepage
 
 ![Official homepage — desktop first screen](docs/images/readme-homepage.png)
-
-### 📊 Project dashboard
-
-![Project dashboard](apps/web/public/marketing/generated/workbench-dashboard-light.png)
 
 ## Architecture
 
@@ -120,10 +143,50 @@ flowchart LR
   H -.Coverage relations.-> L
 ```
 
+### Requirement, design, and code mapping
+
+Record which requirements and design elements relate to which code, then validate those relationships. Solid arrows show implemented associations and checks; dotted arrows show a future custom consistency algorithm. The four MCP tools remain read-only; code, mapping reports, and command execution stay in the agent's local repository.
+
+```mermaid
+flowchart TB
+  req["Requirements and business rules"] -->|"Requirement trace"| analysis["Analysis models"]
+  analysis -->|"Design trace"| design["Design models"]
+  req -->|"requirementIds"| mapping["Implementation task and report: taskId"]
+  design -->|"designRefs: model and element IDs"| mapping
+  docs["Requirements and design documents"] -->|"sourceArtifactIds"| mapping
+  mapping -->|"actualRefs: file, optional symbol, hash"| code["Implemented code"]
+  mapping -->|"testRefs + criterionIds"| tests["Tests and acceptance criteria"]
+  mapping -->|"sourceVersions"| versions["Source version and file change checks"]
+  code --> validator["Existing local verifier"]
+  tests --> validator
+  versions --> validator
+  mapping -.->|"Resolve full requirements, models, and documents"| algorithm["Future: custom consistency algorithm"]
+  code -.-> algorithm
+  tests -.-> algorithm
+  algorithm -.->|"Run via checks; fail with a nonzero exit code"| validator
+  validator --> result["Check results and tasks requiring revalidation"]
+```
+
+The borrowing integration test associates the following evidence through one task:
+
+| Mapping | Example |
+| --- | --- |
+| Requirement | `BORROW`: no more than 5 books borrowed at once |
+| Design element | `LoanService` |
+| Actual code | `LoanService` in `src/loan-service.mjs`, with its file hash |
+| Acceptance tests | Allow the fifth book, reject the sixth without changing the count, restore capacity after a return |
+| Version evidence | Requirement and design source versions, plus hashes of code, tests, and registered inputs |
+
+**Associations are currently many-to-many within a task.** A task can register several requirements, design elements, and code references; there is no explicit pairwise binding from each design element to a particular code symbol. Tests reference acceptance criteria through `criterionIds`, but semantic coverage still requires independent validation.
+
+A future consistency algorithm can check requirement coverage in designs, design structures and constraints in code, and runtime behavior against requirements. Existing `checks` can execute custom validation commands. Per-rule pass/fail/unknown results, algorithm versions, and pairwise bindings remain extensions to implement; an unknown result should not count as a pass.
+
+Mappings provide traceability; algorithms and executed tests provide evidence of correctness. The borrowing regression covers invalidation when the limit changes from 5 to 8 and subsequent code and test updates. It does not establish acceptance of a complete project generated by a real Coding Agent. See the [mapping example](docs/integrations/coding-agent-mcp.md#映射示例与证据边界) and [custom algorithm integration](docs/integrations/coding-agent-mcp.md#接入自定义一致性算法) in the Chinese integration guide.
+
 ### Monorepo layout
 
 ```text
-uml-experimental-platform/
+ai-software-engineering-platform/
 ├── apps/
 │   ├── api/             # Fastify API, generation pipelines, documents, and external adapters
 │   ├── render-service/  # PlantUML SVG/PNG rendering service
@@ -163,8 +226,8 @@ For more detail, see the [platform architecture](docs/architecture/platform-over
 ### 2. Clone and install
 
 ```bash
-git clone <repository-url>
-cd uml-experimental-platform
+git clone https://github.com/guolola/ai-software-engineering-platform.git
+cd ai-software-engineering-platform
 npm ci
 ```
 
@@ -189,7 +252,7 @@ After signing in, add an OpenAI-compatible provider in account settings. Enter t
 
 ### 5. Try Coding Agent integration
 
-The MCP server uses **Streamable HTTP**. Any compatible Coding Agent can use the endpoint with OAuth or a personal token; the listed client configurations are starting points. Your agent implements and tests code in your own repository using your chosen technology stack.
+The MCP implementation uses **Streamable HTTP** with OAuth or personal-token authentication. It is intended for compatible clients; the listed configurations are starting points, not a verified support list. The external agent is responsible for implementing and testing code in your repository using your chosen technology stack.
 
 For the PostgreSQL demo with MCP enabled, run `npm run dev:postgres:demo`. The command checks service ports and verifies the Web, API, rendering, and OAuth discovery paths before reporting success. Docker Desktop or compatible existing PostgreSQL and OnlyOffice services are required. The local MCP address is `http://localhost:3000/api/mcp`.
 

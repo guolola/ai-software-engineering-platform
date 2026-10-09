@@ -13,9 +13,9 @@
 # 软件工程实践平台
 
 <p>
-  <strong>AI 辅助 UML 建模，通过 MCP 为任意兼容的 Coding Agent 提供项目依据</strong><br />
-  从需求基线、可行性分析、UML 模型到外部 Coding Agent、测试与三类说明书<br />
-  <sub>PlantUML 渲染 × 可信链路 × MCP Streamable HTTP</sub>
+  <strong>从需求生成 UML，并追踪到设计与测试</strong><br />
+  在同一工作台检查需求规则、图表、覆盖关系与工程说明书<br />
+  <sub>PlantUML 源码与 SVG · 追踪矩阵 · DOCX 导出</sub>
 </p>
 
 <p>
@@ -32,13 +32,40 @@
   <img src="https://img.shields.io/badge/Runtime-Node.js%2022-339933?style=flat-square" alt="Node.js 22" />
 </p>
 
-> 把系统需求、可行性研究、UML、设计模型、测试和说明书沉淀为可追踪的工程产物，并向外部 Coding Agent 提供实现依据。
+> 从一段需求开始，检查生成的模型，再核对设计和测试是否关联到原始需求规则。
 
 </div>
 
+## 跟着座位预约案例走一遍
+
+使用[快速开始教程](apps/web/src/features/product-docs/content/quick-start.md)中的这段输入体验流程：
+
+```text
+图书馆预约系统允许学生登录后查询空闲座位，选择日期和时间段提交预约。
+同一学生同一时间段不能重复预约。预约成功后，系统向学生发送通知。
+管理员可以维护座位、查看预约记录，并处理异常取消。
+```
+
+| 步骤 | 检查什么 |
+| --- | --- |
+| 确认需求 | 检查抽取的需求规则和修复建议，包括“同一时间段不可重复预约”。 |
+| 生成需求模型 | 先生成用例模型与领域概念模型，检查元素、PlantUML、SVG 及对应的需求规则。 |
+| 继续设计与测试 | 按提示补齐前置条件，检查设计追踪关系与测试覆盖是否关联到已确认的规则。 |
+| 整理交付产物 | 按前置条件生成 DOCX 说明书，检查图表和正文后下载；失败时通过任务历史定位原因。 |
+
+可以从[在线平台](https://jianglisoftware.com)和[使用手册](https://jianglisoftware.com/tutorial)开始。真实生成需要配置可用模型。这里展示的是输入与操作路径；配置为离线演示的项目使用固定示例数据。
+
+**工作台界面示意：** 下图使用示例数字展示布局，不代表真实使用量，也不是本案例的一次实际生成结果。
+
+![包含示例数字的项目仪表盘界面示意](apps/web/public/marketing/generated/workbench-dashboard-light.png)
+
+如果这个流程对你有帮助，可以点 Star 收藏仓库，关注后续改进。
+
 ## 项目简介
 
-软件工程实践平台面向软件工程课程、实验和项目开发。阶段化工作台先确认需求事实，再生成模型与设计，最后形成测试、文档及可复盘证据。任意支持 MCP Streamable HTTP 和平台鉴权方式的 Coding Agent，都可以读取已保存的项目资料，在学生自己的仓库中按所选技术栈实现和测试代码。接入不限于连接页面列出的客户端。
+软件工程实践平台面向软件工程课程与项目开发：确认需求规则，生成 UML 和设计模型，检查追踪关系，再形成测试用例与工程说明书。生成结果仍需人工评审。
+
+仓库同时实现了只读 MCP 接口，可向外部 Coding Agent 提供已保存的项目依据。真实客户端兼容性与生成代码验收仍待完成，详见 [MCP 接入说明](docs/integrations/coding-agent-mcp.md)。
 
 | 🧭 端到端阶段 | 🔗 可信机制 | 📦 可交付产物 |
 | --- | --- | --- |
@@ -56,7 +83,7 @@
 - **重建产品外壳**：响应式 AdminCN 工作区、项目仪表盘、导航、账号页面与认证流程统一使用可访问的组件和主题系统。
 - **生成过程可见**：持久化运行活动事件驱动可恢复的任务对话，支持流式输出、公开思考摘要、并行调用归属与终态重放。
 - **工程流程更清晰**：模型卡、编辑器、追踪关系、项目管理和文档指引统一围绕项目状态与操作守卫组织。
-- **接入你选择的 Coding Agent**：任意支持 MCP Streamable HTTP 和平台鉴权方式的客户端，都可以读取已保存的需求、结构化模型、PlantUML、依赖、规则与来源版本。
+- **向 Coding Agent 提供依据**：只读 MCP 实现可提供已保存的需求、模型、PlantUML、依赖、规则与来源版本；具体客户端的授权和工具调用仍需验收。
 - **公开体验焕新**：Flow 首页、本地化内容、明暗主题、定价入口和应用内教程均使用当前产品视觉。
 
 ## 在线访问
@@ -88,15 +115,11 @@
 
 ## 界面预览
 
-<p align="center"><strong>当前 v2 官网首页与项目仪表盘亮色界面</strong></p>
+<p align="center"><strong>当前 v2 官网首页亮色界面</strong></p>
 
 ### 🌐 官网首页
 
 ![官网首页 — 桌面首屏](docs/images/readme-homepage.png)
-
-### 📊 项目仪表盘
-
-![项目仪表盘](apps/web/public/marketing/generated/workbench-dashboard-light.png)
 
 ## 技术架构
 
@@ -120,10 +143,50 @@ flowchart LR
   H -.覆盖关系.-> L
 ```
 
+### 需求、设计与代码映射
+
+先记录“哪些需求、设计对应哪些代码”，再验证“这些对应关系是否成立”。下图实线表示已实现的关联和检查，虚线表示后续可接入的一致性算法；四个 MCP 工具仍然只读，代码、映射报告和命令执行留在 Agent 的本地仓库。
+
+```mermaid
+flowchart TB
+  req["需求与业务规则"] -->|"需求追踪"| analysis["分析模型"]
+  analysis -->|"设计追踪"| design["设计模型"]
+  req -->|"requirementIds"| mapping["实施任务及映射记录：taskId"]
+  design -->|"designRefs：模型及元素 ID"| mapping
+  docs["需求、设计说明书"] -->|"sourceArtifactIds：文档来源"| mapping
+  mapping -->|"actualRefs：文件、可选符号、哈希"| code["实际生成的代码"]
+  mapping -->|"testRefs + criterionIds"| tests["测试及对应验收条件"]
+  mapping -->|"sourceVersions"| versions["来源版本与文件变化检查"]
+  code --> validator["已有本地验证器"]
+  tests --> validator
+  versions --> validator
+  mapping -.->|"按引用读取完整需求、模型和文档"| algorithm["后续：自定义一致性算法"]
+  code -.-> algorithm
+  tests -.-> algorithm
+  algorithm -.->|"接入 checks，失败返回非零退出码"| validator
+  validator --> result["检查结果及需要重新验证的任务"]
+```
+
+集成测试中的借阅示例通过同一个任务关联以下内容：
+
+| 映射内容 | 示例 |
+| --- | --- |
+| 需求 | `BORROW`：最多同时借阅 5 本书 |
+| 设计元素 | `LoanService` |
+| 实际代码 | `src/loan-service.mjs` 中的 `LoanService`，附文件哈希 |
+| 验收测试 | 第 5 本成功、第 6 本失败、拒绝时数量不变、归还后恢复额度 |
+| 版本依据 | 需求与设计的来源版本，以及代码、测试和登记输入的哈希 |
+
+**当前是任务级的多对多关联**：一项任务可登记多个需求、设计元素和代码引用，尚无“每个设计元素 → 某个代码符号”的逐对绑定。测试通过 `criterionIds` 关联验收条件，但语义覆盖仍需独立验证。
+
+后续一致性算法可检查“需求 → 设计”的规则覆盖、“设计 → 代码”的结构与约束，以及“需求 → 运行结果”的行为符合性。现有 `checks` 可执行自定义验证命令；逐规则的“通过／失败／无法判断”结果、算法版本和逐对绑定属于待扩展内容，无法判断不应算作通过。
+
+映射提供可追踪链路，算法和实际测试提供正确性证据。借阅上限从 5 改为 8 的回归测试已覆盖旧依据失效及代码、测试同步修改；它不代表真实 Coding Agent 的完整项目验收已完成。详见 [MCP 映射示例](docs/integrations/coding-agent-mcp.md#映射示例与证据边界)和[一致性算法接入](docs/integrations/coding-agent-mcp.md#接入自定义一致性算法)。
+
 ### Monorepo 组成
 
 ```text
-uml-experimental-platform/
+ai-software-engineering-platform/
 ├── apps/
 │   ├── api/             # Fastify API、生成流水线、文档与外部适配器
 │   ├── render-service/  # PlantUML SVG/PNG 渲染服务
@@ -163,8 +226,8 @@ uml-experimental-platform/
 ### 2. 获取并安装
 
 ```bash
-git clone <repository-url>
-cd uml-experimental-platform
+git clone https://github.com/guolola/ai-software-engineering-platform.git
+cd ai-software-engineering-platform
 npm ci
 ```
 
@@ -189,7 +252,7 @@ npm run dev
 
 ### 5. 体验 Coding Agent 接入
 
-MCP 服务使用 **Streamable HTTP**。任意兼容的 Coding Agent 都可以通过服务地址与 OAuth 或个人令牌接入，页面列出的客户端配置只是接入示例。Agent 在你自己的仓库中，按你选择的技术栈实现与测试代码。
+MCP 实现使用 **Streamable HTTP**，支持 OAuth 或个人令牌鉴权。页面中的客户端配置是接入起点，不是已经验证的支持名单。外部 Agent 负责在你的仓库中，按你选择的技术栈实现与测试代码。
 
 使用 `npm run dev:postgres:demo` 启动开启 MCP 的 PostgreSQL 演示环境。命令先检查端口，再验证网页、API、渲染和 OAuth 发现路径，全部通过后报告启动成功。需要 Docker Desktop，或已有兼容的 PostgreSQL 与 OnlyOffice 服务。本地 MCP 地址为 `http://localhost:3000/api/mcp`。
 

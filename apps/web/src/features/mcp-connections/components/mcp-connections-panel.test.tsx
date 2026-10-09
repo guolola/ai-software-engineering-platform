@@ -59,7 +59,7 @@ describe("MCP connections", () => {
     render(<McpConnectionsPanel onNavigate={vi.fn()} />);
     await screen.findByRole("button", { name: "查看 Qoder 接入指南" });
     expect(screen.getAllByRole("button", { name: /^查看 .+ 接入指南$/ })).toHaveLength(12);
-    for (const name of ["DeepSeek Harness", "Qoder", "Kimi Code", "MiniMax Code", "WorkBuddy", "TRAE", "Qwen Code", "Cursor", "VS Code MCP Agent", "Codex", "Claude", "MiniMax Agent"]) {
+    for (const name of ["DeepSeek Harness", "Qoder", "Kimi Code", "MiniMax Code", "WorkBuddy", "TRAE", "Qwen Code", "Cursor", "VS Code", "Codex", "Claude", "MiniMax Agent"]) {
       expect(screen.getByRole("button", { name: `查看 ${name} 接入指南` })).toBeVisible();
     }
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -68,7 +68,11 @@ describe("MCP connections", () => {
     expect(screen.queryByLabelText("连接名称")).not.toBeInTheDocument();
     const address = screen.getByRole("textbox", { name: "MCP 地址" });
     expect(address).toHaveValue(info.serverUrl);
-    expect(address.closest('[role="dialog"]')).toBeNull();
+    expect(address.closest('[role="dialog"], [data-slot="card"]')).toBeNull();
+    const catalog = screen.getByRole("region", { name: "MCP 地址" });
+    expect(within(catalog).getByRole("textbox", { name: "MCP 地址" })).toBe(address);
+    expect(within(catalog).getByRole("button", { name: "查看 DeepSeek Harness 接入指南" })).toBeVisible();
+    expect(screen.getAllByRole("textbox", { name: "MCP 地址" })).toHaveLength(1);
   });
   it("opens the selected client's configuration and documentation in its guide", async () => {
     render(<McpConnectionsPanel onNavigate={vi.fn()} />);

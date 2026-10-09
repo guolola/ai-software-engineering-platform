@@ -417,6 +417,7 @@ function applySnapshotToWorkspaceState(
         ...keepDesignScopedRecords(
           designRecords.plantUmlMap,
           successfulAffectedDesignDiagrams,
+          designRecords.modelMap,
         ),
       };
       next.designSvgArtifacts = {
@@ -791,10 +792,12 @@ function clearDesignScopedRecords<T>(
 function keepDesignScopedRecords<T>(
   current: Record<string, T>,
   affected: readonly DesignDiagramKind[],
+  modelsById: Record<string, unknown> = {},
 ) {
+  // PlantUML values are strings; resolve custom IDs through the model's explicit diagram kind.
   return Object.fromEntries(
     Object.entries(current).filter(([key, value]) =>
-      designRecordBelongsToDiagramKinds(key, value, affected),
+      designRecordBelongsToDiagramKinds(key, modelsById[key] ?? value, affected),
     ),
   ) as Record<string, T>;
 }

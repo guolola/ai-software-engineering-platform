@@ -268,11 +268,13 @@ export function AuthenticatedRoute({
   onNavigate,
   routeKey,
   showLoadingScreen = false,
+  renderLayout,
 }: {
   children: React.ReactNode;
   onNavigate: Navigate;
   routeKey?: string;
   showLoadingScreen?: boolean;
+  renderLayout?: (content: React.ReactNode) => React.ReactNode;
 }) {
   return (
     <PlatformLoadingCoordinatorProvider>
@@ -280,6 +282,7 @@ export function AuthenticatedRoute({
         onNavigate={onNavigate}
         routeKey={routeKey}
         showLoadingScreen={showLoadingScreen}
+        renderLayout={renderLayout}
       >
         {children}
       </AuthenticatedRouteContent>
@@ -292,11 +295,13 @@ function AuthenticatedRouteContent({
   onNavigate,
   routeKey,
   showLoadingScreen,
+  renderLayout,
 }: {
   children: React.ReactNode;
   onNavigate: Navigate;
   routeKey?: string;
   showLoadingScreen: boolean;
+  renderLayout?: (content: React.ReactNode) => React.ReactNode;
 }) {
   const { t } = useTranslation();
   const [checking, setChecking] = useState(true);
@@ -363,7 +368,7 @@ function AuthenticatedRouteContent({
     };
   }, [verifySession]);
 
-  if (effectiveChecking) {
+  if (effectiveChecking && (!authSession || !renderLayout)) {
     if (!showLoadingScreen) {
       return <div data-testid="auth-check-placeholder" className="min-h-0 flex-1" aria-busy="true" />;
     }
@@ -381,7 +386,12 @@ function AuthenticatedRouteContent({
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <AuthenticatedRouteSessionProvider value={authSession}>
         <ManagedProviderSettingsSync session={authSession} />
-        {children}
+        {/* Keep verified navigation mounted while blocking target content until its session check completes. */}
+        {renderLayout
+          ? renderLayout(effectiveChecking
+              ? <div data-testid="auth-check-placeholder" className="min-h-0 flex-1" aria-busy="true" />
+              : children)
+          : children}
       </AuthenticatedRouteSessionProvider>
       {showLoadingScreen && loadingTransition.visible && loadingTransition.phase !== "hidden" && (
         <PlatformLoadingScreen

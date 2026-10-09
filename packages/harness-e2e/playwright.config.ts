@@ -25,7 +25,7 @@ export default defineConfig({
   },
   webServer: {
     command:
-      "npm run build:web:production && node packages/harness-e2e/src/preview-server.mjs",
+      "npm run build:web:production && npm run start --workspace @uml-platform/web -- --port 4175 --hostname 127.0.0.1",
     cwd: repoRoot,
     url: "http://127.0.0.1:4175",
     reuseExistingServer: false,

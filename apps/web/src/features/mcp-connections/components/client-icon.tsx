@@ -1,5 +1,5 @@
-// Displays bundled client marks, with honest generic symbols where no product mark is available.
-import { CodeXml, Plug } from "lucide-react";
+// Displays bundled and official client marks while preserving each product brand.
+import { Plug } from "lucide-react";
 import claudeUrl from "@lobehub/icons-static-svg/icons/claude-color.svg?url";
 import codexUrl from "@lobehub/icons-static-svg/icons/codex-color.svg?url";
 import cursorUrl from "@lobehub/icons-static-svg/icons/cursor.svg?url";
@@ -22,12 +22,14 @@ const clientMarks: Partial<Record<McpClientId, string>> = {
   qoder: qoderUrl,
   qwen: qwenUrl,
   trae: traeUrl,
+  workbuddy: '/mcp/clients/workbuddy.svg',
+  vscode: '/mcp/clients/vscode.svg',
 };
 
 export function ClientIcon({ clientId, className }: { clientId: McpClientId; className?: string }) {
   const mark = clientMarks[clientId];
 
-  // Kimi's bundled mark has white lettering, while other color marks need a light tile.
+  // Official WorkBuddy and VS Code marks keep their original colors without theme recoloring.
   return <span aria-hidden="true" className={cn("inline-flex size-12 shrink-0 items-center justify-center", className)}>
     {clientId === "cursor" ? <span
       className="size-full bg-foreground"
@@ -41,8 +43,7 @@ export function ClientIcon({ clientId, className }: { clientId: McpClientId; cla
         WebkitMaskRepeat: "no-repeat",
         WebkitMaskSize: "contain",
       }}
-    /> : mark ? <img alt="" src={mark} className={cn("size-full rounded-md object-contain p-1", clientId === "kimi" ? "bg-black" : "bg-white")} />
-      : clientId === "vscode" ? <CodeXml className="size-10 text-foreground" strokeWidth={1.5} />
+    /> : mark ? <img alt="" src={mark} className={cn("size-full object-contain", clientId !== "workbuddy" && clientId !== "vscode" && ["rounded-md p-1", clientId === "kimi" ? "bg-black" : "bg-white"])} />
       : <Plug className="size-10 text-foreground" strokeWidth={1.5} />}
   </span>;
 }

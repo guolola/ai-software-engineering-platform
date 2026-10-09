@@ -1,8 +1,9 @@
 // Flow 2.0.0 template source; only runtime, content and business integration adaptations.
 import { FlowCopy, flowText } from '@/features/marketing-site/model/flow-copy';
+import { ProductLogo } from '@/shared/ui/product-logo'
 import type { TestimonialItem } from '@/features/marketing-site/template/components/blocks/testimonials/testimonial-card'
 
-const productLogo = '/brand/uml-platform-logo.png'
+const productLogo = <ProductLogo className='size-full' />
 
 export const testimonials: TestimonialItem[] = [
   {

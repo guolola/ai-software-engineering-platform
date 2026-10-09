@@ -1,5 +1,6 @@
 // Assembles the separately gated MCP module using injected platform identity and PostgreSQL services.
 import type { FastifyInstance } from "fastify";
+import type { DocumentLibrary } from "../../documents/library/document-library.js";
 import type { AuthStore } from "../../auth/in-memory-auth-store.js";
 import type { Queryable } from "../../db/transactions.js";
 import { loadMcpConfig, type McpConfig } from "../auth/mcp-config.js";
@@ -11,6 +12,7 @@ import { registerMcpRoutes } from "../../routes/mcp/register-mcp-routes.js";
 export async function registerMcpModule(input: {
   app: FastifyInstance;
   authStore: AuthStore;
+  documentLibrary?: DocumentLibrary;
   pool: Queryable | null;
   production: boolean;
   config?: McpConfig | null;
@@ -32,7 +34,7 @@ export async function registerMcpModule(input: {
       ? createPostgresMcpStore(input.pool)
       : createInMemoryMcpStore());
   const provider = createOAuthProvider(config, store, input.authStore);
-  const access = createMcpAccess(input.authStore, store, config, provider);
+  const access = createMcpAccess(input.authStore, store, config, provider, input.documentLibrary);
   await registerMcpRoutes(input.app, access, provider);
   return { store, provider, access };
 }

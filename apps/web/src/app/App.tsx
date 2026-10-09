@@ -557,7 +557,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
     route.kind !== "invitation-accept" &&
     route.kind !== "legacy-redirect" &&
     route.kind !== "not-found";
-  const guardedRouteContent = showWorkspaceTopBar ? (
+  const renderPlatformLayout = (content: ReactNode) => (
     <DefaultPagesLayout
       sidebar={<PlatformSidebar path={route.path} />}
       header={<TopBar
@@ -568,9 +568,9 @@ export function Shell({ initialPath }: { initialPath?: string }) {
         />}
       contentClassName="min-w-0 p-0"
     >
-        {routeContent}
+        {content}
     </DefaultPagesLayout>
-  ) : routeContent;
+  );
   const shellContent = (
     <FloatingAlertProvider>
     <SidebarProvider resizable={route.kind === 'project-workspace'} className={route.kind === 'marketing-home' || route.kind === 'not-found' ? 'block min-h-screen w-full' : 'flex min-h-svh w-full flex-col bg-background text-foreground'}>
@@ -580,17 +580,19 @@ export function Shell({ initialPath }: { initialPath?: string }) {
           routeKey={protectedRoutePath}
           onNavigate={navigate}
           showLoadingScreen={route.kind === "project-workspace" || loginLoadingRoute === route.path}
+          renderLayout={showWorkspaceTopBar ? renderPlatformLayout : undefined}
         >
-          {guardedRouteContent}
+          {routeContent}
         </AuthenticatedRoute>
       ) : (
-        guardedRouteContent
+        showWorkspaceTopBar ? renderPlatformLayout(routeContent) : routeContent
       )}
       </PageErrorBoundary>
     </SidebarProvider>
     </FloatingAlertProvider>
   );
-  return route.kind === "projects-index" || route.kind === "project-workspace"
+  // All protected pages share a stable provider tree; public pages keep their standalone layout.
+  return protectedRoutePath
     ? <OnboardingTourProvider>{shellContent}</OnboardingTourProvider>
     : shellContent;
 }

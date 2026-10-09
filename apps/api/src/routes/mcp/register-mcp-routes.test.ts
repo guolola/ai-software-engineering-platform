@@ -807,3 +807,80 @@ test("invalid JSON stays a JSON-RPC parse error and feature-off prevents externa
     404,
   );
 });
+
+test("implementation bundle and verifier use normal paging, source manifests and document version guards", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  const { default: JSZip } = await import("jszip");
+  const { mcpUpdatesInputSchema, mcpImplementationSnapshotSchema, mcpImplementationReportSchema } = await import("@uml-platform/contracts");
+  let documentVersion = 1;
+  const metadata = () => ({
+    id: "document-a", workspaceId: "private-workspace", projectId: s.a.id,
+    documentKind: "softwareDesignSpec" as const, title: "借阅设计说明书", fileName: "design.docx",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", byteLength: 100,
+    version: documentVersion, status: "active" as const, sourceRunId: null, createdAt: "now", updatedAt: "now",
+  });
+  s.access.documentLibrary = {
+    async listAllDocuments() { return [metadata(), { ...metadata(), id: "foreign", projectId: s.b.id }]; },
+    async getDocument() { return metadata(); },
+    async getDocumentBuffer(_workspace: string, id: string) {
+      assert.equal(id, "document-a");
+      return new JSZip().file("word/document.xml", '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>版本' + documentVersion + '：借阅事务需要原子性</w:t></w:r></w:p></w:body></w:document>').generateAsync({ type: "nodebuffer" });
+    },
+  } as unknown as NonNullable<typeof s.access.documentLibrary>;
+  await s.authStore.saveProjectWorkspace({
+    projectId: s.a.id, baseVersion: 0, updatedByUserId: s.alice.id,
+    state: { requirementText: "每名学生最多借5本", rules: [{ id: "BORROW", category: "业务规则", text: "最多5本", relatedDiagrams: ["class"] }] },
+  });
+  const service = createMcpToolService(s.access, await s.access.authenticate(s.headers.authorization));
+  const scope = { requirementIds: [], artifactIds: [] };
+  const directory: any[] = [];
+  const manifest: any[] = [];
+  let cursor: string | undefined;
+  let contextVersion: string | undefined;
+  do {
+    const page = await service.get_implementation_context(mcpContextInputSchema.parse({
+      projectId: s.a.id, scope, limit: 1, cursor, expectedContextVersion: contextVersion,
+    }));
+    assert.equal(page.status, "ok");
+    contextVersion = page.data.contextVersion as string;
+    directory.push(...page.data.artifacts as any[]);
+    manifest.push(...page.data.manifest as any[]);
+    cursor = page.data.nextCursor as string | undefined;
+  } while (cursor);
+  assert.ok(directory.some((entry) => entry.id === "document:document-a"));
+  assert.ok(directory.some((entry) => entry.id === "implementation:validator"));
+  assert.ok(manifest.every((entry) => !entry.artifactId.startsWith("implementation:")));
+  async function readPayload(id: string) {
+    const entry = directory.find((value) => value.id === id)!;
+    let nextOffset: number | null = 0;
+    let joined = "";
+    while (nextOffset !== null) {
+      const response = await service.get_artifact(mcpArtifactInputSchema.parse({
+        projectId: s.a.id, scope, artifactId: id, expectedContextVersion: contextVersion,
+        expectedVersion: entry.version.contentHash, offset: nextOffset, length: 24000,
+      }));
+      assert.equal(response.status, "ok");
+      joined += response.data.chunk;
+      nextOffset = response.data.nextOffset as number | null;
+    }
+    return JSON.parse(joined);
+  }
+  const bundle = await readPayload("implementation:bundle");
+  assert.ok(mcpImplementationSnapshotSchema.safeParse(bundle.snapshot).success);
+  assert.ok(mcpImplementationReportSchema.safeParse(bundle.reportTemplate).success);
+  assert.equal(bundle.snapshot.contextVersion, contextVersion);
+  assert.deepEqual(bundle.snapshot.manifest, manifest);
+  assert.ok(bundle.snapshot.tasks[0].sourceArtifactIds.includes("document:document-a"));
+  assert.match((await readPayload("implementation:validator")).source, /verifyImplementation/);
+  const unchanged = await service.check_context_updates(mcpUpdatesInputSchema.parse({ projectId: s.a.id, scope, manifest: bundle.snapshot.manifest }));
+  assert.deepEqual(unchanged.data.changes, []);
+  documentVersion = 2;
+  const changed = await service.check_context_updates(mcpUpdatesInputSchema.parse({ projectId: s.a.id, scope, manifest }));
+  assert.ok((changed.data.changes as any[]).some((entry) => entry.artifactId === "document:document-a" && entry.change === "modified"));
+  const outdated = await service.get_artifact(mcpArtifactInputSchema.parse({
+    projectId: s.a.id, scope, artifactId: "implementation:bundle", expectedContextVersion: contextVersion,
+    expectedVersion: directory.find((entry) => entry.id === "implementation:bundle").version.contentHash,
+  }));
+  assert.equal(outdated.status, "refresh_required");
+});

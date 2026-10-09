@@ -13,7 +13,7 @@ import {
   ZapIcon
 } from 'lucide-react'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/features/marketing-site/template/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/features/marketing-site/template/components/ui/avatar'
 import { Badge } from '@/features/marketing-site/template/components/ui/badge'
 import { Card, CardContent } from '@/features/marketing-site/template/components/ui/card'
 import { Marquee } from '@/features/marketing-site/template/components/ui/marquee'
@@ -21,6 +21,7 @@ import { MotionPreset } from '@/features/marketing-site/template/components/ui/m
 import { Magnetic } from '@/features/marketing-site/template/components/ui/magnet-effect'
 
 import { cn } from '@/shared/ui/utils'
+import { ProductLogo } from '@/shared/ui/product-logo'
 
 import StatCard from '@/features/marketing-site/template/components/blocks/features/stat-card'
 import GoalAndTargetCard from '@/features/marketing-site/template/components/blocks/features/goal-and-target-card'
@@ -383,8 +384,7 @@ const Features = () => {
                   <Marquee pauseOnHover reverse duration={30} gap={0.5} className='px-2 py-1.5'>
                     <div className='flex w-58 items-center gap-3 rounded-xl border py-1.5 pr-3 pl-2 hover:shadow-md'>
                       <Avatar className='size-9.5 rounded-[12px] after:border-0'>
-                        <AvatarImage src='/brand/uml-platform-logo.png' alt='' className='rounded-[12px]' />
-                        <AvatarFallback className='text-xs'><FlowCopy text="RS" /></AvatarFallback>
+                        <ProductLogo className='size-full' />
                       </Avatar>
                       <div className='flex flex-1 flex-col items-start gap-0.5'>
                         <span className='text-muted-foreground text-xs font-light'>09:15</span>
@@ -395,12 +395,7 @@ const Features = () => {
 
                     <div className='flex w-58 items-center gap-3 rounded-xl border py-1.5 pr-3 pl-2 hover:shadow-md'>
                       <Avatar className='size-9.5 rounded-[12px] after:border-0'>
-                        <AvatarImage
-                          src='/brand/uml-platform-logo.png'
-                          alt=''
-                          className='rounded-[12px]'
-                        />
-                        <AvatarFallback className='text-xs'><FlowCopy text="TM" /></AvatarFallback>
+                        <ProductLogo className='size-full' />
                       </Avatar>
                       <div className='flex flex-1 flex-col items-start gap-0.5'>
                         <span className='text-muted-foreground text-xs font-light'>11:45</span>
@@ -411,8 +406,7 @@ const Features = () => {
 
                     <div className='flex w-58 items-center gap-3 rounded-xl border py-1.5 pr-3 pl-2 hover:shadow-md'>
                       <Avatar className='size-9.5 rounded-[12px] after:border-0'>
-                        <AvatarImage src='/brand/uml-platform-logo.png' alt='' className='rounded-[12px]' />
-                        <AvatarFallback className='text-xs'><FlowCopy text="AT" /></AvatarFallback>
+                        <ProductLogo className='size-full' />
                       </Avatar>
                       <div className='flex flex-1 flex-col items-start gap-0.5'>
                         <span className='text-muted-foreground text-xs font-light'>14:45</span>
@@ -425,8 +419,7 @@ const Features = () => {
                   <Marquee pauseOnHover duration={30} gap={0.5} className='px-2 py-1.5'>
                     <div className='flex w-58 items-center gap-3 rounded-xl border py-1.5 pr-3 pl-2 hover:shadow-md'>
                       <Avatar className='size-9.5 rounded-[12px] after:border-0'>
-                        <AvatarImage src='/brand/uml-platform-logo.png' alt='' className='rounded-[12px]' />
-                        <AvatarFallback className='text-xs'><FlowCopy text="JP" /></AvatarFallback>
+                        <ProductLogo className='size-full' />
                       </Avatar>
                       <div className='flex flex-1 flex-col items-start gap-0.5'>
                         <span className='text-muted-foreground text-xs font-light'>19:15</span>
@@ -437,12 +430,7 @@ const Features = () => {
 
                     <div className='flex w-58 items-center gap-3 rounded-xl border py-1.5 pr-3 pl-2 hover:shadow-md'>
                       <Avatar className='size-9.5 rounded-[12px] after:border-0'>
-                        <AvatarImage
-                          src='/brand/uml-platform-logo.png'
-                          alt=''
-                          className='rounded-[12px]'
-                        />
-                        <AvatarFallback className='text-xs'><FlowCopy text="CR" /></AvatarFallback>
+                        <ProductLogo className='size-full' />
                       </Avatar>
                       <div className='flex flex-1 flex-col items-start gap-0.5'>
                         <span className='text-muted-foreground text-xs font-light'>18:30</span>
@@ -453,8 +441,7 @@ const Features = () => {
 
                     <div className='flex w-58 items-center gap-3 rounded-xl border py-1.5 pr-3 pl-2 hover:shadow-md'>
                       <Avatar className='size-9.5 rounded-[12px] after:border-0'>
-                        <AvatarImage src='/brand/uml-platform-logo.png' alt='' className='rounded-[12px]' />
-                        <AvatarFallback className='text-xs'><FlowCopy text="JP" /></AvatarFallback>
+                        <ProductLogo className='size-full' />
                       </Avatar>
                       <div className='flex flex-1 flex-col items-start gap-0.5'>
                         <span className='text-muted-foreground text-xs font-light'>09:15</span>

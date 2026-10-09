@@ -63,7 +63,7 @@ export const mcpClients = [
   },
   {
     id: "vscode",
-    name: "VS Code MCP Agent",
+    name: "VS Code",
     mode: "oauth",
     location: "VS Code 命令面板 → MCP: Add Server",
     source:
@@ -140,5 +140,5 @@ export function clientConfiguration(
 }
 export const projectAgentPrompt = (projectId: string, language = "zh-CN") =>
   language.startsWith("en") ?
-  `Read saved requirements, analysis, design and tests for project ${projectId} through the UML platform MCP. Inspect the current repository first, implement according to my technical requirements and report missing or conflicting sources. Read all catalog pages and artifact chunks. Run tests and report actual results. Use your file tools to maintain .uml-platform.json at the repository root with only the server URL, project ID, implementation scope and applied source versions. Never save credentials or requirement contents there. Check source changes before future edits and preserve existing code.` :
-  `请通过 UML 平台 MCP 读取项目 ${projectId} 的已保存需求、分析与设计。先检查当前仓库，依据我的技术要求实现功能，指出缺失或冲突，不继承平台原型限制。读完目录分页和相关产物分段，完成后运行测试，报告实际结果。用你的文件工具在根目录维护 .uml-platform.json，只记录服务地址、项目标识、实现范围和已应用来源版本；不保存令牌或需求正文。以后修改先检查来源变化，保留我已有的代码。`;
+  `Read all saved requirements, analysis, design, current specification bodies and tests for project ${projectId} through the UML platform MCP. Inspect the repository first. Read every catalog page and required artifact chunk, including implementation:bundle and implementation:validator. Use the supplied snapshot, report template and schema to maintain .uml-implementation-context.json and .uml-implementation.json locally: map requirements and design elements to planned targets, actual files/symbols, file hashes, configuration/dependency inputRefs and acceptance tests. Implement according to my technical requirements, report blockers and preserve existing code. Save the supplied verifier source as uml-verify.mjs; inspect the repository check commands and run it with --run-checks, reporting actual results and unresolved criteria. A mapping or an unexecuted check is not verification. Keep reports local. Maintain .uml-platform.json with only the server URL, project ID, scope and applied source versions; advance a source only when all associated tasks pass. Never save credentials there. Check source updates before further edits and delivery, and revalidate affected code and tests.` :
+  `请通过 UML 平台 MCP 读取项目 ${projectId} 的已保存需求、分析、设计、说明书正文和测试。先检查当前仓库，读完目录分页和相关产物分段，包括 implementation:bundle 与 implementation:validator。按提供的快照、报告模板和契约，在本地维护 .uml-implementation-context.json 和 .uml-implementation.json，逐项记录需求和设计元素对应的计划位置、实际代码文件及符号、文件哈希、配置/依赖 inputRefs 和验收测试。依据我的技术要求实现，指出阻断项，保留已有代码。保存提供的验证器为 uml-verify.mjs，检查仓库验证命令后使用 --run-checks 执行，报告真实结果和未覆盖条件；只有映射或未运行检查不能算验证通过。报告只保留本地。维护 .uml-platform.json，仅记录服务地址、项目、范围和已应用来源版本；同一来源所有相关任务通过后才推进，不保存凭据。后续修改及交付前检查来源变化，定位受影响代码和测试并复验。`;
