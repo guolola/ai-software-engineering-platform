@@ -18,6 +18,7 @@ import {
 } from "../../mcp/auth/mcp-access.js";
 import { createConnectionService } from "../../mcp/auth/connection-service.js";
 import { createPlatformMcpServer } from "../../mcp/server/mcp-server.js";
+import { registerMcpAssets } from "./register-mcp-assets.js";
 
 declare module "fastify" {
   interface FastifyContextConfig {
@@ -137,6 +138,7 @@ export async function registerMcpRoutes(
         return reply;
       }
     });
+    registerMcpAssets(router);
     router.all(`${oauthPrefix}/*`, { config }, async () => undefined);
     for (const name of ["oauth-authorization-server", "openid-configuration"])
       router.get(

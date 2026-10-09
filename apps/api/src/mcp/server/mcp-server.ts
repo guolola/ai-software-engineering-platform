@@ -122,13 +122,13 @@ export function createPlatformMcpServer(
   register(
     "get_implementation_context",
     mcpContextInputSchema,
-    "取得已保存需求、分析/设计/测试/说明书与实施产物目录。按范围读取所有分页，合并来源 manifest；必须读取 implementation:bundle 的任务、映射模板和 implementation:validator 本地验证器。依赖资料不扩展实施范围。",
+    "取得已保存需求、分析/设计/测试/说明书与实施产物目录。按范围读取所有分页，合并来源 manifest；开始前读取 implementation:bundle 的任务、验收和全部关联来源；交付验证前获取 implementation:report 契约及 implementation:validator 下载元数据。依赖资料不扩展实施范围。",
     service.get_implementation_context,
   );
   register(
     "get_artifact",
     mcpArtifactInputSchema,
-    "按 contextVersion 和产物 contentHash 读取完整 JSON 内容分段，包括实施快照、报告契约和独立本地验证器源码。chunk 按 offset 拼接后解析；refresh_required 时重新取得上下文。",
+    "按 contextVersion 和产物 contentHash 读取完整 JSON 内容分段，包括实施快照、按需报告契约及验证器下载元数据；验证器源码用本地程序从 downloadUrl 下载并校验 SHA-256，无需经模型解码。chunk 按 offset 拼接后解析；refresh_required 时重新取得上下文。",
     service.get_artifact,
   );
   register(

@@ -19,6 +19,8 @@ import {
 } from "@uml-platform/contracts";
 import { buildContext } from "./implementation-context.js";
 import { withImplementationArtifacts } from "./implementation-artifacts.js";
+import { implementationVerifierSource } from "../verification/verifier-source.js";
+import { verifierAsset } from "../verification/verifier-distribution.js";
 import { contentHash } from "./source-artifacts.js";
 
 const whole: McpScope = { requirementIds: [], artifactIds: [] };
@@ -79,9 +81,11 @@ function distributed(state = savedState(), scope = whole) {
   const bundle = context.artifacts.find((artifact) => artifact.id === "implementation:bundle")!;
   const validator = context.artifacts.find((artifact) => artifact.id === "implementation:validator")!;
   const snapshot = mcpImplementationSnapshotSchema.parse(bundle.payload.snapshot);
-  const report = mcpImplementationReportSchema.parse(bundle.payload.reportTemplate);
-  assert.equal(typeof validator.payload.source, "string");
-  return { original, context, bundle, validator, snapshot, report };
+  const reportArtifact = context.artifacts.find((artifact) => artifact.id === "implementation:report")!;
+  const report = mcpImplementationReportSchema.parse(reportArtifact.payload.reportTemplate);
+  assert.equal(validator.payload.source, undefined);
+  assert.equal(validator.payload.contentHash, verifierAsset.contentHash);
+  return { original, context, bundle, validator, reportArtifact, snapshot, report };
 }
 
 function implementation(limit: number) {
@@ -173,9 +177,17 @@ test("distributed snapshot and template bind real saved sources without recursiv
   assert.deepEqual(first.snapshot.tasks[0].issues.filter((issue) => issue.severity === "blocking"), []);
   assert.deepEqual(first.report.entries.map((entry) => entry.status), ["planned"]);
   assert.ok(first.report.entries.every((entry) => !entry.actualRefs.length && !entry.testRefs.length && !entry.checks.length));
-  assert.equal((first.bundle.payload.reportSchema as { type: string }).type, "object");
+  assert.equal((first.reportArtifact.payload.reportSchema as { type: string }).type, "object");
   assert.equal(first.bundle.version.contentHash, contentHash(first.bundle.payload));
   assert.equal(first.validator.version.contentHash, contentHash(first.validator.payload));
+  assert.equal(first.bundle.payload.reportTemplate, undefined);
+  assert.equal(first.bundle.payload.reportSchema, undefined);
+  assert.ok(JSON.stringify(first.validator.payload).length < 1000);
+  assert.deepEqual(first.context.implementation.readPolicy.beforeImplementation, ["implementation:bundle"]);
+  assert.deepEqual(first.context.implementation.readPolicy.beforeVerification, ["implementation:report", "implementation:validator"]);
+  assert.deepEqual(first.snapshot.tasks.flatMap((task) => task.sourceArtifactIds).sort(), second.snapshot.tasks.flatMap((task) => task.sourceArtifactIds).sort());
+  const legacyBundleChars = JSON.stringify({ ...first.bundle.payload, reportTemplate: first.reportArtifact.payload.reportTemplate, reportSchema: first.reportArtifact.payload.reportSchema }).length;
+  assert.ok(JSON.stringify(first.bundle.payload).length < legacyBundleChars);
   const incidentalUi = withImplementationArtifacts(buildContext({ ...state, activeTab: "design", progress: 0.8 }, whole), projectId);
   assert.equal(incidentalUi.version, first.context.version);
   assert.ok(first.snapshot.manifest.some((source) => source.artifactId === "requirements:source" && source.freshness === "unknown"));
@@ -194,7 +206,7 @@ test("partial request scope keeps shared-rule dependencies as sources without ad
 
 test("saved five-book requirement verifies real code and tests despite explicitly unknown raw-source freshness", async (t) => {
   const source = distributed();
-  const local = await localRepository(t, source.validator.payload.source as string);
+  const local = await localRepository(t, implementationVerifierSource);
   await writeImplementation(local.root, 5, 5);
   const report = await implementedReport(local.root, source);
   const result = await local.verify({ root: local.root, snapshot: source.snapshot, report, runChecks: true });
@@ -211,7 +223,7 @@ test("saved five-book requirement verifies real code and tests despite explicitl
 
 test("changing saved requirement to eight invalidates previous evidence and requires matching code and acceptance updates", async (t) => {
   const before = distributed(savedState(5));
-  const local = await localRepository(t, before.validator.payload.source as string);
+  const local = await localRepository(t, implementationVerifierSource);
   await writeImplementation(local.root, 5, 5);
   const oldReport = await implementedReport(local.root, before);
   assert.equal((await local.verify({ root: local.root, snapshot: before.snapshot, report: oldReport, runChecks: true })).overall, "verified");

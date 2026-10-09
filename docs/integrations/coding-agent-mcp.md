@@ -40,9 +40,11 @@ SDK 固定为 `@modelcontextprotocol/server` 2.3.1、`@modelcontextprotocol/node
 
 ### 实施任务、代码映射与本地验证
 
-四个工具继续只读。目录新增 `implementation:bundle` 和 `implementation:validator` 两个产物，经原有 `get_artifact` 完整分段读取，不增加远程代码执行或写回权限。
+四个工具继续只读。目录提供 `implementation:bundle`、`implementation:report` 和 `implementation:validator`，不增加远程代码执行或项目写回权限。
 
-- 实施包提供 `snapshot`、`reportTemplate`、`reportSchema` 和操作指引。任务关联真实需求、设计元素候选、验收条件及来源版本；按明确需求/产物范围选择任务，依赖资料不扩展实施授权范围。
+- 开始实现前获取 `implementation:bundle`，包含 `snapshot`、`readPolicy` 和开始阶段指引。任务关联真实需求、设计元素候选、验收条件及来源版本；按明确需求/产物范围选择任务，依赖资料不扩展实施授权范围。
+- 交付验证前再获取 `implementation:report` 的 `reportTemplate`、`reportSchema`、报告维护指引和验证命令。`readPolicy.beforeImplementation` 与 `readPolicy.beforeVerification` 明确各阶段必需产物；任务全部 `sourceRefs` 对应来源及 `issueRefs` 对应告警仍须完整读取，按需获取不能省略依赖或阻断项。
+- `implementation:validator` 只提供 `downloadUrl`、`fileName`、精确文件字节的 `contentHash`、`byteLength`、`encoding` 和验证边界，通常在目录中直接内联。源码不再放入 JSON 字符串，由 Agent 的本地程序下载到文件并核对 SHA-256，不由模型转写、去转义或复制长源码。
 - 快照和报告使用 `version: 2`。`snapshot.shared` 统一存储来源 ID、候选设计元素、告警和指引；任务的 `sourceRefs`、`designRefs`、`issueRefs`、`guidanceRefs` 分别引用 `shared.sourceArtifactIds`、`shared.designRefs`、`shared.issues`、`shared.guidance`，索引从 0 开始。共享内容只传输一次，每项任务仍保留独立的关联范围和验收条件；解析全部告警引用后才能判断阻断状态。
 - 报告根部 `sourceVersions` 存储独立的历史版本池，条目的 `sourceVersionRefs` 引用该池。刷新单项任务时追加新版本并更新该项引用，不能覆盖未更新任务使用的旧版本，也不能从新快照自动补齐报告版本。相同来源可保留多个历史版本，验证时仍逐任务比较。`reportSchema` 用 JSON Schema `$ref` 复用字段定义。
 - 验收条件来自已保存原子需求，不把规则正文猜成验收条件。缺失验收、过期、冲突、被拒绝依据、无效追踪和不可读取说明书会阻止任务验证通过；仍允许完成明确部分并报告未决项。
@@ -51,7 +53,7 @@ SDK 固定为 `@modelcontextprotocol/server` 2.3.1、`@modelcontextprotocol/node
 - 本地报告仅接受 `planned` 或 `implemented`。验证器根据完整任务覆盖、来源版本、仓库内文件、哈希和本轮命令结果，输出 `planned`、`incomplete`、`stale`、`failed` 或 `verified`。Agent 不能在输入报告中直接写验证通过。
 - `verified` 表示登记命令和引用一致性检查通过。验收关联仍由 Agent 声明；通用验证器不能独立证明指定测试名称已执行或业务语义覆盖，结果使用 `verificationScope` 和 `acceptanceCoverage` 明确此边界。它不是平台签发的远程证明。
 
-Agent 将实施包的 `snapshot` 保存为 `.uml-implementation-context.json`，从模板维护 `.uml-implementation.json`，将验证器产物的 `source` 保存为 `uml-verify.mjs`。这三个文件保留在目标仓库本地，加入本地忽略规则，不提交私有正文或临时报告。已有报告按任务合并，不能直接覆盖历史实施记录。
+Agent 将实施包的 `snapshot` 保存为 `.uml-implementation-context.json`，交付前从报告产物的模板维护 `.uml-implementation.json`，按验证器元数据下载并校验后保存 `uml-verify.mjs`。这三个文件保留在目标仓库本地，加入本地忽略规则，不提交私有正文或临时报告。已有报告按任务合并，不能直接覆盖历史实施记录。
 
 此次格式切换不兼容 `version: 1` 快照和报告。使用旧格式的本地项目须重新获取实施包和验证器，并重新生成快照、登记报告证据及运行验证；保留已有代码与测试。新格式报告的共享池和条目引用需一起合并，不能直接拼接来自不同报告的索引。
 
@@ -147,6 +149,12 @@ OAuth 使用固定版本 `oidc-provider` 9.12.2 的授权码与 PKCE；资源为
 只有 `list_projects`、`get_implementation_context`、`get_artifact`、`check_context_updates` 的审计计入工具调用。仅失败调用仍属于使用；授权、创建令牌和撤销在连接详情单独展示，OAuth 端点记录保留在安全审计日志。最近成功使用能证明曾使用，但不能推算已清理的调用次数；统计明确仅覆盖当前留存审计。已过期、已撤销连接和对应历史使用者保留。账号级 PAT 显示“随账号当前项目权限”，按项目筛选时读取当前成员权限，不将空授权数组误判为无项目。
 
 `admin.mcp.read` 与 `admin.mcp.revoke` 对应 `viewMcp`、`revokeMcp` 能力。超级管理员、安全管理员可读及撤销，系统运维、审计员只读，其余角色不开放。管理 Cookie、MFA 与权限在服务端校验。撤销先阻止共享 grant，再清理 OAuth 实体，使 PAT/OAuth 后续调用和刷新立即失败；重复撤销成功且留存审计。该页面不提供客户端准入、限流或在线开关管理。
+
+### 验证器文件分发
+
+通用验证器没有项目正文、凭据或用户代码；启用 MCP 时，`GET /api/mcp/assets/<sha256>/uml-verify.mjs` 提供无令牌的固定文件下载。路径使用源码 UTF-8 字节的 SHA-256，服务器只注册当前版本；未知版本返回 404。响应提供附件文件名、`ETag`、`public, max-age=31536000, immutable` 和 `nosniff`，支持条件请求 304 与 HEAD。文件字节在进程启动时生成一次，下载不读取工作区、说明书或重新组装任务包。原有 Host、Origin 与 HTTP 限流仍适用；禁用 MCP 后不注册下载入口。
+
+客户端程序校验下载字节哈希后才执行本地验证，下载失败、哈希不符或缺少交付契约时不能宣称验证通过。文件下载和落盘是否绕过模型上下文取决于客户端能力；仅返回链接不能保证客户端自动保存。反向代理继续使用现有 `/api/` 路由，无需新增项目文件公开入口。
 
 ## 操作与维护
 

@@ -11,6 +11,8 @@ import { createInMemoryAuthStore } from "../../auth/in-memory-auth-store.js";
 import { loadMcpConfig } from "../../mcp/auth/mcp-config.js";
 import { registerMcpModule } from "../../mcp/server/register-mcp-module.js";
 import { createMcpToolService } from "../../mcp/tools/tool-service.js";
+import { verifierAsset } from "../../mcp/verification/verifier-distribution.js";
+import { implementationVerifierSource } from "../../mcp/verification/verifier-source.js";
 import {
   mcpContextInputSchema,
   mcpArtifactInputSchema,
@@ -875,15 +877,30 @@ test("implementation bundle and verifier use normal paging, source manifests and
     return JSON.parse(joined);
   }
   const bundle = await readPayload("implementation:bundle");
+  const report = await readPayload("implementation:report");
   assert.ok(mcpImplementationSnapshotSchema.safeParse(bundle.snapshot).success);
-  assert.ok(mcpImplementationReportSchema.safeParse(bundle.reportTemplate).success);
+  assert.ok(mcpImplementationReportSchema.safeParse(report.reportTemplate).success);
+  assert.equal(bundle.reportTemplate, undefined);
+  assert.equal(bundle.reportSchema, undefined);
+  assert.deepEqual(bundle.readPolicy.beforeVerification, ["implementation:report", "implementation:validator"]);
   assert.equal(bundle.snapshot.contextVersion, contextVersion);
   assert.deepEqual(bundle.snapshot.manifest, manifest);
   const snapshot = mcpImplementationSnapshotSchema.parse(bundle.snapshot);
   assert.equal(bundle.snapshot.version, 2);
-  assert.equal(bundle.reportTemplate.version, 2);
+  assert.equal(report.reportTemplate.version, 2);
+  assert.equal(report.reportTemplate.contextVersion, contextVersion);
   assert.ok(snapshot.tasks[0].sourceArtifactIds.includes("document:document-a"));
-  assert.match((await readPayload("implementation:validator")).source, /verifyImplementation/);
+  const validator = await readPayload("implementation:validator");
+  assert.equal(validator.source, undefined);
+  assert.equal(validator.downloadUrl, new URL(verifierAsset.path, s.config.origin).href);
+  assert.equal(validator.contentHash, verifierAsset.contentHash);
+  const validatorDirectory = directory.find((value) => value.id === "implementation:validator")!;
+  assert.equal(validatorDirectory.requiresRead, false);
+  assert.equal(validatorDirectory.inlinePayload.downloadUrl, validator.downloadUrl);
+  const download = await s.app.inject({ url: new URL(validator.downloadUrl).pathname, headers: { host: new URL(s.config.origin).host } });
+  assert.equal(download.statusCode, 200);
+  assert.equal(download.body, implementationVerifierSource);
+  assert.equal(`sha256:${createHash("sha256").update(download.rawPayload).digest("hex")}`, validator.contentHash);
   const unchanged = await service.check_context_updates(mcpUpdatesInputSchema.parse({ projectId: s.a.id, scope, manifest: bundle.snapshot.manifest }));
   assert.deepEqual(unchanged.data.changes, []);
   documentVersion = 2;
@@ -894,4 +911,37 @@ test("implementation bundle and verifier use normal paging, source manifests and
     expectedVersion: directory.find((entry) => entry.id === "implementation:bundle").version.contentHash,
   }));
   assert.equal(outdated.status, "refresh_required");
+});
+
+test("generic verifier downloads are byte-exact, immutable and independent of private workspaces", async (t) => {
+  const s = await setup();
+  t.after(() => s.app.close());
+  const workspaceRead = t.mock.method(s.authStore, "getProjectWorkspace", () => { throw new Error("Download must not load project data"); });
+  const headers = { host: new URL(s.config.origin).host };
+  const response = await s.app.inject({ url: verifierAsset.path, headers });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body, implementationVerifierSource);
+  assert.equal(response.rawPayload.length, verifierAsset.bytes.length);
+  assert.match(response.headers["content-type"]!, /^text\/javascript; charset=utf-8/);
+  assert.equal(response.headers["content-disposition"], 'attachment; filename="uml-verify.mjs"');
+  assert.equal(response.headers["cache-control"], "public, max-age=31536000, immutable");
+  assert.equal(response.headers.etag, verifierAsset.etag);
+  assert.equal(response.headers["x-content-type-options"], "nosniff");
+  const cached = await s.app.inject({ url: verifierAsset.path, headers: { ...headers, "if-none-match": `W/${verifierAsset.etag}` } });
+  assert.equal(cached.statusCode, 304);
+  assert.equal(cached.body, "");
+  const head = await s.app.inject({ method: "HEAD", url: verifierAsset.path, headers });
+  assert.equal(head.statusCode, 200);
+  assert.equal(head.body, "");
+  assert.equal(Number(head.headers["content-length"]), verifierAsset.bytes.length);
+  const missing = await s.app.inject({ url: `/api/mcp/assets/${"0".repeat(64)}/uml-verify.mjs`, headers });
+  assert.equal(missing.statusCode, 404);
+  assert.equal(workspaceRead.mock.callCount(), 0);
+});
+
+test("disabled MCP does not expose the verifier download", async (t) => {
+  const app = await createConfiguredFastifyApp();
+  t.after(() => app.close());
+  await registerMcpModule({ app, authStore: createInMemoryAuthStore(), pool: null, production: false, config: null });
+  assert.equal((await app.inject({ url: verifierAsset.path })).statusCode, 404);
 });
