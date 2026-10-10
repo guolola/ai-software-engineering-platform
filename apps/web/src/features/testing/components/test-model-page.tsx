@@ -31,6 +31,7 @@ import { cn } from "../../../shared/ui/utils";
 import { categoryChipTone } from "../../../shared/ui/category-tones";
 import { useWorkspaceShell } from "../../workspace-shell/state";
 import { useWorkspaceSession } from "../../workspace-session/state";
+import { findRequirementModelByKind } from "../../../entities/diagram/model";
 
 const SCENARIO_TYPES: Array<TestScenarioType | "all"> = [
   "all", "normal", "alternative", "exception", "boundary", "decision-table",
@@ -312,7 +313,8 @@ export function TestModelPage() {
   const { openFeedback, openFeedbackOnce } = useFeedbackDialog();
   const [scenarioFilter, setScenarioFilter] = useState<TestScenarioType | "all">("all");
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
-  const useCaseModel = models.usecase;
+  // Generated models are stored by modelId, which may differ from their diagram kind.
+  const useCaseModel = findRequirementModelByKind(models, "usecase");
   const blockedReason =
     !useCaseModel || !("useCases" in useCaseModel) || useCaseModel.useCases.length === 0
       ? t("testingPage.blocked.usecase")

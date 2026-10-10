@@ -51,9 +51,10 @@ describe("TestModelPage", () => {
     expect(screen.queryByText("需求阶段用例模型缺失，无法生成测试用例")).not.toBeInTheDocument();
   });
 
-  it("generates fallback black-box cases for old use cases without event flows", async () => {
+  it.each(["usecase", "usecase-home-security"])("generates fallback black-box cases from a use case model stored under %s", async (modelKey) => {
     const legacyUseCaseModel = {
       diagramKind: "usecase",
+      modelId: modelKey,
       title: "图书馆用例模型",
       summary: "旧历史模型未携带 eventFlows 字段。",
       notes: [],
@@ -81,7 +82,7 @@ describe("TestModelPage", () => {
             relatedDiagrams: ["usecase"],
           }),
         ],
-        models: { usecase: legacyUseCaseModel },
+        models: { [modelKey]: legacyUseCaseModel },
       }),
     );
 
