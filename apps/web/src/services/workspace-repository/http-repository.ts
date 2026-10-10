@@ -744,14 +744,13 @@ export function createHttpWorkspaceRepository(
           };
         } else {
           if (workspace.visualReviews) delete workspace.visualReviews[`requirements:${key}`];
-          const diagramKind = key as DiagramType;
           workspace.plantUml = {
             ...workspace.plantUml,
-            [diagramKind]: artifact.plantUmlSource,
+            [key]: artifact.plantUmlSource,
           };
           workspace.svgArtifacts = {
             ...workspace.svgArtifacts,
-            [diagramKind]: artifact.svgArtifact as SvgArtifact,
+            [key]: artifact.svgArtifact as SvgArtifact,
           };
         }
       });

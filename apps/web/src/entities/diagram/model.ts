@@ -7,6 +7,7 @@ import type {
   DiagramModelSpec,
 } from "@uml-platform/contracts";
 import type { TFunction } from "i18next";
+import { findModelByDiagramKind } from "@uml-platform/contracts";
 
 export type DiagramType = DiagramKind;
 export type DesignDiagramType = DesignDiagramKind;
@@ -140,11 +141,7 @@ export function findRequirementModelByKind(
   models: Record<string, DiagramModelSpec | undefined>,
   diagram: DiagramType,
 ) {
-  // Persisted model IDs are independent of diagram kinds; keep their identity intact.
-  const direct = models[diagram];
-  return direct?.diagramKind === diagram
-    ? direct
-    : Object.values(models).find((model) => model?.diagramKind === diagram);
+  return findModelByDiagramKind(models, diagram);
 }
 
 export function getRequirementArtifactId(

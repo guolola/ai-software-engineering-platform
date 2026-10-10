@@ -29,6 +29,7 @@ import {
 } from "../../adapters/llm/llm-scheduler.js";
 import type { RunQueue } from "../../runs/queue/run-queue.js";
 import type { DocumentLibrary } from "../../documents/library/document-library.js";
+import { resolveDocumentRunInput } from "./run-input-resolution.js";
 import type { RenderClient } from "../../adapters/render/render-client.js";
 import type { PngRenderClient } from "../../adapters/render/png-render-client.js";
 import { createRunRecordStore, emitEvent } from "../../runs/records/run-record-store.js";
@@ -2746,6 +2747,23 @@ test("project run history clear rejects active project records without deleting 
   await app.close();
 });
 
+test("project document commands preserve the type and identity of custom-ID requirement sources", async () => {
+  const workspace = createProjectWorkspaceState();
+  const result = await resolveDocumentRunInput(
+    { projectId: "project-a", documentKind: "requirementsSpec" },
+    undefined,
+    async () => ({ state: {
+      ...workspace,
+      models: { "custom-usecase": { ...minimalUseCaseModel, modelId: "custom-usecase" } },
+      plantUml: { "custom-usecase": "@startuml\nactor 用户\n@enduml" },
+      svgArtifacts: { "custom-usecase": { ...workspaceRequirementSvg, modelId: "custom-usecase" } },
+    } }),
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.input.requirementPlantUml, [{ diagramKind: "usecase", modelId: "custom-usecase", source: "@startuml\nactor 用户\n@enduml" }]);
+});
+
 test("project document runs do not require legacy workspace credentials", async () => {
   let capturedWorkspaceId = "";
   const app = await createRunRouteTestApp({
@@ -2900,6 +2918,48 @@ test("project design start command rejects stale requirement model sources befor
   staleWorkspaceState.generatedDiagramTypes = ["usecase"];
   staleWorkspaceState.rulesVersion = 2;
   staleWorkspaceState.diagramVersions = { usecase: 1 };
+  const { app, runs } = await createRunRouteTestContext({
+    completeRuns: false,
+    runAccessGuard: createTestRunAccessGuard({
+      "user-a": {
+        start_runs: ["project-a"],
+      },
+    }),
+    loadProjectWorkspace: async () => ({ state: staleWorkspaceState }),
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/design-runs",
+    headers: {
+      "x-test-user-id": "user-a",
+    },
+    payload: {
+      projectId: "project-a",
+      selectedDiagrams: ["sequence"],
+    },
+  });
+
+  assert.equal(response.statusCode, 409);
+  assert.equal(response.json().error.code, "REQUIREMENT_MODELS_STALE");
+  assert.deepEqual(response.json().error.details.diagramKinds, ["usecase"]);
+  assert.equal(runs.size, 0);
+
+  await app.close();
+});
+
+test("project design start command rejects custom-ID stale sources using the legacy shared fingerprint", async () => {
+  const staleWorkspaceState = { ...createProjectWorkspaceState(), models: { "custom-usecase": { ...minimalUseCaseModel, modelId: "custom-usecase" } } };
+  const oldRequirementFingerprint = snapshotInputFingerprint({
+    requirementText: "用户可以查看公开活动日历。",
+    rules: workspaceRequirementRules,
+  });
+  staleWorkspaceState.requirementText = "用户可以查看公开活动日历，并按城市筛选。";
+  staleWorkspaceState.requirementInputFingerprint = oldRequirementFingerprint;
+  staleWorkspaceState.diagramInputFingerprints = {};
+  staleWorkspaceState.generatedDiagramTypes = ["usecase"];
+  staleWorkspaceState.rulesVersion = 2;
+  staleWorkspaceState.diagramVersions = {};
   const { app, runs } = await createRunRouteTestContext({
     completeRuns: false,
     runAccessGuard: createTestRunAccessGuard({

@@ -1788,16 +1788,17 @@ describe("DiagramView", () => {
     expect(await screen.findByRole("button", { name: "定位元素：Client" })).toBeInTheDocument();
   });
 
-  it("edits a use case model and rerenders the current diagram", async () => {
+  it.each(["usecase", "usecase-home-security"])("edits and rerenders the use case model stored under %s", async (modelKey) => {
     const repository = createRepository(
       createWorkspaceRecord({
         generatedDiagramTypes: ["usecase"],
         plantUml: {
-          usecase: "@startuml\nactor 教师\n@enduml",
+          [modelKey]: "@startuml\nactor 教师\n@enduml",
         },
         models: {
-          usecase: {
+          [modelKey]: {
             diagramKind: "usecase",
+            modelId: modelKey,
             title: "用例图",
             summary: "教师登录系统",
             notes: [],
@@ -1833,7 +1834,7 @@ describe("DiagramView", () => {
           },
         },
         svgArtifacts: {
-          usecase: {
+          [modelKey]: {
             diagramKind: "usecase",
             svg: "<svg><text>教师</text></svg>",
             renderMeta: {
@@ -1898,6 +1899,7 @@ describe("DiagramView", () => {
     expect(repository.saveRequirementModelEdit).toHaveBeenCalledWith(
       "usecase",
       expect.objectContaining({
+        modelId: modelKey,
         actors: [expect.objectContaining({ name: "授课教师" })],
         relationships: [expect.objectContaining({ label: "发起登录" })],
       }),

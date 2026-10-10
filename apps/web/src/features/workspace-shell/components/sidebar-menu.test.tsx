@@ -1518,7 +1518,7 @@ describe("SidebarMenu", () => {
     releaseRun();
   });
 
-  it("lists all use-case sequence subtasks before they finish and only opens rendered ones", async () => {
+  it.each(["usecase", "custom-usecase"])("lists sequence subtasks from usecase stored under %s and opens only rendered ones", async (modelKey) => {
     let releaseRun!: () => void;
     let emitDesignEvent!: Parameters<NonNullable<WorkspaceRepository["subscribeToDesignRun"]>>[1];
     let currentSnapshot: Awaited<ReturnType<NonNullable<WorkspaceRepository["getDesignRunSnapshot"]>>> =
@@ -1530,8 +1530,9 @@ describe("SidebarMenu", () => {
           rules: [createRule({ id: "r1", relatedDiagrams: ["usecase"] })],
           requirementBaseline: createRequirementBaseline(),
           models: {
-            usecase: {
+            [modelKey]: {
               diagramKind: "usecase",
+              modelId: modelKey,
               title: "用例模型",
               summary: "系统边界",
               notes: [],
@@ -1574,6 +1575,7 @@ describe("SidebarMenu", () => {
             {
               ruleId: "r1",
               target: {
+                modelId: modelKey,
                 diagramKind: "usecase",
                 elementId: "uc_view",
                 elementKind: "usecase",
@@ -1583,6 +1585,7 @@ describe("SidebarMenu", () => {
             {
               ruleId: "r1",
               target: {
+                modelId: modelKey,
                 diagramKind: "usecase",
                 elementId: "uc_create",
                 elementKind: "usecase",

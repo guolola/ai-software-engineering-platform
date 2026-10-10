@@ -9,6 +9,7 @@ import type {
 } from "@uml-platform/contracts";
 import {
   getRequirementModelId,
+  findRequirementModelByKind,
   type DesignDiagramType,
   type DiagramType,
 } from "../../../entities/diagram/model";
@@ -171,7 +172,7 @@ export function useManualModelEditActions({
       modelOverride?: DiagramModelSpec,
       options?: { toastMessage?: string | null },
     ) => {
-      const model = modelOverride ?? models[diagramKind];
+      const model = modelOverride ?? findRequirementModelByKind(models, diagramKind);
       if (!model) {
         throw new Error(t("diagrams.detail.requirementModelMissing"));
       }

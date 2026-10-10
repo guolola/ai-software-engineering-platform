@@ -3304,7 +3304,7 @@ describe("createHttpWorkspaceRepository", () => {
     ).toBe(false);
   });
 
-  it("prunes orphan use-case scoped analysis and sequence records from project workspace state", async () => {
+  it.each(["usecase", "custom-usecase"])("prunes orphan use-case scoped records with the usecase stored under %s", async (modelKey) => {
     let savedState: Record<string, unknown> | null = null;
     const fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
       if (
@@ -3320,8 +3320,9 @@ describe("createHttpWorkspaceRepository", () => {
               generatedDiagramTypes: ["usecase", "analysis"],
               generatedDesignDiagramTypes: ["sequence"],
               models: {
-                usecase: {
+                [modelKey]: {
                   diagramKind: "usecase",
+                  modelId: modelKey,
                   actors: [],
                   useCases: [
                     { id: "uc-1", name: "查询座位" },

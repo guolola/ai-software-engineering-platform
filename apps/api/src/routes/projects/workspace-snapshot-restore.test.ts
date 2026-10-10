@@ -244,6 +244,31 @@ function designSnapshot(
 
 
 
+for (const stage of ["requirements", "design"] as const) {
+  test(`restore replaces custom-ID sources with their models during ${stage} recovery`, () => {
+    const design = stage === "design";
+    const oldModel = { ...(design ? tableDesignModel() : requirementUseCaseModel()), modelId: "custom-old" };
+    const newModel = { ...oldModel, modelId: "custom-new" };
+    const modelField = design ? "designModels" : "models";
+    const sourceField = design ? "designPlantUml" : "plantUml";
+    const errorField = design ? "designDiagramErrors" : "diagramErrors";
+    const currentState = {
+      [modelField]: { "custom-old": oldModel },
+      [sourceField]: { "custom-old": "old-source", unrelated: "keep-source" },
+      [errorField]: { "custom-old": { stage: "render_svg", error: { code: "RUN_RENDER_FAILED" } } },
+    };
+    const snapshot = design
+      ? designSnapshot({ selectedDiagrams: ["table"], requestedDiagrams: ["table"], models: [newModel as DesignDiagramModelSpec], plantUml: [{ diagramKind: "table", modelId: "custom-new", source: "new-source" }] })
+      : createEmptySnapshot("custom-id-run", "", ["usecase"], [], { models: [newModel as DiagramModelSpec] });
+    if (!design) (snapshot as RunSnapshot).plantUml = [{ diagramKind: "usecase", modelId: "custom-new", source: "new-source" }];
+    snapshot.status = "completed";
+    const restored = restoreRunSnapshotToWorkspaceState({ currentState, snapshot });
+    assert.ok(!Object.hasOwn(restored[modelField] as object, "custom-old"));
+    assert.deepEqual(restored[sourceField], { "custom-new": "new-source", unrelated: "keep-source" });
+    assert.ok(!Object.hasOwn(restored[errorField] as object, "custom-old"));
+  });
+}
+
 test("restore stores snapshot input fingerprints for requirement diagrams after current input changed", () => {
   const rulesV1 = [requirementRule("r1", "用户可以查看座位。")];
   const rulesV2 = [requirementRule("r1", "用户可以查看并筛选座位。")];

@@ -35,6 +35,7 @@ import {
   DIAGRAM_META,
   getDesignModelId,
   getRequirementModelId,
+  findRequirementModelByKind,
   type DesignDiagramType,
   type DiagramType,
 } from "../../../entities/diagram/model";
@@ -235,7 +236,7 @@ function DiagramDetailView({
   const requirementModel = !isDesign && !isFeasibility
     ? modelId
       ? models[modelId]
-      : models[requirementType]
+      : findRequirementModelByKind(models, requirementType)
     : undefined;
   const requirementArtifactId = requirementModel
     ? getRequirementModelId(requirementModel)

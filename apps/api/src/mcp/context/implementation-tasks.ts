@@ -1,7 +1,5 @@
 // Builds source-backed coding tasks and explicit readiness issues without inventing acceptance checks or code locations.
 import {
-  atomicRequirementSchema,
-  requirementRuleSchema,
   diagramModelSpecSchema,
   designDiagramModelSpecSchema,
   getModelGraphElements,
@@ -12,20 +10,21 @@ import {
   type ModelElementRef,
 } from "@uml-platform/contracts";
 import { contentHash, record, type SourceArtifact } from "./source-artifacts.js";
+import { implementationAcceptanceSchema, implementationSources } from "./implementation-sources.js";
 
 type TaskIssue = McpImplementationTask["issues"][number];
 const list = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 const strings = (value: unknown): string[] => list(value).filter((item): item is string => typeof item === "string");
 const unique = (values: string[]) => [...new Set(values)].sort();
 const globalSource = (artifact: SourceArtifact) =>
-  ["requirements:source", "requirements:review", "feasibility:inputs", "feasibility:implementation"].includes(artifact.id);
+  artifact.id === "feasibility:inputs";
 
 const commonGuidance = [
-  "先读取 sourceArtifactIds 的完整产物，核对原始需求和模型；学生明确技术要求与目标仓库既有约束优先，模型技术建议不能自动替代它们。",
+  "以完整设计模型为代码实现的直接依据，读取全部设计关系、行为和约束；需求到设计的正确性由平台负责，编码阶段不重新解释需求或推导设计。遵守工程环境与现有仓库规范，冲突时反馈并确认设计。",
   "先登记预计修改的模块和文件，编码后另行登记实际代码文件、类或函数及测试；预计位置不代表已实现，候选设计元素不要求逐个生成代码。",
   "designRefs 只列真实模型节点作为候选位置；完整关系边、时序消息、条件、约束及列定义仍须从来源产物读取，不能忽略。",
   "根据来源中的验收条件编写正常、边界、异常及权限测试；测试场景是参考，不能把规则正文或生成代码本身当作已确认验收条件。",
-  "blocking 问题阻止将本任务标为验证通过；可先计划或实现明确部分，补齐或更新受影响依据后重新验证。缺少某类图不阻止实现已有明确要求。",
+  "缺少设计或存在设计歧义时反馈设计缺口，不从原始需求自行设计。blocking 问题阻止将本任务标为验证通过，更新受影响设计与验收依据后重新验证。",
   "当前只核对来源状态和引用，不代表已验证模型语义、代码行为或设计一致性。来源版本或实际代码变化后，原验证结果必须失效并复验。",
 ];
 const diagramGuidance: Record<string, string> = {
@@ -117,30 +116,22 @@ function qualityIssues(artifact: SourceArtifact, requirementIds: Set<string>): T
 }
 
 export function buildImplementationTasks(input: SourceArtifact[], scope?: McpScope): McpImplementationTask[] {
-  const artifacts = input.filter((artifact) => artifact.stage !== "implementation");
+  const artifacts = implementationSources(input.filter((artifact) => artifact.stage !== "implementation"));
   const byId = new Map(artifacts.map((artifact) => [artifact.id, artifact]));
   const models = new Map(artifacts.flatMap((artifact) => {
     const model = parsedModel(artifact);
     return model ? [[artifact.id, model] as const] : [];
   }));
   const atomic = artifacts.flatMap((artifact) => {
-    const parsed = atomicRequirementSchema.safeParse(artifact.payload.requirement);
+    const parsed = implementationAcceptanceSchema.safeParse(artifact.payload.requirement);
     return artifact.stage === "requirements" && parsed.success ? [{ artifact, requirement: parsed.data }] : [];
   });
-  const linkedRuleIds = new Set(atomic.flatMap(({ requirement }) => requirement.sourceRuleId ? [requirement.sourceRuleId] : []));
   const seeds = [
-    ...atomic.map(({ artifact, requirement }) => ({ artifact, title: requirement.sourceFragment, criteria: requirement.acceptanceCriteria })),
-    ...artifacts.flatMap((artifact) => {
-      const parsed = requirementRuleSchema.safeParse(artifact.payload.rule);
-      return artifact.stage === "requirements" && parsed.success && !linkedRuleIds.has(parsed.data.id)
-        ? [{ artifact, title: parsed.data.text, criteria: [] as string[] }] : [];
-    }),
+    ...atomic.map(({ artifact, requirement }) => ({ artifact, title: `实现设计：${requirement.id}`, criteria: requirement.acceptanceCriteria })),
+    ...artifacts.filter((artifact) => artifact.stage === "design" &&
+      !atomic.some(({ artifact: acceptance }) => acceptance.requirementIds.some((id) => artifact.requirementIds.includes(id))))
+      .map((artifact) => ({ artifact, title: `实现设计：${artifact.title}`, criteria: [] as string[] })),
   ];
-  if (!seeds.length) {
-    const original = byId.get("requirements:source");
-    if (original && typeof original.payload.text === "string" && original.payload.text.trim())
-      seeds.push({ artifact: original, title: "根据原始需求建立实现清单", criteria: [] });
-  }
 
   const tasks = seeds.map(({ artifact: seed, title, criteria }): McpImplementationTask => {
     const requirementIds = new Set(seed.requirementIds);
@@ -188,7 +179,7 @@ export function buildImplementationTasks(input: SourceArtifact[], scope?: McpSco
         if (trace.reviewStatus !== "confirmed") issues.push({ code: "trace-review-pending", severity: "warning", message: `${source.id} 的追踪尚未确认，请核对关联职责。` });
         if (source.stage === "analysis" && trace.target) validateRef(trace.target, "analysis", source.id);
         if (source.stage === "design" && trace.source) {
-          validateRef(trace.source, "analysis", source.id);
+          // Upstream requirement-model references are provenance; the platform validates that transformation.
           for (const ref of list(trace.upstreamDesignRefs)) validateRef(ref, "design", source.id);
           const model = models.get(source.id);
           // A trace may name sibling design targets outside this functional scope; inspect its local target only.
@@ -224,7 +215,9 @@ export function buildImplementationTasks(input: SourceArtifact[], scope?: McpSco
         label: element.name,
       }));
     });
-    if (!designRefs.length) issues.push({ code: "design-mapping-missing", severity: "warning", message: "暂无可核对的设计元素映射；请基于明确需求和已有仓库确定实现位置，并记录设计缺口。" });
+    if (!sources.some((artifact) => artifact.stage === "design" && models.has(artifact.id)))
+      issues.push({ code: "design-model-missing", severity: "blocking", message: "缺少有效设计模型，请在平台补齐设计；编码助手不能从需求自行推导设计。" });
+    if (!designRefs.length) issues.push({ code: "design-mapping-missing", severity: "warning", message: "暂无可核对的设计元素映射，请补齐设计元素并记录设计缺口。" });
     return {
       id: `implement:${seed.id}`,
       title: title.slice(0, 160),

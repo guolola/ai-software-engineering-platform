@@ -19,6 +19,7 @@ import type {
   RequirementQualityReport,
   RunEvent,
 } from "@uml-platform/contracts";
+import { modelRecordBelongsToDiagramKinds, resolveModelArtifactIdentity } from "@uml-platform/contracts";
 import {
   getRequirementModelId,
   findRequirementModelByKind,
@@ -783,15 +784,8 @@ export function WorkspaceSessionProvider({
       setDiagramErrors((current) => {
         const affected =
           mode.kind === "partial-diagrams" ? mode.diagrams : snapshotDiagrams;
-        const next = { ...current };
-        for (const diagram of affected) {
-          delete next[diagram];
-          for (const key of Object.keys(next)) {
-            if (key.startsWith(`${diagram}:`)) {
-              delete next[key as DiagramType];
-            }
-          }
-        }
+        const next = Object.fromEntries(Object.entries(current).filter(([key, value]) =>
+          !modelRecordBelongsToDiagramKinds(key, value, affected, latestInputRef.current.models)));
         for (const [diagram, error] of Object.entries(snapshot.diagramErrors)) {
           next[diagram as DiagramType] = error;
         }
@@ -806,6 +800,7 @@ export function WorkspaceSessionProvider({
         const next = clearRequirementScopedRecordForScope(
           current,
           successfulScope,
+          latestInputRef.current.models,
         );
         const successfulModels = keepRequirementScopedRecordForScope(
           mapped.models,
@@ -833,10 +828,12 @@ export function WorkspaceSessionProvider({
         const next = clearRequirementScopedRecordForScope(
           current,
           successfulScope,
+          latestInputRef.current.models,
         );
         const successfulPlantUml = keepRequirementScopedRecordForScope(
           mapped.plantUml,
           successfulScope,
+          mapped.models,
         );
         for (const [modelId, source] of Object.entries(successfulPlantUml)) {
           next[modelId] = source;
@@ -927,6 +924,7 @@ export function WorkspaceSessionProvider({
               ...clearDesignScopedRecord(
                 current,
                 successfulAffectedDesignDiagrams,
+                latestInputRef.current.designModels,
               ),
               ...affectedDesignModelMap,
             }
@@ -959,10 +957,12 @@ export function WorkspaceSessionProvider({
               ...clearDesignScopedRecord(
                 current,
                 successfulAffectedDesignDiagrams,
+                latestInputRef.current.designModels,
               ),
               ...keepDesignScopedRecord(
                 mapped.plantUml,
                 successfulAffectedDesignDiagrams,
+                mapped.models,
               ),
             }
           : previewAffectedDesignDiagrams.length > 0
@@ -971,6 +971,7 @@ export function WorkspaceSessionProvider({
                 ...keepDesignScopedRecord(
                   mapped.plantUml,
                   previewAffectedDesignDiagrams,
+                  mapped.models,
                 ),
               }
           : current,
@@ -981,10 +982,12 @@ export function WorkspaceSessionProvider({
               ...clearDesignScopedRecord(
                 current,
                 successfulAffectedDesignDiagrams,
+                latestInputRef.current.designModels,
               ),
               ...keepDesignScopedRecord(
                 mapped.svgArtifacts,
                 successfulAffectedDesignDiagrams,
+                mapped.models,
               ),
             }
           : previewAffectedDesignDiagrams.length > 0
@@ -993,6 +996,7 @@ export function WorkspaceSessionProvider({
                 ...keepDesignScopedRecord(
                   mapped.svgArtifacts,
                   previewAffectedDesignDiagrams,
+                  mapped.models,
                 ),
               }
           : current,
@@ -1029,6 +1033,7 @@ export function WorkspaceSessionProvider({
               ...clearDesignScopedRecord(
                 current,
                 successfulAffectedDesignDiagrams,
+                latestInputRef.current.designModels,
               ),
               ...Object.fromEntries(
                 Object.keys(affectedDesignModelMap).map((modelId) => [
@@ -1832,11 +1837,10 @@ export function WorkspaceSessionProvider({
           Object.values(designModels),
           designModelTraceability,
           Object.entries(designPlantUml).map(([artifactId, source]) => {
-            const model = designModels[artifactId];
+            const identity = resolveModelArtifactIdentity(artifactId, designModels, designSvgArtifacts);
             return {
-              diagramKind:
-                model?.diagramKind ?? (artifactId as DesignDiagramType),
-              modelId: model?.modelId,
+              ...identity,
+              diagramKind: identity.diagramKind as DesignDiagramType,
               source,
             };
           }),
@@ -2138,12 +2142,10 @@ export function WorkspaceSessionProvider({
         const requirementPlantUml = Object.entries(plantUml)
           .filter((entry): entry is [string, string] => Boolean(entry[1]))
           .map(([artifactId, source]) => {
-            const diagramKind = artifactId.includes(":")
-              ? artifactId.split(":")[0]
-              : artifactId;
+            const identity = resolveModelArtifactIdentity(artifactId, models, svgArtifacts);
             return {
-              diagramKind: diagramKind as DiagramType,
-              modelId: artifactId.includes(":") ? artifactId : undefined,
+              ...identity,
+              diagramKind: identity.diagramKind as DiagramType,
               source,
             };
           });
@@ -2157,14 +2159,10 @@ export function WorkspaceSessionProvider({
         const designPlantUmlList = Object.entries(designPlantUml)
           .filter((entry): entry is [string, string] => Boolean(entry[1]))
           .map(([artifactId, source]) => {
-            const model = designModels[artifactId];
-            const svgArtifact = designSvgArtifacts[artifactId];
+            const identity = resolveModelArtifactIdentity(artifactId, designModels, designSvgArtifacts);
             return {
-              diagramKind:
-                model?.diagramKind ??
-                svgArtifact?.diagramKind ??
-                (artifactId as DesignDiagramType),
-              modelId: model?.modelId ?? svgArtifact?.modelId,
+              ...identity,
+              diagramKind: identity.diagramKind as DesignDiagramType,
               source,
             };
           });

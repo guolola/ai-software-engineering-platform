@@ -3,6 +3,7 @@ import {
   designDiagramKindFromRecordKey,
   designRecordBelongsToDiagramKinds,
   designTraceabilityTouchesDiagramKinds,
+  modelRecordBelongsToDiagramKinds,
 } from "@uml-platform/contracts";
 import type {
   DesignDiagramModelSpec,
@@ -214,18 +215,11 @@ function refKey(diagramKind: string, elementId: string, modelId?: string) {
 function clearRequirementScopedRecord<T>(
   current: Record<string, T>,
   affectedDiagrams: readonly DiagramType[],
+  models: Record<string, unknown> = {},
 ) {
-  const affected = new Set(affectedDiagrams);
   return Object.fromEntries(
-    Object.entries(current).filter(([key, value]) => {
-      if (affected.has(key as DiagramType)) return false;
-      for (const diagram of affected) {
-        if (key.startsWith(`${diagram}:`)) return false;
-      }
-      const diagramKind = (value as { diagramKind?: string } | undefined)
-        ?.diagramKind;
-      return !diagramKind || !affected.has(diagramKind as DiagramType);
-    }),
+    Object.entries(current).filter(([key, value]) =>
+      !modelRecordBelongsToDiagramKinds(key, value, affectedDiagrams, models)),
   ) as Record<string, T>;
 }
 
@@ -261,8 +255,9 @@ export function requirementSnapshotScope(
 export function clearRequirementScopedRecordForScope<T>(
   current: Record<string, T>,
   scope: RequirementSnapshotScope,
+  models: Record<string, unknown> = {},
 ) {
-  const next = clearRequirementScopedRecord(current, scope.broadDiagrams);
+  const next = clearRequirementScopedRecord(current, scope.broadDiagrams, models);
   for (const modelId of scope.targetedModelIds) {
     delete next[modelId];
   }
@@ -272,29 +267,23 @@ export function clearRequirementScopedRecordForScope<T>(
 function keepRequirementScopedRecord<T>(
   current: Record<string, T>,
   affectedDiagrams: readonly DiagramType[],
+  models: Record<string, unknown> = {},
 ) {
-  const affected = new Set(affectedDiagrams);
   return Object.fromEntries(
-    Object.entries(current).filter(([key, value]) => {
-      if (affected.has(key as DiagramType)) return true;
-      for (const diagram of affected) {
-        if (key.startsWith(`${diagram}:`)) return true;
-      }
-      const diagramKind = (value as { diagramKind?: string } | undefined)
-        ?.diagramKind;
-      return Boolean(diagramKind && affected.has(diagramKind as DiagramType));
-    }),
+    Object.entries(current).filter(([key, value]) =>
+      modelRecordBelongsToDiagramKinds(key, value, affectedDiagrams, models)),
   ) as Record<string, T>;
 }
 
 export function clearDesignScopedRecord<T>(
   current: Record<string, T>,
   affectedDiagrams: readonly DesignDiagramType[],
+  models: Record<string, unknown> = {},
 ) {
   return Object.fromEntries(
     Object.entries(current).filter(
       ([key, value]) =>
-        !designRecordBelongsToDiagramKinds(key, value, affectedDiagrams),
+        !modelRecordBelongsToDiagramKinds(key, value, affectedDiagrams, models),
     ),
   ) as Record<string, T>;
 }
@@ -302,10 +291,11 @@ export function clearDesignScopedRecord<T>(
 export function keepDesignScopedRecord<T>(
   current: Record<string, T>,
   affectedDiagrams: readonly DesignDiagramType[],
+  models: Record<string, unknown> = {},
 ) {
   return Object.fromEntries(
     Object.entries(current).filter(([key, value]) =>
-      designRecordBelongsToDiagramKinds(key, value, affectedDiagrams),
+      modelRecordBelongsToDiagramKinds(key, value, affectedDiagrams, models),
     ),
   ) as Record<string, T>;
 }
@@ -432,8 +422,9 @@ export function mergeDesignPreviewTraceability(
 export function keepRequirementScopedRecordForScope<T>(
   current: Record<string, T>,
   scope: RequirementSnapshotScope,
+  models: Record<string, unknown> = {},
 ) {
-  const next = keepRequirementScopedRecord(current, scope.broadDiagrams);
+  const next = keepRequirementScopedRecord(current, scope.broadDiagrams, models);
   for (const modelId of scope.targetedModelIds) {
     const value = current[modelId];
     if (value !== undefined) {

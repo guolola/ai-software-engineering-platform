@@ -7,6 +7,7 @@ import {
   DIAGRAM_ORDER,
   getDesignModelId,
   getRequirementModelId,
+  findRequirementModelByKind,
   type DesignDiagramType,
   type DiagramType,
 } from "../../../entities/diagram/model";
@@ -229,7 +230,8 @@ function scopedModelMatchesCurrentUseCases(
 }
 
 export function deriveSidebarDiagramState(input: SidebarDiagramStateInput) {
-  const currentUseCaseIds = useCaseIdsFromModel(input.models.usecase);
+  const useCaseModel = findRequirementModelByKind(input.models, "usecase");
+  const currentUseCaseIds = useCaseIdsFromModel(useCaseModel);
   const requirementModelViewable = (diagram: DiagramType, modelId?: string) =>
     Boolean((modelId ? input.svgArtifacts[modelId] : undefined) ?? input.svgArtifacts[diagram]);
   const designModelViewable = (diagram: DesignDiagramType, modelId?: string) =>
@@ -383,7 +385,7 @@ export function deriveSidebarDiagramState(input: SidebarDiagramStateInput) {
     requirementSubtaskStatus.has("analysis") ||
     [...requirementSubtaskStatus.keys()].some((id) => id.startsWith("analysis:"));
   const expectedAnalysisNodes = analysisGenerationActive
-    ? analysisUseCaseNodes(input.models.usecase)
+    ? analysisUseCaseNodes(useCaseModel)
     : [];
   const analysisNodeIds = Array.from(
     new Set([
@@ -442,7 +444,7 @@ export function deriveSidebarDiagramState(input: SidebarDiagramStateInput) {
     designSubtaskStatus.has("sequence") ||
     [...designSubtaskStatus.keys()].some((id) => id.startsWith("sequence:"));
   const expectedSequenceNodes = sequenceGenerationActive
-    ? sequenceUseCaseNodes(input.models.usecase)
+    ? sequenceUseCaseNodes(useCaseModel)
     : [];
   const sequenceNodeIds = Array.from(
     new Set([

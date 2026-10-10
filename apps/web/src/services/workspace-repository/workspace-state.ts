@@ -7,6 +7,7 @@ import {
   designDiagramKindFromRecordKey,
   designRecordBelongsToDiagramKinds,
   designTraceabilityTouchesDiagramKinds,
+  modelRecordBelongsToDiagramKinds,
   
   type DesignRunSnapshot,
   type RequirementBaseline,
@@ -19,6 +20,7 @@ import {
   getDesignModelId,
   getRequirementArtifactId,
   getRequirementModelId,
+  findRequirementModelByKind,
   type DesignDiagramType,
   type DiagramType,
 } from "../../entities/diagram/model";
@@ -383,7 +385,7 @@ function stringProperty(value: unknown, key: string) {
 }
 
 function currentUseCaseIds(models: WorkspaceRecord["models"]): Set<string> | null {
-  const useCaseModel = models.usecase;
+  const useCaseModel = findRequirementModelByKind(models, "usecase");
   if (!useCaseModel || typeof useCaseModel !== "object") return null;
   const useCases = (useCaseModel as { useCases?: unknown }).useCases;
   if (!Array.isArray(useCases)) return null;
@@ -607,36 +609,18 @@ function hasRequirementDiagramRecord(
   workspace: WorkspaceRecord,
   diagramKind: DiagramType,
 ) {
-  return (
-    Boolean(workspace.models[diagramKind]) ||
-    Boolean(workspace.plantUml[diagramKind]) ||
-    Boolean(workspace.svgArtifacts[diagramKind]) ||
-    Boolean(workspace.diagramErrors[diagramKind]) ||
-    Object.entries(workspace.models).some(
-      ([key, model]) => key.startsWith(`${diagramKind}:`) || model?.diagramKind === diagramKind,
-    ) ||
-    Object.keys(workspace.plantUml).some((key) => key.startsWith(`${diagramKind}:`)) ||
-    Object.keys(workspace.svgArtifacts).some((key) => key.startsWith(`${diagramKind}:`)) ||
-    Object.keys(workspace.diagramErrors).some((key) => key.startsWith(`${diagramKind}:`))
-  );
+  return [workspace.models, workspace.plantUml, workspace.svgArtifacts, workspace.diagramErrors]
+    .some((records) => Object.entries(records).some(([key, value]) =>
+      modelRecordBelongsToDiagramKinds(key, value, [diagramKind], workspace.models)));
 }
 
 function hasDesignDiagramRecord(
   workspace: WorkspaceRecord,
   diagramKind: DesignDiagramType,
 ) {
-  return (
-    Boolean(workspace.designModels[diagramKind]) ||
-    Boolean(workspace.designPlantUml[diagramKind]) ||
-    Boolean(workspace.designSvgArtifacts[diagramKind]) ||
-    Boolean(workspace.designDiagramErrors[diagramKind]) ||
-    Object.entries(workspace.designModels).some(
-      ([key, model]) => key.startsWith(`${diagramKind}:`) || model.diagramKind === diagramKind,
-    ) ||
-    Object.keys(workspace.designPlantUml).some((key) => key.startsWith(`${diagramKind}:`)) ||
-    Object.keys(workspace.designSvgArtifacts).some((key) => key.startsWith(`${diagramKind}:`)) ||
-    Object.keys(workspace.designDiagramErrors).some((key) => key.startsWith(`${diagramKind}:`))
-  );
+  return [workspace.designModels, workspace.designPlantUml, workspace.designSvgArtifacts, workspace.designDiagramErrors]
+    .some((records) => Object.entries(records).some(([key, value]) =>
+      modelRecordBelongsToDiagramKinds(key, value, [diagramKind], workspace.designModels)));
 }
 
 function pruneUseCaseScopedWorkspace(workspace: WorkspaceRecord): WorkspaceRecord {
@@ -885,6 +869,7 @@ export function applySnapshotToWorkspace(
         ...clearDesignScopedRecord(
           next.designInputFingerprints,
           successfulAffectedDesignDiagrams,
+          workspace.designModels,
         ),
         ...Object.fromEntries(
           Object.keys(affectedDesignModelMap).map((modelId) => [
@@ -897,16 +882,19 @@ export function applySnapshotToWorkspace(
         ...clearDesignScopedRecord(
           next.designPlantUml,
           successfulAffectedDesignDiagrams,
+          workspace.designModels,
         ),
         ...keepDesignScopedRecord(
           designRecords.plantUmlMap,
           successfulAffectedDesignDiagrams,
+          designRecords.modelMap,
         ),
       };
       next.designSvgArtifacts = {
         ...clearDesignScopedRecord(
           next.designSvgArtifacts,
           successfulAffectedDesignDiagrams,
+          workspace.designModels,
         ),
         ...keepDesignScopedRecord(
           designRecords.svgMap,
@@ -918,6 +906,7 @@ export function applySnapshotToWorkspace(
       next.designDiagramErrors,
       snapshot.diagramErrors,
       affectedForErrors,
+      workspace.designModels,
     );
     next.selectedDiagramTypes = [];
     if (canMergeRequirementContextFromSnapshot) {
@@ -1050,8 +1039,8 @@ export function applySnapshotToWorkspace(
   );
   if (successfulAffected.length > 0) {
     next.plantUml = {
-      ...clearRequirementScopedRecord(next.plantUml, successfulAffected),
-      ...keepRequirementScopedRecord(records.plantUmlMap, successfulAffected),
+      ...clearRequirementScopedRecord(next.plantUml, successfulAffected, workspace.models),
+      ...keepRequirementScopedRecord(records.plantUmlMap, successfulAffected, records.modelMap),
     };
     next.svgArtifacts = {
       ...clearRequirementScopedRecord(next.svgArtifacts, successfulAffected),
@@ -1062,6 +1051,7 @@ export function applySnapshotToWorkspace(
     next.diagramErrors,
     snapshot.diagramErrors,
     affected,
+    workspace.models,
   );
   next.diagramVersions = {
     ...next.diagramVersions,
@@ -1097,16 +1087,10 @@ function clearAndMergeDiagramErrors<T extends string, V>(
   current: Partial<Record<T, V>>,
   incoming: Partial<Record<T, V>>,
   affected: readonly T[],
+  models: Record<string, unknown> = {},
 ) {
-  const next = { ...current };
-  for (const diagram of affected) {
-    delete next[diagram];
-    for (const key of Object.keys(next)) {
-      if (key.startsWith(`${diagram}:`)) {
-        delete next[key as T];
-      }
-    }
-  }
+  const next = Object.fromEntries(Object.entries(current).filter(([key, value]) =>
+    !modelRecordBelongsToDiagramKinds(key, value, affected, models))) as Partial<Record<T, V>>;
   return { ...next, ...incoming };
 }
 
@@ -1128,60 +1112,45 @@ function diagramKindFromErrorKey(key: string) {
 
 function clearRequirementScopedRecord<T>(
   current: Record<string, T | undefined>,
-  affectedDiagrams: readonly DiagramType[],
+  affected: readonly DiagramType[],
+  models: Record<string, unknown> = {},
 ) {
-  const affected = new Set(affectedDiagrams);
   return Object.fromEntries(
-    Object.entries(current).filter(([key, value]) => {
-      if (affected.has(key as DiagramType)) return false;
-      for (const diagram of affected) {
-        if (key.startsWith(`${diagram}:`)) return false;
-      }
-      const diagramKind = (value as { diagramKind?: string } | undefined)
-        ?.diagramKind;
-      return !diagramKind || !affected.has(diagramKind as DiagramType);
-    }),
+    Object.entries(current).filter(([key, value]) =>
+      !modelRecordBelongsToDiagramKinds(key, value, affected, models)),
   ) as Record<string, T | undefined>;
 }
 
 function keepRequirementScopedRecord<T>(
   current: Record<string, T | undefined>,
-  affectedDiagrams: readonly DiagramType[],
+  affected: readonly DiagramType[],
+  models: Record<string, unknown> = {},
 ) {
-  const affected = new Set(affectedDiagrams);
   return Object.fromEntries(
-    Object.entries(current).filter(([key, value]) => {
-      if (affected.has(key as DiagramType)) return true;
-      for (const diagram of affected) {
-        if (key.startsWith(`${diagram}:`)) return true;
-      }
-      const diagramKind = (value as { diagramKind?: string } | undefined)
-        ?.diagramKind;
-      return Boolean(diagramKind && affected.has(diagramKind as DiagramType));
-    }),
+    Object.entries(current).filter(([key, value]) =>
+      modelRecordBelongsToDiagramKinds(key, value, affected, models)),
   ) as Record<string, T | undefined>;
 }
 
 function clearDesignScopedRecord<T>(
   current: Record<string, T | undefined>,
-  affectedDiagrams: readonly DesignDiagramType[],
+  affected: readonly DesignDiagramType[],
+  models: Record<string, unknown> = {},
 ) {
   return Object.fromEntries(
-    Object.entries(current).filter(
-      ([key, value]) =>
-        !designRecordBelongsToDiagramKinds(key, value, affectedDiagrams),
-    ),
+    Object.entries(current).filter(([key, value]) =>
+      !modelRecordBelongsToDiagramKinds(key, value, affected, models)),
   ) as Record<string, T | undefined>;
 }
 
 function keepDesignScopedRecord<T>(
   current: Record<string, T | undefined>,
-  affectedDiagrams: readonly DesignDiagramType[],
+  affected: readonly DesignDiagramType[],
+  models: Record<string, unknown> = {},
 ) {
   return Object.fromEntries(
     Object.entries(current).filter(([key, value]) =>
-      designRecordBelongsToDiagramKinds(key, value, affectedDiagrams),
-    ),
+      modelRecordBelongsToDiagramKinds(key, value, affected, models)),
   ) as Record<string, T | undefined>;
 }
 

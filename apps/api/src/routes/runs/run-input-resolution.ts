@@ -9,6 +9,8 @@ import {
   requirementBaselineSchema,
   snapshotInputFingerprint,
   designRecordBelongsToDiagramKinds,
+  findModelByDiagramKind,
+  resolveModelArtifactIdentity,
   designTraceabilityTouchesDiagramKinds,
   
   
@@ -314,7 +316,7 @@ function requirementModelIsStale(input: {
   }
 
   const models = recordValue(input.state.models);
-  if (!requirementDiagramKindFromWorkspaceRecord(models[input.diagram])) {
+  if (!findModelByDiagramKind(models, input.diagram)) {
     return false;
   }
   const requirementInputFingerprint = input.state.requirementInputFingerprint;
@@ -769,24 +771,16 @@ function compactRunInputText(value: unknown) {
     : "";
 }
 
-function scopedDiagramKindFromKey(key: string) {
-  return key.includes(":") ? key.split(":")[0] : key;
-}
-
 function readNestedText(value: unknown, key: string) {
   return compactRunInputText(recordValue(value)[key]);
 }
 
 function requirementPlantUmlArtifactsFromWorkspace(state: Record<string, unknown>) {
   return Object.entries(stringRecordValue(state.plantUml)).map(
-    ([artifactId, source]) => {
-      const diagramKind = scopedDiagramKindFromKey(artifactId);
-      return {
-        diagramKind,
-        ...(artifactId.includes(":") ? { modelId: artifactId } : {}),
-        source,
-      };
-    },
+    ([artifactId, source]) => ({
+      ...resolveModelArtifactIdentity(artifactId, recordValue(state.models), recordValue(state.svgArtifacts)),
+      source,
+    }),
   );
 }
 
@@ -794,20 +788,10 @@ function designPlantUmlArtifactsFromWorkspace(state: Record<string, unknown>) {
   const designModels = recordValue(state.designModels);
   const designSvgArtifacts = recordValue(state.designSvgArtifacts);
   return Object.entries(stringRecordValue(state.designPlantUml)).map(
-    ([artifactId, source]) => {
-      const model = recordValue(designModels[artifactId]);
-      const svgArtifact = recordValue(designSvgArtifacts[artifactId]);
-      const modelId =
-        readNestedText(model, "modelId") || readNestedText(svgArtifact, "modelId");
-      return {
-        diagramKind:
-          readNestedText(model, "diagramKind") ||
-          readNestedText(svgArtifact, "diagramKind") ||
-          scopedDiagramKindFromKey(artifactId),
-        ...(modelId ? { modelId } : {}),
-        source,
-      };
-    },
+    ([artifactId, source]) => ({
+      ...resolveModelArtifactIdentity(artifactId, designModels, designSvgArtifacts),
+      source,
+    }),
   );
 }
 

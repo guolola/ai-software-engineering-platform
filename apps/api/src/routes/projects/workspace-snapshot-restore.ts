@@ -4,6 +4,7 @@ import {
   designInputFingerprint,
   designRecordBelongsToDiagramKinds,
   designTraceabilityTouchesDiagramKinds,
+  modelRecordBelongsToDiagramKinds,
   normalizeSnapshotFingerprint,
   snapshotInputFingerprint,
   isLegacyCodeSnapshot,
@@ -401,6 +402,7 @@ function applySnapshotToWorkspaceState(
         ...clearDesignScopedRecords(
           recordValue(next.designInputFingerprints),
           successfulAffectedDesignDiagrams,
+          recordValue(state.designModels),
         ),
         ...Object.fromEntries(
           Object.keys(affectedDesignModelMap).map((modelId) => [
@@ -413,6 +415,7 @@ function applySnapshotToWorkspaceState(
         ...clearDesignScopedRecords(
           recordValue(next.designPlantUml),
           successfulAffectedDesignDiagrams,
+          recordValue(state.designModels),
         ),
         ...keepDesignScopedRecords(
           designRecords.plantUmlMap,
@@ -424,6 +427,7 @@ function applySnapshotToWorkspaceState(
         ...clearDesignScopedRecords(
           recordValue(next.designSvgArtifacts),
           successfulAffectedDesignDiagrams,
+          recordValue(state.designModels),
         ),
         ...keepDesignScopedRecords(
           designRecords.svgMap,
@@ -435,6 +439,7 @@ function applySnapshotToWorkspaceState(
       recordValue(next.designDiagramErrors),
       snapshot.diagramErrors,
       affectedForErrors,
+      recordValue(state.designModels),
     );
     next.selectedDiagramTypes = [];
     if (canMergeRequirementContextFromSnapshot) {
@@ -568,8 +573,8 @@ function applySnapshotToWorkspaceState(
   ]);
   if (successfulAffected.length > 0) {
     next.plantUml = {
-      ...clearScopedRecords(recordValue(next.plantUml), successfulAffected),
-      ...keepScopedRecords(records.plantUmlMap, successfulAffected),
+      ...clearScopedRecords(recordValue(next.plantUml), successfulAffected, recordValue(state.models)),
+      ...keepScopedRecords(records.plantUmlMap, successfulAffected, records.modelMap),
     };
     next.svgArtifacts = {
       ...clearScopedRecords(recordValue(next.svgArtifacts), successfulAffected),
@@ -580,6 +585,7 @@ function applySnapshotToWorkspaceState(
     recordValue(next.diagramErrors),
     snapshot.diagramErrors,
     affected,
+    recordValue(state.models),
   );
   next.diagramVersions = {
     ...recordValue(next.diagramVersions),
@@ -726,79 +732,54 @@ function clearAndMergeDiagramErrors<T extends string>(
   current: Record<string, unknown>,
   incoming: Partial<Record<T, unknown>>,
   affected: readonly T[],
+  models: Record<string, unknown> = {},
 ) {
-  const next = { ...current };
-  for (const diagram of affected) {
-    delete next[diagram];
-    for (const key of Object.keys(next)) {
-      if (key.startsWith(`${diagram}:`)) {
-        delete next[key];
-      }
-    }
-  }
+  const next = Object.fromEntries(Object.entries(current).filter(([key, value]) =>
+    !modelRecordBelongsToDiagramKinds(key, value, affected, models)));
   return { ...next, ...incoming };
 }
 
-function clearScopedRecords(
-  current: Record<string, unknown>,
+function clearScopedRecords<T>(
+  current: Record<string, T>,
   affected: readonly string[],
+  models: Record<string, unknown> = {},
 ) {
-  const affectedSet = new Set(affected);
   return Object.fromEntries(
-    Object.entries(current).filter(([key, value]) => {
-      if (affectedSet.has(key)) return false;
-      for (const diagram of affected) {
-        if (key.startsWith(`${diagram}:`)) {
-          return false;
-        }
-      }
-      const diagramKind = readNestedString(value, ["diagramKind"]);
-      return !diagramKind || !affectedSet.has(diagramKind);
-    }),
-  );
+    Object.entries(current).filter(([key, value]) =>
+      !modelRecordBelongsToDiagramKinds(key, value, affected, models)),
+  ) as Record<string, T>;
 }
 
 function keepScopedRecords<T>(
   current: Record<string, T>,
   affected: readonly string[],
+  models: Record<string, unknown> = {},
 ) {
-  const affectedSet = new Set(affected);
   return Object.fromEntries(
-    Object.entries(current).filter(([key, value]) => {
-      if (affectedSet.has(key)) return true;
-      for (const diagram of affected) {
-        if (key.startsWith(`${diagram}:`)) {
-          return true;
-        }
-      }
-      const diagramKind = readNestedString(value, ["diagramKind"]);
-      return Boolean(diagramKind && affectedSet.has(diagramKind));
-    }),
+    Object.entries(current).filter(([key, value]) =>
+      modelRecordBelongsToDiagramKinds(key, value, affected, models)),
   ) as Record<string, T>;
 }
 
 function clearDesignScopedRecords<T>(
   current: Record<string, T>,
   affected: readonly DesignDiagramKind[],
+  models: Record<string, unknown> = {},
 ) {
   return Object.fromEntries(
-    Object.entries(current).filter(
-      ([key, value]) =>
-        !designRecordBelongsToDiagramKinds(key, value, affected),
-    ),
-  );
+    Object.entries(current).filter(([key, value]) =>
+      !modelRecordBelongsToDiagramKinds(key, value, affected, models)),
+  ) as Record<string, T>;
 }
 
 function keepDesignScopedRecords<T>(
   current: Record<string, T>,
   affected: readonly DesignDiagramKind[],
-  modelsById: Record<string, unknown> = {},
+  models: Record<string, unknown> = {},
 ) {
-  // PlantUML values are strings; resolve custom IDs through the model's explicit diagram kind.
   return Object.fromEntries(
     Object.entries(current).filter(([key, value]) =>
-      designRecordBelongsToDiagramKinds(key, modelsById[key] ?? value, affected),
-    ),
+      modelRecordBelongsToDiagramKinds(key, value, affected, models)),
   ) as Record<string, T>;
 }
 

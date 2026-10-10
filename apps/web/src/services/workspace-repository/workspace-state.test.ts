@@ -189,6 +189,28 @@ function createPendingCandidate(
 }
 
 describe("applySnapshotToWorkspace", () => {
+  it.each(["requirements", "design"])("replaces custom-ID sources with their models during %s snapshot recovery", (stage) => {
+    const design = stage === "design";
+    const oldModel = { ...(design ? tableDesignModel() : useCaseModel()), modelId: "custom-old" };
+    const newModel = { ...oldModel, modelId: "custom-new" };
+    const workspace = createEmptyWorkspace();
+    const modelField = design ? "designModels" : "models";
+    const sourceField = design ? "designPlantUml" : "plantUml";
+    const errorField = design ? "designDiagramErrors" : "diagramErrors";
+    Object.assign(workspace, {
+      [modelField]: { "custom-old": oldModel },
+      [sourceField]: { "custom-old": "old-source", unrelated: "keep-source" },
+      [errorField]: { "custom-old": { stage: "render_svg", error: { code: "RUN_RENDER_FAILED", category: "internal", message: "old-error", retryable: true } } },
+    });
+    const snapshot = design
+      ? createDesignSnapshot({ selectedDiagrams: ["table"], requestedDiagrams: ["table"], models: [newModel as DesignDiagramModelSpec], plantUml: [{ diagramKind: "table", modelId: "custom-new", source: "new-source" }] })
+      : createSnapshot({ models: [newModel as DiagramModelSpec], plantUml: [{ diagramKind: "usecase", modelId: "custom-new", source: "new-source" }] });
+    const merged = applySnapshotToWorkspace(workspace, snapshot);
+    expect(merged[modelField]).not.toHaveProperty("custom-old");
+    expect(merged[sourceField]).toEqual({ "custom-new": "new-source", unrelated: "keep-source" });
+    expect(merged[errorField]).not.toHaveProperty("custom-old");
+  });
+
   it("keeps requirement run targets out of workspace draft selection", () => {
     const workspace: WorkspaceRecord = {
       ...createEmptyWorkspace(),

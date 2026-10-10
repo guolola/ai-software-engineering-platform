@@ -23,6 +23,7 @@ export * from "./documents.js";
 export * from "./fingerprints.js";
 export * from "./feasibility.js";
 export * from "./models.js";
+export * from "./model-records.js";
 export * from "./model-semantics.js";
 export * from "./provider-configs.js";
 export * from "./projects.js";

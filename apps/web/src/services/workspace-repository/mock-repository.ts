@@ -2,6 +2,8 @@
 import {
   designRecordBelongsToDiagramKinds,
   designTraceabilityTouchesDiagramKinds,
+  modelRecordBelongsToDiagramKinds,
+  resolveModelArtifactIdentity,
   
   type DesignRunSnapshot,
   type DesignSvgArtifact,
@@ -315,10 +317,10 @@ export function createMockWorkspaceRepository(
           ...workspace.requirementModelTraceability,
         ],
         plantUml: Object.entries(workspace.plantUml).map(
-          ([diagramKind, source]) => ({
-            diagramKind: diagramKind as DiagramType,
-            source,
-          }),
+          ([artifactId, source]) => {
+            const identity = resolveModelArtifactIdentity(artifactId, workspace.models, workspace.svgArtifacts);
+            return { ...identity, diagramKind: identity.diagramKind as DiagramType, source };
+          },
         ),
         svgArtifacts: Object.values(workspace.svgArtifacts),
         diagramErrors: workspace.diagramErrors,
@@ -356,22 +358,18 @@ export function createMockWorkspaceRepository(
       const existingDesignPlantUml = Object.entries(workspace.designPlantUml)
         .filter(
           ([artifactId, source]) =>
-            !designRecordBelongsToDiagramKinds(
+            !modelRecordBelongsToDiagramKinds(
               artifactId,
               { modelId: artifactId, source },
               replacingDiagrams,
+              workspace.designModels,
             ),
         )
         .map(([artifactId, source]) => {
-          const model = workspace.designModels[artifactId];
-          const svgArtifact = workspace.designSvgArtifacts[artifactId];
-          const diagramKind =
-            model?.diagramKind ??
-            svgArtifact?.diagramKind ??
-            (artifactId as DesignDiagramType);
+          const identity = resolveModelArtifactIdentity(artifactId, workspace.designModels, workspace.designSvgArtifacts);
           return {
-            diagramKind,
-            modelId: model?.modelId ?? svgArtifact?.modelId,
+            ...identity,
+            diagramKind: identity.diagramKind as DesignDiagramType,
             source,
           };
         });
@@ -708,11 +706,11 @@ export function createMockWorkspaceRepository(
           : {
               plantUml: {
                 ...workspace.plantUml,
-                [key as DiagramType]: artifact.plantUmlSource,
+                [key]: artifact.plantUmlSource,
               },
               svgArtifacts: {
                 ...workspace.svgArtifacts,
-                [key as DiagramType]: artifact.svgArtifact as SvgArtifact,
+                [key]: artifact.svgArtifact as SvgArtifact,
               },
             }),
       };
