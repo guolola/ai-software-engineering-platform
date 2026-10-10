@@ -20,10 +20,8 @@ export function implementationSources(input: SourceArtifact[]): SourceArtifact[]
       title: `验收条件 ${id}`,
       payload: { requirement: {
         id, ...(sourceRuleId ? { sourceRuleId } : {}), acceptanceCriteria, status,
-        fieldProvenance: { acceptanceCriteria: {
-          ...(acceptanceProvenance.source ? { source: acceptanceProvenance.source } : {}),
-          ...(acceptanceProvenance.status ? { status: acceptanceProvenance.status } : {}),
-        } },
+        fieldProvenance: acceptanceProvenance.source && acceptanceProvenance.status
+          ? { acceptanceCriteria: { source: acceptanceProvenance.source, status: acceptanceProvenance.status } } : {},
       } },
     }];
   });
@@ -32,7 +30,11 @@ export function implementationSources(input: SourceArtifact[]): SourceArtifact[]
     // Hash-only provenance keeps upstream edits observable without reintroducing their bodies through dependencies.
     const upstreamVersions = artifact.dependencies.filter((id) => !retainedIds.has(id))
       .flatMap((id) => input.filter((source) => source.id === id).map((source) => source.version));
-    const dependencies = artifact.dependencies.filter((id) => retainedIds.has(id) || !input.some((source) => source.id === id));
+    const dependencies = [...new Set([
+      ...artifact.dependencies.filter((id) => retainedIds.has(id) || !input.some((source) => source.id === id)),
+      ...(artifact.stage === "design" ? retained.filter((source) => source.stage === "requirements" &&
+        source.requirementIds.some((id) => artifact.requirementIds.includes(id))).map((source) => source.id) : []),
+    ])].sort();
     const payload = {
       ...artifact.payload,
       ...(upstreamVersions.length ? { upstreamVersions } : {}),

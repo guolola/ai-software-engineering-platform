@@ -296,6 +296,17 @@ test("two users cannot exchange project IDs, tokens, artifact IDs or cursors; li
     ),
   );
 });
+function designWorkspace(summary: string) {
+  return {
+    requirementText: "private-upstream-requirement",
+    designModels: { implementation: {
+      diagramKind: "architecture", modelId: "implementation", title: "实现设计", summary, notes: [], packages: [],
+      components: [{ id: "service", name: "Service" }], relationships: [],
+    } },
+    designPlantUml: { implementation: "@startuml\ncomponent Service\n@enduml" },
+  };
+}
+
 test("large model chunks reassemble exactly and concurrent source changes require refresh", async (t) => {
   const s = await setup();
   t.after(() => s.app.close());
@@ -304,7 +315,7 @@ test("large model chunks reassemble exactly and concurrent source changes requir
     projectId: s.a.id,
     baseVersion: 0,
     updatedByUserId: s.alice.id,
-    state: { requirementText: text },
+    state: designWorkspace(text),
   });
   const service = createMcpToolService(
     s.access,
@@ -319,7 +330,7 @@ test("large model chunks reassemble exactly and concurrent source changes requir
     projectId: s.a.id,
     scope: {},
     expectedContextVersion: context.data.contextVersion,
-    artifactId: "requirements:source",
+    artifactId: "design:implementation",
     expectedVersion: version,
     length: 997,
   });
@@ -331,12 +342,20 @@ test("large model chunks reassemble exactly and concurrent source changes requir
     if (part.data.nextOffset === null) break;
     offset = part.data.nextOffset as number;
   }
-  assert.equal(JSON.parse(buffer).text, text);
+  assert.equal(JSON.parse(buffer).model.summary, text);
+  assert.doesNotMatch(buffer, /private-upstream-requirement/);
+  // Knowing an old source ID cannot bypass the design-only directory through direct artifact reads.
+  for (const artifactId of ["requirements:source", "analysis:borrow"]) {
+    const excluded = await service.get_artifact({ ...input, artifactId, offset: 0 });
+    assert.equal(excluded.status, "refresh_required");
+    assert.doesNotMatch(JSON.stringify(excluded), /private-upstream-requirement/);
+    assert.equal(excluded.data.chunk, undefined);
+  }
   s.authStore.saveProjectWorkspace({
     projectId: s.a.id,
     baseVersion: 1,
     updatedByUserId: s.alice.id,
-    state: { requirementText: "新内容" },
+    state: designWorkspace("新内容"),
   });
   assert.equal((await service.get_artifact(input)).status, "refresh_required");
 });
@@ -570,10 +589,7 @@ test("official SDK v2 client completes discovery and all four tools over HTTP", 
     projectId: s.a.id,
     baseVersion: 0,
     updatedByUserId: s.alice.id,
-    state: {
-      requirementText:
-        "使用 Spring Boot + Vue + MySQL 构建图书管理系统，每人最多借5本。",
-    },
+    state: designWorkspace("使用 Spring Boot + Vue + MySQL 构建图书管理系统，每人最多借5本。"),
   });
   const client = new Client({ name: "platform-acceptance", version: "1" });
   const transport = new StreamableHTTPClientTransport(
@@ -642,10 +658,7 @@ test("official SDK v2 client completes discovery and all four tools over HTTP", 
     projectId: s.a.id,
     baseVersion: 1,
     updatedByUserId: s.alice.id,
-    state: {
-      requirementText:
-        "使用 Spring Boot + Vue + MySQL 构建图书管理系统，每人最多借8本。",
-    },
+    state: designWorkspace("使用 Spring Boot + Vue + MySQL 构建图书管理系统，每人最多借8本。"),
   });
   const updates = (
     await client.callTool({
@@ -846,7 +859,7 @@ test("implementation bundle and verifier use normal paging and source version gu
   const { mcpUpdatesInputSchema, mcpImplementationSnapshotSchema, mcpImplementationReportSchema } = await import("@uml-platform/contracts");
   await s.authStore.saveProjectWorkspace({
     projectId: s.a.id, baseVersion: 0, updatedByUserId: s.alice.id,
-    state: { requirementText: "每名学生最多借5本", rules: [{ id: "BORROW", category: "业务规则", text: "最多5本", relatedDiagrams: ["class"] }] },
+    state: { ...designWorkspace("每名学生最多借5本"), rules: [{ id: "BORROW", category: "业务规则", text: "最多5本", relatedDiagrams: ["class"] }] },
   });
   const service = createMcpToolService(s.access, await s.access.authenticate(s.headers.authorization));
   const scope = { requirementIds: [], artifactIds: [] };
@@ -924,10 +937,10 @@ test("implementation bundle and verifier use normal paging and source version gu
   assert.equal(documentScope.status, "selection_required");
   await s.authStore.saveProjectWorkspace({
     projectId: s.a.id, baseVersion: 1, updatedByUserId: s.alice.id,
-    state: { requirementText: "每名学生最多借8本", rules: [{ id: "BORROW", category: "业务规则", text: "最多8本", relatedDiagrams: ["class"] }] },
+    state: { ...designWorkspace("每名学生最多借8本"), rules: [{ id: "BORROW", category: "业务规则", text: "最多8本", relatedDiagrams: ["class"] }] },
   });
   const changed = await service.check_context_updates(mcpUpdatesInputSchema.parse({ projectId: s.a.id, scope, manifest }));
-  assert.ok((changed.data.changes as any[]).some((entry) => entry.artifactId === "requirements:source" && entry.change === "modified"));
+  assert.ok((changed.data.changes as any[]).some((entry) => entry.artifactId === "design:implementation" && entry.change === "modified"));
   const outdated = await service.get_artifact(mcpArtifactInputSchema.parse({
     projectId: s.a.id, scope, artifactId: "implementation:bundle", expectedContextVersion: contextVersion,
     expectedVersion: directory.find((entry) => entry.id === "implementation:bundle").version.contentHash,

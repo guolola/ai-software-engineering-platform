@@ -14,7 +14,6 @@ import { implementationAcceptanceSchema, implementationSources } from "./impleme
 
 type TaskIssue = McpImplementationTask["issues"][number];
 const list = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
-const strings = (value: unknown): string[] => list(value).filter((item): item is string => typeof item === "string");
 const unique = (values: string[]) => [...new Set(values)].sort();
 const globalSource = (artifact: SourceArtifact) =>
   artifact.id === "feasibility:inputs";
@@ -86,35 +85,6 @@ function sourceIssues(artifact: SourceArtifact): TaskIssue[] {
   return issues;
 }
 
-function qualityIssues(artifact: SourceArtifact, requirementIds: Set<string>): TaskIssue[] {
-  if (artifact.id !== "requirements:review") return [];
-  const issues: TaskIssue[] = [];
-  const add = (code: string, severity: TaskIssue["severity"], message: string) => issues.push({ code, severity, message });
-  const report = record(artifact.payload.qualityReport);
-  const blockers = new Set(strings(report.blockingIssueIds));
-  const reportedIssues = list(report.issues).map(record);
-  const applies = (id: unknown) => typeof id !== "string" || requirementIds.has(id);
-  for (const issue of reportedIssues) {
-    if (!applies(issue.requirementId)) continue;
-    const blocking = issue.blocksDownstream === true || blockers.has(String(issue.id));
-    add(`requirement-quality-${String(issue.code ?? "issue")}`, blocking ? "blocking" : "warning", `需求质量问题 ${String(issue.id)}：${String(issue.message)}`);
-  }
-  for (const id of blockers)
-    if (!reportedIssues.some((issue) => issue.id === id))
-      add("requirement-quality-unresolved", "blocking", `质量报告阻断项 ${id} 缺少详情，无法确认影响范围。`);
-  if (report.status === "blocked" && !blockers.size && !reportedIssues.some((issue) => issue.blocksDownstream === true))
-    add("requirement-quality-blocked", "blocking", `需求质量报告已阻断，但未提供具体阻断项：${String(report.summary ?? "请检查报告")}`);
-  if (strings(report.reviewRequiredRequirementIds).some((id) => requirementIds.has(id)))
-    add("requirement-review-required", "warning", "质量报告要求人工确认本任务关联需求。");
-  for (const conflict of list(artifact.payload.conflicts).map(record))
-    if (conflict.status !== "resolved" && strings(conflict.requirementIds).some((id) => requirementIds.has(id)))
-      add("requirement-conflict", "blocking", `未解决的需求冲突 ${String(conflict.id)}：${String(conflict.description)}`);
-  for (const assumption of list(artifact.payload.assumptions).map(record))
-    if (assumption.status !== "accepted" && applies(assumption.requirementId))
-      add("requirement-assumption-unconfirmed", "warning", `假设 ${String(assumption.id)} 尚未接受，不能作为已确认要求：${String(assumption.text)}`);
-  return issues;
-}
-
 export function buildImplementationTasks(input: SourceArtifact[], scope?: McpScope): McpImplementationTask[] {
   const artifacts = implementationSources(input.filter((artifact) => artifact.stage !== "implementation"));
   const byId = new Map(artifacts.map((artifact) => [artifact.id, artifact]));
@@ -126,10 +96,21 @@ export function buildImplementationTasks(input: SourceArtifact[], scope?: McpSco
     const parsed = implementationAcceptanceSchema.safeParse(artifact.payload.requirement);
     return artifact.stage === "requirements" && parsed.success ? [{ artifact, requirement: parsed.data }] : [];
   });
+  const coveredDesignIds = new Set(artifacts.filter((artifact) => artifact.stage === "design" &&
+    atomic.some(({ artifact: acceptance }) => acceptance.requirementIds.some((id) => artifact.requirementIds.includes(id))))
+    .map((artifact) => artifact.id));
+  // Shared design dependencies belong to the linked task rather than becoming duplicate coding assignments.
+  const cover = (id: string) => {
+    for (const dependency of byId.get(id)?.dependencies ?? [])
+      if (byId.get(dependency)?.stage === "design" && !coveredDesignIds.has(dependency)) {
+        coveredDesignIds.add(dependency);
+        cover(dependency);
+      }
+  };
+  for (const id of [...coveredDesignIds]) cover(id);
   const seeds = [
     ...atomic.map(({ artifact, requirement }) => ({ artifact, title: `实现设计：${requirement.id}`, criteria: requirement.acceptanceCriteria })),
-    ...artifacts.filter((artifact) => artifact.stage === "design" &&
-      !atomic.some(({ artifact: acceptance }) => acceptance.requirementIds.some((id) => artifact.requirementIds.includes(id))))
+    ...artifacts.filter((artifact) => artifact.stage === "design" && !coveredDesignIds.has(artifact.id))
       .map((artifact) => ({ artifact, title: `实现设计：${artifact.title}`, criteria: [] as string[] })),
   ];
 
@@ -156,7 +137,7 @@ export function buildImplementationTasks(input: SourceArtifact[], scope?: McpSco
     };
     for (const id of [...selected]) visit(id);
     const sources = artifacts.filter((artifact) => selected.has(artifact.id));
-    for (const source of sources) issues.push(...sourceIssues(source), ...qualityIssues(source, requirementIds));
+    for (const source of sources) issues.push(...sourceIssues(source));
 
     const validateRef = (value: unknown, stage: "analysis" | "design", owner: string) => {
       const parsed = modelElementRefSchema.safeParse(value);

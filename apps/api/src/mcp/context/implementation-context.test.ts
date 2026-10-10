@@ -1,4 +1,4 @@
-// Exercises neutral extraction, dependency scopes, uncertain provenance, and source-only change detection.
+// Verifies design-led coding sources, upstream privacy, scopes and source-only change detection.
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -61,8 +61,6 @@ function fixture() {
     requirementInputFingerprint: "",
     diagramInputFingerprints: { borrow: "" },
     designInputFingerprints: { loan: "" },
-    
-    
     providerConfig: { apiKey: "secret" },
   };
   state.requirementInputFingerprint = snapshotInputFingerprint({
@@ -76,216 +74,99 @@ function fixture() {
   );
   return state;
 }
-test("keeps student stacks and strips prototype runtime/provider data with a deterministic content hash", () => {
-  const context = buildContext(fixture(), whole);
+test("coding context keeps full designs and engineering constraints without upstream bodies", () => {
+  const state = { ...fixture(), feasibilityInputs: { targetEnvironment: "Spring Boot + Vue + MySQL", teamSkills: "Java" } };
+  const before = structuredClone(state);
+  const context = buildContext(state, whole);
   const text = JSON.stringify(context);
   assert.match(text, /Spring Boot/);
-  assert.match(text, /Vue/);
-  assert.match(text, /MySQL/);
-  assert.doesNotMatch(
-    text,
-    /Sandpack|onlyFrontend|privateKey|do-not-return|apiKey/,
-  );
+  assert.ok(context.artifacts.some((artifact) => artifact.id === "design:loan"));
+  assert.ok(context.artifacts.every((artifact) => artifact.stage !== "analysis"));
+  assert.ok(!context.artifacts.some((artifact) => artifact.id.startsWith("rule:") || artifact.id === "requirements:source"));
+  assert.doesNotMatch(text, /每名学生最多借阅5本|apiKey|Sandpack/);
+  assert.deepEqual(state, before);
   assert.equal(contentHash({ b: 2, a: 1 }), contentHash({ a: 1, b: 2 }));
-  assert.equal(
-    context.artifacts.find((a) => a.id === "analysis:borrow")?.version
-      .freshness,
-    "current",
-  );
-  assert.equal(
-    context.artifacts.find((a) => a.id === "analysis:borrow")?.reviewStatus,
-    "unknown",
-  );
-  assert.equal(
-    context.artifacts.find((a) => a.id === "analysis:duplicate")?.version
-      .freshness,
-    "unknown",
-  );
-  for (const stack of ["React", "Java", "Python FastAPI"]) {
-    const state = fixture();
-    state.requirementText = `用户明确要求 ${stack}`;
-    assert.match(JSON.stringify(buildContext(state, whole)), new RegExp(stack));
-  }
-});
-test("document data in saved workspaces cannot enter or invalidate MCP sources", () => {
-  const state = fixture();
-  const initial = buildContext(state, whole);
-  const withDocuments = buildContext({
-    ...state,
-    documents: [{ id: "private-doc", title: "private-document-title", paragraphs: ["private-document-body"] }],
-    documentLibrary: { version: 2, readStatus: "unavailable" },
-  }, whole);
-  assert.deepEqual(withDocuments, initial);
-  assert.doesNotMatch(JSON.stringify(withDocuments), /document:|private-document/);
 });
 
-test("functional scopes follow model identities through analysis and design, not diagram kind alone", () => {
-  const context = buildContext(fixture(), {
-    requirementIds: ["BORROW"],
-    artifactIds: [],
+test("acceptance projection retains test evidence, IDs and status but drops requirement and provenance text", () => {
+  const state = { ...fixture(), requirementBaseline: { requirements: [{
+    id: "BORROW-ATOMIC", sourceRuleId: "BORROW", sourceFragment: "private-original-fragment", type: "functional",
+    actor: "private-actor", subject: "系统", action: "private-action", object: "书", condition: "private-condition",
+    outcome: "private-outcome", confidence: 1, status: "accepted", criticality: "high",
+    acceptanceCriteria: ["第5本可借，第6本拒绝"], fieldProvenance: {
+      acceptanceCriteria: { source: "source-text", status: "accepted", originalValue: "private-provenance", rationale: "private-rationale" },
+    },
+  }] } };
+  const context = buildContext(state, whole);
+  const acceptance = context.artifacts.find((artifact) => artifact.id === "requirement:BORROW-ATOMIC")!;
+  assert.deepEqual(acceptance.payload.requirement, {
+    id: "BORROW-ATOMIC", sourceRuleId: "BORROW", acceptanceCriteria: ["第5本可借，第6本拒绝"], status: "accepted",
+    fieldProvenance: { acceptanceCriteria: { source: "source-text", status: "accepted" } },
   });
-  assert.ok(context.artifacts.some((a) => a.id === "design:loan"));
-  assert.ok(!context.artifacts.some((a) => a.id === "analysis:duplicate"));
-  assert.ok(context.issues.some((issue) => issue.includes("缺少需求追踪")));
-  const artifactScope = buildContext(fixture(), {
-    requirementIds: [],
-    artifactIds: ["design:loan"],
-  });
-  assert.ok(artifactScope.artifacts.some((a) => a.id === "rule:BORROW"));
+  assert.doesNotMatch(JSON.stringify(context), /private-original|private-actor|private-action|private-condition|private-outcome|private-provenance|private-rationale/);
 });
-test("UI changes do not invalidate context; upstream changes stale models and deletion remains visible", () => {
+
+test("functional and design scopes preserve trace IDs without bringing back requirement models", () => {
+  for (const scope of [{ requirementIds: ["BORROW"], artifactIds: [] }, { requirementIds: [], artifactIds: ["design:loan"] }]) {
+    const context = buildContext(fixture(), scope);
+    assert.ok(context.artifacts.some((artifact) => artifact.id === "design:loan"));
+    assert.ok(context.artifacts.every((artifact) => artifact.stage !== "analysis" && !artifact.id.startsWith("rule:")));
+    assert.deepEqual(context.unknownIds, []);
+    const design = context.artifacts.find((artifact) => artifact.id === "design:loan")!;
+    assert.ok((design.payload.upstreamVersions as { artifactId: string }[]).some((version) => version.artifactId === "analysis:borrow"));
+    assert.ok(!design.dependencies.some((id) => id.startsWith("analysis:")));
+  }
+  assert.deepEqual(buildContext(fixture(), { requirementIds: [], artifactIds: ["analysis:borrow"] }).unknownIds, ["analysis:borrow"]);
+});
+
+test("internal upstream changes still invalidate design freshness and old upstream manifests are removed", () => {
   const state = fixture();
   const before = buildContext(state, whole);
-  assert.equal(
-    buildContext(
-      {
-        ...state,
-        activeTab: "code",
-        progress: 0.5,
-        svgArtifacts: { random: "svg" },
-      },
-      whole,
-    ).version,
-    before.version,
-  );
   state.rules[0].text = "每名学生最多借阅8本";
   const after = buildContext(state, whole);
-  assert.equal(
-    after.artifacts.find((a) => a.id === "analysis:borrow")?.version.freshness,
-    "stale",
-  );
-  assert.equal(
-    after.artifacts.find((a) => a.id === "design:loan")?.version.freshness,
-    "stale",
-  );
-  assert.ok(
-    compareManifest(before.manifest, after.manifest).some(
-      (change) =>
-        change.artifactId === "rule:BORROW" && change.change === "modified",
-    ),
-  );
-  assert.ok(
-    compareManifest(before.manifest, buildContext({}, whole).manifest).every(
-      (change) => change.change === "deleted",
-    ),
-  );
+  assert.equal(after.artifacts.find((artifact) => artifact.id === "design:loan")?.version.freshness, "stale");
+  assert.ok(compareManifest(before.manifest, after.manifest).some((change) => change.artifactId === "design:loan"));
+  const legacy = { artifactId: "analysis:borrow", contentHash: "old", inputFingerprint: null, freshness: "unknown" as const };
+  assert.ok(compareManifest([...before.manifest, legacy], after.manifest).some((change) => change.artifactId === legacy.artifactId && change.change === "deleted"));
+  assert.doesNotMatch(JSON.stringify(after), /每名学生最多借阅8本/);
 });
-test("saved review dictionaries and user implementation constraints retain their provenance", () => {
-  const state = {
-    ...fixture(),
-    autoGeneratedUpstreamReviews: {
-      generated: {
-        artifactId: "borrow",
-        artifactType: "requirement-model",
-        status: "pending",
-      },
-    },
-    feasibilityInputs: {
-      targetEnvironment: "Python FastAPI + PostgreSQL",
-      teamSkills: "Python",
-      school: "private-school",
-    },
-  };
-  const context = buildContext(state, whole);
-  assert.equal(
-    context.artifacts.find((a) => a.id === "analysis:borrow")?.reviewStatus,
-    "pending",
-  );
-  assert.match(JSON.stringify(context), /Python FastAPI/);
-  assert.doesNotMatch(JSON.stringify(context), /private-school/);
-});
-test("dirty source, invalid models and absent fingerprints stay explicitly uncertain without mutation", () => {
-  const state = {
-    ...fixture(),
-    manualModelEditStatus: { borrow: { status: "dirty" } },
-    models: { borrow: { diagramKind: "usecase", title: "incomplete" } },
-  };
-  const snapshot = structuredClone(state);
-  const context = buildContext(state, whole);
-  assert.equal(
-    context.artifacts.find((a) => a.id === "analysis:borrow")
-      ?.sourceConsistency,
-    "conflict",
-  );
-  assert.ok(
-    context.artifacts
-      .find((a) => a.id === "analysis:borrow")
-      ?.issues.some((issue) => issue.includes("结构化模型缺失")),
-  );
-  assert.deepEqual(state, snapshot);
-  assert.ok(buildContext({}, whole).issues.length);
-});
-test("cycles terminate and same-kind models without IDs preserve candidate dependencies", () => {
+
+test("UI and document changes cannot enter or invalidate coding inputs", () => {
   const state = fixture();
-  state.designModels = {
-    loan: state.designModels.loan,
-    second: { ...state.designModels.loan, modelId: "second" },
-  } as typeof state.designModels;
-  const ref = (id: string) => ({
-    diagramKind: "class",
-    modelId: id,
-    elementId: id,
-    elementKind: "class",
-    label: id,
-  });
-  state.designModelTraceability = [
-    {
-      source: {
-        diagramKind: "usecase",
-        elementId: "borrow",
-        elementKind: "usecase",
-        label: "borrow",
-      },
-      targets: [ref("loan")],
-      upstreamDesignRefs: [ref("second")],
-    },
-    {
-      source: {
-        diagramKind: "usecase",
-        elementId: "borrow",
-        elementKind: "usecase",
-        label: "borrow",
-      },
-      targets: [ref("second")],
-      upstreamDesignRefs: [ref("loan")],
-    },
-  ] as typeof state.designModelTraceability;
-  const context = buildContext(state, {
-    requirementIds: [],
-    artifactIds: ["design:loan"],
-  });
-  assert.ok(context.artifacts.some((a) => a.id === "design:second"));
-  assert.ok(context.artifacts.some((a) => a.id === "analysis:duplicate"));
+  const initial = buildContext(state, whole);
+  assert.deepEqual(buildContext({ ...state, activeTab: "code", progress: 0.5,
+    documents: [{ title: "private-document", paragraphs: ["private-body"] }], documentLibrary: { version: 2 },
+  }, whole), initial);
 });
-test("embedded domain requirement IDs and separately saved quality reports remain visible", () => {
-  const state = {
-    ...fixture(),
-    designModels: {
-      architecture: {
-        diagramKind: "architecture",
-        title: "Architecture",
-        summary: "Modules",
-        notes: [],
-        packages: [],
-        components: [
-          { id: "loan", name: "Loan", sourceRequirementIds: ["BORROW"] },
-        ],
-        relationships: [],
-      },
-    },
-    requirementQualityReport: {
-      runId: "saved-run",
-      status: "pending-review",
-      summary: "需要确认借阅次数",
-      issues: [],
-      blockingIssueIds: [],
-      reviewRequiredRequirementIds: ["BORROW"],
-    },
-  };
-  const context = buildContext(state, {
-    requirementIds: ["BORROW"],
-    artifactIds: [],
-  });
-  assert.ok(context.artifacts.some((a) => a.id === "design:architecture"));
-  assert.match(JSON.stringify(context), /需要确认借阅次数/);
+
+test("saved design review and dirty design state remain explicit without mutating the workspace", () => {
+  const state = { ...fixture(), autoGeneratedUpstreamReviews: { generated: {
+    artifactId: "loan", artifactType: "design-model", status: "pending",
+  } }, manualModelEditStatus: { loan: { status: "dirty" } } };
+  const before = structuredClone(state);
+  const design = buildContext(state, whole).artifacts.find((artifact) => artifact.id === "design:loan")!;
+  assert.equal(design.reviewStatus, "pending");
+  assert.equal(design.sourceConsistency, "conflict");
+  assert.deepEqual(state, before);
+});
+
+test("design dependency cycles terminate without exporting analysis bodies", () => {
+  const state = fixture();
+  state.designModels = { loan: state.designModels.loan, second: { ...state.designModels.loan, modelId: "second" } } as typeof state.designModels;
+  const ref = (id: string) => ({ diagramKind: "class", modelId: id, elementId: id, elementKind: "class", label: id });
+  const source = { diagramKind: "usecase", elementId: "borrow", elementKind: "usecase", label: "borrow" };
+  state.designModelTraceability = [
+    { source, targets: [ref("loan")], upstreamDesignRefs: [ref("second")] },
+    { source, targets: [ref("second")], upstreamDesignRefs: [ref("loan")] },
+  ] as typeof state.designModelTraceability;
+  const context = buildContext(state, { requirementIds: [], artifactIds: ["design:loan"] });
+  assert.ok(context.artifacts.some((artifact) => artifact.id === "design:second"));
+  assert.ok(context.artifacts.every((artifact) => artifact.stage !== "analysis"));
+});
+
+test("missing design explains the prerequisite and does not expose a raw requirement fallback", () => {
+  const context = buildContext({ requirementText: "从需求自行设计", rules: fixture().rules }, whole);
+  assert.deepEqual(context.artifacts, []);
+  assert.ok(context.issues.some((issue) => issue.includes("请先在平台补齐设计")));
+  assert.doesNotMatch(JSON.stringify(context), /从需求自行设计/);
 });

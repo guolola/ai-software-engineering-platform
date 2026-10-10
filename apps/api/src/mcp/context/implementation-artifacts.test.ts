@@ -190,7 +190,8 @@ test("distributed snapshot and template bind real saved sources without recursiv
   assert.ok(JSON.stringify(first.bundle.payload).length < legacyBundleChars);
   const incidentalUi = withImplementationArtifacts(buildContext({ ...state, activeTab: "design", progress: 0.8 }, whole), projectId);
   assert.equal(incidentalUi.version, first.context.version);
-  assert.ok(first.snapshot.manifest.some((source) => source.artifactId === "requirements:source" && source.freshness === "unknown"));
+  assert.ok(first.snapshot.manifest.every((source) => source.artifactId !== "requirements:source" && !source.artifactId.startsWith("analysis:")));
+  assert.doesNotMatch(JSON.stringify(first.original), /sourceFragment|\"text\":/);
 });
 
 test("partial request scope keeps shared-rule dependencies as sources without adding implementation tasks", () => {
@@ -204,7 +205,7 @@ test("partial request scope keeps shared-rule dependencies as sources without ad
   assert.ok(source.snapshot.tasks[0].sourceArtifactIds.includes("requirement:RETURN"));
 });
 
-test("saved five-book requirement verifies real code and tests despite explicitly unknown raw-source freshness", async (t) => {
+test("saved five-book design and acceptance verify real code and tests without raw requirement bodies", async (t) => {
   const source = distributed();
   const local = await localRepository(t, implementationVerifierSource);
   await writeImplementation(local.root, 5, 5);
@@ -213,7 +214,7 @@ test("saved five-book requirement verifies real code and tests despite explicitl
   assert.equal(result.overall, "verified", JSON.stringify(result));
   assert.equal(result.verificationAuthority, "local-execution");
   assert.deepEqual(result.entries[0].checks.map((check) => check.status), ["passed", "passed"]);
-  assert.ok(result.entries[0].issues.some((issue) => issue.code === "unknown_freshness" && issue.severity === "warning"));
+  assert.ok(!result.entries[0].issues.some((issue) => issue.code === "unknown_freshness"));
   await writeImplementation(local.root, 6, 5);
   const incorrectReport = await implementedReport(local.root, source);
   const incorrect = await local.verify({ root: local.root, snapshot: source.snapshot, report: incorrectReport, runChecks: true });

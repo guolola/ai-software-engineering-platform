@@ -48,11 +48,10 @@ test("atomic tasks replace their linked rules and preserve source-backed, stable
   const first = requirement("BORROW", ["允许第5本", "拒绝第6本", "允许第5本"], "RULE");
   const sources = [first, requirement("RETURN", ["释放借阅额度"], "RULE"), rule("RULE", ["RULE", "BORROW", "RETURN"]), rule("OTHER")];
   const tasks = buildImplementationTasks(sources);
-  assert.deepEqual(tasks.map((task) => task.id), ["implement:requirement:BORROW", "implement:requirement:RETURN", "implement:rule:OTHER"]);
+  assert.deepEqual(tasks.map((task) => task.id), ["implement:requirement:BORROW", "implement:requirement:RETURN"]);
   assert.equal(tasks[0].acceptanceCriteria.length, 2);
   assert.ok(tasks[0].acceptanceCriteria.every((criterion) => criterion.sourceArtifactId === first.id));
-  assert.equal(tasks[2].acceptanceCriteria.length, 0);
-  assert.ok(blocking(tasks[2]).some((issue) => issue.code === "acceptance-criteria-missing"));
+  assert.ok(tasks.every((task) => blocking(task).some((issue) => issue.code === "design-model-missing")));
   const reordered = buildImplementationTasks([requirement("BORROW", ["拒绝第6本", "允许第5本"], "RULE")])[0];
   assert.deepEqual(reordered.acceptanceCriteria, tasks[0].acceptanceCriteria);
   for (const task of tasks) assert.equal(mcpImplementationTaskSchema.safeParse(task).success, true);
@@ -90,10 +89,12 @@ test("linked sources follow a dependency closure while missing sources never bec
   ];
   const testCase = artifact("test:limit", "tests", { testCase: { id: "limit" } }, { requirementIds: ["BORROW"] });
   const sources = [requirement(), analysis, design, shared, unrelated, testCase, ...globals];
-  const task = buildImplementationTasks(sources)[0];
+  const task = buildImplementationTasks(sources).find((entry) => entry.id === "implement:requirement:BORROW")!;
   assert.ok(task.sourceArtifactIds.includes(shared.id));
   assert.ok(task.sourceArtifactIds.includes(testCase.id));
-  for (const source of globals) assert.ok(task.sourceArtifactIds.includes(source.id));
+  assert.ok(task.sourceArtifactIds.includes("feasibility:inputs"));
+  assert.ok(!task.sourceArtifactIds.includes("analysis:business"));
+  for (const source of globals.filter((entry) => entry.id !== "feasibility:inputs")) assert.ok(!task.sourceArtifactIds.includes(source.id));
   assert.ok(!task.sourceArtifactIds.includes(unrelated.id));
   assert.ok(!task.sourceArtifactIds.includes("design:deleted"));
   assert.ok(blocking(task).some((issue) => issue.code === "source-dependency-missing"));
@@ -139,35 +140,37 @@ test("ambiguous same-kind traces remain explicit rather than choosing a model by
   const design = modelArtifact("loan", "design", "loan-service");
   design.payload.traceability = [{ source: ref(undefined, "borrow-case"), targets: [ref("loan", "loan-service")], reviewStatus: "confirmed" }];
   const task = buildImplementationTasks([requirement(), first, second, design])[0];
-  assert.ok(task.issues.some((issue) => issue.code === "trace-model-ambiguous" && issue.severity === "warning"));
+  assert.ok(!task.sourceArtifactIds.some((id) => id.startsWith("analysis:")));
   assert.equal(blocking(task).length, 0);
 });
 
-test("quality blockers apply only to linked requirements unless they are global or unresolved", () => {
+test("upstream requirement quality stays on the platform while coding validates design and acceptance", () => {
   const quality = artifact("requirements:review", "requirements", {
     qualityReport: {
       status: "blocked", summary: "需要澄清", blockingIssueIds: ["borrow-limit"],
       issues: [{ id: "borrow-limit", requirementId: "BORROW", code: "ambiguity", message: "次数不明确", blocksDownstream: false }],
     },
   });
-  const tasks = buildImplementationTasks([requirement(), requirement("RETURN"), quality]);
-  assert.ok(blocking(tasks[0]).some((issue) => issue.code === "requirement-quality-ambiguity"));
+  const design = modelArtifact("loan", "design", "loan-service", ["BORROW", "RETURN"]);
+  const tasks = buildImplementationTasks([requirement(), requirement("RETURN"), quality, design]);
+  assert.ok(!tasks[0].issues.some((issue) => issue.code.startsWith("requirement-quality")));
   assert.equal(blocking(tasks[1]).length, 0);
   const global = structuredClone(quality);
   global.payload.qualityReport = { blockingIssueIds: ["unknown-blocker"], issues: [] };
-  assert.ok(blocking(buildImplementationTasks([requirement(), global])[0]).some((issue) => issue.code === "requirement-quality-unresolved"));
+  assert.equal(blocking(buildImplementationTasks([requirement(), global, design])[0]).length, 0);
 });
 
-test("raw requirements create a guarded fallback but absent sources create no invented task", () => {
+test("raw requirements do not create coding tasks and unlinked designs retain explicit acceptance gaps", () => {
   const raw = artifact("requirements:source", "requirements", { text: "实现图书借阅" }, { reviewStatus: "unknown" });
   raw.version.freshness = "unknown";
-  const task = buildImplementationTasks([raw])[0];
-  assert.equal(task.id, "implement:requirements:source");
+  assert.deepEqual(buildImplementationTasks([raw]), []);
+  const task = buildImplementationTasks([modelArtifact("orphan", "design")])[0];
+  assert.equal(task.id, "implement:design:orphan");
   assert.deepEqual(task.acceptanceCriteria, []);
-  assert.deepEqual(task.requirementIds, []);
+  assert.deepEqual(task.requirementIds, ["BORROW"]);
   assert.deepEqual(blocking(task).map((issue) => issue.code), ["acceptance-criteria-missing"]);
   assert.deepEqual(buildImplementationTasks([]), []);
-  assert.deepEqual(buildImplementationTasks([modelArtifact("orphan", "design")]), []);
+  assert.match(task.guidance.join(" "), /不从原始需求自行设计/);
 });
 
 test("context functional scopes generate only their requirements and never mutate saved inputs", () => {
@@ -209,7 +212,9 @@ test("explicit requirement scope does not authorize requirements discovered thro
   const second = requirement("SECOND", ["完成第二个功能"], "SHARED");
   const shared = rule("SHARED", ["SHARED", "FIRST", "SECOND"]);
   shared.dependencies = [first.id, second.id];
-  const task = buildImplementationTasks([first, second, shared], { requirementIds: ["FIRST"], artifactIds: [] });
+  const design = modelArtifact("first", "design", "first-service", ["FIRST"]);
+  design.dependencies = [first.id, second.id];
+  const task = buildImplementationTasks([first, second, shared, design], { requirementIds: ["FIRST"], artifactIds: [] });
   assert.deepEqual(task.map((entry) => entry.id), ["implement:requirement:FIRST"]);
   assert.ok(task[0].sourceArtifactIds.includes(second.id));
   assert.deepEqual(task[0].acceptanceCriteria.map((criterion) => criterion.text), ["完成首个功能"]);

@@ -161,7 +161,7 @@ export function createMcpToolService(
         );
       return result(
         "ok",
-        "请读完目录分页和需要的产物分段；缺失图种不妨碍实现明确功能。",
+        "请读完完整设计、验收条件与工程约束的目录分页和产物分段；按设计实现，缺少设计时先在平台补齐。",
         {
           project: context.project,
           scope: context.scope,
