@@ -1,4 +1,4 @@
-// Covers project index card background rendering without changing navigation behavior.
+// Covers project index sorting, card presentation, and accessible navigation.
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +9,24 @@ import { formatProjectDateTimeMinute } from "../lib/project-presentation";
 describe("ProjectsIndexPage", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("defaults to latest generation and places projects without generations last", async () => {
+    const projects = [
+      { id: "never-generated", name: "尚未生成", updatedAt: "2026-06-23T00:00:00.000Z", lastGeneratedAt: null },
+      { id: "older-generation", name: "较早生成", updatedAt: "2026-06-22T00:00:00.000Z", lastGeneratedAt: "2026-06-20T00:00:00.000Z" },
+      { id: "latest-generation", name: "最新生成", updatedAt: "2026-06-21T00:00:00.000Z", lastGeneratedAt: "2026-06-21T00:00:00.000Z" },
+    ].map((project) => ({ ...project, visibility: "private", status: "active", ownerUserId: "owner-user" }));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ projects }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    })));
+
+    render(<ProjectsIndexPage onNavigate={() => {}} />);
+
+    await screen.findByRole("heading", { name: "最新生成" });
+    expect(screen.getByLabelText("排序方式")).toHaveTextContent("最近生成");
+    expect(screen.getAllByRole("article").map((card) => within(card).getByRole("heading").textContent))
+      .toEqual(["最新生成", "较早生成", "尚未生成"]);
   });
 
   it("renders project cards with resolved background images and accessible entry actions", async () => {

@@ -74,7 +74,7 @@ export function ProjectsIndexPage({ onNavigate }: { onNavigate: Navigate }) {
   const [listError, setListError] = useState(false);
   const [search, setSearch] = useState("");
   const [scope, setScope] = useState("all");
-  const [sort, setSort] = useState("recent");
+  const [sort, setSort] = useState("generated");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const createDialogLocationRef = useRef<string | null>(null);
 

@@ -16,13 +16,14 @@ import {
 import { McpAccessError, type McpAccess } from "../auth/mcp-access.js";
 import type { McpConnection } from "../records/mcp-store.js";
 import { createMcpToolService } from "../tools/tool-service.js";
+import { platformMcpIcons } from "./mcp-branding.js";
 
 export function createPlatformMcpServer(
   access: McpAccess,
   principal: McpConnection,
 ) {
   const server = new McpServer(
-    { name: "uml-platform", version: "1.0.0" },
+    { name: "uml-platform", version: "1.0.0", icons: platformMcpIcons },
     { instructions: agentInstructions },
   );
   const service = createMcpToolService(access, principal);

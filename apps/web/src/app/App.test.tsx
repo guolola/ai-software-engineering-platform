@@ -2754,7 +2754,7 @@ describe("App shell routes", () => {
     expect(searchInput).toBeInTheDocument();
     expect(searchInput.parentElement).toHaveClass("min-w-0", "flex-1", "md:max-w-2xs");
     const sortTrigger = getSelectTrigger("排序方式");
-    expect(sortTrigger).toHaveTextContent("最近打开");
+    expect(sortTrigger).toHaveTextContent("最近生成");
     expect(sortTrigger).toHaveClass("w-28", "shrink-0", "md:w-fit");
     expect(screen.queryByRole("navigation", { name: "项目导航" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "生成任务" })).not.toBeInTheDocument();

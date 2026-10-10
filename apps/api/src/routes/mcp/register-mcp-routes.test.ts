@@ -210,6 +210,22 @@ test("discovery and failures preserve protocol JSON instead of the platform erro
     }),
   );
   assert.equal(initialize.result.serverInfo.name, "uml-platform");
+  const [icon] = initialize.result.serverInfo.icons;
+  assert.equal(icon.mimeType, "image/png");
+  assert.deepEqual(icon.sizes, ["128x128"]);
+  assert.match(icon.src, /^data:image\/png;base64,/);
+  // The handshake carries a complete PNG, so local and hosted clients need no image endpoint or token.
+  const logo = Buffer.from(
+    icon.src.slice("data:image/png;base64,".length),
+    "base64",
+  );
+  assert.deepEqual(
+    logo.subarray(0, 8),
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  );
+  assert.equal(logo.toString("ascii", 12, 16), "IHDR");
+  assert.equal(logo.readUInt32BE(16), 128);
+  assert.equal(logo.readUInt32BE(20), 128);
   const tools = s.parse(await s.rpc("tools/list"));
   assert.deepEqual(
     tools.result.tools.map((tool: { name: string }) => tool.name).sort(),
