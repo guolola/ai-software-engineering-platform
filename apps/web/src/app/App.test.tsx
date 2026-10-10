@@ -1584,7 +1584,8 @@ describe("App shell routes", () => {
 
   it("keeps the platform shell mounted across sidebar navigation and history while revalidating target content", async () => {
     vi.spyOn(window, "scrollTo").mockImplementation(() => {});
-    vi.useFakeTimers();
+    // Keep animation frames on the real clock so teardown cannot stall later popup interactions.
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     const fetchMock = vi.mocked(fetch);
     const defaultFetch = fetchMock.getMockImplementation();
     let pendingAuth: ReturnType<typeof createDeferred<Response>> | null = null;
@@ -2247,7 +2248,7 @@ describe("App shell routes", () => {
     { path: "/dashboard", readyTestId: "dashboard-shell" },
     { path: "/account/billing", readyTestId: "account-billing-dashboard" },
   ])("blocks $path content without an intermediate loading page while verifying the session", async ({ path, readyTestId }) => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     const authDeferred = createDeferred<Response>();
     const fetchMock = vi.mocked(fetch);
     const defaultFetch = fetchMock.getMockImplementation();
@@ -2350,7 +2351,7 @@ describe("App shell routes", () => {
   });
 
   it("shows the product loading screen while entering a project workspace", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     const projectDeferred = createDeferred<Response>();
     const fetchMock = vi.mocked(fetch);
     const defaultFetch = fetchMock.getMockImplementation();
@@ -2427,7 +2428,7 @@ describe("App shell routes", () => {
   });
 
   it("keeps the projects index visually empty while protected projects load", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     const projectsDeferred = createDeferred<Response>();
     const fetchMock = vi.mocked(fetch);
     const defaultFetch = fetchMock.getMockImplementation();
@@ -2480,7 +2481,7 @@ describe("App shell routes", () => {
   });
 
   it("keeps one coordinated loading overlay while direct project workspaces load", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     const projectDeferred = createDeferred<Response>();
     const fetchMock = vi.mocked(fetch);
     const defaultFetch = fetchMock.getMockImplementation();
@@ -2547,7 +2548,7 @@ describe("App shell routes", () => {
   });
 
   it("blocks protected route navigation until the session is revalidated", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     const routeAuthDeferred = createDeferred<Response>();
     const projectDetailDeferred = createDeferred<Response>();
     const fetchMock = vi.mocked(fetch);
