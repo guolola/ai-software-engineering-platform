@@ -1448,6 +1448,7 @@ describe("TopBar", () => {
       expect(repository.subscribeToRun).toHaveBeenCalledWith(
         "local-completed-run",
         expect.any(Function),
+        expect.objectContaining({ signal: expect.any(AbortSignal), onSnapshot: expect.any(Function) }),
       );
     });
 

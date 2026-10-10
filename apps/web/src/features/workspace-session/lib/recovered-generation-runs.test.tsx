@@ -24,6 +24,15 @@ function recoveryInput(repository: WorkspaceRepository) {
 }
 
 describe("recovered generation runs", () => {
+  it.each([undefined, createRunSnapshot({ runId: "different-run" })])("ignores unavailable or mismatched initial snapshots", async (snapshot) => {
+    const subscribeToRun = vi.fn(async () => {});
+    const input = recoveryInput({ getRunSnapshot: vi.fn(async () => snapshot), subscribeToRun } as unknown as WorkspaceRepository);
+    const { unmount } = renderHook(() => useRecoveredGenerationRuns(input));
+    await waitFor(() => expect(subscribeToRun).toHaveBeenCalledTimes(1));
+    expect(input.onSnapshot).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it("does not create another subscription for a locally observed run", () => {
     const subscribeToRun = vi.fn();
     const task = { ...createGenerationTask({ clientTaskId: "local-task", kind: "requirements", title: "需求生成",

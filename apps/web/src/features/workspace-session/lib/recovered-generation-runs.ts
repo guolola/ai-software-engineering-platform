@@ -47,7 +47,8 @@ export function useRecoveredGenerationRuns(input: RecoveredGenerationRunsInput) 
       const controller = new AbortController();
       connections.current.set(runId, controller);
       const apply = (snapshot: RunSnapshot | DesignRunSnapshot) => {
-        if (!controller.signal.aborted) latest.current.onSnapshot(taskId, snapshot);
+        // Missing or mismatched snapshots cannot restore this run's workspace.
+        if (snapshot?.runId === runId && !controller.signal.aborted) latest.current.onSnapshot(taskId, snapshot);
       };
       // Coalesce replay bursts and serialize reads so older responses cannot
       // overwrite a newer partial snapshot or terminal result.
@@ -77,7 +78,7 @@ export function useRecoveredGenerationRuns(input: RecoveredGenerationRunsInput) 
           if (event.type === "completed") {
             // Invalidate in-flight reads before applying the terminal snapshot.
             controller.abort();
-            latest.current.onSnapshot(taskId, event.snapshot as RunSnapshot | DesignRunSnapshot);
+            if (event.snapshot?.runId === runId) latest.current.onSnapshot(taskId, event.snapshot as RunSnapshot | DesignRunSnapshot);
           } else if (shouldRefreshRunSnapshotFromEvent(event)) {
             void refresh().catch(() => {});
           }
