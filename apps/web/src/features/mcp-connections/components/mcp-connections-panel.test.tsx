@@ -1,4 +1,4 @@
-// Covers catalog setup, one-time credential display, revocation and project consent guards.
+// Covers catalog setup, one-time credential display, revocation and account consent guards.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -46,10 +46,6 @@ beforeEach(() => {
     clientId: "client-id",
   });
 });
-async function selectConsentProject(name = "图书管理系统") {
-  fireEvent.focus(screen.getByRole("combobox", { name: "允许读取的项目" }));
-  fireEvent.click(await screen.findByRole("option", { name }));
-}
 async function openClientGuide(name = "Cursor") {
   fireEvent.click(await screen.findByRole("button", { name: `查看 ${name} 接入指南` }));
   return screen.findByRole("dialog", { name: `连接 ${name}` });
@@ -138,7 +134,7 @@ describe("MCP connections", () => {
   it("omits the acceptance note and shows OAuth guidance without a card or alert", async () => {
     render(<McpConnectionsPanel onNavigate={vi.fn()} />);
     await openClientGuide();
-    const guidance = await screen.findByText("在客户端发起连接，在打开的平台页面登录并选择项目。若未跳转，请检查客户端的连接与鉴权状态。");
+    const guidance = await screen.findByText("在客户端发起连接，在打开的平台页面登录并授权，即可读取账号可访问的全部项目。若未跳转，请检查客户端的连接与鉴权状态。");
     expect(guidance.closest('[data-slot="card"], [role="alert"]')).toBeNull();
     expect(screen.getByText("传输协议：Streamable HTTP（流式 HTTP）。请在客户端使用本页 MCP 地址连接。")).toBeVisible();
     expect(screen.getByLabelText("MCP 地址", { selector: "input" })).toHaveAccessibleDescription("传输协议：Streamable HTTP（流式 HTTP）。请在客户端使用本页 MCP 地址连接。");
@@ -240,7 +236,7 @@ describe("MCP connections", () => {
     expect(within(dialog).queryByRole("combobox", { name: "连接方式" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "创建 30 天个人令牌" })).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText("客户端配置")).not.toBeInTheDocument();
-    expect(within(dialog).queryByText(/在客户端发起连接，在打开的平台页面登录并选择项目/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/在客户端发起连接，在打开的平台页面登录并授权/)).not.toBeInTheDocument();
     expect(mcpApi.createToken).not.toHaveBeenCalled();
   });
   it("resets authentication and removes one-time credentials when closing and selecting another client", async () => {
@@ -313,7 +309,7 @@ describe("MCP connections", () => {
       screen.getByRole("button", { name: "撤销 我的工具" }),
     ).toBeDisabled();
   });
-  it("consent has no default project selection and does not treat a configured client as verified", async () => {
+  it("explains account-wide consent without project selection or automatic submission", async () => {
     render(
       <McpConsentPanel
         onNavigate={vi.fn()}
@@ -322,19 +318,13 @@ describe("MCP connections", () => {
     );
     expect(await screen.findByText("授权给 外部客户端")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "授权读取所选项目" }),
-    ).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "允许读取的项目" })).toHaveValue("");
-    expect(screen.queryByText("library-id")).not.toBeInTheDocument();
-    await selectConsentProject();
-    expect(
-      screen.getByRole("button", { name: "授权读取所选项目" }),
+      screen.getByRole("button", { name: "授权读取全部项目" }),
     ).toBeEnabled();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByText("library-id")).not.toBeInTheDocument();
     expect(mcpApi.consent).not.toHaveBeenCalled();
-    expect(screen.getByText("图书管理系统")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "移除 图书管理系统" }));
-    expect(screen.getByRole("button", { name: "授权读取所选项目" })).toBeDisabled();
-    expect(screen.getByText("至少选择一个项目后才能授权。")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "账号可访问的全部项目" })).toBeVisible();
+    expect(screen.getByText(/包括之后创建或加入的项目，无需选择项目/)).toBeVisible();
   });
   it("preserves interaction when asking the student to log in", async () => {
     vi.mocked(mcpApi.connections).mockRejectedValue(new McpApiError(401));
@@ -360,60 +350,33 @@ describe("MCP connections", () => {
     expect(screen.queryByRole("combobox", { name: "允许读取的项目" })).not.toBeInTheDocument();
     fireEvent.click(retry);
     expect(await screen.findByRole("heading", { name: "授权给 外部客户端" })).toBeVisible();
-    expect(await screen.findByRole("combobox", { name: "允许读取的项目" })).toHaveValue("");
+    expect(await screen.findByRole("button", { name: "授权读取全部项目" })).toBeEnabled();
   });
-  it("submits selected projects and keeps cancellation connected to the OAuth interaction", async () => {
+  it("submits account consent and keeps cancellation connected to the OAuth interaction", async () => {
     // An invalid redirect avoids navigation in JSDOM while still exercising the actual consent actions.
     vi.mocked(mcpApi.consent).mockResolvedValue({ redirect: "https://invalid.example/" });
     vi.mocked(mcpApi.deny).mockResolvedValue({ redirect: "https://invalid.example/" });
     render(<McpConsentPage onNavigate={vi.fn()} interactionId="interaction-id" />);
-    await screen.findByRole("combobox", { name: "允许读取的项目" });
-    await selectConsentProject();
-    fireEvent.click(screen.getByRole("button", { name: "授权读取所选项目" }));
-    await waitFor(() => expect(mcpApi.consent).toHaveBeenCalledWith("interaction-id", ["library-id"], "test-csrf"));
+    fireEvent.click(await screen.findByRole("button", { name: "授权读取全部项目" }));
+    await waitFor(() => expect(mcpApi.consent).toHaveBeenCalledWith("interaction-id", "test-csrf"));
     await waitFor(() => expect(screen.getByRole("button", { name: "取消" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
     await waitFor(() => expect(mcpApi.deny).toHaveBeenCalledWith("interaction-id", "test-csrf"));
   });
-  it("searches projects by name and submits multiple selections without displaying project IDs", async () => {
-    const user = userEvent.setup();
-    vi.mocked(mcpApi.connections).mockResolvedValue({ ...info, projects: [...info.projects, { id: "store-id", name: "商城系统" }] });
-    vi.mocked(mcpApi.consent).mockResolvedValue({ redirect: "https://invalid.example/" });
-    render(<McpConsentPage onNavigate={vi.fn()} interactionId="interaction-id" />);
-    const select = await screen.findByRole("combobox", { name: "允许读取的项目" });
-    await user.click(select);
-    await user.type(select, "图书");
-    expect(screen.getByRole("option", { name: "图书管理系统" })).toBeVisible();
-    expect(screen.queryByRole("option", { name: "商城系统" })).not.toBeInTheDocument();
-    expect(screen.queryByText("library-id")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("option", { name: "图书管理系统" }));
-    await user.type(select, "不存在的项目");
-    expect(screen.getByText("未找到匹配项目")).toBeVisible();
-    await user.clear(select);
-    await user.click(screen.getByRole("option", { name: "商城系统" }));
-    expect(screen.getByRole("button", { name: "移除 商城系统" })).toBeVisible();
-    expect(screen.queryByText("store-id")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "授权读取所选项目" }));
-    await waitFor(() => expect(mcpApi.consent).toHaveBeenCalledWith("interaction-id", ["library-id", "store-id"], "test-csrf"));
-  });
-  it("disables project selection when no projects exist and while authorization is pending", async () => {
-    vi.mocked(mcpApi.connections).mockResolvedValueOnce({ ...info, projects: [] });
-    const first = render(<McpConsentPage onNavigate={vi.fn()} interactionId="interaction-id" />);
-    expect(await screen.findByRole("combobox", { name: "允许读取的项目" })).toBeDisabled();
-    expect(screen.getByText("当前没有可授权项目，请先创建或加入项目。")).toBeVisible();
-    expect(screen.getByRole("button", { name: "授权读取所选项目" })).toBeDisabled();
-    first.unmount();
+  it("allows accounts with no projects to authorize and prevents duplicate pending submissions", async () => {
+    vi.mocked(mcpApi.connections).mockResolvedValue({ ...info, projects: [] });
     let finish!: (value: { redirect: string }) => void;
     vi.mocked(mcpApi.consent).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
     render(<McpConsentPage onNavigate={vi.fn()} interactionId="interaction-id" />);
-    await screen.findByRole("combobox", { name: "允许读取的项目" });
-    await selectConsentProject();
-    fireEvent.click(screen.getByRole("button", { name: "授权读取所选项目" }));
-    expect(screen.getByRole("combobox", { name: "允许读取的项目" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "移除 图书管理系统" })).toBeDisabled();
-    expect(screen.queryByRole("option")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "移除 图书管理系统" }));
-    expect(screen.getByText("图书管理系统")).toBeVisible();
+    const authorize = await screen.findByRole("button", { name: "授权读取全部项目" });
+    expect(authorize).toBeEnabled();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    fireEvent.click(authorize);
+    expect(authorize).toBeDisabled();
+    expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
+    fireEvent.click(authorize);
+    expect(mcpApi.consent).toHaveBeenCalledTimes(1);
+    expect(mcpApi.consent).toHaveBeenCalledWith("interaction-id", "test-csrf");
     finish({ redirect: "https://invalid.example/" });
     await screen.findByText("连接操作未完成，请重试。");
   });

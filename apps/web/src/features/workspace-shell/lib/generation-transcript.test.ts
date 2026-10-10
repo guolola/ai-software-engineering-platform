@@ -11,6 +11,37 @@ const activity = (id: string, callId: string, phase: RunActivityEvent["phase"], 
 });
 
 describe("generation transcript", () => {
+  it("keeps visual diagnostics out of progress-only projection during streaming and replay", () => {
+    const detail = "追踪关系错配、字段归属待核对。".repeat(10_000);
+    const check = { ...activity("visual-start", "visual", "started"), stage: "verify_diagram_visual" as const, subtaskId: "usecase", operation: "visual_check" as const };
+    const events: RunEvent[] = [
+      check,
+      { ...check, eventId: "visual-output", phase: "output", text: detail },
+      { type: "stage_progress", stage: "verify_diagram_visual", progress: 98, subtaskId: "usecase", subtaskStatus: "pending_review", message: detail },
+    ];
+    const live = projectGenerationTranscript(events, "running", [], {}, { includeContent: false });
+    expect(live.steps[0].calls[0]).toMatchObject({ status: "pending_review", message: "视觉检查已结束", output: "" });
+    expect(JSON.stringify(live.steps)).not.toContain(detail);
+    const review = { status: "pending_review" as const, issues: [detail], reason: detail, stopReason: detail, attempts: 1, checkedAt: "check-1" };
+    events.push({ type: "completed", snapshot: createRunSnapshot({ status: "completed", visualReviews: { usecase: review } }) });
+    const before = JSON.stringify(events);
+    const restored = projectGenerationTranscript(events, "completed", [{ id: "verify_diagram_visual:usecase", label: "用例图", status: "pending_review", message: detail, errorMessage: null }], {}, { includeContent: false });
+    expect(restored.steps[0].calls[0]).toMatchObject({ status: "pending_review", message: "视觉检查已结束" });
+    expect(restored.steps[0].calls[0].review).toBeUndefined();
+    expect(JSON.stringify(restored.steps)).not.toContain(detail);
+    expect(restored.finalMessage).not.toContain("待确认");
+    expect(JSON.stringify(events)).toBe(before);
+    expect(projectGenerationTranscript(events).steps[0].calls[0].review).toEqual(review);
+  });
+
+  it("keeps visual failures and skips concise in progress-only projection", () => {
+    const detail = "结构核对未完成：" + "超时诊断".repeat(10_000);
+    const failed = projectGenerationTranscript([{ type: "stage_progress", stage: "verify_diagram_visual", progress: 98, subtaskId: "class", subtaskStatus: "failed", message: detail }], "running", [], {}, { includeContent: false });
+    expect(failed.steps[0].calls[0]).toMatchObject({ status: "failed", message: "视觉检查未完成，可重试。" });
+    const skipped = projectGenerationTranscript([{ type: "stage_progress", stage: "verify_diagram_visual", progress: 98, subtaskId: "class", subtaskStatus: "completed", message: "已跳过视觉检查：" + detail }], "running", [], {}, { includeContent: false });
+    expect(skipped.steps[0].calls[0]).toMatchObject({ status: "completed", message: "视觉检查已跳过" });
+  });
+
   it("projects progress without accumulating content while preserving attempts, legacy calls and failures", () => {
     const body = "批量正文".repeat(10_000);
     const events: RunEvent[] = [

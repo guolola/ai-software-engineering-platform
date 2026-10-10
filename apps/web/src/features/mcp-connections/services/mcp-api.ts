@@ -66,11 +66,11 @@ export const mcpApi = {
       `interactions/${encodeURIComponent(uid)}`,
       "GET", undefined, undefined, signal,
     ),
-  consent: (uid: string, projectIds: string[], csrf: string) =>
+  consent: (uid: string, csrf: string) =>
     request<{ redirect: string }>(
       `interactions/${encodeURIComponent(uid)}`,
       "POST",
-      { projectIds, csrf },
+      { csrf },
       csrf,
     ),
   deny: (uid: string, csrf: string) =>

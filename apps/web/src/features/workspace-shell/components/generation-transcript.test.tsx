@@ -11,7 +11,28 @@ const steps: TranscriptStep[] = [{ stage: "generate_models", title: "生成模�
 afterEach(async () => { await act(async () => { await i18n.changeLanguage("zh-CN"); }); });
 
 describe("stage reading surface", () => {
-  it("shows verified evidence, actual attempts and rejected changes under the review call", () => {
+  it("does not mount batch visual warnings while keeping failed checks retryable", () => {
+    const detail = "架构模型追踪关系错配，需核对字段归属。".repeat(10_000);
+    const calls = Array.from({ length: 20 }, (_, index) => ({
+      ...steps[0].calls[0], id: `review-${index}`, title: `模型 ${index + 1} · 视觉检查`,
+      subtaskId: `model-${index}`, status: "pending_review" as const, message: detail,
+    }));
+    const { container } = render(<GenerationTranscript taskKey="batch-review" active={false} finalMessage="生成完成。" onRetry={() => {}}
+      steps={[{ stage: "verify_diagram_visual", title: "视觉检查", status: "completed", finished: true, messages: [detail], calls: [
+        ...calls, { ...calls[0], id: "failed-check", subtaskId: "class", title: "类图 · 结构核对", status: "failed", message: detail },
+      ] }]} />);
+    expect(container).not.toHaveTextContent(detail);
+    expect(container.querySelector('[data-slot="diagram-review-details"]')).toBeNull();
+    expect(screen.getAllByText("检查已结束")).toHaveLength(20);
+    const issues = container.querySelector('[data-slot="generation-task-issues"]') as HTMLElement;
+    expect(issues).toHaveTextContent("类图 · 结构核对：视觉检查未完成，可重试。");
+    expect(within(issues).getAllByRole("button", { name: "重试此模型" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "思考过程" }));
+    fireEvent.click(screen.getByRole("button", { name: "思考过程" }));
+    expect(container).not.toHaveTextContent(detail);
+  });
+
+  it("omits review findings, evidence and repair history from the task drawer", () => {
     const reviewSteps: TranscriptStep[] = [{ ...steps[0], stage: "verify_diagram_visual", title: "视觉检查", status: "completed", finished: true, messages: [], calls: [{
       ...steps[0].calls[0], title: "领域模型 · 视觉检查", status: "pending_review", output: "", summary: "", thinking: false,
       review: { status: "pending_review", issues: ["字段标记与约束不同"], reason: "待确认", checkedAt: "check-1", attempts: 1, structureAttempts: 2, repairAttempts: 1, checkOutcome: "differences",
@@ -19,15 +40,13 @@ describe("stage reading surface", () => {
         repairHistory: [{ round: 1, target: "model", issueIds: ["f1"], beforeFingerprint: "old", status: "rejected", changes: ["候选改变了模型标题"], reason: "越过授权字段" }], stopReason: "候选越界，保留上一份有效模型" },
     }] }];
     const { container } = render(<GenerationTranscript taskKey="review-details" steps={reviewSteps} active={false} finalMessage="生成完成，问题待确认。" />);
-    const details = container.querySelector('[data-slot="diagram-review-details"]') as HTMLElement;
-    expect(details).toHaveTextContent("结构核对 2 次 · 图片检查 1 次 · 纠错尝试 1 次");
-    expect(details).toHaveTextContent("业务约束（1）");
-    expect(details).toHaveTextContent("已核实：字段标记与约束不同");
-    fireEvent.click(within(details).getByText("查看问题依据与处理详情"));
-    expect(within(details).getByText("依据：fk-order · 明确外键")).toBeVisible();
-    expect(details).toHaveTextContent("第 1 轮结构纠错：已拒绝 · 越过授权字段");
-    expect(details).toHaveTextContent("停止原因：候选越界，保留上一份有效模型");
-    expect(details.closest('[data-slot="chain-of-thought-step-content"]')).not.toBeNull();
+    expect(container.querySelector('[data-slot="diagram-review-details"]')).toBeNull();
+    expect(container.querySelector('[data-slot="generation-task-issues"]')).toBeNull();
+    expect(container).not.toHaveTextContent("字段标记与约束不同");
+    expect(container).not.toHaveTextContent("明确外键");
+    expect(container).not.toHaveTextContent("候选改变了模型标题");
+    expect(container).not.toHaveTextContent("候选越界");
+    expect(screen.getByTestId("generation-task-step")).toHaveTextContent("视觉检查");
     expect(screen.getByRole("region", { name: "输出总结" })).toHaveTextContent("生成完成，问题待确认。");
   });
   it("retains the user's disclosure choice when prose starts and the stage finishes", () => {

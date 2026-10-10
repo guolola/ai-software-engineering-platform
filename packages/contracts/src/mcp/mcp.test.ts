@@ -6,6 +6,7 @@ import {
   mcpArtifactInputSchema,
   mcpTokenCreateSchema,
   mcpContextInputSchema,
+  mcpConsentSchema,
 } from "./index.js";
 test("whole-project defaults and account-wide or explicitly scoped personal tokens", () => {
   assert.deepEqual(mcpContextInputSchema.parse({ projectId: "p" }).scope, {
@@ -30,6 +31,12 @@ test("whole-project defaults and account-wide or explicitly scoped personal toke
       .success,
     false,
   );
+});
+test("OAuth account consent requires CSRF but no project selection", () => {
+  assert.deepEqual(mcpConsentSchema.parse({ csrf: "csrf" }), { csrf: "csrf" });
+  assert.equal(mcpConsentSchema.safeParse({}).success, false);
+  assert.equal(mcpConsentSchema.safeParse({ csrf: "" }).success, false);
+  assert.equal(mcpConsentSchema.safeParse({ csrf: "csrf", projectIds: ["p"] }).success, false);
 });
 test("association rejects credentials and private extra fields", () => {
   const association = {

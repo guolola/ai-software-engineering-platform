@@ -53,14 +53,13 @@ describe("connection refresh lifecycle", () => {
   it("marks refresh failure, recovers on retry and removes projects that lost permission", async () => {
     const { result } = renderHook(() => useMcpConnections(null, navigate));
     await act(async () => {});
-    act(() => result.current.setSelected(["one", "two"]));
     vi.mocked(mcpApi.connections).mockRejectedValueOnce(new Error("network"));
     await act(async () => result.current.retry());
     expect(result.current.error).not.toBe("");
     expect(result.current.info).toEqual(info);
     vi.mocked(mcpApi.connections).mockResolvedValueOnce({ ...info, projects: [{ id: "two", name: "Two" }] });
     await act(async () => result.current.retry());
-    expect(result.current.selected).toEqual(["two"]);
+    expect(result.current.info?.projects).toEqual([{ id: "two", name: "Two" }]);
     expect(result.current.error).toBe("");
   });
   it("guards empty names and creates account-wide tokens without persisting credentials", async () => {

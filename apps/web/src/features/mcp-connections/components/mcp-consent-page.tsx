@@ -1,11 +1,9 @@
-// Presents external-client project consent independently of the connection-management workbench.
+// Presents account-wide read consent independently of the connection-management workbench.
 import { useTranslation } from "react-i18next";
 import { ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "../../../shared/ui/alert";
 import { Button } from "../../../shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../shared/ui/card";
-import { Label } from "../../../shared/ui/label";
-import MultipleSelector from "../../../shared/ui/multi-select";
 import { Skeleton } from "../../../shared/ui/skeleton";
 import { useMcpConnections } from "../model/use-mcp-connections";
 
@@ -14,9 +12,7 @@ type McpConsentProps = { interactionId: string; onNavigate: (path: string) => vo
 export function McpConsentPanel({ interactionId, onNavigate }: McpConsentProps) {
   const { t } = useTranslation();
   const state = useMcpConnections(interactionId, onNavigate);
-  const projects = state.info?.projects ?? [];
   const disabled = state.busy || !state.info?.enabled || Boolean(state.error);
-  const projectOptions = projects.map((project) => ({ value: project.id, label: project.name }));
 
   return <Card className="w-full min-w-0 overflow-visible shadow-xl">
     {state.loading ? <CardContent aria-busy="true" className="space-y-5">
@@ -33,26 +29,10 @@ export function McpConsentPanel({ interactionId, onNavigate }: McpConsentProps) 
         {state.info && !state.info.enabled && <Alert><AlertTitle>{t("mcp.status.disabled")}</AlertTitle><AlertDescription>{t("mcp.disabled")}</AlertDescription></Alert>}
         {state.info?.enabled && <>
           <div className="space-y-3">
-            <h2 className="text-sm font-medium"><Label id="mcp-consent-projects-label" htmlFor="mcp-consent-projects">{t("mcp.projects")}</Label></h2>
-            <p id="mcp-consent-projects-help" className="text-sm text-muted-foreground">{t("mcp.projectsHelp")}</p>
-            {!projects.length && <p className="text-sm text-muted-foreground">{t("mcp.noProjects")}</p>}
-            <MultipleSelector
-              commandProps={{ label: t("mcp.guideProject") }}
-              inputProps={{ id: "mcp-consent-projects", "aria-labelledby": "mcp-consent-projects-label", "aria-describedby": "mcp-consent-projects-help" }}
-              value={projectOptions.filter((option) => state.selected.includes(option.value))}
-              options={projectOptions}
-              onChange={(options) => { if (!disabled) state.setSelected(options.map((option) => option.value)); }}
-              disabled={disabled || !projects.length}
-              placeholder={t("mcp.guidePlaceholder")}
-              hideClearAllButton
-              hidePlaceholderWhenSelected
-              emptyIndicator={<p className="text-center text-sm">{t("mcp.noMatchingProjects")}</p>}
-              removeOptionLabel={(option) => t("mcp.removeProject", { name: option.label })}
-              className="w-full"
-            />
-            {!state.selected.length && <p className="text-xs text-muted-foreground">{t("mcp.selectRequired")}</p>}
+            <h2 className="text-sm font-medium">{t("mcp.allProjects")}</h2>
+            <p className="text-sm text-muted-foreground">{t("mcp.projectsHelp")}</p>
           </div>
-          <div className="flex flex-wrap gap-3"><Button disabled={disabled || !state.selected.length || !state.client} onClick={() => void state.consent()}>{t("mcp.authorize")}</Button><Button variant="outline" disabled={state.busy} onClick={() => void state.deny()}>{t("mcp.cancel")}</Button></div>
+          <div className="flex flex-wrap gap-3"><Button disabled={disabled || !state.client} onClick={() => void state.consent()}>{t("mcp.authorize")}</Button><Button variant="outline" disabled={state.busy} onClick={() => void state.deny()}>{t("mcp.cancel")}</Button></div>
         </>}
       </CardContent>
     </>}

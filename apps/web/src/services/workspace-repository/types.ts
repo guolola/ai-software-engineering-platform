@@ -59,6 +59,12 @@ export interface RequirementRulesUpdateMetadata {
   rulesVersion?: number;
 }
 
+// Recovery delivers snapshots independently of SSE events, including partial results.
+export interface RunSubscriptionOptions<TSnapshot> {
+  signal?: AbortSignal;
+  onSnapshot?: (snapshot: TSnapshot) => void | Promise<void>;
+}
+
 export interface WorkspaceRepository {
   exportDiagram?(input: { diagramKind: UmlDiagramKind; plantUmlSource: string; format: "png" | "pdf" }, signal?: AbortSignal): Promise<Blob>;
   loadWorkspace(): Promise<WorkspaceRecord>;
@@ -82,6 +88,7 @@ export interface WorkspaceRepository {
   subscribeToFeasibilityRun?(
     runId: string,
     onEvent: (event: RunEvent) => void,
+    options?: RunSubscriptionOptions<FeasibilityRunSnapshot>,
   ): Promise<void>;
   updateRequirementRules?(
     rules: RequirementRule[],
@@ -118,15 +125,18 @@ export interface WorkspaceRepository {
   subscribeToRun(
     runId: string,
     onEvent: (event: RunEvent) => void,
+    options?: RunSubscriptionOptions<RunSnapshot>,
   ): Promise<void>;
   subscribeToDesignRun?(
     runId: string,
     onEvent: (event: RunEvent) => void,
+    options?: RunSubscriptionOptions<DesignRunSnapshot>,
   ): Promise<void>;
   
   subscribeToDocumentRun?(
     runId: string,
     onEvent: (event: RunEvent) => void,
+    options?: RunSubscriptionOptions<DocumentRunSnapshot>,
   ): Promise<void>;
   getRunSnapshot(runId: string): Promise<RunSnapshot>;
   getDesignRunSnapshot?(runId: string): Promise<DesignRunSnapshot>;

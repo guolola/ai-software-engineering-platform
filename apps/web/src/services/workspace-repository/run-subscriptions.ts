@@ -14,8 +14,9 @@ import { subscribeToRunEvents } from "../sse-client";
 import { projectHeaders, requireProjectScope } from "./project-scope";
 import { snapshotErrorMessage } from "./run-payload";
 import { localizeRunFailure } from "../../shared/i18n/api-errors";
+import type { RunSubscriptionOptions } from "./types";
 
-type RunSubscriptionInput = {
+type RunSubscriptionInput<TSnapshot extends RestorableRunSnapshot> = RunSubscriptionOptions<TSnapshot> & {
   runId: string;
   projectId: string | null;
   onEvent: (event: RunEvent) => void;
@@ -32,10 +33,7 @@ type SnapshotReader<TSnapshot extends RestorableRunSnapshot> = (
   projectId: string | null,
 ) => Promise<TSnapshot>;
 
-type SnapshotWaitInput<TSnapshot extends RestorableRunSnapshot> = {
-  runId: string;
-  projectId: string | null;
-  onEvent: (event: RunEvent) => void;
+type SnapshotWaitInput<TSnapshot extends RestorableRunSnapshot> = RunSubscriptionInput<TSnapshot> & {
   readSnapshot: SnapshotReader<TSnapshot>;
   fallbackFailureMessage: string;
   fallbackCancelledStage: RunStage;
@@ -47,6 +45,7 @@ type SnapshotWaitInput<TSnapshot extends RestorableRunSnapshot> = {
 const PROJECT_STREAM_IDLE_TIMEOUT_MS = 60_000;
 const INITIAL_SNAPSHOT_POLL_MS = 1_500;
 const MAX_SNAPSHOT_POLL_MS = 10_000;
+const MAX_PROJECT_STREAM_RECONNECTS = 3;
 
 class StreamedRunFailedError extends Error {
   readonly runError: RunError;
@@ -58,8 +57,30 @@ class StreamedRunFailedError extends Error {
   }
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const abort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      reject(new DOMException("Subscription aborted", "AbortError"));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
+  });
+}
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) throw new DOMException("Subscription aborted", "AbortError");
+}
+
+function isRetryableConnectionError(error: unknown) {
+  return !(error instanceof StreamedRunFailedError) &&
+    !isNonRetryableSnapshotReadError(error) &&
+    !(error instanceof Error && error.name === "AbortError");
 }
 
 function isNonRetryableSnapshotReadError(error: unknown) {
@@ -95,12 +116,17 @@ async function waitForTerminalSnapshot<TSnapshot extends RestorableRunSnapshot>(
   fallbackProgressStage,
   progressMessage,
   progressForSnapshot,
+  signal,
+  onSnapshot,
 }: SnapshotWaitInput<TSnapshot>) {
   let delayMs = INITIAL_SNAPSHOT_POLL_MS;
 
   while (true) {
+    throwIfAborted(signal);
     try {
       const snapshot = await readSnapshot(runId, projectId);
+      throwIfAborted(signal);
+      await onSnapshot?.(snapshot);
       if (snapshot.status === "completed") {
         onEvent({ type: "completed", snapshot });
         return;
@@ -130,10 +156,11 @@ async function waitForTerminalSnapshot<TSnapshot extends RestorableRunSnapshot>(
         message: progressMessage,
       });
     } catch (error) {
-      if (isNonRetryableSnapshotReadError(error)) {
+      if (!isRetryableConnectionError(error)) {
         throw error;
       }
       const retryableNetworkError =
+        (error instanceof ApiClientError && (error.status >= 500 || error.status === 429)) ||
         error instanceof TypeError ||
         (error instanceof Error &&
           (error.message === "Failed to fetch" ||
@@ -150,9 +177,59 @@ async function waitForTerminalSnapshot<TSnapshot extends RestorableRunSnapshot>(
       });
     }
 
-    await sleep(delayMs);
+    await sleep(delayMs, signal);
     delayMs = Math.min(MAX_SNAPSHOT_POLL_MS, Math.floor(delayMs * 1.5));
   }
+}
+
+async function subscribeToProjectRun<TSnapshot extends RestorableRunSnapshot>(
+  endpoint: string,
+  input: SnapshotWaitInput<TSnapshot>,
+) {
+  const projectId = requireProjectScope(input.projectId);
+  const seenEventIds = new Set<string>();
+  const onEvent = (event: RunEvent) => {
+    // The server replays persisted events on every connection; deliver each once.
+    if (event.eventId) {
+      if (seenEventIds.has(event.eventId)) return;
+      seenEventIds.add(event.eventId);
+    }
+    input.onEvent(event);
+  };
+  for (let attempt = 0; attempt <= MAX_PROJECT_STREAM_RECONNECTS; attempt += 1) {
+    throwIfAborted(input.signal);
+    try {
+      await streamProjectRunEvents(endpoint, projectId, onEvent, input.signal);
+      return;
+    } catch (error) {
+      if (!isRetryableConnectionError(error)) throw error;
+    }
+    // Reconcile partial artifacts immediately, before waiting to reconnect.
+    let snapshot: TSnapshot | null = null;
+    try {
+      snapshot = await input.readSnapshot(input.runId, projectId);
+    } catch (error) {
+      if (!isRetryableConnectionError(error)) throw error;
+    }
+    throwIfAborted(input.signal);
+    if (snapshot) {
+      if (snapshot.status !== "queued" && snapshot.status !== "running") {
+        await waitForTerminalSnapshot({ ...input, onEvent, readSnapshot: async () => snapshot! });
+        return;
+      }
+      await input.onSnapshot?.(snapshot);
+    }
+    if (attempt < MAX_PROJECT_STREAM_RECONNECTS) {
+      onEvent({
+        type: "stage_progress",
+        stage: snapshot ? snapshotStage(snapshot, input.fallbackProgressStage) : input.fallbackProgressStage,
+        progress: snapshot ? input.progressForSnapshot(snapshot) : 5,
+        message: "连接暂时中断，正在恢复实时进度",
+      });
+      await sleep(1_000 * 2 ** attempt, input.signal);
+    }
+  }
+  await waitForTerminalSnapshot({ ...input, onEvent });
 }
 
 export async function readRunSnapshot(
@@ -267,10 +344,11 @@ export async function streamProjectRunEvents(
       buffer = chunks.pop() ?? "";
       for (const chunk of chunks) {
         flushEvent(chunk);
+        if (terminalEventSeen) break;
       }
-      if (done) break;
+      if (done || terminalEventSeen) break;
     }
-    if (buffer.trim()) {
+    if (!terminalEventSeen && buffer.trim()) {
       flushEvent(buffer);
     }
     if (!terminalEventSeen) {
@@ -281,6 +359,10 @@ export async function streamProjectRunEvents(
     await reader.cancel().catch(() => {});
     throw error;
   } finally {
+    if (terminalEventSeen) {
+      controller.abort();
+      await reader.cancel().catch(() => {});
+    }
     signal?.removeEventListener("abort", abort);
     reader.releaseLock();
   }
@@ -300,8 +382,13 @@ async function waitForRequirementRunSnapshot(
   runId: string,
   onEvent: (event: RunEvent) => void,
   projectId: string | null = null,
+  options: RunSubscriptionOptions<RunSnapshot> = {},
 ) {
-  await waitForTerminalSnapshot({
+  const wait = projectId
+    ? (input: SnapshotWaitInput<RunSnapshot>) => subscribeToProjectRun(`/api/runs/${runId}/events`, input)
+    : waitForTerminalSnapshot;
+  await wait({
+    ...options,
     runId,
     projectId,
     onEvent,
@@ -325,8 +412,13 @@ async function waitForDesignRunSnapshot(
   runId: string,
   onEvent: (event: RunEvent) => void,
   projectId: string | null = null,
+  options: RunSubscriptionOptions<DesignRunSnapshot> = {},
 ) {
-  await waitForTerminalSnapshot({
+  const wait = projectId
+    ? (input: SnapshotWaitInput<DesignRunSnapshot>) => subscribeToProjectRun(`/api/design-runs/${runId}/events`, input)
+    : waitForTerminalSnapshot;
+  await wait({
+    ...options,
     runId,
     projectId,
     onEvent,
@@ -354,8 +446,13 @@ async function waitForDocumentRunSnapshot(
   runId: string,
   onEvent: (event: RunEvent) => void,
   projectId: string | null = null,
+  options: RunSubscriptionOptions<DocumentRunSnapshot> = {},
 ) {
-  await waitForTerminalSnapshot({
+  const wait = projectId
+    ? (input: SnapshotWaitInput<DocumentRunSnapshot>) => subscribeToProjectRun(`/api/document-runs/${runId}/events`, input)
+    : waitForTerminalSnapshot;
+  await wait({
+    ...options,
     runId,
     projectId,
     onEvent,
@@ -373,8 +470,13 @@ async function waitForFeasibilityRunSnapshot(
   runId: string,
   onEvent: (event: RunEvent) => void,
   projectId: string | null = null,
+  options: RunSubscriptionOptions<FeasibilityRunSnapshot> = {},
 ) {
-  await waitForTerminalSnapshot({
+  const wait = projectId
+    ? (input: SnapshotWaitInput<FeasibilityRunSnapshot>) => subscribeToProjectRun(`/api/feasibility-runs/${runId}/events`, input)
+    : waitForTerminalSnapshot;
+  await wait({
+    ...options,
     runId,
     projectId,
     onEvent,
@@ -400,33 +502,15 @@ export async function subscribeToRequirementRunEvents({
   runId,
   projectId,
   onEvent,
-}: RunSubscriptionInput) {
+  ...options
+}: RunSubscriptionInput<RunSnapshot>) {
   if (projectId) {
-    const scopedProjectId = requireProjectScope(projectId);
-    try {
-      await streamProjectRunEvents(
-        `/api/runs/${runId}/events`,
-        scopedProjectId,
-        onEvent,
-      );
-      return;
-    } catch (error) {
-      if (
-        error instanceof ApiClientError &&
-        (error.status === 401 || error.status === 403)
-      ) {
-        throw error;
-      }
-      if (error instanceof StreamedRunFailedError) {
-        throw error;
-      }
-      await waitForRequirementRunSnapshot(runId, onEvent, scopedProjectId);
-      return;
-    }
+    await waitForRequirementRunSnapshot(runId, onEvent, projectId, options);
+    return;
   }
   const subscription = subscribeToRunEvents(`/api/runs/${runId}/events`, {
     onEvent,
-    onError: () => waitForRequirementRunSnapshot(runId, onEvent, projectId),
+    onError: () => waitForRequirementRunSnapshot(runId, onEvent, projectId, options),
   });
   await subscription.closed;
 }
@@ -435,74 +519,33 @@ export async function subscribeToDesignRunEvents({
   runId,
   projectId,
   onEvent,
-}: RunSubscriptionInput) {
+  ...options
+}: RunSubscriptionInput<DesignRunSnapshot>) {
   if (projectId) {
-    const scopedProjectId = requireProjectScope(projectId);
-    try {
-      await streamProjectRunEvents(
-        `/api/design-runs/${runId}/events`,
-        scopedProjectId,
-        onEvent,
-      );
-      return;
-    } catch (error) {
-      if (
-        error instanceof ApiClientError &&
-        (error.status === 401 || error.status === 403)
-      ) {
-        throw error;
-      }
-      if (error instanceof StreamedRunFailedError) {
-        throw error;
-      }
-      await waitForDesignRunSnapshot(runId, onEvent, scopedProjectId);
-      return;
-    }
+    await waitForDesignRunSnapshot(runId, onEvent, projectId, options);
+    return;
   }
   const subscription = subscribeToRunEvents(`/api/design-runs/${runId}/events`, {
     onEvent,
-    onError: () => waitForDesignRunSnapshot(runId, onEvent, projectId),
+    onError: () => waitForDesignRunSnapshot(runId, onEvent, projectId, options),
   });
   await subscription.closed;
 }
-
-
 
 export async function subscribeToDocumentRunEvents({
   runId,
   projectId,
   onEvent,
-}: RunSubscriptionInput) {
+  ...options
+}: RunSubscriptionInput<DocumentRunSnapshot>) {
   if (projectId) {
-    const scopedProjectId = requireProjectScope(projectId);
-    try {
-      await streamProjectRunEvents(
-        `/api/document-runs/${runId}/events`,
-        scopedProjectId,
-        onEvent,
-      );
-      return;
-    } catch (error) {
-      if (
-        error instanceof ApiClientError &&
-        (error.status === 401 || error.status === 403)
-      ) {
-        throw error;
-      }
-      if (error instanceof StreamedRunFailedError) {
-        throw error;
-      }
-      await waitForDocumentRunSnapshot(runId, onEvent, scopedProjectId);
-      return;
-    }
+    await waitForDocumentRunSnapshot(runId, onEvent, projectId, options);
+    return;
   }
-  const subscription = subscribeToRunEvents(
-    `/api/document-runs/${runId}/events`,
-    {
-      onEvent,
-      onError: () => waitForDocumentRunSnapshot(runId, onEvent, projectId),
-    },
-  );
+  const subscription = subscribeToRunEvents(`/api/document-runs/${runId}/events`, {
+    onEvent,
+    onError: () => waitForDocumentRunSnapshot(runId, onEvent, projectId, options),
+  });
   await subscription.closed;
 }
 
@@ -510,28 +553,15 @@ export async function subscribeToFeasibilityRunEvents({
   runId,
   projectId,
   onEvent,
-}: RunSubscriptionInput) {
+  ...options
+}: RunSubscriptionInput<FeasibilityRunSnapshot>) {
   if (projectId) {
-    const scopedProjectId = requireProjectScope(projectId);
-    try {
-      await streamProjectRunEvents(
-        `/api/feasibility-runs/${runId}/events`,
-        scopedProjectId,
-        onEvent,
-      );
-      return;
-    } catch (error) {
-      if (error instanceof ApiClientError && (error.status === 401 || error.status === 403)) {
-        throw error;
-      }
-      if (error instanceof StreamedRunFailedError) throw error;
-      await waitForFeasibilityRunSnapshot(runId, onEvent, scopedProjectId);
-      return;
-    }
+    await waitForFeasibilityRunSnapshot(runId, onEvent, projectId, options);
+    return;
   }
   const subscription = subscribeToRunEvents(`/api/feasibility-runs/${runId}/events`, {
     onEvent,
-    onError: () => waitForFeasibilityRunSnapshot(runId, onEvent, projectId),
+    onError: () => waitForFeasibilityRunSnapshot(runId, onEvent, projectId, options),
   });
   await subscription.closed;
 }

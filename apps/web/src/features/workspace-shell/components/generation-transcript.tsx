@@ -11,8 +11,6 @@ import { Shimmer } from "../../../shared/ui/ai/shimmer";
 import { cn } from "../../../shared/ui/utils";
 import type { TranscriptCall, TranscriptStep } from "../lib/generation-transcript";
 import { useTranscriptScroll } from "../lib/use-transcript-scroll";
-import { DiagramReviewDetails } from "../../../entities/diagram/components/diagram-review-details";
-import { reviewProblemGroups } from "../../../entities/diagram/lib/review-presentation";
 
 const statusText: Record<TranscriptCall["status"], string> = {
   queued: "排队中", running: "正在处理", completed: "已完成", failed: "未完成", cancelled: "已停止", pending_review: "待确认",
@@ -51,43 +49,43 @@ function QueueProgress({ queue }: { queue: GenerationQueueDetails }) {
   </section>;
 }
 
-function ProcessCall({ call, showTitle }: { call: TranscriptCall; showTitle: boolean }) {
+function ProcessCall({ call, showTitle, visual }: { call: TranscriptCall; showTitle: boolean; visual: boolean }) {
   const Icon = call.status === "completed" ? Check : call.status === "failed" ? X : Circle;
   // The task drawer shows progress, not generated prose; never parse or mount provider output here.
   return <div data-slot="generation-call" className="min-w-0 space-y-2 text-sm leading-6 text-muted-foreground">
     {showTitle && <div className="flex items-start gap-2">
       <Icon aria-hidden="true" className={cn("mt-1.5 size-3 shrink-0", call.status === "failed" && "text-destructive")} />
       <span className="min-w-0 flex-1 break-words">{call.title}</span>
-      <span className="shrink-0 text-xs leading-6">{statusText[call.status]}</span>
+      <span className="shrink-0 text-xs leading-6">{visual && call.status === "pending_review" ? "检查已结束" : statusText[call.status]}</span>
     </div>}
     {call.inputImages?.filter((image) => /^(?:https?:\/\/|data:image\/(?:png|jpe?g|gif|webp);base64,)/i.test(image.url)).map((image) => <ChainOfThoughtImage key={image.url} caption={image.caption ?? `${call.title}使用的图片`}>
       <img src={image.url} alt={image.caption ?? `${call.title}的输入图片`} className="max-h-80 max-w-full object-contain" loading="lazy" />
     </ChainOfThoughtImage>)}
-    {call.review && <DiagramReviewDetails review={call.review} />}
-    {call.message && !["failed", "pending_review"].includes(call.status) && /修复|重试|补跑|人工确认|跳过/.test(call.message) && <p className="break-words">{call.message}</p>}
+    {!visual && call.message && !["failed", "pending_review"].includes(call.status) && /修复|重试|补跑|人工确认|跳过/.test(call.message) && <p className="break-words">{call.message}</p>}
   </div>;
 }
 
 function Stage({ step, active }: { step: TranscriptStep; active: boolean }) {
-  const currentStatus = active ? step.calls.some((call) => call.thinking) ? "正在分析" : "正在处理" : statusText[step.status];
+  const currentStatus = active ? step.calls.some((call) => call.thinking) ? "正在分析" : "正在处理" : step.stage === "verify_diagram_visual" && step.status === "pending_review" ? "检查已结束" : statusText[step.status];
   // Retain repair explanations, but avoid filling the reading surface with successive progress notices.
-  const messages = step.messages.filter((message, index) => /修复|重试|失败|复核/.test(message) || index === step.messages.length - 1);
+  const messages = step.stage === "verify_diagram_visual" ? [] : step.messages.filter((message, index) => /修复|重试|失败|复核/.test(message) || index === step.messages.length - 1);
   const Icon = active ? LoaderCircle : step.status === "failed" ? X : step.stage.includes("verify") ? ScanEye : step.stage.includes("render") ? ImageIcon : FileText;
   return <ChainOfThoughtStep aria-label={step.title} data-testid="generation-task-step" data-active-step={active}
     icon={Icon} iconClassName={active ? "animate-spin motion-reduce:animate-none" : undefined}
     label={active ? <Shimmer>{step.title}</Shimmer> : step.title} status={active ? "active" : step.status === "queued" ? "pending" : "complete"} statusLabel={currentStatus}>
     {messages.map((message) => <p key={message} className="whitespace-pre-wrap break-words">{message}</p>)}
-    {step.calls.map((call) => <ProcessCall key={call.id} call={call} showTitle={step.calls.length > 1} />)}
+    {step.calls.map((call) => <ProcessCall key={call.id} call={call} showTitle={step.calls.length > 1} visual={step.stage === "verify_diagram_visual"} />)}
   </ChainOfThoughtStep>;
 }
 
 function TaskIssues({ steps, canRetry, onRetry }: { steps: TranscriptStep[]; canRetry: boolean; onRetry?: (id: string) => void }) {
-  const issues = steps.flatMap((step) => step.calls.filter((call) => ["failed", "pending_review"].includes(call.status)).map((call) => ({ call, key: `${step.id ?? step.stage}:${call.id}` })));
+  // Review observations are advisory records, not task failures; keep them out of the drawer.
+  const issues = steps.flatMap((step) => step.calls.filter((call) => call.status === "failed" || (call.status === "pending_review" && step.stage !== "verify_diagram_visual")).map((call) => ({ call, visual: step.stage === "verify_diagram_visual", key: `${step.id ?? step.stage}:${call.id}` })));
   if (!issues.length) return null;
   // Actionable results remain visible when the reader folds the task's timeline.
   return <div className="space-y-3" data-slot="generation-task-issues">
-    {issues.map(({ call, key }) => <div key={key} className={cn("text-sm leading-6", call.status === "failed" ? "text-destructive" : "text-warning")}>
-      <p>{call.title}：{call.review ? `结构检查有 ${reviewProblemGroups(call.review).reduce((count, group) => count + group.items.length, 0)} 条记录，请在思考过程中按分类查看。` : call.message || (call.status === "failed" ? "本次处理未完成。" : "有追踪关系需要确认。")}</p>
+    {issues.map(({ call, visual, key }) => <div key={key} className={cn("text-sm leading-6", call.status === "failed" ? "text-destructive" : "text-warning")}>
+      <p>{call.title}：{visual ? "视觉检查未完成，可重试。" : call.message || (call.status === "failed" ? "本次处理未完成。" : "有追踪关系需要确认。")}</p>
       {canRetry && call.status === "failed" && call.subtaskId && onRetry && <Button size="sm" variant="link" className="h-auto px-0 py-0" title={call.subtaskId.includes(":") ? "当前重试按模型类型执行，会重试同类模型而不是单个实例" : "重试此模型"} onClick={() => onRetry(call.subtaskId!)}>{call.subtaskId.includes(":") ? "重试全部同类模型" : "重试此模型"}</Button>}
     </div>)}
   </div>;

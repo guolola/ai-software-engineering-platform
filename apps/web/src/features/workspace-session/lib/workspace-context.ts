@@ -37,6 +37,7 @@ import {
 
 export type ApplyRunSnapshotOptions = {
   preserveRuleReviewState?: boolean;
+  persistRuleState?: boolean;
 };
 
 export type DesignRequirementContext = {

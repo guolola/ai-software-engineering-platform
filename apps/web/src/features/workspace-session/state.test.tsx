@@ -19,6 +19,8 @@ import type {
   RequirementBaseline,
   UseCaseDiagramSpec,
 } from "@uml-platform/contracts";
+import { designRunSnapshotSchema } from "@uml-platform/contracts";
+import { deriveSidebarDiagramState } from "../workspace-shell/lib/sidebar-menu-model";
 import type {
   StartRunInput,
   WorkspaceRepository,
@@ -140,6 +142,60 @@ function deferred<T>() {
 }
 
 describe("WorkspaceSessionProvider", () => {
+  it.each(["requirements", "design"] as const)("restores completed %s models immediately when reopening a running batch", async (kind) => {
+    const runId = `reopened-${kind}`;
+    const modelId = "class:restored";
+    const base = createRunSnapshot({ runId, requirementText: "订单需求", selectedDiagrams: ["class", "deployment"],
+      status: "running", currentStage: "generate_models", models: [{
+        diagramKind: "class", modelId, title: "已完成的类图", summary: "类图", notes: [],
+        classes: [], interfaces: [], enums: [], relationships: [],
+      }], plantUml: [{ diagramKind: "class", modelId, source: "@startuml\n@enduml" }],
+      svgArtifacts: [{ diagramKind: "class", modelId, svg: "<svg>已完成</svg>", renderMeta: {
+        engine: "plantuml", generatedAt: "2026-10-10T00:00:00.000Z", sourceLength: 18, durationMs: 1,
+      } }],
+    });
+    const snapshot = kind === "design" ? designRunSnapshotSchema.parse({ ...base,
+      currentStage: "generate_design_models", requirementModels: [], designModelTraceability: [], designTrace: [],
+    }) : base;
+    let signal: AbortSignal | undefined;
+    const subscribe = vi.fn(async (_runId, _onEvent, options) => {
+      signal = options.signal;
+      await new Promise<void>((resolve) => options.signal.addEventListener("abort", () => resolve(), { once: true }));
+    });
+    const repository: WorkspaceRepository = {
+      loadWorkspace: vi.fn(async () => createWorkspaceRecord({ requirementText: "订单需求" })),
+      updateRequirementText: vi.fn(async () => {}), startRun: vi.fn(),
+      subscribeToRun: subscribe, subscribeToDesignRun: subscribe,
+      getRunSnapshot: vi.fn(async () => base), getDesignRunSnapshot: vi.fn(async () => snapshot as DesignRunSnapshot),
+      renderPlantUml: vi.fn(), testProviderSettings: vi.fn(), saveRunHistory: vi.fn(),
+      listRunHistory: vi.fn(async () => []), restoreRunHistory: vi.fn(async () => null),
+      deleteRunHistory: vi.fn(async () => []), clearRunHistory: vi.fn(async () => {}),
+    };
+    const { result, unmount } = renderHook(() => useWorkspaceSession(), {
+      wrapper: ({ children }) => withWorkspaceProviders(children, repository),
+    });
+    await waitFor(() => expect(result.current.workspaceInitialized).toBe(true));
+    const projectRun = { runId, status: "running", runKind: kind, selectedDiagrams: ["class", "deployment"] as const };
+    act(() => result.current.reconcileGenerationTasksWithProjectRuns([{ ...projectRun, selectedDiagrams: [...projectRun.selectedDiagrams] }]));
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+    expect(repository.startRun).not.toHaveBeenCalled();
+    expect(result.current.generationTasks[0]).toMatchObject({ runId, status: "running" });
+    const sidebar = deriveSidebarDiagramState({
+      models: result.current.models, svgArtifacts: result.current.svgArtifacts, diagramErrors: result.current.diagramErrors,
+      designModels: result.current.designModels, designSvgArtifacts: result.current.designSvgArtifacts, designDiagramErrors: result.current.designDiagramErrors,
+      generatedDiagrams: result.current.generatedDiagrams, generatedDesignDiagrams: result.current.generatedDesignDiagrams,
+      staleDiagrams: [], staleDesignDiagrams: [], staleDesignModelIds: [], generationTasks: result.current.generationTasks,
+      projectRuns: [{ ...projectRun, selectedDiagrams: [...projectRun.selectedDiagrams] }],
+    });
+    expect(kind === "design" ? sidebar.designStatusFor("class", modelId) : sidebar.requirementStatusFor("class", modelId)).toBe("completed");
+    expect(kind === "design" ? sidebar.designModelViewable("class", modelId) : sidebar.requirementModelViewable("class", modelId)).toBe(true);
+    expect(kind === "design" ? sidebar.designStatusFor("deployment") : sidebar.requirementStatusFor("deployment")).toBe("running");
+    act(() => result.current.reconcileGenerationTasksWithProjectRuns([{ ...projectRun, selectedDiagrams: [...projectRun.selectedDiagrams] }]));
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(signal?.aborted).toBe(true);
+  });
+
   it("refreshes workspace and history after the browser comes back online without an active generation task", async () => {
     let loadCount = 0;
     const repository: WorkspaceRepository = {

@@ -425,9 +425,11 @@ test("accounts with no projects can create personal tokens before creating their
   s.authStore.updateUser(user.id, { status: "disabled" });
   await assert.rejects(() => service.list_projects(mcpListProjectsInputSchema.parse({})), { code: "invalid_token" });
 });
-test("OAuth PKCE login, project consent, refresh and revocation round-trip", async (t) => {
+test("OAuth PKCE account consent without projects follows live access through refresh and revocation", async (t) => {
   const s = await setup();
   t.after(() => s.app.close());
+  // An empty account can authorize before creating or joining its first project.
+  s.authStore.deleteMember(s.ownerMember.id);
   const jar = new Map<string, string>();
   jar.set("uml_session", s.browserHeaders.cookie.slice("uml_session=".length));
   const send = async (
@@ -469,7 +471,7 @@ test("OAuth PKCE login, project consent, refresh and revocation round-trip", asy
   const consent = await send(
     `/api/mcp/interactions/${uid}`,
     "POST",
-    { projectIds: [s.a.id], csrf: info.csrf },
+    { csrf: info.csrf },
     { "x-mcp-csrf": info.csrf },
   );
   assert.equal(consent.statusCode, 200, consent.body);
@@ -506,7 +508,25 @@ test("OAuth PKCE login, project consent, refresh and revocation round-trip", asy
   const principal = await s.access.authenticate(
     `Bearer ${tokens.access_token}`,
   );
-  assert.deepEqual(principal.projectIds, [s.a.id]);
+  assert.deepEqual(principal.projectIds, []);
+  const connections = (await send("/api/mcp/connections")).json().connections;
+  assert.equal(connections.find((connection: { id: string }) => connection.id === principal.id).projectScope, "account");
+  const service = createMcpToolService(s.access, principal);
+  assert.deepEqual((await service.list_projects(mcpListProjectsInputSchema.parse({}))).data.items, []);
+  const later = await s.authStore.createProject({ ownerUserId: s.alice.id, name: "Later OAuth project", description: "", visibility: "private" });
+  assert.deepEqual(((await service.list_projects(mcpListProjectsInputSchema.parse({}))).data.items as { id: string }[]).map((project) => project.id), [later.project.id]);
+  assert.equal((await service.get_implementation_context(mcpContextInputSchema.parse({ projectId: later.project.id }))).status, "ok");
+  await assert.rejects(() => service.get_implementation_context(mcpContextInputSchema.parse({ projectId: s.b.id })), { code: "access_denied" });
+  s.authStore.deleteMember(later.ownerMember.id);
+  await assert.rejects(() => service.get_implementation_context(mcpContextInputSchema.parse({ projectId: later.project.id })), { code: "access_denied" });
+  assert.deepEqual((await service.list_projects(mcpListProjectsInputSchema.parse({}))).data.items, []);
+  const joined = s.authStore.createMember({
+    projectId: s.a.id, userId: s.alice.id, email: s.alice.email, displayName: s.alice.displayName,
+    role: "viewer", status: "active", invitedByUserId: null, invitedAt: null, joinedAt: new Date().toISOString(),
+  });
+  assert.equal((await service.get_implementation_context(mcpContextInputSchema.parse({ projectId: s.a.id }))).status, "ok");
+  assert.deepEqual(((await service.list_projects(mcpListProjectsInputSchema.parse({}))).data.items as { id: string }[]).map((project) => project.id), [s.a.id]);
+  s.authStore.deleteMember(joined.id);
   assert.ok(tokens.refresh_token);
   const refreshed = await send(
     "/api/mcp/oauth/token",
@@ -520,6 +540,8 @@ test("OAuth PKCE login, project consent, refresh and revocation round-trip", asy
     { "content-type": "application/x-www-form-urlencoded" },
   );
   assert.equal(refreshed.statusCode, 200, refreshed.body);
+  const refreshedPrincipal = await s.access.authenticate(`Bearer ${refreshed.json().access_token}`);
+  assert.deepEqual(refreshedPrincipal.projectIds, []);
   const admin = s.authStore.createUser({ email: "oauth-admin@example.test", displayName: "MCP Admin", passwordHash: "unused", systemRoles: ["security_admin"] });
   s.authStore.updateUser(admin.id, { mfaEnabled: true });
   const adminSession = s.authStore.createSession({ userId: admin.id, ipAddress: null, userAgent: null });

@@ -45,7 +45,11 @@ test("PostgreSQL migration, shared instances, atomic consumption, expiry and res
   assert.deepEqual(new Set((await second.listAdminConnections()).map((c) => c.id)), new Set(["grant", "account-token"]));
   assert.deepEqual(await second.findToken("account-token-hash"), accountToken);
   assert.equal(hasAccountProjectScope(accountToken), true);
-  assert.equal(hasAccountProjectScope({ kind: "oauth", projectIds: [] }), false);
+  const accountGrant: McpConnection = { ...connection, id: "account-grant", projectIds: [] };
+  await first.putConnection(accountGrant);
+  assert.deepEqual(await second.getConnection(accountGrant.id), accountGrant);
+  assert.equal(hasAccountProjectScope(accountGrant), true);
+  assert.equal(hasAccountProjectScope(connection), false);
   await first.putEntity({
     model: "AuthorizationCode",
     id: "code",
@@ -98,6 +102,9 @@ test("PostgreSQL migration, shared instances, atomic consumption, expiry and res
     const persistedAccount = await persisted.findToken("account-token-hash");
     assert.ok(persistedAccount);
     assert.equal(hasAccountProjectScope(persistedAccount), true);
+    const persistedGrant = await persisted.getConnection(accountGrant.id);
+    assert.ok(persistedGrant);
+    assert.equal(hasAccountProjectScope(persistedGrant), true);
     assert.ok(
       (await persisted.findEntity("AuthorizationCode", "id", "code"))?.consumed,
     );

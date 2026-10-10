@@ -124,7 +124,7 @@ export function createOAuthProvider(
       return { accountId: id, claims: async () => ({ sub: id }) };
     },
     async loadExistingGrant(ctx) {
-      // A resumed explicit consent may load its grant; a new authorization always selects projects again.
+      // Resume only the explicitly confirmed grant; a new authorization requires account consent again.
       const id = ctx.oidc.result?.consent?.grantId;
       if (!id) return undefined;
       const connection = await store.getConnection(id);

@@ -1489,7 +1489,8 @@ describe("App shell routes", () => {
     expect(screen.queryByRole("heading", { name: "编程助手" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("使用的软件")).not.toBeInTheDocument();
     expect(screen.queryByText("如何根据项目资料开始实现？")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "授权读取所选项目" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "授权读取全部项目" })).toBeEnabled();
+    expect(screen.queryByRole("combobox", { name: "允许读取的项目" })).not.toBeInTheDocument();
 
     act(() => {
       window.history.pushState({}, "", "/projects/connections");

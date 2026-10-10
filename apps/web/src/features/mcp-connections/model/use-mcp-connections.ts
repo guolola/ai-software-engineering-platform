@@ -7,7 +7,6 @@ export function useMcpConnections(interactionId: string | null, onNavigate: (pat
   const { t } = useTranslation();
   const [info, setInfo] = useState<ConnectionInfo | null>(null);
   const [client, setClient] = useState<{ clientName: string; clientId: string } | null>(null);
-  const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState("");
@@ -37,7 +36,6 @@ export function useMcpConnections(interactionId: string | null, onNavigate: (pat
       if (!active.current || controller.signal.aborted || generation !== revision.current) return;
       setInfo(response);
       setClient(details);
-      setSelected((current) => current.filter((id) => response.projects?.some((project) => project.id === id)));
       setError("");
     } catch (failure) {
       if (!controller.signal.aborted && generation === revision.current) report(failure);
@@ -54,7 +52,6 @@ export function useMcpConnections(interactionId: string | null, onNavigate: (pat
     revision.current += 1;
     setLoading(true);
     setInfo(null);
-    setSelected([]);
     setToken("");
     setClient(null);
     setError("");
@@ -104,7 +101,7 @@ export function useMcpConnections(interactionId: string | null, onNavigate: (pat
     window.location.assign(target.href);
   }
   return {
-    info, client, selected, setSelected, error, busy, token, setToken, loading, refreshing,
+    info, client, error, busy, token, setToken, loading, refreshing,
     retry: () => { if (!busyRef.current) void reload(); },
     create: (name: string) => mutate(async () => {
       if (!name.trim() || !info?.csrf || !info.enabled || error) throw new Error(t("mcp.operationFailed"));
@@ -119,8 +116,8 @@ export function useMcpConnections(interactionId: string | null, onNavigate: (pat
       await reload();
     }),
     consent: () => mutate(async () => {
-      if (!interactionId || !client || !selected.length || !info?.csrf || !info.enabled) throw new Error(t("mcp.selectRequired"));
-      finish((await mcpApi.consent(interactionId, selected, info.csrf)).redirect);
+      if (!interactionId || !client || !info?.csrf || !info.enabled || error) throw new Error(t("mcp.operationFailed"));
+      finish((await mcpApi.consent(interactionId, info.csrf)).redirect);
     }),
     deny: () => mutate(async () => { if (interactionId && info?.csrf) finish((await mcpApi.deny(interactionId, info.csrf)).redirect); }),
   };

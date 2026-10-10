@@ -116,7 +116,7 @@ export function createPlatformMcpServer(
   register(
     "list_projects",
     mcpListProjectsInputSchema,
-    "搜索已授权项目并分页读取。使用返回的稳定 id，不按名称猜选；无结果时请学生在平台授权项目。",
+    "搜索账号可访问的项目并分页读取。使用返回的稳定 id，不按名称猜选；无结果时请学生确认项目存在及账号查看权限。",
     service.list_projects,
   );
   register(

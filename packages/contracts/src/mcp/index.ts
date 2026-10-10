@@ -69,7 +69,7 @@ export const mcpTokenCreateSchema = z
   .strict();
 export const mcpConsentSchema = z
   .object({
-    projectIds: z.array(id).min(1).max(100),
+    // Browser consent follows the account's live project permissions without a project snapshot.
     csrf: z.string().min(1).max(256),
   })
   .strict();

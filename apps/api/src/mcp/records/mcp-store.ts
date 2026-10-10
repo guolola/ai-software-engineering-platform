@@ -13,10 +13,10 @@ export type McpConnection = {
   revokedAt: string | null;
   lastUsedAt: string | null;
 };
-// Only personal tokens may use an empty project list for account-wide access.
-// Existing scoped tokens and OAuth grants retain their explicit project boundaries.
+// New OAuth grants and personal tokens use an empty list to follow live account permissions.
+// Existing nonempty project grants retain their explicit boundaries until reauthorization.
 export function hasAccountProjectScope(connection: Pick<McpConnection, "kind" | "projectIds">) {
-  return connection.kind === "pat" && connection.projectIds.length === 0;
+  return connection.projectIds.length === 0;
 }
 export type OAuthEntity = {
   model: string;

@@ -7,6 +7,9 @@ import type {
   RepairRequirementRulesRequest,
   RequirementBaseline,
   RunEvent,
+  RunSnapshot,
+  DesignRunSnapshot,
+  DocumentRunSnapshot,
   SvgArtifact,
   FeasibilityRunSnapshot,
 } from "@uml-platform/contracts";
@@ -83,6 +86,7 @@ import {
 import type {
   RequirementRulesUpdateMetadata,
   WorkspaceRepository,
+  RunSubscriptionOptions,
 } from "./types";
 
 interface WorkspaceRepositoryOptions {
@@ -497,8 +501,9 @@ export function createHttpWorkspaceRepository(
     async subscribeToFeasibilityRun(
       runId: string,
       onEvent: (event: RunEvent) => void,
+      options?: RunSubscriptionOptions<FeasibilityRunSnapshot>,
     ) {
-      await subscribeToFeasibilityRunEvents({ runId, projectId, onEvent });
+      await subscribeToFeasibilityRunEvents({ runId, projectId, onEvent, ...options });
     },
 
     async updateRequirementBaseline(baseline: RequirementBaseline) {
@@ -606,19 +611,21 @@ export function createHttpWorkspaceRepository(
       return startDocumentRunRequest(input, projectId);
     },
 
-    async subscribeToRun(runId: string, onEvent: (event: RunEvent) => void) {
+    async subscribeToRun(runId: string, onEvent: (event: RunEvent) => void, options?: RunSubscriptionOptions<RunSnapshot>) {
       await subscribeToRequirementRunEvents({
         runId,
         projectId,
         onEvent,
+        ...options,
       });
     },
 
     async subscribeToDesignRun(
       runId: string,
       onEvent: (event: RunEvent) => void,
+      options?: RunSubscriptionOptions<DesignRunSnapshot>,
     ) {
-      await subscribeToDesignRunEvents({ runId, projectId, onEvent });
+      await subscribeToDesignRunEvents({ runId, projectId, onEvent, ...options });
     },
 
     
@@ -626,8 +633,9 @@ export function createHttpWorkspaceRepository(
     async subscribeToDocumentRun(
       runId: string,
       onEvent: (event: RunEvent) => void,
+      options?: RunSubscriptionOptions<DocumentRunSnapshot>,
     ) {
-      await subscribeToDocumentRunEvents({ runId, projectId, onEvent });
+      await subscribeToDocumentRunEvents({ runId, projectId, onEvent, ...options });
     },
 
     async getRunSnapshot(runId: string) {

@@ -191,3 +191,16 @@ test("revocation is idempotent and records the administrator, owner and outcome"
   assert.equal(connections.connections[0].status, "revoked");
   assert.equal(connections.connections[0].activities.length, 2);
 });
+
+test("account-wide OAuth scope and project filters follow current membership", async () => {
+  const s = await fixture();
+  const connection = (await s.store.getConnection("a"))!;
+  await s.store.putConnection({ ...connection, id: "account-oauth", kind: "oauth", clientId: "agent", tokenHash: null });
+  const query = adminMcpQuerySchema.parse({ projectId: s.project.id, kind: "oauth" });
+  const list = await s.service.connections(query);
+  assert.equal(list.connections.find((item) => item.id === "account-oauth")?.projectScope, "account");
+  assert.equal(list.connections.find((item) => item.id === "expired")?.projectScope, "selected");
+  const member = s.authStore.findProjectMember(s.project.id, s.alice.id)!;
+  s.authStore.deleteMember(member.id);
+  assert.ok(!(await s.service.connections(query)).connections.some((item) => item.id === "account-oauth"));
+});

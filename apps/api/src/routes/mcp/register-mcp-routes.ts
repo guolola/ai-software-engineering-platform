@@ -272,7 +272,6 @@ export async function registerMcpRoutes(
           reply.raw,
           interactionParams.parse(req.params).uid,
           auth.user.id,
-          input.projectIds,
         );
       },
     );

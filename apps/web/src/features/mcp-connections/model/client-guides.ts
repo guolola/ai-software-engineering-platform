@@ -63,8 +63,8 @@ export function clientGuide(
       ? "After connecting, ask the agent to read a project accessible to your personal token and check the returned project."
       : "连接后，让 Agent 读取个人令牌可访问的项目，并核对返回的项目。"
     : en
-      ? "Complete platform authorization, explicitly select the projects to share, then ask the agent to read a project and verify the result."
-      : "在平台完成授权，明确选择允许访问的项目，再让 Agent 读取项目并核对结果。";
+      ? "Complete platform authorization for all projects accessible to your account, then ask the agent to read a project and verify the result."
+      : "在平台完成授权，默认读取账号可访问的全部项目，再让 Agent 读取项目并核对结果。";
   const guide = (source: string, zh: string[], english: string[], options: GuideOptions = {}): Guide => ({
     source,
     steps: [...(en ? english : zh), verify],

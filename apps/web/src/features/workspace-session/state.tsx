@@ -125,6 +125,8 @@ import { useGenerationModel } from "./lib/use-generation-model";
 import { generationModelBlockedReason as readGenerationModelBlockedReason } from "../../shared/lib/generation-model";
 import { useBillingGenerationBlock } from "./lib/billing-generation-block";
 import { useWorkspaceInitialization } from "./lib/workspace-initialization";
+import { useRecoveredGenerationRuns } from "./lib/recovered-generation-runs";
+import { updateTaskFromSnapshotArtifacts } from "./lib/snapshot-artifact-events";
 import { useLatestGenerationInputRef } from "./lib/latest-generation-input";
 import { useAutoCompletedRuleMappingActions } from "./lib/auto-completed-rule-mapping-actions";
 import { usePlantUmlRenderActions } from "./lib/plantuml-render-actions";
@@ -566,6 +568,8 @@ export function WorkspaceSessionProvider({
     enqueueGenerationTask,
     generating,
     generationTasks,
+    recoverGenerationTask,
+    serverRuns,
     reconcileGenerationTasksWithProjectRuns,
     selectGenerationTask,
     selectedGenerationTaskId,
@@ -628,6 +632,7 @@ export function WorkspaceSessionProvider({
   );
   const generationTasksRef = useRef(generationTasks);
   generationTasksRef.current = generationTasks;
+  const getGenerationTasks = useCallback(() => generationTasksRef.current, []);
   const getHasActiveGenerationTask = useCallback(
     () =>
       generationTasksRef.current.some(
@@ -756,7 +761,7 @@ export function WorkspaceSessionProvider({
           );
         setRules(snapshot.rules);
         setRequirementModelTraceability(nextRequirementModelTraceability);
-        void repository.updateRequirementRules?.(snapshot.rules, {
+        if (options?.persistRuleState !== false) void repository.updateRequirementRules?.(snapshot.rules, {
           sourceRunId: snapshot.runId,
           requirementInputFingerprint: activeRequirementFingerprint,
           rulesBasedOnTextVersion: baseTextVersion,
@@ -769,7 +774,7 @@ export function WorkspaceSessionProvider({
             snapshot.requirementBaseline?.qualityReport ?? null,
           );
           setRequirementReviewCandidates({});
-          void repository.updateRequirementReviewCandidates?.({}, { sourceRunId: snapshot.runId });
+          if (options?.persistRuleState !== false) void repository.updateRequirementReviewCandidates?.({}, { sourceRunId: snapshot.runId });
         }
       }
       setRulesVersion(nextRulesVersion);
@@ -897,7 +902,8 @@ export function WorkspaceSessionProvider({
       const previewAffectedDesignDiagrams =
         snapshot.status === "running"
           ? orderedDesignDiagrams(
-              generatedOverride ?? successfulDesignDiagramsFromSnapshot(snapshot),
+              (generatedOverride ?? successfulDesignDiagramsFromSnapshot(snapshot))
+                .filter((diagram) => snapshot.selectedDiagrams.includes(diagram)),
             )
           : [];
       const mergeAffectedDesignDiagrams =
@@ -1046,6 +1052,31 @@ export function WorkspaceSessionProvider({
     },
     [],
   );
+
+  useRecoveredGenerationRuns({
+    initialized: workspaceInitialized,
+    repository,
+    runs: serverRuns,
+    getTasks: getGenerationTasks,
+    recoverTask: recoverGenerationTask,
+    onEvent: (taskId, event) => updateGenerationTask(taskId, (task) =>
+      updateTaskFromEvent(task, event, { queued: "任务已进入队列", completed: "生成完成" })),
+    onSnapshot: (taskId, snapshot) => {
+      updateGenerationTask(taskId, (task) => updateTaskFromSnapshotArtifacts(task, snapshot));
+      if ("requirementModels" in snapshot) {
+        applyDesignRunSnapshot(snapshot, snapshot.requestedDiagrams ?? snapshot.selectedDiagrams,
+          snapshot.svgArtifacts.map((artifact) => artifact.diagramKind));
+      } else if (snapshot.selectedDiagrams.length > 0) {
+        const diagrams = snapshot.status === "queued" || snapshot.status === "running"
+          ? [...new Set(snapshot.svgArtifacts.map((artifact) => artifact.diagramKind))]
+          : snapshot.selectedDiagrams;
+        if (diagrams.length > 0) applyRunSnapshot(snapshot, textVersion, { kind: "partial-diagrams", diagrams });
+      } else if (snapshot.status === "completed") {
+        // Observing another server run must not issue new workspace writes.
+        applyRunSnapshot(snapshot, textVersion, { kind: "rules-only" }, { persistRuleState: false });
+      }
+    },
+  });
 
   const applyRestoredSnapshot = useCallback(
     (snapshot: RunHistorySnapshot) => {
@@ -1226,6 +1257,7 @@ export function WorkspaceSessionProvider({
           providerModel,
         }));
 
+        let snapshotRefreshRevision = 0;
         await repository.subscribeToRun(runId, (event) => {
           if (mode.kind === "rules-only" && event.type === "completed") {
             lastCompletedSnapshot = event.snapshot as WorkspaceRunSnapshot;
@@ -1243,6 +1275,7 @@ export function WorkspaceSessionProvider({
             return;
           }
 
+          if (event.type === "completed" || event.type === "failed" || event.type === "cancelled") snapshotRefreshRevision += 1;
           const progress = getProgressFromEvent(event);
           if (event.type === "completed") {
             lastCompletedSnapshot = event.snapshot as WorkspaceRunSnapshot;
@@ -1259,11 +1292,13 @@ export function WorkspaceSessionProvider({
                     diagrams: [eventDiagramKind as DiagramType],
                   }
                 : mode;
+            const refreshRevision = ++snapshotRefreshRevision;
             void repository
               .getRunSnapshot(runId)
               .then((partialSnapshot) => {
                 if (
                   partialSnapshot &&
+                  refreshRevision === snapshotRefreshRevision &&
                   runController.isCurrentRun(runRequestId, "requirements")
                 ) {
                   applyRunSnapshot(
@@ -1288,6 +1323,15 @@ export function WorkspaceSessionProvider({
               completed: "生成完成",
             }),
           );
+        }, {
+          signal: runController.getSubscriptionSignal(),
+          onSnapshot: (partialSnapshot) => {
+            if (mode.kind === "rules-only" || !runController.isCurrentRun(runRequestId, "requirements")) return;
+            snapshotRefreshRevision += 1;
+            updateGenerationTask(clientTaskId, (task) => updateTaskFromSnapshotArtifacts(task, partialSnapshot));
+            const diagrams = [...new Set(partialSnapshot.svgArtifacts.map((artifact) => artifact.diagramKind))];
+            if (diagrams.length > 0) applyRunSnapshot(partialSnapshot, baseTextVersion, { kind: "partial-diagrams", diagrams });
+          },
         });
 
         const snapshot =
@@ -1836,6 +1880,7 @@ export function WorkspaceSessionProvider({
           providerModel,
         }));
 
+        let snapshotRefreshRevision = 0;
         await repository.subscribeToDesignRun(runId, (event) => {
           if (clientTaskId) {
             updateGenerationTask(clientTaskId, (task) =>
@@ -1849,17 +1894,20 @@ export function WorkspaceSessionProvider({
             return;
           }
 
+          if (event.type === "completed" || event.type === "failed" || event.type === "cancelled") snapshotRefreshRevision += 1;
           const progress = getProgressFromEvent(event);
           if (event.type === "completed") {
             lastCompletedSnapshot =
               event.snapshot as WorkspaceDesignRunSnapshot;
           }
           if (runId && shouldRefreshRunSnapshotFromEvent(event)) {
+            const refreshRevision = ++snapshotRefreshRevision;
             void repository
               .getDesignRunSnapshot(runId)
               .then((partialSnapshot) => {
                 if (
                   partialSnapshot &&
+                  refreshRevision === snapshotRefreshRevision &&
                   runController.isCurrentRun(runRequestId, "design")
                 ) {
                   const generatedKinds = Array.from(
@@ -1891,6 +1939,15 @@ export function WorkspaceSessionProvider({
               completed: "设计生成完成",
             }),
           );
+        }, {
+          signal: runController.getSubscriptionSignal(),
+          onSnapshot: (partialSnapshot) => {
+            if (!runController.isCurrentRun(runRequestId, "design")) return;
+            snapshotRefreshRevision += 1;
+            updateGenerationTask(clientTaskId, (task) => updateTaskFromSnapshotArtifacts(task, partialSnapshot));
+            applyDesignRunSnapshot(partialSnapshot, requestedDiagrams,
+              partialSnapshot.svgArtifacts.map((artifact) => artifact.diagramKind));
+          },
         });
 
         const snapshot =

@@ -12,8 +12,11 @@ import {
   subscribeToDesignRunEvents,
   subscribeToDocumentRunEvents,
   subscribeToRequirementRunEvents,
+  subscribeToFeasibilityRunEvents,
+  streamProjectRunEvents,
 } from "./run-subscriptions";
 import { PROJECT_ID_HEADER } from "./project-scope";
+import { feasibilityInputsSchema, feasibilityRunSnapshotSchema } from "@uml-platform/contracts";
 
 function jsonResponse(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -58,6 +61,7 @@ function requirementSnapshot(
     svgArtifacts: [],
     diagramErrors: {},
     requirementTrace: [],
+    visualReviews: {},
     currentStage: "generate_models",
     status: "running",
     error: null,
@@ -85,6 +89,7 @@ function designSnapshot(
     svgArtifacts: [],
     diagramErrors: {},
     designTrace: [],
+    visualReviews: {},
     currentStage: "generate_design_models",
     status: "running",
     error: null,
@@ -110,6 +115,8 @@ function documentSnapshot(
     mimeType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     byteLength: 12,
+    feasibilityImplementationPlan: null,
+    feasibilityInputs: feasibilityInputsSchema.parse({}),
     missingArtifacts: [],
     currentStage: "render_document_file",
     status: "completed",
@@ -136,7 +143,113 @@ describe("run subscriptions", () => {
     vi.unstubAllGlobals();
   });
 
-  it("polls requirement snapshots until completion after a project SSE stream ends early", async () => {
+  it.each([
+    { kind: "requirements", path: "/api/runs", subscribe: subscribeToRequirementRunEvents, snapshot: requirementSnapshot() },
+    { kind: "design", path: "/api/design-runs", subscribe: subscribeToDesignRunEvents, snapshot: designSnapshot() },
+    { kind: "document", path: "/api/document-runs", subscribe: subscribeToDocumentRunEvents, snapshot: documentSnapshot({ status: "running" }) },
+    { kind: "feasibility", path: "/api/feasibility-runs", subscribe: subscribeToFeasibilityRunEvents, snapshot: feasibilityRunSnapshotSchema.parse({
+      runId: "run-feasibility-1", projectId: "project-a", selectedArtifacts: ["context"],
+      providerSettings: { providerConfigId: "provider", model: "model" }, rules: [], requirementBaseline: null,
+      inputs: {}, contextModel: null, contextPlantUml: null, contextSvg: null, implementationPlan: null,
+      contextFingerprint: null, implementationFingerprint: null, currentStage: "generate_context", status: "running", error: null,
+    }) },
+  ])("restores a $kind snapshot before reconnecting SSE", async ({ path, subscribe, snapshot }) => {
+    vi.useFakeTimers();
+    let connections = 0;
+    const onSnapshot = vi.fn();
+    const events: RunEvent[] = [];
+    const queued: RunEvent = { type: "queued", eventId: "queued-once" };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.endsWith(`${path}/${snapshot.runId}/events`)) {
+        connections += 1;
+        return eventStreamResponse(connections === 1 ? [queued] : [queued,
+          { type: "completed", eventId: "completed-once", snapshot: { ...snapshot, status: "completed" } }]);
+      }
+      return jsonResponse(snapshot);
+    }));
+    const subscription = subscribe({ runId: snapshot.runId, projectId: "project-a", onEvent: (event) => events.push(event), onSnapshot });
+    await vi.waitFor(() => expect(onSnapshot).toHaveBeenCalledTimes(1));
+    expect(connections).toBe(1);
+    expect(onSnapshot).toHaveBeenCalledWith(snapshot);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await subscription;
+    expect(connections).toBe(2);
+    expect(events.filter((event) => event.type === "queued")).toHaveLength(1);
+    expect(events.at(-1)?.type).toBe("completed");
+    expect(events.some((event) => event.type === "stage_progress" && event.message?.includes("轮询"))).toBe(false);
+  });
+
+  it("keeps synchronizing partial design results when repeated reconnects require polling", async () => {
+    vi.useFakeTimers();
+    let connections = 0;
+    let reads = 0;
+    const snapshots: DesignRunSnapshot[] = [];
+    const events: RunEvent[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.endsWith("/events")) {
+        connections += 1;
+        throw new TypeError("Failed to fetch");
+      }
+      reads += 1;
+      return jsonResponse(designSnapshot({
+        status: reads >= 7 ? "completed" : "running",
+        svgArtifacts: reads >= 5 ? [{ diagramKind: "navigation", modelId: "nav-1", svg: `<svg>${reads}</svg>`, renderMeta: {
+          engine: "plantuml", generatedAt: "2026-10-10T00:00:00.000Z", sourceLength: 18, durationMs: 1,
+        } }] : [],
+      }));
+    }));
+    const subscription = subscribeToDesignRunEvents({ runId: "run-design-1", projectId: "project-a",
+      onEvent: (event) => events.push(event), onSnapshot: (snapshot) => { snapshots.push(snapshot); } });
+    await vi.waitFor(() => expect(reads).toBe(1));
+    await vi.advanceTimersByTimeAsync(7_000);
+    expect(connections).toBe(4);
+    expect(reads).toBe(5);
+    expect(snapshots.at(-1)).toMatchObject({ status: "running", svgArtifacts: [{ modelId: "nav-1" }] });
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(reads).toBe(6);
+    expect(snapshots.at(-1)?.svgArtifacts[0].svg).toBe("<svg>6</svg>");
+    await vi.advanceTimersByTimeAsync(2_250);
+    await subscription;
+    expect(events.at(-1)?.type).toBe("completed");
+  });
+
+  it.each([401, 403, 404])("does not reconnect or poll a forbidden or missing SSE endpoint (%s)", async (status) => {
+    const fetchMock = vi.fn(async () => jsonResponse({ message: "unavailable" }, status));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(subscribeToRequirementRunEvents({ runId: "run-req-1", projectId: "project-a", onEvent: vi.fn() })).rejects.toMatchObject({ status });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels reconnection when the recovered page is unmounted", async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const onSnapshot = vi.fn();
+    const fetchMock = vi.fn(async (url: string) => url.endsWith("/events")
+      ? eventStreamResponse([]) : jsonResponse(requirementSnapshot()));
+    vi.stubGlobal("fetch", fetchMock);
+    const subscription = subscribeToRequirementRunEvents({ runId: "run-req-1", projectId: "project-a", onEvent: vi.fn(), onSnapshot, signal: controller.signal });
+    const rejected = expect(subscription).rejects.toMatchObject({ name: "AbortError" });
+    await vi.waitFor(() => expect(onSnapshot).toHaveBeenCalled());
+    controller.abort();
+    await rejected;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes a stream immediately after its terminal event without waiting for a server EOF", async () => {
+    const cancel = vi.fn();
+    const snapshot = requirementSnapshot({ status: "completed" });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: "completed", snapshot })}\n\n`)); },
+      cancel,
+    }))));
+    const onEvent = vi.fn();
+    await streamProjectRunEvents("/api/runs/run-req-1/events", "project-a", onEvent);
+    expect(onEvent).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("reconnects requirement SSE and deduplicates replay after an early disconnect", async () => {
     vi.useFakeTimers();
     let snapshotReads = 0;
     const events: RunEvent[] = [];
@@ -144,7 +257,7 @@ describe("run subscriptions", () => {
       "fetch",
       vi.fn(async (url: string) => {
         if (url.endsWith("/api/runs/run-req-1/events")) {
-          return eventStreamResponse([{ type: "queued" }]);
+          return eventStreamResponse([{ type: "queued", eventId: "queued-1" }]);
         }
         if (url.endsWith("/api/runs/run-req-1")) {
           snapshotReads += 1;

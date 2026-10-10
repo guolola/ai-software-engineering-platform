@@ -149,6 +149,7 @@ function retainGenerationTasksWithinCapacity(tasks: GenerationTask[]) {
 export function useGenerationTaskActions() {
   const [generationTasks, setGenerationTasks] = useState<GenerationTask[]>([]);
   const [activeServerRunIds, setActiveServerRunIds] = useState<string[]>([]);
+  const [serverRuns, setServerRuns] = useState<GenerationTaskRunSummary[]>([]);
   const [selectedGenerationTaskId, setSelectedGenerationTaskId] = useState<
     string | null
   >(null);
@@ -216,8 +217,31 @@ export function useGenerationTaskActions() {
     [],
   );
 
+  const recoverGenerationTask = useCallback((run: GenerationTaskRunSummary) => {
+    const clientTaskId = `recovered:${run.runId}`;
+    const kind = run.runKind as GenerationTaskKind;
+    const task = createGenerationTask({
+      clientTaskId,
+      kind,
+      title: kind === "design" ? "设计模型生成" : "需求模型生成",
+      providerModel: run.model ?? null,
+      startedAt: run.startedAt ?? run.createdAt ?? new Date().toISOString(),
+      message: "正在恢复任务进度",
+    });
+    setGenerationTasks((current) => current.some((item) => item.runId === run.runId)
+      ? current
+      : retainGenerationTasksWithinCapacity([{ ...task, runId: run.runId!, status: "running" }, ...current]));
+    return clientTaskId;
+  }, []);
+
   const reconcileGenerationTasksWithProjectRuns = useCallback(
     (runs: GenerationTaskRunSummary[]) => {
+      const recoveryRuns = runs.filter((run) =>
+        (run.status === "queued" || run.status === "running") &&
+        (run.runKind === "requirements" || run.runKind === "design"))
+        .map(({ runId, runKind, status, model, createdAt, startedAt, selectedDiagrams, requestedDiagrams }) =>
+          ({ runId, runKind, status, model, createdAt, startedAt, selectedDiagrams, requestedDiagrams }));
+      setServerRuns((current) => JSON.stringify(current) === JSON.stringify(recoveryRuns) ? current : recoveryRuns);
       setActiveServerRunIds(
         runs
           .filter(
@@ -282,6 +306,8 @@ export function useGenerationTaskActions() {
     enqueueGenerationTask,
     generating,
     generationTasks,
+    recoverGenerationTask,
+    serverRuns,
     reconcileGenerationTasksWithProjectRuns,
     selectGenerationTask,
     selectedGenerationTaskId,

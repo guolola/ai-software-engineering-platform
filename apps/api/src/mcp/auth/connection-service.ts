@@ -1,4 +1,4 @@
-// Manages explicit project grants after platform login; consent cannot be replayed or widen an existing grant.
+// Manages account-wide consent after platform login; each authorization creates a new, non-replayable grant.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Provider } from "oidc-provider";
 import type { McpAccess } from "./mcp-access.js";
@@ -50,10 +50,10 @@ export function createConnectionService(access: McpAccess, provider: Provider) {
       res: ServerResponse,
       uid: string,
       userId: string,
-      projectIds: string[],
     ) {
       const details = await interaction(req, res, uid);
-      await access.validateProjects(userId, projectIds);
+      const user = await access.authStore.getUser(userId);
+      if (!user || user.status !== "active") throw new McpAccessError(401, "login_required");
       // Adapter-level consume makes concurrent submissions fail closed, including on different API instances.
       await access.store.consumeEntity("Interaction", uid);
       const clientId = String(details.params.client_id);
@@ -72,7 +72,8 @@ export function createConnectionService(access: McpAccess, provider: Provider) {
         clientId,
         name: client?.clientName ?? clientId,
         kind: "oauth",
-        projectIds: [...new Set(projectIds)],
+        // Resolve project membership at read time, including projects created or joined later.
+        projectIds: [],
         tokenHash: null,
         createdAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
@@ -91,7 +92,7 @@ export function createConnectionService(access: McpAccess, provider: Provider) {
         targetType: "mcp_connection",
         targetId: id,
         outcome: "success",
-        message: JSON.stringify({ clientId, projectIds }),
+        message: JSON.stringify({ clientId, projectScope: "account" }),
       });
       return { redirect };
     },

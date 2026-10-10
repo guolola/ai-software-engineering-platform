@@ -120,6 +120,12 @@ export interface GenerationTask {
 
 export interface GenerationTaskRunSummary {
   runId?: string | null;
+  runKind?: string | null;
+  model?: string | null;
+  createdAt?: string | null;
+  startedAt?: string | null;
+  selectedDiagrams?: string[] | null;
+  requestedDiagrams?: string[] | null;
   status?: string | null;
   completedAt?: string | null;
   updatedAt?: string | null;

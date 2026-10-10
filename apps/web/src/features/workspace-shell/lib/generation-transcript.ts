@@ -83,6 +83,13 @@ function newCall(id: string, title: string, at?: string, subtaskId?: string): Tr
   return { id, title, subtaskId, startedAt: at, status: "running", output: "", reasoning: "", summary: "", thinking: false, technical: true };
 }
 
+function visualProgressMessage(status: TranscriptStatus, skipped = false) {
+  if (skipped) return "视觉检查已跳过";
+  if (status === "failed") return "视觉检查未完成，可重试。";
+  if (status === "completed" || status === "pending_review") return "视觉检查已结束";
+  return "正在检查模型与图形";
+}
+
 // Surface a real natural-language summary while JSON is arriving, without displaying its wire structure.
 export function readableOutput(call: TranscriptCall) {
   if (!call.technical) return call.output;
@@ -113,7 +120,7 @@ export function readableOutput(call: TranscriptCall) {
 }
 
 export function projectGenerationTranscript(events: RunEvent[], fallbackStatus = "running", subtasks: GenerationSubtask[] = [], currentVisualReviews: Record<string, DiagramVisualReview> = {}, options: { includeContent?: boolean } = {}) {
-  // Progress-only consumers retain lifecycle and findings without rebuilding large streamed text.
+  // The drawer keeps lifecycle state without projecting streamed text or large review findings.
   const includeContent = options.includeContent ?? true;
   const repairSubtask = subtasks.find((subtask) => subtask.id === "repair_rules");
   const rulesOnly = Boolean(repairSubtask) || events.some((event) =>
@@ -228,7 +235,9 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
     } else if (event.type === "stage_progress") {
       const step = getStep(event.stage);
       const subtaskId = event.subtaskId ?? event.modelId ?? event.diagramKind;
-      const text = event.message ? readableTaskText(event.message) : "";
+      const text = !includeContent && event.stage === "verify_diagram_visual"
+        ? visualProgressMessage(event.subtaskStatus === "repairing" || event.subtaskStatus === "rendering" ? "running" : event.subtaskStatus ?? "running", Boolean(event.message?.includes("跳过")))
+        : event.message ? readableTaskText(event.message) : "";
       if (subtaskId) {
         const call = getCall(step, `${event.stage}:${subtaskId}`, at, subtaskId, event.subtaskLabel);
         call.status = event.subtaskStatus === "repairing" || event.subtaskStatus === "rendering" ? "running" : event.subtaskStatus ?? "running";
@@ -289,7 +298,7 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
         const visualReviews = "visualReviews" in snapshot ? Object.entries(snapshot.visualReviews ?? {}) : [];
         const pending = visualReviews.filter(([id, review]) => review.status === "pending_review" && !isConfirmedVisualReview(review, currentVisualReviews[id])).length;
         const skipped = visualReviews.filter(([, review]) => review.status === "skipped").length;
-        finalMessage = `已生成 ${snapshot.svgArtifacts.length} 个图形预览。${pending ? `${pending} 个视觉检查待确认。` : ""}${skipped ? `${skipped} 个视觉检查已跳过。` : ""}`;
+        finalMessage = `已生成 ${snapshot.svgArtifacts.length} 个图形预览。${includeContent && pending ? `${pending} 个视觉检查待确认。` : ""}${skipped ? `${skipped} 个视觉检查已跳过。` : ""}`;
       }
       else finalMessage = "生成完成，可以查看结果。";
     } else if (event.type === "failed" || event.type === "cancelled") {
@@ -367,7 +376,9 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
         const savedReview = step.stage === "verify_diagram_visual" && completed && "visualReviews" in completed.snapshot
           ? completed.snapshot.visualReviews?.[rawId]
           : undefined;
-        call.message = visualReviewDetail(savedReview) ?? subtask.message ?? `有 ${subtask.pendingReviewCount ?? 1} 条追踪关系需复核`;
+        call.message = !includeContent && step.stage === "verify_diagram_visual"
+          ? visualProgressMessage("pending_review")
+          : visualReviewDetail(savedReview) ?? subtask.message ?? `有 ${subtask.pendingReviewCount ?? 1} 条追踪关系需复核`;
       }
       else if (subtask.status === "failed") {
         call.message = subtask.messageCode
@@ -413,15 +424,17 @@ export function projectGenerationTranscript(events: RunEvent[], fallbackStatus =
       for (const [subtaskId, call] of latestCalls) {
         const review = completed.snapshot.visualReviews?.[subtaskId];
         if (review) {
-          call.review = review;
+          if (includeContent) call.review = review;
           call.status = review.status === "pending_review" && !isConfirmedVisualReview(review, currentVisualReviews[subtaskId]) ? "pending_review" : "completed";
           call.message = isConfirmedVisualReview(review, currentVisualReviews[subtaskId])
-            ? "已人工确认当前图" : visualReviewDetail(review) ?? undefined;
+            ? "已人工确认当前图" : includeContent ? visualReviewDetail(review) ?? undefined : visualProgressMessage(call.status);
           call.thinking = false;
         }
         if (review?.status === "skipped") {
           call.status = "completed";
-          call.message = review.reason.includes("跳过") ? review.reason : `已跳过视觉检查：${review.reason}`;
+          call.message = includeContent
+            ? review.reason.includes("跳过") ? review.reason : `已跳过视觉检查：${review.reason}`
+            : visualProgressMessage("completed", true);
           call.thinking = false;
         }
       }
