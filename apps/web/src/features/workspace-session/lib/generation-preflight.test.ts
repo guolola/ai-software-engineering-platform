@@ -1,6 +1,7 @@
 // Verifies design generation preflight resumes failed batches without rerunning successful diagrams.
 import { describe, expect, it } from "vitest";
-import type { DesignDiagramModelSpec } from "@uml-platform/contracts";
+import { runSnapshotSchema, type DesignDiagramModelSpec } from "@uml-platform/contracts";
+import { librarySeatDemoFixture } from "../../../../../api/src/runs/demo/fixtures/library-seat-demo-fixture";
 import type { DesignDiagramType } from "../../../entities/diagram/model";
 import { createEmptyWorkspace } from "../../../services/workspace-repository/workspace-state";
 import { designInputFingerprint } from "../../../shared/lib/fingerprint";
@@ -84,6 +85,29 @@ function basePreflightInput() {
 }
 
 describe("analyzeDesignGenerationPreflight", () => {
+  it.each([true, false])("checks sequence coverage against custom saved use case keys: complete=%s", (complete) => {
+    const snapshot = runSnapshotSchema.parse(librarySeatDemoFixture.requirementSnapshot);
+    const useCase = snapshot.models.find((model) => model.diagramKind === "usecase")!;
+    if (!("useCases" in useCase)) throw new Error("Expected a use case fixture");
+    const targets = complete ? useCase.useCases : useCase.useCases.slice(1);
+    const preflight = analyzeDesignGenerationPreflight({
+      ...basePreflightInput(),
+      models: Object.fromEntries(snapshot.models.map((model) => [`saved-${model.modelId ?? model.diagramKind}`, model])),
+      requirementText: snapshot.requirementText,
+      requirementBaseline: snapshot.requirementBaseline,
+      rules: snapshot.rules,
+      requirementModelTraceability: snapshot.requirementModelTraceability,
+      designDiagramErrors: {},
+      designModels: Object.fromEntries(targets.map((item) => [item.id, {
+        ...designModel("sequence"), sourceUseCaseId: item.id,
+      }])),
+      selectedDesignDiagrams: ["class"],
+    });
+    expect(preflight.status).toBe(complete ? "ready" : "blocked");
+    if (preflight.status === "ready") expect(preflight.requirementPlan.effectiveDiagrams).toEqual([]);
+    if (preflight.status === "blocked") expect(preflight.block.message).toBe("已有用例实现设计覆盖不足，请先手动更新用例实现设计");
+  });
+
   it("resumes failed batch design generation without rerunning successful artifacts", () => {
     const preflight = analyzeDesignGenerationPreflight(basePreflightInput());
 

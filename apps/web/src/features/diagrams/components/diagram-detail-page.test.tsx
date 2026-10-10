@@ -156,7 +156,7 @@ describe("DiagramView", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows a saved visual judgment after loading the workspace", async () => {
+  it.each([false, true])("shows saved visual summaries without requiring acceptance: confirmed=%s", async (confirmed) => {
     const workspace = createWorkspaceRecord({
       generatedDiagramTypes: ["usecase"],
       models: { usecase: {
@@ -169,17 +169,11 @@ describe("DiagramView", () => {
         renderMeta: { engine: "plantuml", generatedAt: new Date().toISOString(), sourceLength: 1, durationMs: 1 },
       } },
       visualReviews: { "requirements:usecase": {
-        status: "pending_review", issues: ["标签不可读", "连线交叉"], reason: "视觉检查仍有问题，请人工确认", attempts: 3, checkedAt: new Date().toISOString(),
+        status: "pending_review", issues: ["标签不可读", "连线交叉"], reason: "视觉检查仍有问题，请人工确认", attempts: 3, structureAttempts: 1, repairAttempts: 0, checkedAt: new Date().toISOString(), confirmedAt: confirmed ? new Date().toISOString() : undefined,
       } },
     });
     const repository = createRepository(workspace);
-    repository.confirmVisualReview = vi.fn(async (key, checkedAt) => {
-      const review = workspace.visualReviews?.[key];
-      if (!review || review.checkedAt !== checkedAt) throw new Error("视觉检查结果已更新");
-      const saved = { ...review, confirmedAt: new Date().toISOString() };
-      workspace.visualReviews = { ...workspace.visualReviews, [key]: saved };
-      return saved;
-    });
+    repository.confirmVisualReview = vi.fn();
     const { unmount } = render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
     const noticeButton = await screen.findByRole("button", { name: /提示（\d+）/ });
     const heading = screen.getByRole("heading", { name: "用例模型", level: 1 });
@@ -191,18 +185,20 @@ describe("DiagramView", () => {
     expect(screen.queryByText("标签不可读")).not.toBeInTheDocument();
     await userEvent.click(noticeButton);
     const notice = await screen.findByRole("dialog", { name: "模型提示" });
-    expect(within(notice).getByText("标签不可读")).toBeInTheDocument();
+    expect(within(notice).queryByText("标签不可读")).not.toBeInTheDocument();
     expect(within(notice).queryByText("连线交叉")).not.toBeInTheDocument();
-    expect(within(notice).getByRole("heading", { name: "检查未完成或异常（1）" })).toBeVisible();
-    expect(within(notice).getByText(/已检查 3 次/)).toBeInTheDocument();
-    await userEvent.click(within(notice).getByRole("button", { name: "确认当前图" }));
-    expect(await within(notice).findByText("已人工确认当前图")).toBeInTheDocument();
+    expect(within(notice).queryByRole("heading", { name: "检查未完成或异常（1）" })).not.toBeInTheDocument();
+    expect(within(notice).getByText("结构核对 1 次 · 图片检查 3 次 · 纠错尝试 0 次")).toBeInTheDocument();
+    expect(within(notice).queryByRole("button", { name: "确认当前图" })).not.toBeInTheDocument();
+    expect(within(notice).getByText(confirmed ? "已人工确认当前图" : "检查已结束，原检查结论保留。")).toBeVisible();
+    expect(repository.confirmVisualReview).not.toHaveBeenCalled();
     const saved = await repository.loadWorkspace();
-    expect(saved.visualReviews?.["requirements:usecase"]).toEqual(expect.objectContaining({ status: "pending_review", confirmedAt: expect.any(String) }));
+    expect(saved.visualReviews?.["requirements:usecase"]).toEqual(workspace.visualReviews?.["requirements:usecase"]);
+    expect(Boolean(saved.visualReviews?.["requirements:usecase"].confirmedAt)).toBe(confirmed);
     unmount();
     render(withWorkspaceProviders(<DiagramView type="usecase" />, repository));
     await userEvent.click(await screen.findByRole("button", { name: /提示（\d+）/ }));
-    expect(within(await screen.findByRole("dialog", { name: "模型提示" })).getByText("已人工确认当前图")).toBeVisible();
+    expect(within(await screen.findByRole("dialog", { name: "模型提示" })).getByText(confirmed ? "已人工确认当前图" : "检查已结束，原检查结论保留。")).toBeVisible();
   });
 
   it("shows the successful visual review reason in the notice dialog", async () => {
@@ -235,7 +231,10 @@ describe("DiagramView", () => {
       expect(button).toHaveClass("w-auto", "shrink-0");
       expect(screen.queryByText("标签不可读")).not.toBeInTheDocument();
       await userEvent.click(button);
-      expect(within(await screen.findByRole("dialog", { name: "模型提示" })).getByText("标签不可读")).toBeVisible();
+      const notice = await screen.findByRole("dialog", { name: "模型提示" });
+      expect(within(notice).getByText("检查已结束，原检查结论保留。")).toBeVisible();
+      expect(within(notice).queryByText("标签不可读")).not.toBeInTheDocument();
+      expect(within(notice).queryByRole("button", { name: "确认当前图" })).not.toBeInTheDocument();
       expect(screen.queryByText(/手动修改会更新当前模型结构/)).not.toBeInTheDocument();
     } finally {
       restoreViewport();

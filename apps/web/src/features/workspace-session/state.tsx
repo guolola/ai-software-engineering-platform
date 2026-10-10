@@ -21,6 +21,7 @@ import type {
 } from "@uml-platform/contracts";
 import {
   getRequirementModelId,
+  findRequirementModelByKind,
   type DesignDiagramType,
   type DiagramType,
 } from "../../entities/diagram/model";
@@ -187,7 +188,7 @@ function downstreamDesignBlockReason(input: {
   const hasSequenceModels = Object.values(input.designModels).some(
     (model) => model.diagramKind === "sequence",
   );
-  const useCaseModel = input.models.usecase;
+  const useCaseModel = findRequirementModelByKind(input.models, "usecase");
   const hasUseCaseTargets =
     Boolean(useCaseModel) &&
     "useCases" in useCaseModel &&
@@ -1717,9 +1718,7 @@ export function WorkspaceSessionProvider({
           Array.from(
             new Set([
               ...generatedDiagrams,
-              ...(Object.keys(models).filter((diagram) =>
-                Boolean(models[diagram as DiagramType]),
-              ) as DiagramType[]),
+              ...collectExistingRequirementDiagramKinds(models),
             ]),
           ),
         );
@@ -2166,9 +2165,7 @@ export function WorkspaceSessionProvider({
           Array.from(
             new Set([
               ...generatedDiagrams,
-              ...(Object.keys(models).filter((diagram) =>
-                Boolean(models[diagram as DiagramType]),
-              ) as DiagramType[]),
+              ...collectExistingRequirementDiagramKinds(models),
             ]),
           ),
         );

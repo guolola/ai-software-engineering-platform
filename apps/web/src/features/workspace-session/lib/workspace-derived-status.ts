@@ -22,6 +22,7 @@ import {
 import {
   orderedDesignDiagrams,
   orderedRequirementDiagrams,
+  collectExistingRequirementDiagramKinds,
 } from "./generation-planning";
 
 type RunUiState = ReturnType<typeof createEmptyRunUiState>;
@@ -79,11 +80,7 @@ export function deriveWorkspaceStatus(input: WorkspaceDerivedStatusInput) {
           ? "text"
           : "rules";
 
-  const presentRequirementDiagrams = orderedRequirementDiagrams(
-    Object.keys(input.models).filter((diagram) =>
-      Boolean(input.models[diagram as DiagramType]),
-    ) as DiagramType[],
-  );
+  const presentRequirementDiagrams = collectExistingRequirementDiagramKinds(input.models);
   const generatedRequirementDiagramSet = new Set([
     ...input.generatedDiagrams,
     ...presentRequirementDiagrams,

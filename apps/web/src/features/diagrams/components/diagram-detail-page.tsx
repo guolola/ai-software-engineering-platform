@@ -44,7 +44,6 @@ import { useSvgPanZoom } from "../hooks/use-svg-pan-zoom";
 import { mobileTouchTargetClass } from "../../workspace-shell/components/mobile-density";
 import { localizeRunFailure } from "../../../shared/i18n/api-errors";
 import { useWorkspaceSession } from "../../workspace-session/state";
-import { visualReviewDetail } from "../../workspace-session/lib/visual-review-message";
 import {
   buildDiagramDetailModel,
   type DiagramDetailItem,
@@ -193,7 +192,6 @@ function DiagramDetailView({
     designDiagramErrors,
     generationTasks,
     visualReviews,
-    confirmVisualReview,
     canUpdateWorkspace,
     rulesForDiagram,
     staleDiagrams,
@@ -268,29 +266,17 @@ function DiagramDetailView({
   const savedReview = visualReviews[`${visualTaskKind}:${visualId}`];
   // A newer task may already be inspecting another render while the old workspace review is still loaded.
   const savedVisualReview = !visualTask || (taskVisualReview?.checkedAt === savedReview?.checkedAt && taskVisualReview?.inputFingerprint === savedReview?.inputFingerprint) ? savedReview : undefined;
-  const subtaskVisualMessage = visualSubtask?.message?.trim();
-  const savedVisualDetail = visualReviewDetail(savedVisualReview);
-  const visualConfirmed = savedVisualReview?.status === "pending_review" && Boolean(savedVisualReview.confirmedAt) &&
-    (!visualSubtask || visualSubtask.message === "已人工确认当前图");
-  // An older task may retain only the generic reason; the saved review carries its findings.
-  const pendingVisualDetail = subtaskVisualMessage &&
-    subtaskVisualMessage !== savedVisualReview?.reason &&
-    subtaskVisualMessage !== "请查看生成任务"
-      ? subtaskVisualMessage
-      : savedVisualDetail ?? subtaskVisualMessage ?? "请查看生成任务";
-  const visualStatus = visualConfirmed
-    ? "视觉检查：已人工确认当前图"
+  const currentVisualReview = savedVisualReview ?? taskVisualReview;
+  const visualConfirmed = Boolean(currentVisualReview?.confirmedAt);
+  const visualStatus = currentVisualReview
+    ? currentVisualReview.reason
     : visualSubtask?.status === "pending_review"
-    ? `视觉检查待确认：${pendingVisualDetail}`
+      ? "检查已结束，原检查结论保留。"
     : visualSubtask?.status === "completed"
-      ? `视觉检查：${visualSubtask.message ?? "已通过"}`
+      ? `视觉检查：${visualSubtask.message ?? "已完成"}`
       : visualSubtask && visualSubtask.status !== "failed"
         ? "视觉检查中"
-        : savedVisualReview?.status === "pending_review"
-          ? `视觉检查待确认：${savedVisualDetail ?? "请查看生成任务"}`
-          : savedVisualReview
-            ? `视觉检查：${savedVisualReview.reason}`
-            : svgMarkup ? "视觉检查：未复核" : null;
+        : svgMarkup ? "视觉检查：未复核" : null;
   const diagramError = isFeasibility
     ? null
     : isDesign
@@ -546,16 +532,14 @@ function DiagramDetailView({
   if (diagramError) notices.push({ id: "diagram-error", kind: "error", tone: "destructive", title: t("diagrams.detail.generatedFailed", { label: metaLabel }), detail: localizeRunFailure(diagramError.error, t("errors.codes.RUN_INTERNAL_ERROR")) });
   if (visualStatus) notices.push({
     id: "visual", kind: "visual",
-    tone: visualConfirmed || savedVisualReview?.status === "passed" ? "success" : visualSubtask?.status === "pending_review" || savedVisualReview?.status === "pending_review" ? "warning" : "info",
-    title: "视觉检查", detail: visualConfirmed ? "已人工确认当前图" : visualSubtask?.status === "pending_review" || savedVisualReview?.status === "pending_review" ? savedVisualReview?.reason ?? subtaskVisualMessage ?? pendingVisualDetail : savedVisualReview?.reason ?? visualSubtask?.message ?? visualStatus,
-    issues: savedVisualReview?.status === "pending_review" ? savedVisualReview.issues.filter((issue) => issue.trim()) : undefined,
-    checks: savedVisualReview?.attempts,
-    repairs: savedVisualReview?.repairAttempts,
-    review: savedVisualReview ?? taskVisualReview,
-    reviewCheckedAt: savedVisualReview?.status === "pending_review" && !visualConfirmed ? savedVisualReview.checkedAt : undefined,
+    tone: visualConfirmed || currentVisualReview?.status === "passed" ? "success" : "info",
+    title: "视觉检查", detail: visualStatus,
+    checks: currentVisualReview?.attempts,
+    repairs: currentVisualReview?.repairAttempts,
+    review: currentVisualReview,
     confirmed: visualConfirmed,
   });
-  const noticeButton = notices.length > 0 ? <ModelNotices notices={notices} canConfirm={canUpdateWorkspace} onConfirm={(checkedAt) => confirmVisualReview(`${visualTaskKind}:${visualId}`, checkedAt)} /> : null;
+  const noticeButton = notices.length > 0 ? <ModelNotices notices={notices} /> : null;
   const canEditMetadata = Boolean(draft) && !readOnly && canUpdateWorkspace && (!isFeasibility || Boolean(saveContextModel));
   const overviewPanelId = `model-overview-${stage}-${statusKey}`.replace(/[^A-Za-z0-9_-]/g, "-");
   const openOverviewPanel = useCallback(() => {

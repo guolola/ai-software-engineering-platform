@@ -93,8 +93,21 @@ function storeManagedUserSettings() {
 }
 
 describe("DesignModelPage", () => {
-  it("allows all seven design targets from the PostgreSQL offline demo requirement snapshot", async () => {
+  it.each([false, true])("allows all seven design targets with custom saved requirement IDs: %s", async (customIds) => {
     const snapshot = runSnapshotSchema.parse(librarySeatDemoFixture.requirementSnapshot);
+    if (customIds) {
+      // Match production records whose IDs differ from their diagram kinds.
+      const kinds = new Set(["function", "usecase", "class", "deployment"]);
+      snapshot.models = snapshot.models.map((model) => kinds.has(model.diagramKind)
+        ? { ...model, modelId: `saved-home-security-${model.diagramKind}` }
+        : model);
+      snapshot.requirementModelTraceability = snapshot.requirementModelTraceability.map((entry) => ({
+        ...entry,
+        target: kinds.has(entry.target.diagramKind)
+          ? { ...entry.target, modelId: `saved-home-security-${entry.target.diagramKind}` }
+          : entry.target,
+      }));
+    }
     const repository = createMockWorkspaceRepository({
       requirementText: snapshot.requirementText,
       requirementBaseline: snapshot.requirementBaseline,
@@ -121,11 +134,13 @@ describe("DesignModelPage", () => {
     }
     expect(screen.getByText("7/7")).toBeInTheDocument();
     expect(screen.queryByText(/需求模型之间的追踪关系不完整/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/将自动补齐：/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /生成设计模型/ }));
     const confirmation = await screen.findByRole("dialog", { name: "确认生成设计模型" });
     await user.click(within(confirmation).getByRole("button", { name: "确认生成" }));
     await waitFor(() => expect(startDesignRun).toHaveBeenCalledTimes(1));
     expect(new Set(startDesignRun.mock.calls[0][0].requestedDiagrams)).toEqual(new Set(designDiagramKindSchema.options));
+    expect(startDesignRun.mock.calls[0][0].requirementModels).toEqual(snapshot.models);
   });
 
   it("shows real model eligibility independently of design prerequisites", async () => {
@@ -638,14 +653,15 @@ describe("DesignModelPage", () => {
     expect(classDiagramCheckbox).toBeChecked();
   });
 
-  it("disables sequence generation when the use case model has no use cases", async () => {
+  it.each(["usecase", "usecase-home-security"])("disables sequence generation for an empty use case model saved as %s", async (modelId) => {
     const repository: WorkspaceRepository = {
       loadWorkspace: vi.fn(async () =>
         createWorkspaceRecord({
           requirementText: "生成 UML",
           models: {
-            usecase: {
+            [modelId]: {
               ...useCaseModel,
+              modelId,
               useCases: [],
             },
           },

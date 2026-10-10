@@ -42,6 +42,7 @@ import {
   getDesignDiagramLabel,
   getDiagramLabel,
   getDesignModelId,
+  findRequirementModelByKind,
   type DesignDiagramType,
   type DiagramType,
 } from "../../../entities/diagram/model";
@@ -138,16 +139,11 @@ type RequirementSourceDetails = RequirementSourceStatus & {
 };
 
 function hasAnalysisModels(models: ReturnType<typeof useWorkspaceSession>["models"]) {
-  return Boolean(models.analysis) || Object.keys(models).some((modelId) => modelId.startsWith("analysis:"));
+  return Boolean(findRequirementModelByKind(models, "analysis"));
 }
 
 function hasPrototypeModels(models: ReturnType<typeof useWorkspaceSession>["models"]) {
-  return (
-    Boolean(models.prototype) ||
-    Object.entries(models).some(
-      ([modelId, model]) => modelId.startsWith("proto") || model?.diagramKind === "prototype",
-    )
-  );
+  return Boolean(findRequirementModelByKind(models, "prototype"));
 }
 
 function sameDesignDiagramSelection(
@@ -173,7 +169,7 @@ function getDesignDiagramBlockReason(
 }
 
 function getUseCasesFromRequirementModel(models: ReturnType<typeof useWorkspaceSession>["models"]) {
-  const model = models.usecase;
+  const model = findRequirementModelByKind(models, "usecase");
   return model && "useCases" in model && Array.isArray(model.useCases)
     ? model.useCases
     : [];
@@ -312,17 +308,14 @@ export function DesignModelPage() {
 
   const sourceStatus = useMemo(
     () => {
-      const useCases =
-        models.usecase && "useCases" in models.usecase && Array.isArray(models.usecase.useCases)
-          ? models.usecase.useCases
-          : [];
+      const useCases = getUseCasesFromRequirementModel(models);
       return {
-        context: Boolean(models.context),
-        function: Boolean(models.function),
-        usecase: Boolean(models.usecase),
-        activity: Boolean(models.activity),
-        class: Boolean(models.class),
-        deployment: Boolean(models.deployment),
+        context: Boolean(findRequirementModelByKind(models, "context")),
+        function: Boolean(findRequirementModelByKind(models, "function")),
+        usecase: Boolean(findRequirementModelByKind(models, "usecase")),
+        activity: Boolean(findRequirementModelByKind(models, "activity")),
+        class: Boolean(findRequirementModelByKind(models, "class")),
+        deployment: Boolean(findRequirementModelByKind(models, "deployment")),
         prototype: hasPrototypeModels(models),
         analysis: hasAnalysisModels(models),
         useCaseCount: useCases.length,
@@ -535,7 +528,7 @@ export function DesignModelPage() {
 
   const incompleteTraceabilityDiagram = useMemo(
     () => DIAGRAM_ORDER.find((diagram) => {
-      const model = models[diagram];
+      const model = findRequirementModelByKind(models, diagram);
       return model && !hasCompleteRequirementTraceability(
         [model], requirementModelTraceability, manualModelEditStatus,
       );

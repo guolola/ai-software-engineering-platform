@@ -17,59 +17,38 @@ export interface ModelNotice {
   issues?: string[];
   checks?: number;
   repairs?: number;
-  reviewCheckedAt?: string;
   confirmed?: boolean;
   review?: DiagramVisualReview;
 }
 
-export function ModelNotices({ notices, canConfirm, onConfirm }: {
+export function ModelNotices({ notices }: {
   notices: ModelNotice[];
-  canConfirm: boolean;
-  onConfirm: (checkedAt: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   if (notices.length === 0) return null;
 
   const freshness = notices.find((notice) => notice.kind === "freshness");
   const visual = notices.find((notice) => notice.kind === "visual");
   const otherNotices = notices.filter((notice) => notice.kind !== "freshness" && notice.kind !== "visual");
   const hasFailure = otherNotices.some((notice) => notice.tone === "destructive");
-  const actionTone: ModelNotice["tone"] = visual?.reviewCheckedAt && !visual.confirmed
-    ? "warning" : hasFailure ? "destructive" : freshness ? "warning" : "success";
+  const actionTone: ModelNotice["tone"] = hasFailure ? "destructive" : freshness ? "warning" : "success";
   // Always render the same three stages; missing notices become positive or neutral states.
   const stages: ModelNotice[] = [
     freshness ?? { id: "current", kind: "freshness", tone: "success", title: "模型当前有效", detail: "上游内容未标记为过期。" },
     visual ?? { id: "unchecked", kind: "visual", tone: "info", title: "视觉检查", detail: "当前没有视觉检查结果。" },
     {
       id: "action", kind: "info", tone: actionTone, title: "下一步",
-      detail: visual?.reviewCheckedAt && !visual.confirmed
-        ? canConfirm ? "确认当前图的视觉检查结果。" : "当前没有确认视觉检查的权限。"
-        : hasFailure ? "查看下方错误并重试相关操作。"
+      detail: hasFailure ? "查看下方错误并重试相关操作。"
           : freshness ? "更新模型后再次检查图形。" : "当前没有需要处理的操作。",
     },
   ];
-
-  const confirm = async (checkedAt: string) => {
-    if (busy || !canConfirm) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await onConfirm(checkedAt);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "确认未保存，请重试。");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const buttonTone: PageNoticeTone = hasFailure ? "destructive"
     : notices.some((notice) => notice.tone === "warning") ? "warning" : "info";
 
   return <>
     <PageNoticeButton label={`提示（${notices.length}）`} tone={buttonTone} onClick={() => setOpen(true)} />
-    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setError(null); }}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>模型提示</DialogTitle>
@@ -78,16 +57,14 @@ export function ModelNotices({ notices, canConfirm, onConfirm }: {
         <StatusFlow aria-label="模型状态流程">
           {stages.map((stage) => (
             <StatusFlowItem key={stage.id} title={stage.title} tone={stage.tone} data-notice-stage={stage.id}>
-              {stage.kind === "visual" && (stage.review || stage.checks !== undefined) ? <DiagramReviewDetails confirmed={stage.confirmed} review={stage.review ?? {
+              {stage.kind === "visual" && (stage.review || stage.checks !== undefined) ? <DiagramReviewDetails summaryOnly confirmed={stage.confirmed} review={stage.review ?? {
                 status: "pending_review", reason: stage.detail, issues: stage.issues ?? [], attempts: stage.checks ?? 0,
-                repairAttempts: stage.repairs, checkedAt: stage.reviewCheckedAt ?? "",
+                repairAttempts: stage.repairs, checkedAt: "",
               }} /> : <p className="mt-1 whitespace-pre-wrap break-words text-sm text-black dark:text-foreground">{stage.detail}</p>}
-              {stage.reviewCheckedAt && !stage.confirmed ? <Button type="button" size="sm" className="mt-2" disabled={busy || !canConfirm} onClick={() => void confirm(stage.reviewCheckedAt!)}>确认当前图</Button> : null}
             </StatusFlowItem>
           ))}
         </StatusFlow>
         {otherNotices.length > 0 ? <ul className="divide-y border-t text-sm">{otherNotices.map((notice) => <li key={notice.id} className="py-3"><strong className={cn("font-medium", notice.tone === "destructive" ? "text-destructive" : notice.tone === "warning" ? "text-warning" : "text-info")}>{notice.title}</strong><p className="mt-1 text-muted-foreground">{notice.detail}</p></li>)}</ul> : null}
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>知道了</Button></DialogFooter>
       </DialogContent>
     </Dialog>

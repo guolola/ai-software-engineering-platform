@@ -7,6 +7,7 @@ import {
   DESIGN_DIAGRAM_ORDER,
   DIAGRAM_META,
   DIAGRAM_ORDER,
+  findRequirementModelByKind,
   type DesignDiagramType,
   type DiagramType,
 } from "../../../entities/diagram/model";
@@ -351,7 +352,7 @@ export function designGenerationSubtasks(
         label: DESIGN_DIAGRAM_META[diagram].label,
       });
     }
-    const useCaseModel = requirementModels.usecase;
+    const useCaseModel = findRequirementModelByKind(requirementModels, "usecase");
     if (!useCaseModel || !("useCases" in useCaseModel)) {
       return stagedDiagramSubtasks({
         modelStage: "generate_design_sequence",
@@ -383,7 +384,7 @@ export function requirementGenerationSubtasks(
         label: DIAGRAM_META[diagram].label,
       });
     }
-    const useCaseModel = requirementModels.usecase;
+    const useCaseModel = findRequirementModelByKind(requirementModels, "usecase");
     if (!useCaseModel || !("useCases" in useCaseModel)) {
       return stagedDiagramSubtasks({
         modelStage: "generate_models",

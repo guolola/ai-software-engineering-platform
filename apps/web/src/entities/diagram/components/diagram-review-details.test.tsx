@@ -9,6 +9,16 @@ const review: DiagramVisualReview = { status: "pending_review", reason: "结构�
   repairHistory: [{ round: 1, target: "model", issueIds: ["fk"], beforeFingerprint: "before", status: "rejected", changes: ["标题也被改动"], reason: "候选越界" }],
 };
 describe("categorized review details", () => {
+  it.each([false, true])("shows only the retained summary and counters in model notices: confirmed=%s", (confirmed) => {
+    render(<DiagramReviewDetails summaryOnly confirmed={confirmed} review={{ ...review, repairAttempts: 0 }} />);
+    const summary = screen.getByRole("region", { name: "视觉检查摘要" });
+    expect(within(summary).getByText(confirmed ? "已人工确认当前图" : "检查已结束，原检查结论保留。")).toBeVisible();
+    expect(within(summary).getByText("结构核对 1 次 · 图片检查 2 次 · 纠错尝试 0 次")).toBeVisible();
+    expect(within(summary).queryByRole("heading")).not.toBeInTheDocument();
+    expect(within(summary).queryByText(/外键标记错误|停止原因|查看问题依据与处理详情|修复记录/)).not.toBeInTheDocument();
+    expect(review.status).toBe("pending_review");
+    expect(review.confirmedAt).toBeUndefined();
+  });
   it("shows only nonempty groups and reveals evidence through an accessible disclosure", () => {
     const { container } = render(<DiagramReviewDetails review={review} />);
     expect(screen.getAllByRole("heading").map((node) => node.textContent)).toEqual(["业务约束（1）"]);

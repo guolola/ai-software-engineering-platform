@@ -14,6 +14,7 @@ import type {
 } from "@uml-platform/contracts";
 import {
   getDesignModelId,
+  findRequirementModelByKind,
   type DesignDiagramType,
   type DiagramType,
 } from "../../../entities/diagram/model";
@@ -130,7 +131,7 @@ function analysisSourceUseCaseId(model: DiagramModelSpec) {
 }
 
 function missingAnalysisUseCaseIds(models: WorkspaceRecord["models"]) {
-  const useCases = extractUseCasesFromRequirementModel(models.usecase);
+  const useCases = extractUseCasesFromRequirementModel(findRequirementModelByKind(models, "usecase"));
   if (useCases.length === 0) return [];
   const covered = new Set(
     Object.values(models)
@@ -752,7 +753,7 @@ export function isRequirementDiagramStale(input: {
   const diagramVersion = diagramVersions[diagram];
   if (diagramVersion !== undefined) return diagramVersion !== rulesVersion;
 
-  if (!models[diagram] || !requirementInputFingerprint) return false;
+  if (!findRequirementModelByKind(models, diagram) || !requirementInputFingerprint) return false;
   return !fingerprintMatches(
     requirementInputFingerprint,
     activeRequirementFingerprint,

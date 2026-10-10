@@ -8,7 +8,7 @@ import type {
   DesignDiagramType,
   DiagramType,
 } from "../../../entities/diagram/model";
-import { getDesignModelId } from "../../../entities/diagram/model";
+import { getDesignModelId, findRequirementModelByKind } from "../../../entities/diagram/model";
 import type { RequirementRule } from "../../../entities/requirement-rule/model";
 import type { WorkspaceRecord } from "../../../entities/workspace/model";
 import type { GenerationResultDialogState } from "../components/generation-dialogs";
@@ -172,7 +172,7 @@ function requestedDesignDiagramsForPreflight(
     if (designDiagramHasError(input.designDiagramErrors, diagram)) return true;
     if (
       diagram === "sequence" &&
-      !sequenceModelsCoverUseCases(input.designModels, input.models.usecase)
+      !sequenceModelsCoverUseCases(input.designModels, findRequirementModelByKind(input.models, "usecase"))
     ) {
       return true;
     }
@@ -383,7 +383,7 @@ export function analyzeDesignGenerationPreflight(
     needsExistingSequenceDependency &&
     !sequenceWillGenerate &&
     existingDesignDiagrams.includes("sequence") &&
-    !sequenceModelsCoverUseCases(input.designModels, input.models.usecase)
+    !sequenceModelsCoverUseCases(input.designModels, findRequirementModelByKind(input.models, "usecase"))
   ) {
     return {
       status: "blocked",
