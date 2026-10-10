@@ -1,9 +1,9 @@
-// Projects saved provenance into design-led coding inputs without sending upstream requirement bodies.
+// Projects platform-approved implementation inputs without exporting historical review metadata.
 import { atomicRequirementSchema } from "@uml-platform/contracts";
-import { contentHash, record, type SourceArtifact } from "./source-artifacts.js";
+import { contentHash, type SourceArtifact } from "./source-artifacts.js";
 
 export const implementationAcceptanceSchema = atomicRequirementSchema.pick({
-  id: true, sourceRuleId: true, acceptanceCriteria: true, status: true, fieldProvenance: true,
+  id: true, sourceRuleId: true, acceptanceCriteria: true,
 });
 
 export function implementationSources(input: SourceArtifact[]): SourceArtifact[] {
@@ -12,16 +12,13 @@ export function implementationSources(input: SourceArtifact[]): SourceArtifact[]
       return [artifact];
     const requirement = implementationAcceptanceSchema.safeParse(artifact.payload.requirement);
     if (artifact.stage !== "requirements" || !requirement.success) return [];
-    const { id, sourceRuleId, acceptanceCriteria, status, fieldProvenance } = requirement.data;
-    // Acceptance text is test evidence; all other requirement fields and provenance excerpts stay on the platform.
-    const acceptanceProvenance = record(fieldProvenance.acceptanceCriteria);
+    const { id, sourceRuleId, acceptanceCriteria } = requirement.data;
+    // MCP use accepts the saved criteria; prior reviews and repair candidates stay on the platform.
     return [{
       ...artifact,
       title: `验收条件 ${id}`,
       payload: { requirement: {
-        id, ...(sourceRuleId ? { sourceRuleId } : {}), acceptanceCriteria, status,
-        fieldProvenance: acceptanceProvenance.source && acceptanceProvenance.status
-          ? { acceptanceCriteria: { source: acceptanceProvenance.source, status: acceptanceProvenance.status } } : {},
+        id, ...(sourceRuleId ? { sourceRuleId } : {}), acceptanceCriteria,
       } },
     }];
   });
@@ -43,7 +40,7 @@ export function implementationSources(input: SourceArtifact[]): SourceArtifact[]
     };
     return { ...artifact, dependencies, payload, version: { ...artifact.version,
       contentHash: contentHash({ payload, dependencies, requirementIds: artifact.requirementIds,
-        reviewStatus: artifact.reviewStatus, sourceConsistency: artifact.sourceConsistency, issues: artifact.issues }),
+        sourceConsistency: artifact.sourceConsistency, issues: artifact.issues }),
     } };
   });
 }

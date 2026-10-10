@@ -159,6 +159,8 @@ flowchart LR
 
 The platform workflow owns correctness and completeness from requirements to designs. The Coding Agent implements complete saved designs, uses acceptance criteria for tests, and follows saved engineering constraints and repository conventions. It reports missing or ambiguous designs instead of deriving a new design from requirements. MCP excludes upstream requirement bodies and engineering documents.
 
+Reading saved designs and acceptance criteria through MCP treats them as platform-approved implementation inputs. Acceptance criteria define the behavior required for completion and remain available for coding and tests. Review opinions describe findings about platform artifacts; whether repaired or unresolved, those opinions, confirmation states, repair histories, and repair candidates stay on the platform and do not block MCP implementation tasks. Missing inputs, invalid references, stale versions, and local verification failures are still reported.
+
 ### Requirement, design, and code mapping
 
 The four coding inputs are complete design models, acceptance evidence, engineering constraints, and existing tests. Requirement models stay on the platform, with trace IDs and upstream version metadata preserving lineage and freshness. Solid arrows show source delivery, tool calls, and local operations; dotted arrows show future local consistency checks. Local code and results are not written back through MCP.
@@ -167,7 +169,7 @@ The four coding inputs are complete design models, acceptance evidence, engineer
 flowchart TB
   subgraph platform["Platform: saved sources and read-only MCP"]
     feasibility["Engineering constraints<br/>Saved environment and resource constraints"]
-    req["Acceptance evidence<br/>Criteria, requirement IDs, and confirmation status"]
+    req["Acceptance evidence<br/>Criteria and requirement IDs"]
     design["Design models"]
     savedTests["Platform test scenarios<br/>Test cases and requirement/design coverage"]
     bundle["MCP implementation context<br/>Designs, acceptance, constraints, tests, source versions,<br/>report templates, and verifier download information"]
@@ -214,7 +216,7 @@ flowchart TB
   verifierFile -->|"Serve the script through the platform download address"| download
 ```
 
-The four source nodes are coding inputs. Complete designs govern code structure and behavior. Acceptance sources contain criteria, requirement IDs, and confirmation status; original requirements, business rules, assumptions, reviews, and requirement-model bodies stay on the platform. Internal upstream checks still propagate stale status; designs expose upstream version metadata. Refresh existing manifests and regenerate snapshots and reports when removed sources are reported as deleted. Preserve existing code and tests.
+The four source nodes are coding inputs. Complete designs govern code structure and behavior. Acceptance sources contain criteria and requirement IDs; original requirements, business rules, assumptions, reviews, and requirement-model bodies stay on the platform. Internal upstream checks still propagate stale status; designs expose upstream version metadata. Refresh existing manifests and regenerate snapshots and reports when removed sources are reported as deleted. Preserve existing code and tests.
 
 The four tools select a project, read its source directory and versions, read full artifacts, and check for updates. Read all directory pages and required content chunks; if versions change during reading, return to the directory and refresh. Before delivery, use the same artifact-reading tool again for report templates and verifier download information. Downloading the verifier, filling reports, editing code, and executing commands are local agent operations. Source changes or verification failures require updating the affected implementation and reports, then rerunning verification. Passing confirms the registered checks and commands for that run; semantic coverage still requires review.
 

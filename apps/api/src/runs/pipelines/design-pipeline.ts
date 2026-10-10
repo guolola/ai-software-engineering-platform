@@ -427,7 +427,7 @@ function sequenceModelIdForUseCase(useCase: UseCaseForSequence) {
   return `sequence:${useCase.id}`;
 }
 
-function coerceSequenceModelForUseCase(
+export function coerceSequenceModelForUseCase(
   result: Awaited<ReturnType<typeof generateDesignModelsWithRepair>>,
   useCase: UseCaseForSequence,
 ) {
@@ -453,8 +453,13 @@ function coerceSequenceModelForUseCase(
     summary:
       selected.summary?.trim() || `${useCase.name}用例的对象交互流程。`,
   };
+  const selectedElementIds = new Set(collectModelRefs([selected]).refs.map((ref) => ref.elementId));
+  const siblingElementIds = new Set(collectModelRefs(sequenceModels.filter((candidate) => candidate !== selected)).refs.map((ref) => ref.elementId));
   const designModelTraceability = result.designModelTraceability
-    .filter((entry) => entry.source.diagramKind === "sequence")
+    // A response can contain sibling use-case models; renaming all their traces would fabricate local references.
+    .filter((entry) => entry.source.diagramKind === "sequence" &&
+      (entry.source.modelId ? entry.source.modelId === selected.modelId : !siblingElementIds.has(entry.source.elementId)) &&
+      selectedElementIds.has(entry.source.elementId))
     .map((entry) => ({
       ...entry,
       source: {

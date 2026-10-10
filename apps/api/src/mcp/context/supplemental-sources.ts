@@ -1,7 +1,6 @@
-// Whitelists pending requirement reviews and feasibility sources without exposing prototypes or personal metadata.
+// Whitelists saved feasibility sources without exposing reviews, prototypes or personal metadata.
 import { z } from "zod";
 import {
-  atomicRequirementSchema,
   contextDiagramSpecSchema,
   contextTraceRowSchema,
   feasibilityInputsSchema,
@@ -14,14 +13,6 @@ const object = (v: unknown): Record<string, unknown> =>
   v && typeof v === "object" && !Array.isArray(v)
     ? (v as Record<string, unknown>)
     : {};
-export const reviewCandidateSchema = z.object({
-  ruleId: z.string(),
-  beforeRequirement: atomicRequirementSchema,
-  afterRequirement: atomicRequirementSchema.nullable(),
-  repairRationale: z.string().nullable(),
-  blockingReasons: z.array(z.string()),
-  status: z.enum(["pending", "accepted", "rejected", "failed"]),
-});
 export function supplementalSources(state: Record<string, unknown>) {
   const outputs: {
     id: string;

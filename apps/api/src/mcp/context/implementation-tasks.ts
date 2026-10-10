@@ -24,7 +24,7 @@ const commonGuidance = [
   "designRefs 只列真实模型节点作为候选位置；完整关系边、时序消息、条件、约束及列定义仍须从来源产物读取，不能忽略。",
   "根据来源中的验收条件编写正常、边界、异常及权限测试；测试场景是参考，不能把规则正文或生成代码本身当作已确认验收条件。",
   "缺少设计或存在设计歧义时反馈设计缺口，不从原始需求自行设计。blocking 问题阻止将本任务标为验证通过，更新受影响设计与验收依据后重新验证。",
-  "当前只核对来源状态和引用，不代表已验证模型语义、代码行为或设计一致性。来源版本或实际代码变化后，原验证结果必须失效并复验。",
+  "MCP 提供的已保存设计与验收条件视为平台认可的实现依据，不携带或重新处理历史审核意见；编码阶段验证代码是否落实这些依据。来源版本或实际代码变化后，原验证结果必须失效并复验。",
 ];
 const diagramGuidance: Record<string, string> = {
   context: "上下文模型确定系统边界、外部参与方和集成职责。",
@@ -71,10 +71,6 @@ function traceElementIds(model: AnyDiagramModel) {
 function sourceIssues(artifact: SourceArtifact): TaskIssue[] {
   const issues: TaskIssue[] = [];
   const add = (code: string, severity: TaskIssue["severity"], message: string) => issues.push({ code, severity, message: `${artifact.id}：${message}` });
-  if (["conflict", "rejected"].includes(artifact.reviewStatus))
-    add("source-review-blocked", "blocking", "来源存在冲突或已被拒绝，请更新相关依据后再验证。");
-  else if (artifact.reviewStatus !== "accepted" && !["requirements:source", "requirements:review", "feasibility:inputs"].includes(artifact.id))
-    add("source-review-pending", "warning", "来源尚未确认；请核对其适用范围和未决内容。");
   if (artifact.sourceConsistency === "conflict")
     add("source-inconsistent", "blocking", "结构化模型与图源码可能冲突，须确认并同步依据。");
   if (artifact.version.freshness === "stale")
@@ -139,14 +135,14 @@ export function buildImplementationTasks(input: SourceArtifact[], scope?: McpSco
     const sources = artifacts.filter((artifact) => selected.has(artifact.id));
     for (const source of sources) issues.push(...sourceIssues(source));
 
-    const validateRef = (value: unknown, stage: "analysis" | "design", owner: string) => {
+    const validateRef = (value: unknown, stage: "analysis" | "design", owner: string, localArtifact?: SourceArtifact) => {
       const parsed = modelElementRefSchema.safeParse(value);
       if (!parsed.success) {
         issues.push({ code: "trace-reference-invalid", severity: "blocking", message: `${owner} 的追踪引用不符合模型元素契约。` });
         return;
       }
       const ref = parsed.data;
-      const candidates = artifacts.filter((artifact) => {
+      const candidates = (localArtifact ? [localArtifact] : artifacts).filter((artifact) => {
         const model = models.get(artifact.id);
         return artifact.stage === stage && model && modelMatches(artifact, model, ref);
       });
@@ -157,17 +153,11 @@ export function buildImplementationTasks(input: SourceArtifact[], scope?: McpSco
     };
     for (const source of sources.filter((artifact) => artifact.stage === "analysis" || artifact.stage === "design")) {
       for (const trace of list(source.payload.traceability).map(record)) {
-        if (trace.reviewStatus !== "confirmed") issues.push({ code: "trace-review-pending", severity: "warning", message: `${source.id} 的追踪尚未确认，请核对关联职责。` });
         if (source.stage === "analysis" && trace.target) validateRef(trace.target, "analysis", source.id);
-        if (source.stage === "design" && trace.source) {
-          // Upstream requirement-model references are provenance; the platform validates that transformation.
+        if (source.stage === "design") {
+          // Validate the design source in its owning model; targets are private upstream requirement provenance.
+          validateRef(trace.source, "design", source.id, source);
           for (const ref of list(trace.upstreamDesignRefs)) validateRef(ref, "design", source.id);
-          const model = models.get(source.id);
-          // A trace may name sibling design targets outside this functional scope; inspect its local target only.
-          for (const value of list(trace.targets)) {
-            const ref = modelElementRefSchema.safeParse(value);
-            if (!ref.success || !model || modelMatches(source, model, ref.data)) validateRef(value, "design", source.id);
-          }
         }
       }
     }
@@ -178,9 +168,6 @@ export function buildImplementationTasks(input: SourceArtifact[], scope?: McpSco
       sourceArtifactId: seed.id,
     }));
     if (!acceptanceCriteria.length) issues.push({ code: "acceptance-criteria-missing", severity: "blocking", message: "尚无结构化验收条件；可先计划或实现明确部分，但必须补齐并确认验收条件后才能标为验证通过。" });
-    const acceptanceProvenance = record(record(record(seed.payload.requirement).fieldProvenance).acceptanceCriteria);
-    if (acceptanceProvenance.status && acceptanceProvenance.status !== "accepted")
-      issues.push({ code: "acceptance-criteria-unconfirmed", severity: acceptanceProvenance.status === "rejected" ? "blocking" : "warning", message: "验收条件的字段来源尚未接受，须核对后再作为验收依据。" });
     const designRefs = sources.filter((artifact) => artifact.stage === "design").flatMap((artifact) => {
       const model = models.get(artifact.id);
       if (!model) return [];

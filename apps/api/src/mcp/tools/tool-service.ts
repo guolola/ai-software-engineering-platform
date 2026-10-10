@@ -207,7 +207,7 @@ export function createMcpToolService(
         "ok",
         next < content.length
           ? "内容尚未读完；按 nextOffset 继续，拼接所有 chunk 后解析 JSON。"
-          : "本产物读取完成；请结合确认状态及来源使用。",
+          : "本产物读取完成；按平台已保存的设计与验收条件实现。",
         {
           artifactId: artifact.id,
           version: artifact.version,

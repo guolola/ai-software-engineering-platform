@@ -66,7 +66,7 @@ export function withImplementationArtifacts(context: ReturnType<typeof buildCont
   function artifact(id: string, title: string, payload: Record<string, unknown>): SourceArtifact {
     return {
       id, stage: "implementation", title, requirementIds: [], dependencies: [],
-      reviewStatus: "unknown", sourceConsistency: "unknown", issues: [], payload,
+      sourceConsistency: "unknown", issues: [], payload,
       version: { artifactId: id, contentHash: contentHash(payload), inputFingerprint: null, freshness: "current" },
     };
   }

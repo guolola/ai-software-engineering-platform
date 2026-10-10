@@ -12,7 +12,7 @@ import { contentHash, type SourceArtifact } from "./source-artifacts.js";
 
 function artifact(id: string, stage: SourceArtifact["stage"], payload: Record<string, unknown>, options: Partial<SourceArtifact> = {}): SourceArtifact {
   return {
-    id, stage, title: id, requirementIds: [], dependencies: [], reviewStatus: "accepted",
+    id, stage, title: id, requirementIds: [], dependencies: [],
     sourceConsistency: "unknown", issues: [], payload,
     version: { artifactId: id, contentHash: contentHash(payload), inputFingerprint: "fp:v3:fixture", freshness: "current" },
     ...options,
@@ -100,26 +100,29 @@ test("linked sources follow a dependency closure while missing sources never bec
   assert.ok(blocking(task).some((issue) => issue.code === "source-dependency-missing"));
 });
 
-test("unconfirmed provenance warns while rejected, stale and conflicting sources block verification", () => {
+test("historical acceptance and trace reviews do not block while stale and conflicting saved sources do", () => {
   const accepted = requirement();
   const pending = modelArtifact("pending", "design");
-  pending.reviewStatus = "pending";
+  const value = accepted.payload.requirement as AtomicRequirement;
+  value.status = "rejected";
+  value.fieldProvenance = { acceptanceCriteria: { source: "ai-suggested", status: "rejected" } };
+  pending.payload.traceability = [{ source: ref("pending", "loan"), targets: [ref("business", "borrow-case")], reviewStatus: "pending", rationale: "待确认" }];
   pending.version.freshness = "unknown";
   assert.equal(blocking(buildImplementationTasks([accepted, pending])[0]).length, 0);
-  const blockedSources: SourceArtifact[] = ["rejected", "conflict"].map((status) => ({ ...pending, reviewStatus: status as "rejected" | "conflict" }));
-  blockedSources.push({ ...pending, sourceConsistency: "conflict" }, { ...pending, version: { ...pending.version, freshness: "stale" } });
+  assert.ok(!buildImplementationTasks([accepted, pending])[0].issues.some((issue) => /review|unconfirmed/.test(issue.code)));
+  const blockedSources: SourceArtifact[] = [{ ...pending, sourceConsistency: "conflict" }, { ...pending, version: { ...pending.version, freshness: "stale" } }];
   for (const source of blockedSources) assert.ok(blocking(buildImplementationTasks([accepted, source])[0]).length);
 });
 
-test("broken trace targets block without fabricating design references", () => {
+test("broken design trace sources block without fabricating design references", () => {
   const analysis = modelArtifact("business", "analysis", "borrow-case");
   const design = modelArtifact("loan", "design", "loan-service");
   design.dependencies = [analysis.id];
-  design.payload.traceability = [{ source: ref("business", "borrow-case"), targets: [ref("loan", "missing-service")], reviewStatus: "confirmed" }];
+  design.payload.traceability = [{ source: ref("loan", "missing-service"), targets: [ref("business", "borrow-case")], reviewStatus: "confirmed" }];
   const task = buildImplementationTasks([requirement(), analysis, design])[0];
   assert.ok(blocking(task).some((issue) => issue.code === "trace-reference-missing"));
   assert.deepEqual(task.designRefs.map((entry) => entry.elementId), ["loan-service"]);
-  design.payload.traceability = [{ source: ref("business", "borrow-case"), targets: [ref("loan", "loan-service")], reviewStatus: "confirmed" }];
+  design.payload.traceability = [{ source: ref("loan", "loan-service"), targets: [ref("business", "borrow-case")], reviewStatus: "confirmed" }];
   assert.equal(blocking(buildImplementationTasks([requirement(), analysis, design])[0]).length, 0);
 });
 
@@ -128,20 +131,46 @@ test("valid relationship trace refs remain legal and absent sibling models do no
   const model = classModel("business", "borrow-case");
   analysis.payload.model = { ...model, classes: [...model.classes, { id: "book", name: "Book" }], relationships: [{ id: "borrows", type: "association", sourceId: "borrow-case", targetId: "book" }] };
   const design = modelArtifact("loan", "design", "loan-service");
-  design.payload.traceability = [{ source: { ...ref("business", "borrows"), elementKind: "relationship" }, targets: [ref("loan", "loan-service"), ref("outside-scope", "other")], reviewStatus: "confirmed" }];
+  design.payload.model = { ...classModel("loan", "loan-service"), classes: [{ id: "loan-service", name: "Loan" }, { id: "book", name: "Book" }], relationships: [{ id: "borrows", type: "association", sourceId: "loan-service", targetId: "book" }] };
+  design.payload.traceability = [{ source: { ...ref("loan", "borrows"), elementKind: "relationship" }, targets: [ref("business", "borrows"), ref("outside-scope", "other")], reviewStatus: "confirmed" }];
   const task = buildImplementationTasks([requirement(), analysis, design])[0];
   assert.equal(blocking(task).length, 0);
   assert.deepEqual(task.dependsOnTaskIds, []);
 });
 
-test("ambiguous same-kind traces remain explicit rather than choosing a model by diagram kind", () => {
+test("same-kind requirement provenance does not become a design reference", () => {
   const first = modelArtifact("first", "analysis", "borrow-case");
   const second = modelArtifact("second", "analysis", "borrow-case");
   const design = modelArtifact("loan", "design", "loan-service");
-  design.payload.traceability = [{ source: ref(undefined, "borrow-case"), targets: [ref("loan", "loan-service")], reviewStatus: "confirmed" }];
+  design.payload.traceability = [{ source: ref("loan", "loan-service"), targets: [ref(undefined, "borrow-case")], reviewStatus: "confirmed" }];
   const task = buildImplementationTasks([requirement(), first, second, design])[0];
   assert.ok(!task.sourceArtifactIds.some((id) => id.startsWith("analysis:")));
   assert.equal(blocking(task).length, 0);
+});
+
+test("design trace sources must exist in their owning model even when a sibling has the element", () => {
+  const design = modelArtifact("loan", "design", "loan-service");
+  const sibling = modelArtifact("sibling", "design", "other-service");
+  for (const source of [ref("sibling", "other-service"), ref(undefined, "other-service"), {}, undefined]) {
+    design.payload.traceability = [{ source, targets: [ref("business", "borrow-case")], reviewStatus: "confirmed" }];
+    const task = buildImplementationTasks([requirement(), design, sibling])[0];
+    assert.ok(blocking(task).some((issue) => ["trace-reference-missing", "trace-reference-invalid"].includes(issue.code)));
+  }
+  design.payload.traceability = [{ source: ref(undefined, "loan-service"), targets: [ref("business", "borrow-case")], reviewStatus: "confirmed" }];
+  assert.equal(blocking(buildImplementationTasks([requirement(), design, sibling])[0]).length, 0);
+});
+
+test("sequence messages, fragments and activations are legal design trace sources", () => {
+  const design = modelArtifact("sequence", "design");
+  design.payload.model = {
+    diagramKind: "sequence", modelId: "sequence", title: "借阅", summary: "借阅调用", notes: [],
+    participants: [{ id: "user", name: "User", participantType: "actor" }, { id: "service", name: "Service", participantType: "service" }],
+    messages: [{ id: "request", type: "sync", sourceId: "user", targetId: "service", name: "borrow", parameters: [] }, { id: "result", type: "return", sourceId: "service", targetId: "user", name: "result", parameters: [] }],
+    fragments: [{ id: "optional", type: "opt", label: "borrow", messageIds: ["request"] }],
+    activations: [{ id: "active", participantId: "service", startMessageId: "request", endMessageId: "result" }],
+  };
+  design.payload.traceability = ["request", "optional", "active"].map((id) => ({ source: ref("sequence", id, "sequence"), targets: [ref("business", "borrow-case")], reviewStatus: "confirmed" }));
+  assert.equal(blocking(buildImplementationTasks([requirement(), design])[0]).length, 0);
 });
 
 test("upstream requirement quality stays on the platform while coding validates design and acceptance", () => {
@@ -161,7 +190,7 @@ test("upstream requirement quality stays on the platform while coding validates 
 });
 
 test("raw requirements do not create coding tasks and unlinked designs retain explicit acceptance gaps", () => {
-  const raw = artifact("requirements:source", "requirements", { text: "实现图书借阅" }, { reviewStatus: "unknown" });
+  const raw = artifact("requirements:source", "requirements", { text: "实现图书借阅" });
   raw.version.freshness = "unknown";
   assert.deepEqual(buildImplementationTasks([raw]), []);
   const task = buildImplementationTasks([modelArtifact("orphan", "design")])[0];
