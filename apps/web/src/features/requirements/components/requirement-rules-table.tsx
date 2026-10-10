@@ -259,14 +259,6 @@ export function RequirementRulesTable({
                         {statusLabel(reviewDecisionLabel, t)}
                       </Badge>
                     )}
-                    {hintCount > 0 && (
-                      <Badge
-                        variant="secondary"
-                        className="shrink-0 px-1 py-0.5 text-[10px] md:px-1.5 md:text-[11px]"
-                      >
-                        {t("requirements.itemCount", { count: hintCount })}
-                      </Badge>
-                    )}
                   </>
                 ) : null;
                 return (
@@ -309,7 +301,7 @@ export function RequirementRulesTable({
                         {hasHintDetails ? (
                           <Button variant="ghost"
                             type="button"
-                            className="inline-flex min-w-0 items-center gap-1 overflow-hidden text-left md:gap-1.5"
+                            className="inline-flex h-auto min-w-0 items-center justify-start gap-1 overflow-hidden rounded-none border-0 p-0 text-left md:gap-1.5"
                             aria-label={t("requirements.table.hintAria", { id: rule.id })}
                             onClick={() => onOpenHintDetail(rule.id)}
                           >

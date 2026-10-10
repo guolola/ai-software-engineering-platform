@@ -45,7 +45,6 @@ export interface RequirementHintDetail {
 
 interface RequirementReviewDialogProps {
   generating: boolean;
-  onConfirmQualityHint: (ruleId: string) => Promise<void>;
   onDecideReviewCandidate: (
     ruleId: string,
     decision: "accepted" | "rejected",
@@ -57,7 +56,6 @@ interface RequirementReviewDialogProps {
 
 export function RequirementReviewDialog({
   generating,
-  onConfirmQualityHint,
   onDecideReviewCandidate,
   onOpenChange,
   onRepairRequirementRule,
@@ -85,10 +83,6 @@ export function RequirementReviewDialog({
       visibleHintDetail?.requirement.status !== "accepted" ||
       hasOpenFieldReview ||
       (visibleHintDetail?.qualityIssues.length ?? 0) > 0);
-  const hasConfirmableQualityHint =
-    hasActionableQualityHint &&
-    !pendingReviewCandidate &&
-    !failedReviewCandidate;
   const repairingCurrentRule =
     Boolean(visibleHintDetail) && repairingRuleId === visibleHintDetail?.rule.id;
   const repairDisabled = generating || repairingCurrentRule;
@@ -302,7 +296,8 @@ export function RequirementReviewDialog({
             </Button>
           ) : null}
           {visibleHintDetail &&
-          !visibleHintDetail.candidate &&
+          !pendingReviewCandidate &&
+          !failedReviewCandidate &&
           hasActionableQualityHint ? (
             <Button
               type="button"
@@ -311,17 +306,6 @@ export function RequirementReviewDialog({
               disabled={repairDisabled}
             >
               {repairingCurrentRule ? t("requirements.review.repairing") : t("requirements.review.smartRepair")}
-            </Button>
-          ) : null}
-          {visibleHintDetail && hasConfirmableQualityHint ? (
-            <Button
-              type="button"
-              onClick={() =>
-                void onConfirmQualityHint(visibleHintDetail.rule.id).then(close)
-              }
-              disabled={generating}
-            >
-              {t("requirements.review.confirmHint")}
             </Button>
           ) : null}
           {pendingReviewCandidate && visibleHintDetail ? (

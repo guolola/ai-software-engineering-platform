@@ -141,7 +141,6 @@ export function TextRequirementView({
     requirementReviewBlockedReason,
     repairRequirementRule,
     decideRequirementReviewCandidate,
-    confirmRequirementQualityHint,
     canUpdateWorkspace,
     canStartRuns,
     workspacePermissionReason,
@@ -846,7 +845,6 @@ export function TextRequirementView({
 
       {view !== "models" && <RequirementReviewDialog
         generating={generating}
-        onConfirmQualityHint={confirmRequirementQualityHint}
         onDecideReviewCandidate={decideRequirementReviewCandidate}
         onOpenChange={(open) => {
           if (!open) setHintDetailRuleId(null);

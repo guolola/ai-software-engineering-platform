@@ -67,7 +67,8 @@ export function requirementRowState(
 export function requirementStateTone(state: string | null) {
   if (state === "已生成") return "border-success/40 bg-success/10 text-success";
   if (state === "已确认") return "border-success/40 bg-success/10 text-success";
-  if (state === "有待确认提示") return "border-warning/40 bg-warning/10 text-warning";
+  // Ordinary hints describe generated content; generation gates are evaluated separately.
+  if (state === "有待确认提示") return "border-success/40 bg-success/10 text-success";
   if (state === "存在冲突提示") return "border-destructive/40 bg-destructive/10 text-destructive";
   return "border-border bg-muted/40 text-muted-foreground";
 }

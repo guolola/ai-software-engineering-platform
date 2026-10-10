@@ -988,7 +988,7 @@ describe("TextRequirementView", () => {
       name: /r10.*功能\(4\)可供普通读者查找他们自己借出的书目/u,
     });
     expect(within(row).getByText("已确认")).toBeInTheDocument();
-    expect(within(row).getByText("3项")).toBeInTheDocument();
+    expect(within(row).queryByText("3项")).not.toBeInTheDocument();
     expect(
       within(row).queryByRole("button", { name: /复核详情/u }),
     ).not.toBeInTheDocument();
@@ -1129,7 +1129,7 @@ describe("TextRequirementView", () => {
     });
     expect(updateRequirementBaseline).not.toHaveBeenCalled();
     expect(within(row).getByText("有待确认提示")).toBeInTheDocument();
-    expect(within(row).getByText("4项")).toBeInTheDocument();
+    expect(within(row).queryByText("4项")).not.toBeInTheDocument();
     const detailsButton = within(row).getByRole("button", {
       name: /需求提示详情 r10/u,
     });
@@ -1558,7 +1558,7 @@ describe("TextRequirementView", () => {
       name: /r14.*一个读者一次借出的书籍数目不能超过预定值/u,
     });
     expect(within(row).getByText("有待确认提示")).toBeInTheDocument();
-    expect(within(row).getByText("2项")).toBeInTheDocument();
+    expect(within(row).queryByText("2项")).not.toBeInTheDocument();
     expect(
       within(row).queryByRole("button", { name: /复核详情/u }),
     ).not.toBeInTheDocument();
@@ -2119,7 +2119,7 @@ describe("TextRequirementView", () => {
     });
   });
 
-  it("allows confirming quality hints when no repair candidate is available", async () => {
+  it("keeps ordinary hints informational without confirming other rules", async () => {
     const updateRequirementBaseline = vi.fn<
       NonNullable<WorkspaceRepository["updateRequirementBaseline"]>
     >(async () => {});
@@ -2213,28 +2213,23 @@ describe("TextRequirementView", () => {
     expect(
       within(dialog).getByText("REQ-006 缺少明确角色/执行者。"),
     ).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "确认提示" }));
-
-    await waitFor(() => {
-      expect(updateRequirementBaseline).toHaveBeenCalled();
-    });
-    const savedBaseline = updateRequirementBaseline.mock
-      .calls[0][0] as RequirementBaseline;
-    expect(
-      savedBaseline.requirements.find((item) => item.id === "REQ-006")?.status,
-    ).toBe("accepted");
-    expect(
-      savedBaseline.requirements.find((item) => item.id === "REQ-007")?.status,
-    ).toBe("pending-review");
-    expect(savedBaseline.qualityReport.issues.map((issue) => issue.id)).toEqual(
-      ["ISS-004"],
-    );
-    expect(savedBaseline.qualityReport.reviewRequiredRequirementIds).toEqual([
-      "REQ-007",
-    ]);
+    expect(within(dialog).queryByRole("button", { name: "确认提示" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "智能修复" })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "关闭" }));
+    const hintButton = within(table).getByRole("button", { name: "需求提示详情 r6" });
+    expect(hintButton).toHaveClass("p-0", "border-0", "justify-start");
+    expect(within(table).getAllByText("有待确认提示")[0].closest("[data-slot=badge]")).toHaveClass("text-success");
+    expect(within(table).queryByText(/\d+项/u)).not.toBeInTheDocument();
+    expect(updateRequirementBaseline).not.toHaveBeenCalled();
+    expect(within(table).getAllByText("有待确认提示")).toHaveLength(2);
+    await user.click(within(table).getByRole("button", { name: "需求提示详情 r7" }));
+    const otherDialog = await screen.findByRole("dialog", { name: "需求质量提示" });
+    expect(within(otherDialog).getByText("REQ-007 缺少明确角色/执行者。")).toBeInTheDocument();
+    expect(within(otherDialog).queryByRole("button", { name: "确认提示" })).not.toBeInTheDocument();
+    expect(updateRequirementBaseline).not.toHaveBeenCalled();
   });
 
-  it("allows confirming quality hints when an old candidate was already accepted", async () => {
+  it("offers smart repair without hint confirmation for a historical accepted candidate", async () => {
     const updateRequirementBaseline = vi.fn<
       NonNullable<WorkspaceRepository["updateRequirementBaseline"]>
     >(async () => {});
@@ -2315,24 +2310,10 @@ describe("TextRequirementView", () => {
     expect(
       within(dialog).queryByRole("button", { name: "采纳" }),
     ).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "确认提示" }));
-
-    await waitFor(() => {
-      expect(updateRequirementBaseline).toHaveBeenCalledWith(
-        expect.objectContaining({
-          requirements: [
-            expect.objectContaining({
-              id: "REQ-008",
-              status: "accepted",
-            }),
-          ],
-          qualityReport: expect.objectContaining({
-            issues: [],
-            reviewRequiredRequirementIds: [],
-          }),
-        }),
-      );
-    });
+    expect(within(dialog).queryByRole("button", { name: "确认提示" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "智能修复" })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "关闭" }));
+    expect(updateRequirementBaseline).not.toHaveBeenCalled();
   });
 
   it("keeps requirement text editable on the same page as generated rules", async () => {
@@ -2683,7 +2664,7 @@ describe("TextRequirementView", () => {
     const cells = within(row).getAllByRole("cell");
     expect(cells[2]).toHaveClass("px-1.5", "md:px-4");
     expect(within(cells[2]).getByText("已确认")).toBeInTheDocument();
-    expect(within(cells[2]).getByText("3项")).toBeInTheDocument();
+    expect(within(cells[2]).queryByText("3项")).not.toBeInTheDocument();
     expect(within(cells[2]).queryByText("3项提示")).not.toBeInTheDocument();
 
     expect(cells).toHaveLength(5);
