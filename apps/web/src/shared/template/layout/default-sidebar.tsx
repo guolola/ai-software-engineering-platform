@@ -1,13 +1,15 @@
 // Uses the AdminCN default-layout Sidebar composition with platform navigation.
 import type { ReactNode } from 'react';
 import { SidebarBrand } from './sidebar-brand';
-import { Sidebar, SidebarContent, SidebarResizeHandle } from '../../ui/sidebar';
+import { Sidebar, SidebarContent, SidebarFooter, SidebarResizeHandle } from '../../ui/sidebar';
 
 export function DefaultSidebar({
   children,
+  footer,
   resizeLabel,
 }: {
   children: ReactNode;
+  footer?: ReactNode;
   resizeLabel?: string;
 }) {
   return (
@@ -16,6 +18,7 @@ export function DefaultSidebar({
       <SidebarContent>
         {children}
       </SidebarContent>
+      {footer && <SidebarFooter>{footer}</SidebarFooter>}
       {resizeLabel && <SidebarResizeHandle label={resizeLabel} />}
     </Sidebar>
   );

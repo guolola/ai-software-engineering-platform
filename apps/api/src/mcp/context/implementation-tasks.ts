@@ -18,13 +18,12 @@ const list = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 const strings = (value: unknown): string[] => list(value).filter((item): item is string => typeof item === "string");
 const unique = (values: string[]) => [...new Set(values)].sort();
 const globalSource = (artifact: SourceArtifact) =>
-  ["requirements:source", "requirements:review", "feasibility:inputs", "feasibility:implementation"].includes(artifact.id) ||
-  artifact.stage === "documents";
+  ["requirements:source", "requirements:review", "feasibility:inputs", "feasibility:implementation"].includes(artifact.id);
 
 const commonGuidance = [
-  "先读取 sourceArtifactIds 的完整产物，核对原始需求、模型和说明书；学生明确技术要求与目标仓库既有约束优先，模型技术建议不能自动替代它们。",
+  "先读取 sourceArtifactIds 的完整产物，核对原始需求和模型；学生明确技术要求与目标仓库既有约束优先，模型技术建议不能自动替代它们。",
   "先登记预计修改的模块和文件，编码后另行登记实际代码文件、类或函数及测试；预计位置不代表已实现，候选设计元素不要求逐个生成代码。",
-  "designRefs 只列真实模型节点作为候选位置；完整关系边、时序消息、条件、约束、列定义及说明书正文仍须从来源产物读取，不能忽略。",
+  "designRefs 只列真实模型节点作为候选位置；完整关系边、时序消息、条件、约束及列定义仍须从来源产物读取，不能忽略。",
   "根据来源中的验收条件编写正常、边界、异常及权限测试；测试场景是参考，不能把规则正文或生成代码本身当作已确认验收条件。",
   "blocking 问题阻止将本任务标为验证通过；可先计划或实现明确部分，补齐或更新受影响依据后重新验证。缺少某类图不阻止实现已有明确要求。",
   "当前只核对来源状态和引用，不代表已验证模型语义、代码行为或设计一致性。来源版本或实际代码变化后，原验证结果必须失效并复验。",
@@ -84,12 +83,6 @@ function sourceIssues(artifact: SourceArtifact): TaskIssue[] {
     add("source-stale", "blocking", "来源已过期，须更新受影响设计并重新验证。");
   else if (artifact.version.freshness === "unknown" && !["requirements:source", "requirements:review", "feasibility:inputs"].includes(artifact.id))
     add("source-freshness-unknown", "warning", "尚无可核对的输入版本，不能声称来源已验证为最新。");
-  if (artifact.stage === "documents") {
-    if (artifact.payload.readStatus !== "available")
-      add("document_unavailable", "blocking", "说明书正文不可读取，不能声称已经应用其中约束。");
-    else
-      add("document-consistency-unverified", "warning", "说明书与结构化模型的语义一致性尚未核验；遇到冲突须确认，不能自行猜选。");
-  }
   for (const message of artifact.issues) add("source-note", "warning", message);
   return issues;
 }

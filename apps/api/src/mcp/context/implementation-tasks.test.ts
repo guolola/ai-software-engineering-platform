@@ -87,7 +87,6 @@ test("linked sources follow a dependency closure while missing sources never bec
     artifact("requirements:review", "requirements", {}),
     artifact("feasibility:inputs", "feasibility", { targetEnvironment: "Java" }),
     artifact("feasibility:implementation", "feasibility", {}),
-    artifact("document:design", "documents", { readStatus: "available", paragraphs: ["事务须原子提交"] }),
   ];
   const testCase = artifact("test:limit", "tests", { testCase: { id: "limit" } }, { requirementIds: ["BORROW"] });
   const sources = [requirement(), analysis, design, shared, unrelated, testCase, ...globals];
@@ -98,7 +97,6 @@ test("linked sources follow a dependency closure while missing sources never bec
   assert.ok(!task.sourceArtifactIds.includes(unrelated.id));
   assert.ok(!task.sourceArtifactIds.includes("design:deleted"));
   assert.ok(blocking(task).some((issue) => issue.code === "source-dependency-missing"));
-  assert.ok(task.issues.some((issue) => issue.code === "document-consistency-unverified" && issue.severity === "warning"));
 });
 
 test("unconfirmed provenance warns while rejected, stale and conflicting sources block verification", () => {
@@ -110,8 +108,6 @@ test("unconfirmed provenance warns while rejected, stale and conflicting sources
   const blockedSources: SourceArtifact[] = ["rejected", "conflict"].map((status) => ({ ...pending, reviewStatus: status as "rejected" | "conflict" }));
   blockedSources.push({ ...pending, sourceConsistency: "conflict" }, { ...pending, version: { ...pending.version, freshness: "stale" } });
   for (const source of blockedSources) assert.ok(blocking(buildImplementationTasks([accepted, source])[0]).length);
-  const unavailable = artifact("document:locked", "documents", { readStatus: "unavailable", paragraphs: [] });
-  assert.ok(blocking(buildImplementationTasks([accepted, unavailable])[0]).some((issue) => issue.code === "document_unavailable"));
 });
 
 test("broken trace targets block without fabricating design references", () => {

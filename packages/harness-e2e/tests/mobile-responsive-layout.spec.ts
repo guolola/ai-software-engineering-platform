@@ -1,5 +1,6 @@
 // Verifies that the primary public, account, and project workflows do not create page-level horizontal overflow.
 import { expect, test, type Page } from "@playwright/test";
+import { dashboardFixture } from "../../../apps/web/src/features/dashboard/testing/dashboard-fixture";
 import { mockProjectApi, projectId } from "./fixtures/project-workspace";
 
 const widths = [360, 375, 768, 1440] as const;
@@ -21,7 +22,9 @@ test("template page scroll keeps the header and documentation rails visible", as
   });
   await page.setViewportSize({ width: 1440, height: 620 });
 
-  await page.goto("/dashboard?wbdemo=1");
+  await page.route("**/api/dashboard/summary", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dashboardFixture()) }));
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("dashboard-06-grid")).toBeVisible();
   const header = page.locator('[data-slot="sidebar-inset"] > header');
   await expect(header).toBeVisible();
   await expect(page.locator('[data-slot="sidebar-content"] [data-slot="scroll-area"]')).toHaveCount(0);

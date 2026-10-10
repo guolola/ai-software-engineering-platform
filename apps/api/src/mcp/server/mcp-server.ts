@@ -122,7 +122,7 @@ export function createPlatformMcpServer(
   register(
     "get_implementation_context",
     mcpContextInputSchema,
-    "取得已保存需求、分析/设计/测试/说明书与实施产物目录。按范围读取所有分页，合并来源 manifest；开始前读取 implementation:bundle 的任务、验收和全部关联来源；交付验证前获取 implementation:report 契约及 implementation:validator 下载元数据。依赖资料不扩展实施范围。",
+    "取得已保存需求、分析/设计/测试与实施产物目录。按范围读取所有分页，合并来源 manifest；开始前读取 implementation:bundle 的任务、验收和全部关联来源；交付验证前获取 implementation:report 契约及 implementation:validator 下载元数据。依赖资料不扩展实施范围。",
     service.get_implementation_context,
   );
   register(

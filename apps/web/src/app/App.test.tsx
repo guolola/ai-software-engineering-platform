@@ -1552,7 +1552,7 @@ describe("App shell routes", () => {
         expect(window.location.pathname).toBe("/login");
       });
       expect(window.location.search).toBe(`?redirect=${encodeURIComponent(path)}&reason=login-required`);
-      expect(screen.queryByRole("heading", { name: "考试" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "准备好迎接" })).not.toBeInTheDocument();
       expect(screen.queryByText("项目导航")).not.toBeInTheDocument();
 
       view.unmount();
@@ -1608,7 +1608,7 @@ describe("App shell routes", () => {
       const destinations = [
         { path: "/projects", heading: "项目首页" },
         { path: "/projects/connections", heading: "MCP 地址" },
-        { path: "/exam", heading: "考试" },
+        { path: "/exam", heading: "准备好迎接" },
         { path: "/account/billing", heading: "权益与账单" },
         { path: "/dashboard", heading: null },
       ];
@@ -1700,12 +1700,25 @@ describe("App shell routes", () => {
     expect(screen.queryByTestId("account-billing-dashboard")).not.toBeInTheDocument();
   });
 
-  it("hides workspace tools on signed-in standalone pages", async () => {
+  it("renders the supplied waitlist block without background artwork or workspace tools on the exam page", async () => {
     authSessionMode = "authenticated";
     window.history.pushState({}, "", "/exam");
     render(withWorkspaceProviders(<Shell />, createRepository()));
 
-    expect(await screen.findByRole("heading", { name: "考试" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "准备好迎接" })).toBeInTheDocument();
+    const exam = screen.getByRole("main", { name: "考试" });
+    expect(within(exam).getByRole("heading", { name: "创新体验" })).toBeInTheDocument();
+    expect(within(exam).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(within(exam).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(exam).queryByText(/2K\+/)).not.toBeInTheDocument();
+    expect(within(exam).getByText("考试模块正在建设中，后续将支持课程测评、题目生成与评分，帮助你检验学习成果。")).toBeInTheDocument();
+    expect(within(exam).queryAllByRole("img")).toHaveLength(0);
+    expect(within(exam).queryByRole("navigation")).not.toBeInTheDocument();
+    expect(within(exam).queryByText("shadcn/studio")).not.toBeInTheDocument();
+    expect(within(exam).queryByAltText("Background Image")).not.toBeInTheDocument();
+    expect(exam.querySelector('section')).not.toHaveClass("min-h-screen");
+    expect(within(exam).getByText("天")).toBeInTheDocument();
+    expect(within(exam).getByText("秒")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "生成任务" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "导出" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "历史" })).not.toBeInTheDocument();
@@ -2256,7 +2269,7 @@ describe("App shell routes", () => {
 
       expect(screen.getByTestId("auth-check-placeholder")).toHaveAttribute("aria-busy", "true");
       expect(screen.queryByTestId("platform-loading-screen")).not.toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "考试" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "准备好迎接" })).not.toBeInTheDocument();
 
       await act(async () => {
         authDeferred.resolve(createAuthMeResponse());
@@ -2266,7 +2279,7 @@ describe("App shell routes", () => {
       if (readyTestId) {
         expect(screen.getByTestId(readyTestId)).toBeInTheDocument();
       } else {
-        expect(screen.getByRole("heading", { name: "考试" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "准备好迎接" })).toBeInTheDocument();
       }
       expect(screen.queryByTestId("auth-check-placeholder")).not.toBeInTheDocument();
       expect(screen.queryByTestId("platform-loading-screen")).not.toBeInTheDocument();

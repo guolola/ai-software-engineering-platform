@@ -107,6 +107,18 @@ test("keeps student stacks and strips prototype runtime/provider data with a det
     assert.match(JSON.stringify(buildContext(state, whole)), new RegExp(stack));
   }
 });
+test("document data in saved workspaces cannot enter or invalidate MCP sources", () => {
+  const state = fixture();
+  const initial = buildContext(state, whole);
+  const withDocuments = buildContext({
+    ...state,
+    documents: [{ id: "private-doc", title: "private-document-title", paragraphs: ["private-document-body"] }],
+    documentLibrary: { version: 2, readStatus: "unavailable" },
+  }, whole);
+  assert.deepEqual(withDocuments, initial);
+  assert.doesNotMatch(JSON.stringify(withDocuments), /document:|private-document/);
+});
+
 test("functional scopes follow model identities through analysis and design, not diagram kind alone", () => {
   const context = buildContext(fixture(), {
     requirementIds: ["BORROW"],

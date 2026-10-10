@@ -18,6 +18,7 @@ export type {
 export * from "./auth-account.js";
 export * from "./api-errors.js";
 export * from "./billing.js";
+export * from "./dashboard.js";
 export * from "./documents.js";
 export * from "./fingerprints.js";
 export * from "./feasibility.js";

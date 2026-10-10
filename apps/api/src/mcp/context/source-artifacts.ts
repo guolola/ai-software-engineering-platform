@@ -22,7 +22,7 @@ import {
 
 export type SourceArtifact = {
   id: string;
-  stage: "requirements" | "analysis" | "design" | "tests" | "feasibility" | "documents" | "implementation";
+  stage: "requirements" | "analysis" | "design" | "tests" | "feasibility" | "implementation";
   title: string;
   requirementIds: string[];
   dependencies: string[];

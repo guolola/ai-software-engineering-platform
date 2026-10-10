@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import Link from '../../../shared/lib/template-link';
 import { DefaultSidebar } from '../../../shared/template/layout/default-sidebar';
 import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from '../../../shared/ui/sidebar';
+import { SidebarUserDropdown, type SidebarUserDropdownProps } from './sidebar-user-dropdown';
 
-export function PlatformSidebar({ path }: { path: string }) {
+export function PlatformSidebar({ path, ...accountActions }: { path: string } & SidebarUserDropdownProps) {
   const { t } = useTranslation();
   const { setOpenMobile } = useSidebar();
   const items = [
@@ -15,7 +16,7 @@ export function PlatformSidebar({ path }: { path: string }) {
     { path: '/exam', title: t('nav.exam'), icon: ClipboardCheck },
     { path: '/account/billing', title: t('nav.payment'), icon: CreditCard },
   ];
-  return <DefaultSidebar>
+  return <DefaultSidebar footer={<SidebarUserDropdown {...accountActions} />}>
     <SidebarGroup><SidebarGroupContent><SidebarMenu>
       {items.map(item => <SidebarMenuItem key={item.path}>
         <SidebarMenuButton tooltip={item.title} aria-current={(item.path === '/projects' ? path === '/projects' || path === '/projects/new' : path.startsWith(item.path)) ? "page" : undefined} isActive={(item.path === '/projects' ? path === '/projects' || path === '/projects/new' : path.startsWith(item.path))} className="data-active:bg-primary/10!" onClick={() => setOpenMobile(false)} render={<Link href={item.path} />}>

@@ -12,7 +12,7 @@ export function registerMcpAssets(app: FastifyInstance) {
       .header("X-Content-Type-Options", "nosniff");
     const candidates = request.headers["if-none-match"]?.split(",").map((value) => value.trim().replace(/^W\//, ""));
     if (candidates?.some((value) => value === "*" || value === verifierAsset.etag)) return reply.code(304).send();
-    // Reuse bytes computed once at module load; downloads never rebuild a workspace or read DOCX files.
+    // Reuse bytes computed once at module load; downloads never rebuild a workspace.
     return reply.send(verifierAsset.bytes);
   });
 }

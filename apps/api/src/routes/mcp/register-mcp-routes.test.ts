@@ -818,26 +818,10 @@ test("invalid JSON stays a JSON-RPC parse error and feature-off prevents externa
   );
 });
 
-test("implementation bundle and verifier use normal paging, source manifests and document version guards", async (t) => {
+test("implementation bundle and verifier use normal paging and source version guards without documents", async (t) => {
   const s = await setup();
   t.after(() => s.app.close());
-  const { default: JSZip } = await import("jszip");
   const { mcpUpdatesInputSchema, mcpImplementationSnapshotSchema, mcpImplementationReportSchema } = await import("@uml-platform/contracts");
-  let documentVersion = 1;
-  const metadata = () => ({
-    id: "document-a", workspaceId: "private-workspace", projectId: s.a.id,
-    documentKind: "softwareDesignSpec" as const, title: "借阅设计说明书", fileName: "design.docx",
-    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", byteLength: 100,
-    version: documentVersion, status: "active" as const, sourceRunId: null, createdAt: "now", updatedAt: "now",
-  });
-  s.access.documentLibrary = {
-    async listAllDocuments() { return [metadata(), { ...metadata(), id: "foreign", projectId: s.b.id }]; },
-    async getDocument() { return metadata(); },
-    async getDocumentBuffer(_workspace: string, id: string) {
-      assert.equal(id, "document-a");
-      return new JSZip().file("word/document.xml", '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>版本' + documentVersion + '：借阅事务需要原子性</w:t></w:r></w:p></w:body></w:document>').generateAsync({ type: "nodebuffer" });
-    },
-  } as unknown as NonNullable<typeof s.access.documentLibrary>;
   await s.authStore.saveProjectWorkspace({
     projectId: s.a.id, baseVersion: 0, updatedByUserId: s.alice.id,
     state: { requirementText: "每名学生最多借5本", rules: [{ id: "BORROW", category: "业务规则", text: "最多5本", relatedDiagrams: ["class"] }] },
@@ -858,7 +842,7 @@ test("implementation bundle and verifier use normal paging, source manifests and
     manifest.push(...page.data.manifest as any[]);
     cursor = page.data.nextCursor as string | undefined;
   } while (cursor);
-  assert.ok(directory.some((entry) => entry.id === "document:document-a"));
+  assert.ok(directory.every((entry) => !entry.id.startsWith("document:") && entry.stage !== "documents"));
   assert.ok(directory.some((entry) => entry.id === "implementation:validator"));
   assert.ok(manifest.every((entry) => !entry.artifactId.startsWith("implementation:")));
   async function readPayload(id: string) {
@@ -889,7 +873,7 @@ test("implementation bundle and verifier use normal paging, source manifests and
   assert.equal(bundle.snapshot.version, 2);
   assert.equal(report.reportTemplate.version, 2);
   assert.equal(report.reportTemplate.contextVersion, contextVersion);
-  assert.ok(snapshot.tasks[0].sourceArtifactIds.includes("document:document-a"));
+  assert.ok(snapshot.tasks.every((task) => task.sourceArtifactIds.every((id) => !id.startsWith("document:"))));
   const validator = await readPayload("implementation:validator");
   assert.equal(validator.source, undefined);
   assert.equal(validator.downloadUrl, new URL(verifierAsset.path, s.config.origin).href);
@@ -903,9 +887,25 @@ test("implementation bundle and verifier use normal paging, source manifests and
   assert.equal(`sha256:${createHash("sha256").update(download.rawPayload).digest("hex")}`, validator.contentHash);
   const unchanged = await service.check_context_updates(mcpUpdatesInputSchema.parse({ projectId: s.a.id, scope, manifest: bundle.snapshot.manifest }));
   assert.deepEqual(unchanged.data.changes, []);
-  documentVersion = 2;
+  // Existing clients must discard removed document baselines and cannot read their old artifact IDs.
+  const removedDocument = { artifactId: "document:document-a", contentHash: "sha256:old-document", inputFingerprint: null, freshness: "unknown" };
+  const removed = await service.check_context_updates(mcpUpdatesInputSchema.parse({ projectId: s.a.id, scope, manifest: [...manifest, removedDocument] }));
+  assert.deepEqual(removed.data.changes, [{ artifactId: removedDocument.artifactId, change: "deleted", previous: removedDocument, current: null }]);
+  const unavailable = await service.get_artifact(mcpArtifactInputSchema.parse({
+    projectId: s.a.id, scope, artifactId: removedDocument.artifactId, expectedContextVersion: contextVersion,
+    expectedVersion: removedDocument.contentHash,
+  }));
+  assert.equal(unavailable.status, "refresh_required");
+  const documentScope = await service.get_implementation_context(mcpContextInputSchema.parse({
+    projectId: s.a.id, scope: { requirementIds: [], artifactIds: [removedDocument.artifactId] },
+  }));
+  assert.equal(documentScope.status, "selection_required");
+  await s.authStore.saveProjectWorkspace({
+    projectId: s.a.id, baseVersion: 1, updatedByUserId: s.alice.id,
+    state: { requirementText: "每名学生最多借8本", rules: [{ id: "BORROW", category: "业务规则", text: "最多8本", relatedDiagrams: ["class"] }] },
+  });
   const changed = await service.check_context_updates(mcpUpdatesInputSchema.parse({ projectId: s.a.id, scope, manifest }));
-  assert.ok((changed.data.changes as any[]).some((entry) => entry.artifactId === "document:document-a" && entry.change === "modified"));
+  assert.ok((changed.data.changes as any[]).some((entry) => entry.artifactId === "requirements:source" && entry.change === "modified"));
   const outdated = await service.get_artifact(mcpArtifactInputSchema.parse({
     projectId: s.a.id, scope, artifactId: "implementation:bundle", expectedContextVersion: contextVersion,
     expectedVersion: directory.find((entry) => entry.id === "implementation:bundle").version.contentHash,

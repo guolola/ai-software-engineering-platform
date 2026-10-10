@@ -1,6 +1,5 @@
 // Implements four read-only tools with principal-bound pagination and optimistic source-version checks.
 import { z } from "zod";
-import { readDocumentSources } from "../context/document-sources.js";
 import { withImplementationArtifacts } from "../context/implementation-artifacts.js";
 import {
   mcpListProjectsInputSchema,
@@ -85,8 +84,7 @@ export function createMcpToolService(
   async function read(projectId: string, scope: McpScope) {
     const project = await access.project(principal, projectId);
     const workspace = await access.authStore.getProjectWorkspace(projectId);
-    const documents = access.documentLibrary ? await readDocumentSources(access.documentLibrary, projectId) : [];
-    const context = withImplementationArtifacts(buildContext(workspace?.state ?? {}, normalizeScope(scope), documents), projectId, access.config.origin);
+    const context = withImplementationArtifacts(buildContext(workspace?.state ?? {}, normalizeScope(scope)), projectId, access.config.origin);
     return {
       ...context,
       project: { id: project.id, name: project.name },

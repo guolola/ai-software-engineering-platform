@@ -1,6 +1,12 @@
 [
   {
     "template": "shadcn-studio",
+    "source": "components/shadcn-studio/blocks/waitlist-05/waitlist-05.tsx",
+    "target": "src/shared/template/blocks/waitlist-05/waitlist-05.tsx",
+    "sha256": "4e4f6c7fc3b0b9c1ed038ca43c74e9c216d4fbcd53037ee7360f5826819259b1"
+  },
+  {
+    "template": "shadcn-studio",
     "source": "https://shadcnstudio.com/r/components/base-nova/code-block-01.json",
     "target": "src/shared/ui/code-block.tsx",
     "sha256": "55c5ec51a68f93d7efd613b6a7c1acb2c4afec4449b9233421f6470022e3e842"
@@ -656,5 +662,77 @@
     "source": "https://www.shadcn.io/ai#task-card",
     "target": "src/shared/ui/ai/task-card.tsx",
     "sha256": "0a7c4db50b3c36334068aa48accea14b316836bdb2631be77215f53c4e6e4b7e"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "components/shadcn-studio/blocks/gift-card-03/gift-card-03.tsx",
+    "target": "src/shared/template/blocks/ecommerce/gift-card-03.tsx",
+    "sha256": "e8649311250e7431acd200e00d6bf905a359da7e5c5df78fb863e9b3435748b4"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "components/shadcn-studio/blocks/checkout-page-02/checkout-page-02.tsx",
+    "target": "src/shared/template/blocks/ecommerce/checkout-page-02.tsx",
+    "sha256": "3bae05926e85cb0f533e32c2e567daf77ed794160a5a831b94d02d75ce3b5cf0"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "dashboard-shell-06.zip!components/shadcn-studio/blocks/chart-conversion-rate.tsx",
+    "target": "src/shared/template/blocks/dashboard-shell-06/chart-conversion-rate.tsx",
+    "sha256": "62c14d1b521ea00b70ea8704d16f7047959b35311e3d511886e15339c2a06f10"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "dashboard-shell-06.zip!components/shadcn-studio/blocks/chart-earning-report.tsx",
+    "target": "src/shared/template/blocks/dashboard-shell-06/chart-earning-report.tsx",
+    "sha256": "d9a76ccca23743b34e8a76c1536b6af0f59070e87f86b7e5f8844b75629b8888"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "dashboard-shell-06.zip!components/shadcn-studio/blocks/chart-performance.tsx",
+    "target": "src/shared/template/blocks/dashboard-shell-06/chart-performance.tsx",
+    "sha256": "21a089b4d367e4b854d843e17fc899cfdbdf8c32938ec6929c9a36d7e706b66e"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "dashboard-shell-06.zip!components/shadcn-studio/blocks/chart-services-by-sales.tsx",
+    "target": "src/shared/template/blocks/dashboard-shell-06/chart-services-by-sales.tsx",
+    "sha256": "d5967e003798a262880c39aca1ea0746bbaf1c7d4c6321348e6f980869f9c2b8"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "dashboard-shell-06.zip!components/shadcn-studio/blocks/datatable-course.tsx",
+    "target": "src/shared/template/blocks/dashboard-shell-06/datatable-course.tsx",
+    "sha256": "52f2dbfae5786e2da8b16b50fbc65f14cf2d132db4fa001a974c9204cb0f58f4"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "dashboard-shell-06.zip!components/shadcn-studio/blocks/statistics-card-03.tsx",
+    "target": "src/shared/template/blocks/dashboard-shell-06/statistics-card-03.tsx",
+    "sha256": "d6d2b80d5538eabe09e03ca6163a53df09885a630493d27b0ae69a092c59279d"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "dashboard-shell-06.zip!components/shadcn-studio/blocks/statistics-impression-card.tsx",
+    "target": "src/shared/template/blocks/dashboard-shell-06/statistics-impression-card.tsx",
+    "sha256": "d3fa263bf6f6d73cd46246e091746d697f4614af0572b3b75ca667a19555a28f"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "dashboard-shell-06.zip!components/shadcn-studio/blocks/statistics-total-profit-card.tsx",
+    "target": "src/shared/template/blocks/dashboard-shell-06/statistics-total-profit-card.tsx",
+    "sha256": "92d7b99780b9a366b5ee19095d49a18824d7680d449b42b5bddd8b60e442e6d9"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "dashboard-shell-06.zip!components/shadcn-studio/blocks/statistics-total-revenue-card.tsx",
+    "target": "src/shared/template/blocks/dashboard-shell-06/statistics-total-revenue-card.tsx",
+    "sha256": "85b38eab6cf2d40f27cbe0f4803d3b9817604753271d68a58552a3f851eb5a5d"
+  },
+  {
+    "template": "shadcn-studio",
+    "source": "dashboard-shell-06.zip!components/shadcn-studio/blocks/widget-payment-history.tsx",
+    "target": "src/shared/template/blocks/dashboard-shell-06/widget-payment-history.tsx",
+    "sha256": "bd19b637ec0c70b94fec25b1f31119a83314d38d28da8312d859bb45a041210a"
   }
 ]

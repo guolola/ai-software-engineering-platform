@@ -63,7 +63,7 @@ If this workflow is useful to you, star the repository to bookmark it and follow
 
 The Software Engineering Practice Platform is an AI-assisted workspace for software engineering courses and project development. Confirm requirement rules, generate UML and design models, inspect their traceability, and produce test cases and engineering documents. Generated results remain subject to human review.
 
-The repository also implements a read-only MCP interface for supplying saved project context to external Coding Agents. Real-client compatibility and generated-code acceptance testing remain pending; see the [MCP integration guide](docs/integrations/coding-agent-mcp.md).
+The repository also implements a read-only MCP interface for supplying saved requirements, feasibility sources, requirement and design models, and existing tests to external Coding Agents. Engineering documents remain available through the platform's document tools and are excluded from MCP context. Real-client compatibility and generated-code acceptance testing remain pending; see the [MCP integration guide](docs/integrations/coding-agent-mcp.md).
 
 | 🧭 End-to-end stages | 🔗 Trust mechanisms | 📦 Deliverables |
 | --- | --- | --- |
@@ -83,7 +83,7 @@ The repository also implements a read-only MCP interface for supplying saved pro
 - **A rebuilt product shell:** the responsive AdminCN workspace, project dashboard, navigation, account pages, and authentication flow now share one accessible component and theme system.
 - **Visible generation activity:** durable run activity events power a recoverable task conversation with streamed output, public reasoning summaries, parallel-call attribution, and terminal-state replay.
 - **Sharper engineering workflows:** model cards, editors, traceability, project administration, and document guidance are aligned around the same project state and action guards.
-- **Provide context to Coding Agents:** the read-only MCP implementation exposes saved requirements, models, PlantUML, dependencies, rules, and source versions. Client-specific authorization and tool calls still require validation.
+- **Provide context to Coding Agents:** the read-only MCP implementation exposes saved requirements, feasibility sources, requirement and design models, PlantUML, existing tests, dependencies, and source versions. Client-specific authorization and tool calls still require validation.
 - **A refreshed public experience:** the Flow landing page, localized content, light/dark palettes, pricing entry points, and in-app tutorial use the current product visuals.
 
 ## Online Access
@@ -103,7 +103,7 @@ The repository also implements a read-only MCP interface for supplying saved pro
 | 📐 Requirement UML | Generate and validate structural and behavioral models for the requirement stage | PlantUML, SVG, model elements |
 | 🏗️ Design modeling | Derive architecture, classes, interactions, interfaces, and data designs from requirement models | Design models, diagrams, element details |
 | 🔗 Traceability and coverage | Connect requirements, designs, tests, and documents | Coverage matrix, traceability matrix, lineage graph |
-| 💻 Coding Agent | Authorize external agents to read saved project sources over MCP | Implementation context, artifact versions, connection records |
+| 💻 Coding Agent | Authorize external agents to read saved requirements, feasibility sources, models, and tests over MCP | Implementation context, artifact versions, connection records |
 | 🧪 Test design | Generate test scenarios from requirements and designs, then evaluate coverage | Test cases, coverage relations |
 | 📄 Document delivery | Generate, edit online, version, and download three types of engineering documents | DOCX files, document versions |
 | 🤖 Model management | Discover, test, and select personal or managed provider models | Provider configurations, model catalog |
@@ -127,59 +127,115 @@ The platform is intended for coursework, conventional business systems, and prot
 
 ```mermaid
 flowchart LR
-  A["Requirement text"] --> B["Requirement rules"]
-  B --> C["Requirement baseline"]
-  C --> D["Feasibility analysis"]
-  C --> E["Requirement UML"]
-  E --> F["Design model"]
-  F --> G["External Coding Agent · MCP"]
-  F --> H["Test cases"]
-  D --> I["Feasibility report"]
-  E --> J["Requirements specification"]
-  F --> K["Software design description"]
-  C -.Coverage and traceability.-> L["Run evidence"]
-  E -.Coverage and traceability.-> L
-  F -.Coverage and traceability.-> L
-  H -.Coverage relations.-> L
+  subgraph platform["Platform: generate and save project artifacts"]
+    A["Requirement text"] --> B["Requirement rules"]
+    B --> C["Requirement baseline"]
+    C --> D["Feasibility analysis"]
+    C --> E["Requirement models"]
+    E --> F["Design models"]
+    F --> H["Test cases"]
+    D --> I["Feasibility report"]
+    E --> J["Requirements specification"]
+    F --> K["Software design description"]
+    C -.Coverage and traceability.-> L["Run evidence"]
+    E -.Coverage and traceability.-> L
+    F -.Coverage and traceability.-> L
+    H -.Coverage relations.-> L
+    A --> M["Read-only MCP<br/>Project implementation sources"]
+    C --> M
+    D --> M
+    E --> M
+    F --> M
+    H --> M
+  end
+
+  subgraph agent["Coding Agent: local development"]
+    G["External Coding Agent"] -->|"Implement and verify"| N["Local code and tests"]
+  end
+
+  M -->|"Read saved project sources"| G
 ```
+
+The external Coding Agent reads requirements, feasibility sources, requirement models, design models, and existing tests through read-only MCP, then implements and verifies code in its local repository. MCP arrows represent source reads; connection does not require completing all design models, and the three engineering-document types are excluded. The next diagram details task, code, and test mappings.
 
 ### Requirement, design, and code mapping
 
-Record which requirements and design elements relate to which code, then validate those relationships. Solid arrows show implemented associations and checks; dotted arrows show a future custom consistency algorithm. The four MCP tools remain read-only; code, mapping reports, and command execution stay in the agent's local repository.
+The platform shows five parallel source categories: feasibility sources, atomic requirements and supporting sources, requirement models, design models, and platform test scenarios. These categories feed the MCP implementation context; generation dependencies appear in the preceding diagram. The Coding Agent section shows the four read-only tools in their usage order, followed by local implementation, mapping reports, and verification. Solid arrows show existing source delivery, tool calls, and local operations; dotted arrows show a future custom consistency algorithm. Local code, reports, and verification results are not written back through MCP.
 
 ```mermaid
 flowchart TB
-  req["Requirements and business rules"] -->|"Requirement trace"| analysis["Analysis models"]
-  analysis -->|"Design trace"| design["Design models"]
-  req -->|"requirementIds"| mapping["Implementation task and report: taskId"]
-  design -->|"designRefs: model and element IDs"| mapping
-  docs["Requirements and design documents"] -->|"sourceArtifactIds"| mapping
-  mapping -->|"actualRefs: file, optional symbol, hash"| code["Implemented code"]
-  mapping -->|"testRefs + criterionIds"| tests["Tests and acceptance criteria"]
-  mapping -->|"sourceVersions"| versions["Source version and file change checks"]
-  code --> validator["Existing local verifier"]
-  tests --> validator
-  versions --> validator
-  mapping -.->|"Resolve full requirements, models, and documents"| algorithm["Future: custom consistency algorithm"]
-  code -.-> algorithm
-  tests -.-> algorithm
-  algorithm -.->|"Run via checks; fail with a nonzero exit code"| validator
-  validator --> result["Check results and tasks requiring revalidation"]
+  subgraph platform["Platform: saved sources and read-only MCP"]
+    feasibility["Feasibility sources<br/>Environment constraints, context,<br/>business flows, and candidate solutions"]
+    req["Atomic requirements and supporting sources<br/>Acceptance criteria, original requirements,<br/>business rules, and review information"]
+    requirementModels["Requirement models"]
+    design["Design models"]
+    savedTests["Platform test scenarios<br/>Test cases and requirement/design coverage"]
+    bundle["MCP implementation context<br/>Five source categories, tasks, source versions,<br/>report templates, and verifier download information"]
+    feasibility -->|"Feasibility sources"| bundle
+    req -->|"Requirements and acceptance sources"| bundle
+    requirementModels -->|"Full models and traceability"| bundle
+    design -->|"Full models and candidate design elements"| bundle
+    savedTests -->|"Test references"| bundle
+    verifierFile["Generic verifier distributed by the platform<br/>uml-verify.mjs: implementation support file"]
+    bundle -->|"File corresponding to the download information"| verifierFile
+  end
+
+  subgraph agent["Coding Agent: local code repository and verification"]
+    projects["list_projects<br/>Select an authorized project"]
+    catalog["get_implementation_context<br/>Read the source directory,<br/>implementation scope, and source versions"]
+    sources["get_artifact<br/>Read tasks and full sources<br/>Review acceptance criteria, gaps, and conflicts"]
+    implementation["Implement code locally<br/>Write tests for acceptance criteria"]
+    delivery["get_artifact: call again before delivery<br/>Read report templates<br/>and verifier download information"]
+    download{"Download the verifier from the platform<br/>Does its file hash match the expected value?"}
+    mapping["Fill the local mapping report<br/>Link requirements, designs, code, and tests"]
+    updates{"check_context_updates<br/>During development and before delivery:<br/>have platform sources changed?"}
+    validator["Run the validated verifier locally<br/>Check mappings, files, and versions<br/>Run registered verification commands"]
+    result{"Did local verification pass?"}
+    done["Deliver local code, tests, and reports"]
+    algorithm["Future: custom consistency algorithm"]
+    projects --> catalog
+    catalog --> sources
+    sources --> implementation
+    implementation --> delivery
+    delivery -->|"Download address and expected file hash"| download
+    download -->|"Match"| mapping
+    download -->|"Download failed or mismatch: do not execute; refresh"| delivery
+    mapping --> updates
+    updates -->|"Changed: refresh sources and adjust implementation"| catalog
+    updates -->|"Unchanged"| validator
+    validator --> result
+    result -->|"Failed: correct code, tests, or reports"| implementation
+    result -->|"Passed"| done
+    sources -.->|"Full requirements, feasibility sources, and models"| algorithm
+    implementation -.->|"Local code and tests"| algorithm
+    algorithm -.->|"Include in local verification"| validator
+  end
+
+  bundle -->|"Call read-only tools after MCP authorization"| projects
+  verifierFile -->|"Serve the script through the platform download address"| download
 ```
+
+The five source nodes are parallel categories; arrows identify inputs to the MCP implementation context rather than a generation sequence. Atomic requirements and supporting sources include atomic requirements with their acceptance criteria, plus saved original requirements, business rules, assumptions, conflicts, and quality-review information.
+
+The four tools select a project, read its source directory and versions, read full artifacts, and check for updates. Read all directory pages and required content chunks; if versions change during reading, return to the directory and refresh. Before delivery, use the same artifact-reading tool again for report templates and verifier download information. Downloading the verifier, filling reports, editing code, and executing commands are local agent operations. Source changes or verification failures require updating the affected implementation and reports, then rerunning verification. Passing confirms the registered checks and commands for that run; semantic coverage still requires review.
+
+The platform maintains the verifier and distributes it through a fixed HTTP download address. It is a generic implementation support script, separate from the five project-source categories. MCP returns its download address and expected file hash; the agent downloads `uml-verify.mjs`, checks its SHA-256, and executes it locally only when they match. Failed downloads or hash mismatches prevent execution and a passing claim. Downloading the script does not add a fifth MCP tool or send local code to the platform for execution.
+
+Feasibility sources enter the implementation context as supporting evidence: user-saved environment and resource constraints guide implementation, system context and business flows link through requirement traceability, and candidate technology choices still require confirmation. This arrow represents source transfer; it does not mean feasibility analysis automatically generates requirement models or mandates a technology stack. The platform supplies tasks and report templates; the agent selects design elements and fills the local report based on its actual implementation.
 
 The borrowing integration test associates the following evidence through one task:
 
 | Mapping | Example |
 | --- | --- |
-| Requirement | `BORROW`: no more than 5 books borrowed at once |
+| Requirement | No more than 5 books borrowed at once |
 | Design element | `LoanService` |
 | Actual code | `LoanService` in `src/loan-service.mjs`, with its file hash |
 | Acceptance tests | Allow the fifth book, reject the sixth without changing the count, restore capacity after a return |
 | Version evidence | Requirement and design source versions, plus hashes of code, tests, and registered inputs |
 
-**Associations are currently many-to-many within a task.** A task can register several requirements, design elements, and code references; there is no explicit pairwise binding from each design element to a particular code symbol. Tests reference acceptance criteria through `criterionIds`, but semantic coverage still requires independent validation.
+**Associations are currently many-to-many within a task.** A task can register several requirements, design elements, and code locations; there is no explicit pairwise binding from each design element to a particular code symbol. The report records which acceptance criteria each test addresses, but semantic coverage still requires independent validation.
 
-A future consistency algorithm can check requirement coverage in designs, design structures and constraints in code, and runtime behavior against requirements. Existing `checks` can execute custom validation commands. Per-rule pass/fail/unknown results, algorithm versions, and pairwise bindings remain extensions to implement; an unknown result should not count as a pass.
+A future consistency algorithm can check requirement coverage in designs, design structures and constraints in code, and runtime behavior against requirements. The existing local verification workflow can execute custom validation commands. Per-rule pass/fail/unknown results, algorithm versions, and pairwise bindings remain extensions to implement; an unknown result should not count as a pass.
 
 Mappings provide traceability; algorithms and executed tests provide evidence of correctness. The borrowing regression covers invalidation when the limit changes from 5 to 8 and subsequent code and test updates. It does not establish acceptance of a complete project generated by a real Coding Agent. See the [mapping example](docs/integrations/coding-agent-mcp.md#映射示例与证据边界) and [custom algorithm integration](docs/integrations/coding-agent-mcp.md#接入自定义一致性算法) in the Chinese integration guide.
 
@@ -258,7 +314,9 @@ For the PostgreSQL demo with MCP enabled, run `npm run dev:postgres:demo`. The c
 
 Sign in and open **Coding Agent** in the project-list sidebar (`/projects/connections`). Use the client's desktop connection form when available; CLI configuration examples are also provided. OAuth prompts the student to select projects. Clients that support an authorization header can use a personal token, subject to the account's current project permissions.
 
-The four read-only tools are `list_projects`, `get_implementation_context`, `get_artifact`, and `check_context_updates`. They provide saved requirements, acceptance criteria, structured models, PlantUML, dependencies, existing tests, and version information. The agent edits and tests local code; MCP does not generate code, return diagram images, or receive implementation results. Explicit technology requirements are preserved without inheriting the retired prototype generator's framework restrictions.
+The four read-only tools are `list_projects`, `get_implementation_context`, `get_artifact`, and `check_context_updates`. They provide saved requirements, acceptance criteria, feasibility sources, structured requirement and design models, PlantUML, dependencies, existing tests, and version information. Implementation bundles, report templates, and local-verifier download metadata support code and test traceability in the agent's repository. The agent edits and tests local code; MCP does not generate code, return diagram images, or receive implementation results. Explicit technology requirements are preserved without inheriting the retired prototype generator's framework restrictions.
+
+MCP does not read or transmit engineering documents, their text, or DOCX files. Documents are excluded from implementation-task sources and source-version checks. Document generation, online editing, versioning, and downloads remain available in the platform. Clients with previously saved document references should refresh their context; `check_context_updates` reports those sources as deleted.
 
 Client-specific versions and generated-code acceptance remain pending. See the [MCP integration guide](docs/integrations/coding-agent-mcp.md) for configuration, source consistency, and acceptance steps.
 

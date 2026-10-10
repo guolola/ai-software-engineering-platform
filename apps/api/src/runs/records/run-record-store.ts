@@ -1,6 +1,7 @@
 // Defines the in-memory run record boundary shared by routes, pipelines, and SSE.
 import { randomUUID } from "node:crypto";
 import type {
+  DashboardRun,
   
   DesignRunSnapshot,
   DocumentRunSnapshot,
@@ -28,6 +29,8 @@ export interface RunRecord {
 }
 
 export type RunRecordStore = Map<string, RunRecord> & {
+  // Dashboard queries persisted summaries without loading snapshots and event transcripts.
+  listDashboardRuns?: (projectIds: string[]) => Promise<DashboardRun[]>;
   refreshRun?: (runId: string) => Promise<RunRecord | null>;
   refreshProject?: (projectId: string) => Promise<void>;
 };

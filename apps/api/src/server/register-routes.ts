@@ -14,6 +14,7 @@ import { registerBillingRoutes } from "../routes/billing/register-billing-routes
 import { registerCaseRoutes } from "../routes/cases/register-case-routes.js";
 import { registerDocumentRoutes } from "../routes/documents/register-document-routes.js";
 import { registerProjectRoutes } from "../routes/projects/register-project-routes.js";
+import { registerDashboardRoutes } from "../routes/dashboard/register-dashboard-routes.js";
 import { registerProviderConfigRoutes } from "../routes/provider-configs/register-provider-config-routes.js";
 import { registerRenderRoutes } from "../routes/render/register-render-routes.js";
 import { registerSystemNoticeRoutes } from "../routes/system-notices/register-system-notice-routes.js";
@@ -244,6 +245,7 @@ export function registerApiRoutes({
     academicStore,
     runs,
   });
+  registerDashboardRoutes({ app, authStore, runs, documentLibrary });
   registerCaseRoutes({ app, authStore, renderClient });
   registerProviderConfigRoutes({
     app,

@@ -31,14 +31,11 @@ import { ProductDocsPage } from "../features/product-docs/components/product-doc
 import { McpConnectionsPage } from "../features/mcp-connections/components/mcp-connections-panel";
 import { McpConsentPage } from "../features/mcp-connections/components/mcp-consent-page";
 import { SidebarMenu } from "../features/workspace-shell/components/sidebar-menu";
+import { SidebarUserDropdown } from "../features/workspace-shell/components/sidebar-user-dropdown";
 import {
   TopBar,
   type TopBarProps,
 } from "../features/workspace-shell/components/top-bar";
-import {
-  findShellRouteModule,
-  type ShellRoutePath,
-} from "./workspace-modules";
 import { matchAppRoute, type AppRoute, type ProjectRouteSection } from "./app-routes";
 import { LineageGraphPage } from "../features/lineage/components/lineage-graph-page";
 
@@ -60,6 +57,7 @@ import {
   ProjectsIndexPage,
   useProjectOverview,
 } from "../features/user-platform/components/user-platform-pages";
+import { ExamPage } from "../features/exam/components/exam-page";
 import { DashboardPage } from "../features/dashboard/components/dashboard-page";
 import { OnboardingTourProvider } from "../features/onboarding/components/onboarding-tour-provider";
 import { useProjectOnboarding } from "../features/onboarding/hooks/use-project-onboarding";
@@ -73,27 +71,6 @@ import {
   type ProjectTaskDrawerRequest,
   type ProjectWorkspaceTarget,
 } from "../shared/lib/app-navigation";
-
-function StandaloneRoutePage({ route }: { route: Exclude<ShellRoutePath, "/workspace"> }) {
-  const { t } = useTranslation();
-  const meta = findShellRouteModule(route);
-  const routeKey = route === "/exam" ? "exam" : "workspace";
-
-  return (
-    <main className="flex min-h-[calc(100svh-5rem)] flex-1 bg-background">
-      <PageContainer className="flex items-center justify-center text-center">
-        <div className="flex max-w-xl flex-col items-center gap-3">
-          <h1 className="text-3xl font-semibold">{t(`nav.${routeKey}`)}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t(`workspace.routeDescriptions.${routeKey}`, {
-              defaultValue: meta.description,
-            })}
-          </p>
-        </div>
-      </PageContainer>
-    </main>
-  );
-}
 
 function getProtectedRoutePath(route: AppRoute) {
   // Project sections share one authentication scope so menu changes keep the workspace mounted.
@@ -122,6 +99,7 @@ function ProjectWorkspaceShell({
   activeProjectDrawer,
   onActiveProjectDrawerChange,
   onOpenProviderSettings,
+  onOpenAccount,
   onNavigate,
   preferredTaskRunId,
 }: {
@@ -131,6 +109,7 @@ function ProjectWorkspaceShell({
   activeProjectDrawer: ProjectDrawerKind | null;
   onActiveProjectDrawerChange: (drawer: ProjectDrawerKind | null) => void;
   onOpenProviderSettings: () => void;
+  onOpenAccount: () => void;
   onNavigate: (route: string) => void;
   preferredTaskRunId?: string | null;
 }) {
@@ -379,7 +358,9 @@ function ProjectWorkspaceShell({
 
   return (
     <DefaultPagesLayout
-      sidebar={<DefaultSidebar resizeLabel={t("workspace.sidebar.resize")}>
+      sidebar={<DefaultSidebar resizeLabel={t("workspace.sidebar.resize")} footer={
+        <SidebarUserDropdown onOpenAccount={onOpenAccount} onNavigate={onNavigate} />
+      }>
         <SidebarMenu
           projectRuns={projectRuns}
           activeProjectSection={projectSection}
@@ -512,7 +493,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
       if (route.path === "/workspace") {
         return <RedirectRoute to="/projects" onNavigate={navigate} />;
       }
-      return <StandaloneRoutePage route={route.path as Exclude<ShellRoutePath, "/workspace">} />;
+      return <ExamPage />;
     }
     if (route.kind === "auth") {
       return <AuthPage key={route.path} path={route.path} onNavigate={navigate} />;
@@ -558,6 +539,7 @@ export function Shell({ initialPath }: { initialPath?: string }) {
               activeProjectDrawer={activeProjectDrawer}
               onActiveProjectDrawerChange={setActiveProjectDrawer}
               onOpenProviderSettings={openProviderSettings}
+              onOpenAccount={() => setAccountDialogOpen(true)}
               onNavigate={navigate}
               preferredTaskRunId={preferredTaskRunId}
             />
@@ -581,14 +563,15 @@ export function Shell({ initialPath }: { initialPath?: string }) {
     route.kind !== "not-found";
   const renderPlatformLayout = (content: ReactNode) => (
     <DefaultPagesLayout
-      sidebar={<PlatformSidebar path={route.path} />}
+      sidebar={<PlatformSidebar path={route.path} onOpenAccount={() => setAccountDialogOpen(true)} onNavigate={navigate} />}
       header={<TopBar
           currentRoute={route.path}
           onNavigate={navigate}
           accountDialogOpen={accountDialogOpen}
           onAccountDialogOpenChange={setAccountDialogOpen}
+          globalSettingsRequestId={globalSettingsRequestId}
         />}
-      contentClassName="min-w-0 p-0"
+      contentClassName={route.kind === "dashboard" ? "min-w-0 p-0 sm:p-0" : "min-w-0 p-0"}
     >
         {content}
     </DefaultPagesLayout>

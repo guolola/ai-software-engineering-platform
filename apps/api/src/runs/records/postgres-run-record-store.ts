@@ -1,8 +1,9 @@
 // Persists run records/events to PostgreSQL while preserving the existing Map API.
-import type { RunEvent } from "@uml-platform/contracts";
+import type { DashboardRun, RunEvent } from "@uml-platform/contracts";
 import type { Queryable } from "../../db/transactions.js";
 import type { RunRecord, RunRecordMetadata, RunRecordStore } from "./run-record-store.js";
 import { createRunError } from "../pipelines/shared/errors.js";
+import { dashboardArtifactTimings, type DashboardTimingEvent, type DashboardTimingSnapshot } from "./dashboard-artifact-timings.js";
 
 interface RunRecordRow {
   id: string;
@@ -237,6 +238,50 @@ class PostgresRunRecordStore extends Map<string, RunRecord> implements Persisten
     );
     const events = await this.loadEventsForRunIds(records.rows.map((row) => row.id));
     this.applyLoadedRows(records.rows, events, { markActiveInterrupted: false });
+  }
+
+  async listDashboardRuns(projectIds: string[]): Promise<DashboardRun[]> {
+    if (projectIds.length === 0) return [];
+    await this.flush();
+    // Read only summary fields from persisted records. Stage timestamps are real events, not
+    // substitutes based on queue creation; missing legacy timestamps stay unavailable.
+    const result = await this.db.query<{
+      id: string; project_id: string; status: DashboardRun["status"]; model: string | null;
+      run_kind: DashboardRun["runKind"]; created_at: Date | string;
+      started_at: Date | string | null; completed_at: Date | string | null;
+      timing_snapshot: Omit<DashboardTimingSnapshot, "runKind">;
+      timing_events: { event: DashboardTimingEvent; at: string }[] | null;
+    }>(`
+      select r.id, r.project_id,
+        case when r.status in ('queued', 'running') and r.completed_at is not null then 'failed' else r.status end as status,
+        coalesce(nullif(trim(r.model), ''), nullif(trim(r.snapshot->'providerSettings'->>'model'), '')) as model,
+        case when r.snapshot ? 'selectedArtifacts' then 'feasibility'
+          when r.snapshot ? 'documentKind' then 'document'
+          when r.snapshot ? 'designModelTraceability' then 'design' else 'requirements' end as run_kind,
+        r.created_at, r.completed_at,
+        jsonb_build_object('documentId', r.snapshot->>'documentId', 'documentKind', r.snapshot->>'documentKind',
+          'fileName', r.snapshot->>'fileName', 'models', coalesce((select jsonb_agg(jsonb_build_object(
+            'modelId', m->>'modelId', 'diagramKind', m->>'diagramKind', 'title', m->>'title'))
+            from jsonb_array_elements(case when jsonb_typeof(r.snapshot->'models') = 'array'
+              then r.snapshot->'models' else '[]'::jsonb end) m), '[]'::jsonb)) as timing_snapshot,
+        (select jsonb_agg(jsonb_build_object('at', e.created_at, 'event', jsonb_build_object(
+          'type', e.payload->>'type', 'stage', e.payload->>'stage', 'subtaskId', e.payload->>'subtaskId',
+          'subtaskStatus', e.payload->>'subtaskStatus', 'diagramKind', e.payload->>'diagramKind',
+          'modelId', e.payload->>'modelId', 'artifactKind', e.payload->>'artifactKind', 'phase', e.payload->>'phase',
+          'callId', e.payload->>'callId', 'operation', e.payload->>'operation')) order by e.sequence)
+          from run_events e where e.run_id = r.id and (e.payload->>'type' in ('stage_started', 'stage_progress', 'artifact_ready')
+            or (e.payload->>'type'='run_activity' and e.payload->>'phase' in ('started','completed','failed')))) as timing_events,
+        (select e.created_at from run_events e where e.run_id = r.id and e.payload->>'type' = 'stage_started'
+          order by e.sequence asc limit 1) as started_at
+      from run_records r where r.project_id = any($1::text[])
+    `, [projectIds]);
+    return result.rows.map(row => ({ runId: row.id, projectId: row.project_id,
+      status: row.status, model: row.model, runKind: row.run_kind,
+      createdAt: toIsoString(row.created_at) ?? null, startedAt: toIsoString(row.started_at) ?? null,
+      completedAt: toIsoString(row.completed_at) ?? null,
+      artifactTimings: dashboardArtifactTimings({ ...row.timing_snapshot, runKind: row.run_kind, status: row.status },
+        (row.timing_events ?? []).map(item => item.event), (row.timing_events ?? []).map(item => item.at)),
+    }));
   }
 
   async flush() {

@@ -1,10 +1,10 @@
 // AdminCN ProfileDropdown composition connected to the authenticated user and existing account dialog.
-import { CircleQuestionMarkIcon, DollarSignIcon, UserIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { PlatformUser } from '../../user-platform/services/platform-api';
 import { Avatar, AvatarFallback, AvatarImage } from '../../../shared/ui/avatar';
 import { Button } from '../../../shared/ui/button';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuItem } from '../../../shared/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from '../../../shared/ui/dropdown-menu';
+import { AccountMenuItems } from './account-menu-items';
 
 export function ProfileDropdown({ user, onAccount, onNavigate }: { user: PlatformUser | null; onAccount: () => void; onNavigate: (path: string) => void }) {
   const { t } = useTranslation();
@@ -27,11 +27,7 @@ export function ProfileDropdown({ user, onAccount, onNavigate }: { user: Platfor
         </div>
       </DropdownMenuLabel></DropdownMenuGroup>
       <DropdownMenuSeparator />
-      <DropdownMenuGroup>
-        <DropdownMenuItem onClick={onAccount}><UserIcon />{t('auth.account')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onNavigate('/account/billing')}><DollarSignIcon />{t('nav.payment')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onNavigate('/tutorial')}><CircleQuestionMarkIcon />{t('nav.tutorial')}</DropdownMenuItem>
-      </DropdownMenuGroup>
+      <AccountMenuItems onAccount={onAccount} onNavigate={onNavigate} />
     </DropdownMenuContent>
   </DropdownMenu>;
 }

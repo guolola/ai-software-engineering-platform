@@ -13,7 +13,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { KeyboardEvent } from "react";
+import type { RefObject } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
@@ -36,6 +36,7 @@ import { Button } from "../../../shared/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogClose,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -43,6 +44,8 @@ import {
 import { cn } from "../../../shared/ui/utils";
 import { PageContainer } from "../../../shared/template/layout/page";
 import { DashboardTablePagination } from "../../../shared/template/blocks/dashboard/table-pagination";
+import GiftCard from "../../../shared/template/blocks/ecommerce/gift-card-03";
+import Checkout from "../../../shared/template/blocks/ecommerce/checkout-page-02";
 import { useAppI18n } from "../../../shared/i18n";
 import { billingApi } from "../services/billing-api";
 import { floatingAlert } from "../../../shared/ui/floating-alert";
@@ -496,296 +499,133 @@ function BillingSkuCard({
   );
 }
 
-function creditPackArtworkClass(sku: BillingSkuDto) {
-  if (sku.code === "credits_10") return "border-primary/25 bg-primary text-primary-foreground";
-  if (sku.code === "credits_50") return "border-border bg-secondary text-secondary-foreground";
-  if (sku.code === "credits_100") return "border-foreground/20 bg-foreground text-background";
-  return "border-primary/20 bg-accent text-accent-foreground";
-}
-
-function CreditPackArtwork({
-  sku,
-  locale,
-  t,
-  compact = false,
-}: {
-  sku: BillingSkuDto;
-  locale: string;
-  t: TFunction;
-  compact?: boolean;
-}) {
-  return (
-    <div
-      data-testid={compact ? undefined : "billing-account-sku-artwork"}
-      role={compact ? undefined : "img"}
-      aria-hidden={compact || undefined}
-      aria-label={
-        compact
-          ? undefined
-          : t("billing.sku.selector.artworkLabel", {
-              name: skuCopy(sku, "name", t),
-              metric: skuMetric(sku, t),
-              price: formatCny(sku.amountCents, locale),
-            })
-      }
-      className={cn(
-        "relative isolate aspect-[16/10] w-full overflow-hidden rounded-lg border",
-        creditPackArtworkClass(sku),
-      )}
-    >
-      <span
-        aria-hidden="true"
-        className="absolute -right-[12%] -top-[24%] size-[62%] rounded-full border-[1.5rem] border-current opacity-10"
-      />
-      <span
-        aria-hidden="true"
-        className="absolute -bottom-[30%] -left-[8%] size-[56%] rounded-full bg-current opacity-[0.08]"
-      />
-      <div className={cn("relative z-10 flex h-full flex-col justify-between", compact ? "p-2.5" : "p-5 sm:p-6")}>
-        <div className="flex items-start justify-between gap-2">
-          <span className={cn("font-display font-semibold tracking-wide", compact ? "text-[9px]" : "text-xs")}>
-            UML LAB
-          </span>
-          {!compact && isRecommendedSku(sku) && (
-            <span className="rounded-full border border-current/25 px-2 py-0.5 text-[10px] font-medium">
-              {t("billing.sku.recommended")}
-            </span>
-          )}
-        </div>
-        <div>
-          <div className={cn("font-display font-bold tracking-tight", compact ? "text-sm" : "text-3xl sm:text-4xl")}>
-            {skuMetric(sku, t)}
-          </div>
-          {!compact && (
-            <div className="mt-1 text-xs font-medium opacity-75">
-              {t("billing.sku.selector.artworkEyebrow")}
-            </div>
-          )}
-        </div>
-        <div className={cn("flex items-end justify-between gap-2 font-medium", compact ? "text-[8px]" : "text-xs")}>
-          <span>{skuCopy(sku, "name", t)}</span>
-          <span>{formatCny(sku.amountCents, locale)}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
+// Original gift-card-03 gallery URLs are assigned to the corresponding catalog slots.
+const creditPackImages: Record<string, string> = {
+  credits_10: "https://cdn.shadcnstudio.com/ss-assets/blocks/ecommerce/gift-card/image-08.png",
+  credits_50: "https://cdn.shadcnstudio.com/ss-assets/blocks/ecommerce/gift-card/image-07.png",
+  credits_100: "https://cdn.shadcnstudio.com/ss-assets/blocks/ecommerce/gift-card/image-09.png",
+  credits_500: "https://cdn.shadcnstudio.com/ss-assets/blocks/ecommerce/gift-card/image-10.png",
+};
 
 function AccountCreditPackSelector({
-  skus,
-  loading,
-  error,
-  channel,
-  creating,
-  onChannelChange,
-  onPurchase,
-  locale,
-  t,
+  skus, loading, error, onPurchase, purchaseButtonRef, locale, t,
 }: {
   skus: BillingSkuDto[];
   loading: boolean;
   error: string;
-  channel: PaymentChannel;
-  creating: boolean;
-  onChannelChange: (channel: PaymentChannel) => void;
   onPurchase: (sku: BillingSkuDto) => void;
+  purchaseButtonRef: RefObject<HTMLButtonElement | null>;
   locale: string;
   t: TFunction;
 }) {
   const orderedSkus = useMemo(
-    () => [...skus].sort((left, right) => left.sortOrder - right.sortOrder),
-    [skus],
+    () => [...skus].sort((left, right) => left.sortOrder - right.sortOrder), [skus],
   );
   const [selectedCode, setSelectedCode] = useState("credits_100");
-  const selectedIndex = Math.max(0, orderedSkus.findIndex((sku) => sku.code === selectedCode));
-  const selectedSku = orderedSkus[selectedIndex] ?? null;
-
-  if (loading) {
-    return (
-      <Card className="gap-0 p-6 text-sm leading-6 text-muted-foreground">
-        {t("billing.loading.skus")}
-      </Card>
-    );
-  }
-  if (error) {
-    return (
-      <Alert variant="destructive" className="border p-6 text-sm leading-6">
-        {error}
-      </Alert>
-    );
-  }
-  if (!selectedSku) {
-    return (
-      <Card className="gap-0 border-dashed p-6 text-sm leading-6 text-muted-foreground">
-        {t("billing.sku.selector.empty")}
-      </Card>
-    );
-  }
-
-  const selectAtIndex = (index: number) => {
-    const nextSku = orderedSkus[index];
-    if (nextSku) setSelectedCode(nextSku.code);
-  };
-
-  const handleOptionKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    let nextIndex: number | null = null;
-    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-      nextIndex = (index + 1) % orderedSkus.length;
-    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-      nextIndex = (index - 1 + orderedSkus.length) % orderedSkus.length;
-    } else if (event.key === "Home") {
-      nextIndex = 0;
-    } else if (event.key === "End") {
-      nextIndex = orderedSkus.length - 1;
-    }
-    if (nextIndex === null) return;
-    event.preventDefault();
-    selectAtIndex(nextIndex);
-    event.currentTarget.parentElement
-      ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
-      .item(nextIndex)
-      .focus();
-  };
+  const selectedSku = orderedSkus.find(sku => sku.code === selectedCode) ?? orderedSkus[0];
+  if (loading) return <Card className="gap-0 p-6 text-sm text-muted-foreground">{t("billing.loading.skus")}</Card>;
+  if (error) return <Alert variant="destructive" className="border p-6 text-sm">{error}</Alert>;
+  if (!selectedSku) return <Card className="gap-0 border-dashed p-6 text-sm text-muted-foreground">{t("billing.sku.selector.empty")}</Card>;
 
   return (
-    <Card
-      as="section"
-      data-testid="billing-account-sku-selector"
-      className="gap-0 p-5 sm:p-6"
+    <GiftCard
+      options={orderedSkus.map(sku => ({
+        id: sku.code,
+        name: skuCopy(sku, "name", t),
+        description: skuCopy(sku, "description", t),
+        price: formatCny(sku.amountCents, locale),
+        image: creditPackImages[sku.code] ?? creditPackImages.credits_100,
+        imageAlt: t("billing.sku.selector.artworkLabel", {
+          name: skuCopy(sku, "name", t), metric: skuMetric(sku, t), price: formatCny(sku.amountCents, locale),
+        }),
+        previewLabel: t("billing.sku.selector.previewLabel", { name: skuCopy(sku, "name", t) }),
+      }))}
+      selectedId={selectedSku.code}
+      onSelect={setSelectedCode}
+      onPurchase={() => onPurchase(selectedSku)}
+      purchaseButtonRef={purchaseButtonRef}
+      selectionLabel={t("billing.sku.selector.groupLabel")}
+      previewGroupLabel={t("billing.sku.selector.previewGroupLabel")}
+      purchaseLabel={t("billing.actions.buyNow")}
+    />
+  );
+}
+
+function AccountCheckoutDialog({
+  sku, creating, channel, locale, t, onChannelChange, onClose, onConfirm, purchaseButtonRef,
+}: {
+  sku: BillingSkuDto | null;
+  creating: boolean;
+  channel: PaymentChannel;
+  locale: string;
+  t: TFunction;
+  onChannelChange: (channel: PaymentChannel) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+  purchaseButtonRef: RefObject<HTMLButtonElement | null>;
+}) {
+  return (
+    <Dialog
+      open={Boolean(sku)}
+      disablePointerDismissal={creating}
+      onOpenChange={(open, details) => {
+        // Keep the checkout and its selected SKU mounted until the order request settles.
+        if (!open && creating) { details.cancel(); return; }
+        if (!open) onClose();
+      }}
     >
-      <div className="grid min-w-0 gap-6 lg:grid-cols-2 lg:gap-8">
-        <div className="min-w-0 space-y-2.5">
-          <CreditPackArtwork sku={selectedSku} locale={locale} t={t} />
-          <div
-            className="grid grid-cols-4 gap-2"
-            role="group"
-            aria-label={t("billing.sku.selector.previewGroupLabel")}
-          >
-            {orderedSkus.map((sku) => {
-              const selected = sku.code === selectedSku.code;
-              return (
-                <Button
-                  key={sku.code}
-                  type="button"
-                  variant="outline"
-                  aria-pressed={selected}
-                  aria-label={t("billing.sku.selector.previewLabel", {
-                    name: skuCopy(sku, "name", t),
-                  })}
-                  onClick={() => setSelectedCode(sku.code)}
-                  className={cn(
-                    "cursor-pointer overflow-hidden rounded-md border bg-background p-1 text-left transition-colors duration-200 outline-none motion-reduce:transition-none",
-                    "hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    selected ? "border-primary ring-1 ring-primary" : "border-border",
-                  )}
-                >
-                  <CreditPackArtwork sku={sku} locale={locale} t={t} compact />
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-5">
-          <div aria-live="polite" className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-display text-2xl font-semibold leading-8 text-foreground">
-                {skuCopy(selectedSku, "name", t)}
-              </h3>
-              {isRecommendedSku(selectedSku) && (
-                <Badge variant="secondary">{t("billing.sku.recommended")}</Badge>
-              )}
-            </div>
-            <p className="text-sm leading-6 text-muted-foreground">
-              {skuCopy(selectedSku, "description", t)}
-            </p>
-            <ul className="grid gap-2 text-sm leading-5 text-muted-foreground">
-              {skuFeatures(selectedSku, t).map((feature) => (
-                <li key={feature} className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-2.5">
-            <div className="text-sm font-medium text-foreground">
-              {t("billing.sku.selector.groupLabel")}
-            </div>
-            <div
-              role="radiogroup"
-              aria-label={t("billing.sku.selector.groupLabel")}
-              className="grid grid-cols-2 gap-2 xl:grid-cols-4"
-            >
-              {orderedSkus.map((sku, index) => {
-                const selected = sku.code === selectedSku.code;
-                return (
-                  <Button
-                    key={sku.code}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    tabIndex={selected ? 0 : -1}
-                    variant={selected ? "default" : "secondary"}
-                    className="h-auto min-w-0 cursor-pointer flex-col items-start gap-0.5 px-3 py-2.5 text-left transition-colors duration-200 motion-reduce:transition-none"
-                    onClick={() => setSelectedCode(sku.code)}
-                    onKeyDown={(event) => handleOptionKeyDown(event, index)}
-                  >
-                    <span className="w-full truncate text-xs font-semibold">
-                      {skuCopy(sku, "name", t)}
-                    </span>
-                    <span className="text-[11px] opacity-75">
-                      {formatCny(sku.amountCents, locale)}
-                    </span>
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-2.5">
-            <div className="text-sm font-medium text-foreground">
-              {t("billing.payment.methodLabel")}
-            </div>
-            <div
-              role="radiogroup"
-              aria-label={t("billing.payment.methodLabel")}
-              className="grid"
-            >
-              <PaymentMethodCard
-                channel="alipay"
-                active={channel === "alipay"}
-                onSelect={onChannelChange}
-                t={t}
-              />
-            </div>
-          </div>
-
-          <div className="mt-auto flex flex-col gap-3 border-t border-border pt-5">
-            <div className="flex items-end justify-between gap-4">
-              <span className="text-sm text-muted-foreground">
-                {t("billing.payment.orderAmount")}
-              </span>
-              <span className="font-display text-3xl font-bold leading-9 text-foreground">
-                {formatCny(selectedSku.amountCents, locale)}
-              </span>
-            </div>
-            <Button
-              type="button"
-              data-testid="billing-account-buy-button"
-              size="lg"
-              className="w-full cursor-pointer text-base"
-              disabled={creating}
-              onClick={() => onPurchase(selectedSku)}
-            >
-              {creating ? <Loader2 className="size-4 animate-spin" /> : <WalletCards className="size-4" />}
-              {creating ? t("billing.actions.creatingOrder") : t("billing.actions.buyNow")}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Card>
+      <DialogContent
+        data-testid="billing-checkout-dialog"
+        className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-[1200px] gap-0 overflow-y-auto p-0 sm:max-w-[1200px]"
+        showCloseButton={false}
+        finalFocus={purchaseButtonRef}
+      >
+        {sku && (
+          <Checkout
+            title={<DialogTitle className="text-2xl font-semibold">{t("billing.checkout.title")}</DialogTitle>}
+            description={<DialogDescription>{t("billing.payment.confirmDescription")}</DialogDescription>}
+            paymentMethods={[{
+              id: "alipay", name: channelLabel("alipay", t),
+              description: t("billing.payment.alipayDesktop"),
+              icon: <AlipayIcon className="size-6 text-[#1677ff]" />,
+            }]}
+            selectedMethod={channel}
+            onMethodChange={id => { if (!creating && id === "alipay") onChannelChange(id); }}
+            methodLabel={t("billing.payment.methodLabel")}
+            summaryRows={[
+              { label: t("billing.payment.purchaseContent"), value: skuCopy(sku, "name", t) },
+              { label: t("billing.checkout.creditedAmount"), value: skuMetric(sku, t) },
+              { label: t("billing.payment.orderAmount"), value: formatCny(sku.amountCents, locale) },
+            ]}
+            totalLabel={t("billing.checkout.total")}
+            total={formatCny(sku.amountCents, locale)}
+            infoCards={[
+              { title: t("billing.checkout.validityTitle"), description: t("billing.sku.features.noExpiry") },
+              { title: t("billing.checkout.bonusTitle"), description: `${skuCopy(sku, "description", t)} · ${t("billing.sku.features.bonusIncluded")}` },
+            ]}
+            payLabel={t("billing.actions.payNow")}
+            processingLabel={t("billing.actions.creatingOrder")}
+            usageGuide={{
+              title: t("billing.checkout.usageTitle"),
+              steps: [
+                { title: t("billing.checkout.payStepTitle"), description: t("billing.checkout.payStepDescription") },
+                { title: t("billing.checkout.balanceStepTitle"), description: t("billing.checkout.balanceStepDescription") },
+                { title: t("billing.checkout.generateStepTitle"), description: t("billing.checkout.generateStepDescription") },
+              ],
+              note: t("billing.checkout.arrivalNote"),
+            }}
+            creating={creating}
+            onPay={onConfirm}
+          />
+        )}
+        <DialogClose
+          disabled={creating}
+          render={<Button variant="ghost" className="absolute right-4 top-4" />}
+        >
+          {t("billing.actions.cancel")}
+        </DialogClose>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -793,10 +633,13 @@ function usePaymentFlow(onNavigate: Navigate, t: TFunction, onPaid?: () => void)
   const [selectedSku, setSelectedSku] = useState<BillingSkuDto | null>(null);
   const [channel, setChannel] = useState<PaymentChannel>("alipay");
   const [creating, setCreating] = useState(false);
+  const creatingRef = useRef(false);
 
   const createOrder = async (skuOverride?: BillingSkuDto) => {
     const orderSku = skuOverride ?? selectedSku;
-    if (!orderSku) return;
+    if (!orderSku || creatingRef.current) return;
+    // A synchronous guard also blocks repeated calls before React commits the disabled state.
+    creatingRef.current = true;
     setCreating(true);
     try {
       const response = await billingApi.createOrder({
@@ -817,6 +660,7 @@ function usePaymentFlow(onNavigate: Navigate, t: TFunction, onPaid?: () => void)
     } catch (nextError) {
       floatingAlert.error(localizeCaughtFailure(nextError, t("billing.errors.orderCreateFailed")));
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   };
@@ -978,6 +822,7 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
       .finally(() => setSummaryLoading(false));
   };
   const payment = usePaymentFlow(onNavigate, t, refreshSummary);
+  const purchaseButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -1060,10 +905,8 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
               skus={skus}
               loading={loading}
               error={error}
-              channel={payment.channel}
-              creating={payment.creating}
-              onChannelChange={payment.setChannel}
-              onPurchase={(sku) => void payment.createOrder(sku)}
+              onPurchase={payment.setSelectedSku}
+              purchaseButtonRef={purchaseButtonRef}
               locale={locale}
               t={t}
             />
@@ -1148,6 +991,17 @@ export function AccountBillingPage({ onNavigate }: { onNavigate: Navigate }) {
         </section>
       </div>
       </PageContainer>
+      <AccountCheckoutDialog
+        sku={payment.selectedSku}
+        creating={payment.creating}
+        channel={payment.channel}
+        locale={locale}
+        t={t}
+        onChannelChange={payment.setChannel}
+        onClose={() => payment.setSelectedSku(null)}
+        onConfirm={() => void payment.createOrder()}
+        purchaseButtonRef={purchaseButtonRef}
+      />
     </main>
   );
 }

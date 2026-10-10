@@ -1,5 +1,7 @@
 // Provides the initial bilingual resource bundle for shared navigation, metadata, and core UI states.
 import type { Resource } from "i18next";
+import { dashboardShellEn, dashboardShellZh } from "./dashboard-shell-resources";
+import { examEn, examZh } from "./exam-resources";
 import { mcpEn, mcpZh } from "./mcp-resources";
 import { feasibilityResourcesEn, feasibilityResourcesZh } from "./feasibility-resources";
 import { onboardingEn, onboardingZh } from "./onboarding-resources";
@@ -48,6 +50,8 @@ export const resources = {
           providerSettings: "查看连接配置",
         },
       },
+      dashboardShell: dashboardShellZh,
+      examPage: examZh,
       dashboard: {
         title: "仪表盘",
         subtitle: "汇总你所有项目的工作台概览",
@@ -955,13 +959,28 @@ export const resources = {
           title: "开通 AI 生成权益",
           description: "购买次数包后可用于所有可选模型，每次生成扣 1 次。新用户邮箱验证后自动赠送 30 次，有效期 30 天。",
         },
+        checkout: {
+          title: "订单结算",
+          creditedAmount: "到账次数",
+          total: "应付总额",
+          validityTitle: "次数有效期",
+          bonusTitle: "赠送次数",
+          usageTitle: "购买后如何使用",
+          payStepTitle: "完成付款",
+          payStepDescription: "点击立即支付，在支付宝完成付款后返回平台。",
+          balanceStepTitle: "核对到账次数",
+          balanceStepDescription: "支付确认后，购买和赠送次数会计入当前账号的可用余额。",
+          generateStepTitle: "开始生成",
+          generateStepDescription: "进入项目，选择平台模型生成，每次生成扣 1 次。",
+          arrivalNote: "暂未到账时，请先刷新余额并核对订单状态；未完成的有效订单可在订单历史中继续支付。",
+        },
         payment: {
           confirmTitle: "支付确认",
           confirmDescription: "请确认套餐内容与支付方式。",
           purchaseContent: "购买内容",
           orderAmount: "订单金额",
           methodLabel: "选择支付方式",
-          alipayDesktop: "通过 EPay 聚合支付宝支付",
+          alipayDesktop: "使用支付宝完成付款",
           channels: {
             alipay: "支付宝",
           },
@@ -1536,6 +1555,8 @@ export const resources = {
           providerSettings: "View connection settings",
         },
       },
+      dashboardShell: dashboardShellEn,
+      examPage: examEn,
       dashboard: {
         title: "Dashboard",
         subtitle: "A workbench overview aggregated across all of your projects",
@@ -2446,13 +2467,28 @@ export const resources = {
           title: "Enable AI generation credits",
           description: "Credit packs can be used with all optional models. Each generation costs 1 credit. New users receive 5 credits after email verification, valid for 30 days.",
         },
+        checkout: {
+          title: "Checkout",
+          creditedAmount: "Credits added",
+          total: "Total due",
+          validityTitle: "Credit validity",
+          bonusTitle: "Bonus credits",
+          usageTitle: "How to use your credits",
+          payStepTitle: "Complete payment",
+          payStepDescription: "Select Pay now, complete payment in Alipay, and return to the platform.",
+          balanceStepTitle: "Check your balance",
+          balanceStepDescription: "Once payment is confirmed, purchased and bonus credits are added to your current account balance.",
+          generateStepTitle: "Start generating",
+          generateStepDescription: "Open a project and generate with a platform model. Each generation uses 1 credit.",
+          arrivalNote: "If credits have not appeared, refresh your balance and check the order status. Resume valid unpaid orders from order history.",
+        },
         payment: {
           confirmTitle: "Confirm payment",
           confirmDescription: "Confirm the plan and payment method.",
           purchaseContent: "Purchase",
           orderAmount: "Order amount",
           methodLabel: "Select payment method",
-          alipayDesktop: "Pay with Alipay through the EPay aggregator",
+          alipayDesktop: "Complete payment with Alipay",
           channels: {
             alipay: "Alipay",
           },

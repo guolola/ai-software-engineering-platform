@@ -1,5 +1,5 @@
 // Covers billing page responsive layout contracts for entitlement cards, orders, and payment dialogs.
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { floatingAlert as toast } from "../../../shared/ui/floating-alert";
 import { AppI18nProvider } from "../../../shared/i18n";
@@ -99,12 +99,14 @@ function stubBillingFetch({
   onSummary,
   onCreateOrder,
   failOrderCreation = false,
+  waitForOrderCreation,
   recentOrders,
 }: {
   order?: typeof billingOrder | typeof paidBillingOrder;
   onSummary?: () => void;
   onCreateOrder?: (body: unknown) => void;
-  failOrderCreation?: boolean;
+  failOrderCreation?: boolean | (() => boolean);
+  waitForOrderCreation?: () => Promise<void>;
   recentOrders?: Array<typeof billingOrder | typeof paidBillingOrder>;
 } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -136,7 +138,8 @@ function stubBillingFetch({
     }
     if (url.pathname === "/api/billing/orders" && method === "POST") {
       onCreateOrder?.(JSON.parse(String(init?.body ?? "{}")) as unknown);
-      if (failOrderCreation) {
+      await waitForOrderCreation?.();
+      if (typeof failOrderCreation === "function" ? failOrderCreation() : failOrderCreation) {
         return new Response(JSON.stringify({ message: "Order creation failed" }), {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -243,7 +246,7 @@ describe("AccountBillingPage", () => {
     expect(screen.getByRole("button", { name: "前往下一页" })).toBeDisabled();
   });
 
-  it("renders the account gift-card selector and purchases the selected pack with Alipay directly", async () => {
+  it("uses the supplied gift-card gallery and opens checkout before purchasing the selected pack", async () => {
     const onCreateOrder = vi.fn();
     stubBillingFetch({ onCreateOrder });
     const user = userEvent.setup();
@@ -274,13 +277,12 @@ describe("AccountBillingPage", () => {
       "aria-checked",
       "true",
     );
-    const paymentGroup = within(selector).getByRole("radiogroup", { name: "选择支付方式" });
-    expect(within(paymentGroup).getAllByRole("radio")).toHaveLength(1);
-    expect(within(paymentGroup).getByRole("radio", { name: /支付宝/ })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    expect(within(paymentGroup).getByTestId("alipay-icon")).toBeInTheDocument();
+    expect(within(selector).queryByRole("radiogroup", { name: "选择支付方式" })).not.toBeInTheDocument();
+    const artwork = within(selector).getByRole("img");
+    expect(artwork).toHaveAttribute("src", "https://cdn.shadcnstudio.com/ss-assets/blocks/ecommerce/gift-card/image-09.png");
+    await user.click(within(selector).getByRole("button", { name: "预览 500 次包" }));
+    expect(within(packGroup).getByRole("radio", { name: "500 次包" })).toBeChecked();
+    expect(artwork).toHaveAttribute("src", "https://cdn.shadcnstudio.com/ss-assets/blocks/ecommerce/gift-card/image-10.png");
     expect(screen.queryByTestId("billing-sku-card")).not.toBeInTheDocument();
     expect(within(selector).getAllByRole("button", { name: "立即购买" })).toHaveLength(1);
     expect(await screen.findByRole("button", { name: "继续支付" })).toBeInTheDocument();
@@ -300,6 +302,25 @@ describe("AccountBillingPage", () => {
     await user.click(within(selector).getByRole("radio", { name: /10 次包/ }));
 
     await user.click(within(selector).getByRole("button", { name: "立即购买" }));
+    const checkout = await screen.findByTestId("billing-checkout-dialog");
+    expect(onCreateOrder).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(within(checkout).getByRole("heading", { name: "订单结算" })).toBeInTheDocument();
+    expect(checkout).toHaveTextContent("10 次包");
+    expect(checkout).toHaveTextContent("11 次");
+    expect(checkout).toHaveTextContent("9.90");
+    expect(within(checkout).getByRole("radio", { name: "支付宝" })).toBeChecked();
+    expect(within(checkout).getByTestId("alipay-icon")).toBeInTheDocument();
+    expect(within(checkout).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(checkout).not.toHaveTextContent("EPay");
+    expect(checkout).toHaveTextContent("使用支付宝完成付款");
+    const checkoutBlock = within(checkout).getByTestId("billing-checkout-block");
+    expect(checkoutBlock.querySelectorAll('[data-slot="card"]')).toHaveLength(1);
+    const usageGuide = within(checkout).getByRole("region", { name: "购买后如何使用" });
+    expect(within(usageGuide).getAllByRole("listitem")).toHaveLength(3);
+    expect(usageGuide).toHaveTextContent("每次生成扣 1 次");
+    expect(usageGuide).toHaveTextContent("核对订单状态");
+    await user.click(within(checkout).getByRole("button", { name: "立即支付" }));
 
     await waitFor(() => {
       expect(onCreateOrder).toHaveBeenCalledWith({
@@ -315,25 +336,73 @@ describe("AccountBillingPage", () => {
     );
   });
 
-  it("keeps the selected pack and shows a floating error when direct order creation fails", async () => {
-    stubBillingFetch({ failOrderCreation: true });
+  it("keeps checkout and the selected pack after failure and allows retry", async () => {
+    const onCreateOrder = vi.fn();
+    let attempts = 0;
+    stubBillingFetch({ onCreateOrder, failOrderCreation: () => ++attempts === 1 });
     const user = userEvent.setup();
     const navigate = vi.fn();
     renderWithI18n(<AccountBillingPage onNavigate={navigate} />);
-
     const selector = await screen.findByTestId("billing-account-sku-selector");
+    await user.click(within(selector).getByRole("button", { name: "立即购买" }));
+    const checkout = await screen.findByTestId("billing-checkout-dialog");
+    await user.click(within(checkout).getByRole("button", { name: "立即支付" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("支付订单创建失败"));
+    expect(checkout).toBeInTheDocument();
+    expect(checkout).toHaveTextContent("100 次包");
+    expect(within(checkout).getByRole("button", { name: "立即支付" })).toBeEnabled();
+    expect(navigate).not.toHaveBeenCalled();
+    await user.click(within(checkout).getByRole("button", { name: "立即支付" }));
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
+    expect(onCreateOrder).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves the pack and returns focus when checkout is closed", async () => {
+    const onCreateOrder = vi.fn();
+    stubBillingFetch({ onCreateOrder });
+    const user = userEvent.setup();
+    renderWithI18n(<AccountBillingPage onNavigate={vi.fn()} />);
+    const selector = await screen.findByTestId("billing-account-sku-selector");
+    await user.click(within(selector).getByRole("button", { name: "预览 50 次包" }));
     const buyButton = within(selector).getByRole("button", { name: "立即购买" });
     await user.click(buyButton);
+    const checkout = await screen.findByTestId("billing-checkout-dialog");
+    expect(checkout).toHaveTextContent("50 次包");
+    await user.click(within(checkout).getByRole("button", { name: "取消" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(buyButton).toHaveFocus());
+    expect(within(selector).getByRole("radio", { name: "50 次包" })).toBeChecked();
+    expect(onCreateOrder).not.toHaveBeenCalled();
+    await user.click(buyButton);
+    expect(await screen.findByRole("dialog")).toHaveTextContent("50 次包");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("支付订单创建失败"));
-    expect(within(selector).queryByRole("alert")).not.toBeInTheDocument();
-    expect(within(selector).getByRole("radio", { name: /100 次包/ })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    expect(buyButton).toBeEnabled();
+  it("blocks duplicate payment and dismissal while the order request is pending", async () => {
+    let releaseOrder: () => void;
+    const pending = new Promise<void>(resolve => { releaseOrder = resolve; });
+    const onCreateOrder = vi.fn();
+    stubBillingFetch({ onCreateOrder, waitForOrderCreation: () => pending });
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    renderWithI18n(<AccountBillingPage onNavigate={navigate} />);
+    await user.click(await screen.findByRole("button", { name: "立即购买" }));
+    const checkout = await screen.findByTestId("billing-checkout-dialog");
+    const payButton = within(checkout).getByRole("button", { name: "立即支付" });
+    fireEvent.click(payButton);
+    fireEvent.click(payButton);
+    await waitFor(() => expect(onCreateOrder).toHaveBeenCalledTimes(1));
+    expect(payButton).toBeDisabled();
+    expect(within(checkout).getByRole("button", { name: "取消" })).toBeDisabled();
+    expect(within(checkout).getByRole("radio", { name: "支付宝" })).toBeDisabled();
+    await user.keyboard("{Escape}");
+    fireEvent.click(document.querySelector('[data-slot="dialog-overlay"]')!);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(navigate).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("payment-confirm-dialog")).not.toBeInTheDocument();
+    await act(async () => releaseOrder!());
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
+    expect(onCreateOrder).toHaveBeenCalledTimes(1);
   });
 
   it("resumes pending orders from the order table", async () => {
@@ -364,9 +433,17 @@ describe("AccountBillingPage", () => {
     expect(screen.getByRole("button", { name: "Go to next page" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Rows per page" })).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Select a credit pack" })).toBeInTheDocument();
-    expect(screen.getByRole("radiogroup", { name: "Select payment method" })).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Select payment method" })).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Buy now" }));
+    const checkout = await screen.findByRole("dialog");
+    expect(within(checkout).getByRole("heading", { name: "Checkout" })).toBeInTheDocument();
+    expect(within(checkout).getByRole("radio", { name: "Alipay" })).toBeChecked();
+    expect(checkout).toHaveTextContent("Total due");
+    expect(checkout).not.toHaveTextContent("EPay");
+    expect(within(checkout).getByRole("region", { name: "How to use your credits" })).toBeInTheDocument();
     expect(screen.getAllByText("100-credit pack").length).toBeGreaterThan(0);
-    expect(screen.getByText("Buy 100 and get 20 bonus, for 120 credits total")).toBeInTheDocument();
+    expect(within(screen.getByTestId("billing-account-sku-selector")).getByText("Buy 100 and get 20 bonus, for 120 credits total")).toBeInTheDocument();
   });
 
   it("shows payment success feedback on account billing and clears the return marker", async () => {
