@@ -56,15 +56,19 @@ test("template page scroll keeps the header and documentation rails visible", as
   await expect(directory).toBeVisible();
   await expect(outline).toBeVisible();
   await expectNoPageOverflow(page, "desktop docs");
-  await page.evaluate(() => window.scrollTo(0, 500));
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-  await expect.poll(() => directory.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(96);
-  await expect.poll(() => outline.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(96);
-  await expect.poll(() => header.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(0);
-  const directoryScrollRange = await directory.evaluate((element) => element.scrollHeight - element.clientHeight);
+  // Public documentation owns its reading and directory viewports independently of the application shell.
+  const docsViewport = page.getByTestId("docs-content-scroll-area").locator(':scope > [data-slot="scroll-area-viewport"]');
+  const directoryViewport = page.getByTestId("docs-directory-scroll-area").locator(':scope > [data-slot="scroll-area-viewport"]');
+  await docsViewport.evaluate((element) => { element.scrollTop = 500; });
+  await expect.poll(() => docsViewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  const stickyTop = await docsViewport.evaluate((element) => Math.round(element.getBoundingClientRect().top) + 32);
+  await expect.poll(() => directory.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(stickyTop);
+  await expect.poll(() => outline.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(stickyTop);
+  await expect.poll(() => page.getByTestId("docs-header").evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(0);
+  const directoryScrollRange = await directoryViewport.evaluate((element) => element.scrollHeight - element.clientHeight);
   expect(directoryScrollRange).toBeGreaterThan(0);
-  await directory.evaluate((element) => { element.scrollTop = 100; });
-  expect(await directory.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await directoryViewport.evaluate((element) => { element.scrollTop = 100; });
+  expect(await directoryViewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 
   await page.setViewportSize({ width: 390, height: 720 });
   await expect(outline).toBeHidden();
@@ -98,6 +102,7 @@ async function checkViewportMatrix(page: Page, label: string) {
 
 test("public home, dashboard, projects, and MFA fit the mobile viewport", async ({ page }, info) => {
   await mockProjectApi(page);
+  await page.route("**/api/dashboard/summary", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dashboardFixture()) }));
   await page.route("**/api/projects", async (route) => {
     await route.fulfill({
       status: 200,
@@ -125,11 +130,11 @@ test("public home, dashboard, projects, and MFA fit the mobile viewport", async 
   await page.screenshot({ path: info.outputPath("home-360.png"), fullPage: true });
 
   await page.goto("/dashboard");
-  await expect(page.getByText("项目活动", { exact: true })).toBeVisible();
+  await expect(page.getByText("协作与任务活动", { exact: true })).toBeVisible();
   await checkViewportMatrix(page, "dashboard");
   for (const width of [360, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
-    const activityCard = page.getByText("项目活动", { exact: true }).locator("xpath=ancestor::*[@data-slot='card'][1]");
+    const activityCard = page.getByText("协作与任务活动", { exact: true }).locator("xpath=ancestor::*[@data-slot='card'][1]");
     const card = await activityCard.boundingBox();
     const tabs = await activityCard.getByRole("tablist").boundingBox();
     const content = await activityCard.getByRole("tabpanel").boundingBox();
@@ -232,14 +237,8 @@ test("workspace stages, details, tests, and account dialog fit the responsive vi
   await expect(page.getByRole("heading", { name: "设计模型", exact: true })).toBeVisible();
   await checkViewportMatrix(page, "design models");
 
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await navigation.getByRole("button", { name: "代码", exact: true }).click();
-  await expect(page.getByTestId("code-preview-region")).toBeVisible();
-  await checkViewportMatrix(page, "code");
-  await page.setViewportSize({ width: 360, height: 844 });
-  await expect(page.getByTestId("code-editor-region")).toHaveCount(0);
-  await expect(page.getByTestId("code-file-tabs")).toHaveCount(0);
-  await expectNoPageOverflow(page, "code at 360px");
+  // Implementation now belongs to the external Coding Agent rather than a workspace code page.
+  await expect(navigation.getByRole("button", { name: "代码", exact: true })).toHaveCount(0);
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await navigation.getByRole("button", { name: "测试", exact: true }).click();
@@ -254,8 +253,8 @@ test("workspace stages, details, tests, and account dialog fit the responsive vi
   await expectNoPageOverflow(page, "tests at 360px");
 
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole("button", { name: "账号" }).click();
-  await page.getByRole("menuitem", { name: "账号" }).click();
+  await page.getByRole("button", { name: "账号", exact: true }).click();
+  await page.getByRole("menuitem", { name: "账号", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "设置" });
   await expect(dialog).toBeVisible();
   await checkViewportMatrix(page, "account settings");
